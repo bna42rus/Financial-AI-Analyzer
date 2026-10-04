@@ -611,10 +611,18 @@
       "title": "Общая структура продукта",
       "source_text": "Глобальные фильтры Период, банк, счёт, категория и другие глобальные фильтры задают контекст для Обзора и Операций. В Анализаторе явный текстовый запрос важнее фильтра. Например, если вверху выбран октябрь, но пользователь спрашивает «сравни август и сентябрь», Анализатор обязан использовать август и сентябрь и показать фактически использованный контекст.",
       "group": "scope",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-4.6",
@@ -637,10 +645,18 @@
       "title": "Общая структура продукта",
       "source_text": "Header и постоянная навигация приложени я Desktop shell: Logo → Overview, затем Operations, Analyzer, Settings, глобальная кнопка «Загрузить файлы» и Profile. Header компактный и может оставаться sticky, чтобы upload и основные разделы были доступны при длинных списках. Profile содержит Account, Security, Access/Subscription status, quick theme, Support и Logout. Глобальный search и отдельный Notification Center в первой версии не добавляются без необходимости: поиск финансовых данных живёт в Operations/Analyzer, а системные сообщения приходят через banners, email и status screens. Во время background import в header может сохраняться компактный upload status.",
       "group": "scope",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-4.8",
@@ -650,10 +666,18 @@
       "title": "Общая структура продукта",
       "source_text": "Onboarding и empty state s После invite-registration пользователь без данных видит не нулевые графики, а понятный onboarding: главный CTA «Загрузить первую выписку», короткое privacy- объяснение и список реально поддерживаемых способов импорта. Fake demo transactions не создаются. После первого import показывается результат загрузки и основной CTA «Открыть Обзор», дополнительные — Operations и Review. Первый Overview использует стандартный набор widgets. Если для сравнения периодов данных недостаточно, widget объясняет, каких данных не хватает, и предлагает загрузить более ранний период. Пустой Operations показывает upload CTA вместо пустой таблицы. Analyzer без загруженных операций всё равно доступен для deterministic financial calculators и общих объяснений финансовых продуктов в пределах финансовой тематики. Settings остаются доступны до первого import согласно разделу 31.2.",
       "group": "scope",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-4.9",
@@ -2332,10 +2356,18 @@
       "title": "Обзор (Overview)",
       "source_text": "Основные показатели Стандартные KPI: Расходы, Доходы, Разница и Требуют внимания. «Расходы» показываются в net- логике: gross expenses минус связанные возвраты и компенсации. «Разница» = доходы − net expenses и не является банковским балансом.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.2",
@@ -2345,10 +2377,18 @@
       "title": "Обзор (Overview)",
       "source_text": "Карточка «Требуют внимания» Считает именно transactions с активными `review_reasons`. Системные предупреждения, например «не загружена детализация кредитной карты» или «один файл не распознан», выводятся отдельными banners, чтобы число в карточке всегда имело однозначный смысл.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.3",
@@ -2358,10 +2398,18 @@
       "title": "Обзор (Overview)",
       "source_text": "Виджеты Базовые widgets: расходы по категориям, доходы по категориям, динамика, сравнение периодов, крупнейшие категории, крупнейшие операции, budgets и requires attention. Дополнительный каталог может включать refunds, reimbursements, loan costs, fees, own transfers, cash и пользовательские графики.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.4",
@@ -2384,10 +2432,18 @@
       "title": "Обзор (Overview)",
       "source_text": "Почему готовый виджет расходов не смешивает разные сущности Виджет «Расходы по категориям» должен оставаться именно анализом расходов. Собственные переводы, cash movements и нейтральные операции не следует добавлять туда только потому, что у них есть сумма. Для смешанного анализа существует Custom Widget.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.6",
@@ -2397,10 +2453,18 @@
       "title": "Обзор (Overview)",
       "source_text": "Переход в операции Tap/click по сегменту или строке аналитики открывает Operations с уже установленным соответствующим контекстом. Например, нажатие на «Рестораны — 31 200 ₽ » открывает список этих операций за выбранный период.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.7",
@@ -2410,10 +2474,18 @@
       "title": "Обзор (Overview)",
       "source_text": "«Как рассчитано» Для ключевых показателей пользователь может открыть диагностический breakdown: количество операций, gross, refunds, reimbursements, excluded, neutral, unresolved и активные filters. Это механизм доверия: число не должно быть магическим.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.8",
@@ -2436,10 +2508,18 @@
       "title": "Обзор (Overview)",
       "source_text": "Схема взаимодействия Глобальные фильтры → Widgets → пользователь выбирает показатель → Operations с контекстом → при необходимости Operation Card или Review. Таким образом аналитика всегда связана с исходными операциями, а не существует отдельно от них.",
       "group": "overview",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-21.10",
@@ -5413,10 +5493,18 @@
       "title": "Mobile UX",
       "source_text": "Навигация Нижнее меню: Overview, Operations, Analyzer, Settings. В верхней части — контекст, Upload и Profile.",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/App.tsx",
+        "apps/web/src/demo/overview.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/overview.test.ts",
+        "apps/web/e2e/overview.spec.ts",
+        "docs/architecture/web-overview.md"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
     },
     {
       "id": "PDF-47.2",

@@ -12,7 +12,7 @@ jobs:
   bootstrap-checks:
     name: bootstrap-checks
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v5
         with:
@@ -20,5 +20,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify product sources and monetary invariants
-        run: npm run check
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Verify sources, calculations, types and web build
+        run: pnpm run check
+      - name: Install browser for interface checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check interface on desktop and mobile
+        run: pnpm run test:e2e
