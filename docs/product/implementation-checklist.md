@@ -40,7 +40,7 @@
 | --- | --- | --- | --- |
 | Точные денежные primitives; часть PDF 6.2 и A-04 | packages/finance-core/src/money.ts | packages/finance-core/test/money.test.ts — 10 тестов прошли локально | Только integer money, serialization/range и signed component sum; полный финансовый движок ещё отсутствует |
 | Неизменность источников и наличие изменений A/B | scripts/check-spec.mjs | npm run check:spec — прошёл локально | Проверяет hashes и состав A/B, а не полноту реализации требований |
-| Private GitHub и чтение | Репозиторий bna42rus/Financial-AI-Analyzer | Подключение вернуло private и pull/push/admin; README, manifest и baseline прочитаны | Hosted CI, защита main и реальные платные сервисы этим не подтверждаются |
+| Private GitHub, чтение, запись и начальный CI | Репозиторий bna42rus/Financial-AI-Analyzer; feature commit fee3c177c582041e03a4899439aab86723f888f5; draft PR #1 | Документы сохранены и прочитаны через подключение; [run 37210531621](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/37210531621) — completed/success | Проверен bootstrap CI; защита main, Pro, вся функциональность и реальные платные сервисы этим не подтверждаются |
 
 ## Согласованные изменения и технические условия
 
