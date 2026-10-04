@@ -18,11 +18,11 @@
 }
 * { box-sizing: border-box; }
 body { margin: 0; color: var(--color-text); background: var(--color-background); font-size: 14px; line-height: 1.5; }
-button, input, select { font: inherit; }
-button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+button, input, select, textarea { font: inherit; }
+button, a, input, select, textarea, summary { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; color: inherit; }
 button:disabled { cursor: not-allowed; }
-button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--color-chart); outline-offset: 3px; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 3px solid var(--color-chart); outline-offset: 3px; }
 input[type="checkbox"] { accent-color: var(--color-primary); }
 h1, h2, h3, p { margin: 0; }
 svg { flex-shrink: 0; }

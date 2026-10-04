@@ -3208,10 +3208,19 @@
       "title": "AI- Анализатор",
       "source_text": "Context Диалог хранит semantic context, но source of truth всегда текущая БД. Старый ответ остаётся историческим snapshot. Если пользователь после него исправил операции, новый follow-up заново рассчитывается на актуальных данных.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Analyzer.tsx",
+        "apps/web/src/demo/analyzer.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/analyzer.test.ts",
+        "apps/web/e2e/analyzer.spec.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
     },
     {
       "id": "PDF-26.3",
@@ -3221,10 +3230,19 @@
       "title": "AI- Анализатор",
       "source_text": "Формы ответа Analyzer выбирает наиболее понятный формат: число, короткий текст, список, таблица, chart, список операций или комбинация. Сотни операций не вставляются в чат; показывается preview + count + Open in Operations.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Analyzer.tsx",
+        "apps/web/src/demo/analyzer.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/analyzer.test.ts",
+        "apps/web/e2e/analyzer.spec.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
     },
     {
       "id": "PDF-26.4",
@@ -3247,10 +3265,19 @@
       "title": "AI- Анализатор",
       "source_text": "Диалоги Каждый новый диалог имеет отдельный conversational context, но общую финансовую БД. История группируется Today / Yesterday / Last 7 days / Older; поддерживаются search, pin, rename, delete. Удаление чата не откатывает выполненные financial actions.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Analyzer.tsx",
+        "apps/web/src/demo/analyzer.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/analyzer.test.ts",
+        "apps/web/e2e/analyzer.spec.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
     },
     {
       "id": "PDF-26.6",
@@ -3260,10 +3287,19 @@
       "title": "AI- Анализатор",
       "source_text": "Контекст и проверяемость ответ а Для сложного ответа Analyzer может показывать служебную строку вида «На основе 284 операций • 01.09–30.09 • 3 счёта» и действие «Как рассчитано». Это не раскрытие внутреннего reasoning модели, а воспроизводимый финансовый scope: использованный период, filters, количество operations и deterministic totals.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Analyzer.tsx",
+        "apps/web/src/demo/analyzer.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/analyzer.test.ts",
+        "apps/web/e2e/analyzer.spec.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
     },
     {
       "id": "PDF-26.7",
@@ -3299,10 +3335,19 @@
       "title": "AI- Анализатор",
       "source_text": "Заголовок диалога и скрытые служебные детал и Новый chat автоматически получает короткий title по первому содержательному финансовому запросу; пользователь может его переименовать. Внутренние tool calls, system logs и скрытые reasoning traces не показываются как часть чата. Пользователь видит только результат, использованный financial scope, sources и action outcome.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Analyzer.tsx",
+        "apps/web/src/demo/analyzer.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/analyzer.test.ts",
+        "apps/web/e2e/analyzer.spec.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
     },
     {
       "id": "PDF-27",
@@ -5665,10 +5710,19 @@
       "title": "Mobile UX",
       "source_text": "Analyzer и Review Chat занимает экран, history открывается отдельной панелью, composer закреплён снизу. Review показывает прогресс и одну operation за раз; critical controls не должны скрываться клавиатурой.",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Analyzer.tsx",
+        "apps/web/src/demo/analyzer.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/analyzer.test.ts",
+        "apps/web/e2e/analyzer.spec.ts",
+        "docs/architecture/web-analyzer.md"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
     },
     {
       "id": "PDF-47.6",
