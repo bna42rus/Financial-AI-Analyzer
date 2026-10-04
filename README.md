@@ -20,4 +20,12 @@
 
 Infrastructure содержит отдельные templates Development/Staging для PostgreSQL. Docker в текущем исполнении не установлен; запуск контейнеров здесь не проверялся. Пароли генерируются отдельно, не добавляются в Git. Production configuration отсутствует, поскольку providers/retention/RPO/RTO/security acceptance ещё не закрыты.
 
-Выбранный remote: private GitHub на личном аккаунте владельца, рекомендуемый принятый план Pro после проверки подключения и оплаты. Доступ можно сначала испытать на Free. Remote не создан и не подключён. Настройка branch protection и hosted CI требует авторизованного доступа. Product data и credentials в Git не добавляются.
+Репозиторий владельца создан: https://github.com/bna42rus/Financial-AI-Analyzer — private. Чтение и сохранение изменений через подключение проверены; оригинальная история из двух коммитов и база 1.3 доступны. План сохранён в отдельной ветке, открыт [draft PR #1](https://github.com/bna42rus/Financial-AI-Analyzer/pull/1). [Bootstrap CI #2](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/37210531621) для коммита fee3c177c582041e03a4899439aab86723f888f5 завершился успешно. Это проверка источников и денежных primitives, а не всего сайта. Подписка Pro и защита main пока не подтверждены. Product data и credentials в Git не добавляются.
+
+## План и готовность сайта
+
+- [План разработки простыми словами](docs/product/implementation-plan.md).
+- [Список реализации и проверок](docs/product/implementation-checklist.md).
+- [Реестр всех разделов и подпунктов](docs/product/implementation-registry.json).
+
+Готовность отслеживается по требованиям, коду и результатам проверок. Список задач и успешные начальные тесты не означают готовность сайта.
