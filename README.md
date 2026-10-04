@@ -1,6 +1,6 @@
 # Персональный финансовый анализатор
 
-Начальная подготовка репозитория. Продуктовая база: полный Master Specification + approved A/B, версия 1.2. Структура и основной стек согласованы. Российские инфраструктурные кандидаты и условия минимального бюджета записаны в baseline, часть D.
+Начальная подготовка репозитория. Продуктовая база: полный Master Specification + approved A/B + admin recovery E-04, версия 1.3. Структура, основной стек и базовый выбор сервисов согласованы. Текущие решения, домен/бюджет и ещё открытые условия записаны в baseline, часть E.
 
 Сейчас реализованы только точные integer money primitives, проверка component sums и проверка неизменности исходных документов. Web/admin/API, imports, Registry, authentication и database schema ещё не реализованы. Этот пакет не является работающим сайтом или Production release.
 
@@ -20,4 +20,4 @@
 
 Infrastructure содержит отдельные templates Development/Staging для PostgreSQL. Docker в текущем исполнении не установлен; запуск контейнеров здесь не проверялся. Пароли генерируются отдельно, не добавляются в Git. Production configuration отсутствует, поскольку providers/retention/RPO/RTO/security acceptance ещё не закрыты.
 
-Предлагаемый remote: private GitVerse Free на аккаунте владельца. Remote не создан и не подключён. Настройка branch protection и hosted CI требует авторизованного доступа. Product data и credentials в Git не добавляются.
+Выбранный remote: private GitHub на личном аккаунте владельца, рекомендуемый принятый план Pro после проверки подключения и оплаты. Доступ можно сначала испытать на Free. Remote не создан и не подключён. Настройка branch protection и hosted CI требует авторизованного доступа. Product data и credentials в Git не добавляются.

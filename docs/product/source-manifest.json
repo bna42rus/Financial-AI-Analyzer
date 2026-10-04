@@ -1,5 +1,5 @@
 {
-  "product_baseline_version": "1.2",
+  "product_baseline_version": "1.3",
   "sources": [
     {
       "path": "docs/product/master_spec_v1.pdf",
@@ -13,10 +13,12 @@
     }
   ],
   "precedence": [
+    "Approved E-04 replaces mandatory admin SMS recovery; other access/security requirements remain active",
     "Approved amendments A-01..A-11 and B-01..B-10 override the specifically named clauses",
     "Other original PDF requirements remain active in full",
     "Word supplies context, not overriding logic"
   ],
-  "architecture": "Structure and principal stack accepted; provider purchases and Production release not approved",
-  "budget": "Russia seller/users; no additional development spend; infrastructure candidates in baseline part D"
+  "architecture": "Principal stack and baseline E choices approved: private GitHub Pro, Timeweb RU with managed PostgreSQL preferred subject to cost/capability validation, Yandex AI model trials, Postbox; no purchases or Production release",
+  "budget": "Russia seller/users; no hired developer or additional coding subscription; reasonable quality/convenience spending accepted; 3000-5000 RUB/month infrastructure/Git estimate plus variable AI/web and annual domain; not a final quote",
+  "technical_precedence": "Baseline part E supersedes conflicting technical recommendations C/D only in its stated scope; E-08 remains open"
 }

@@ -1,9 +1,11 @@
 # Private remote setup
 
-Candidate: https://gitverse.ru — Free. Owner signs in and creates a private repository named personal-finance-analyzer, without adding an unrelated README/history. Remote creation requires the owner's account/authorized connection; this package has no remote credentials.
+Approved host: GitHub; personal private repository under the owner's identity. The accepted recommended plan is GitHub Pro after connection/payment verification. Free may be used to test the connection before purchase. A future organization requires its own appropriate plan; personal Pro does not apply to it. No remote has been created or connected.
 
-Set main protection: disallow direct/force pushes and deletion; merge only with successful named checks and owner-controlled permissions. Verify protection can be enforced on the current Free account. Do not grant ordinary CI a Production deployment credential.
+Verify actual private repository read/write, feature branches, pull requests, named hosted checks, and access to their results. Set main protection to prevent unreviewed direct/force pushes and deletion with required checks appropriate to the selected plan. No code, credentials, original statements or actual user finance data may be exposed through public artifacts.
 
-Bootstrap checks: source integrity and money tests. Full build/type/lint/integration/e2e/security checks will be added before automated app Staging. A bootstrap-only green check is not release acceptance.
+Private native required-reviewer deployment gates are not assumed to be included with Pro. Production approval and deployment must use a separate owner-controlled release mechanism. Ordinary checks and Staging never receive Production credentials. Promote the same tested immutable artifacts; migration compatibility determines rollback versus forward fix.
 
-The official pricing and docs disagree on CI/artifact quotas. Until account settings confirm the actual limits, plan for 500 private CI minutes and 500 MB artifacts. Do not auto-buy more quota or omit checks.
+Bootstrap checks currently verify only source integrity and monetary primitives. Full build/type/lint/integration/e2e/security checks are required before automated app Staging. This draft GitHub workflow has not run remotely; bootstrap green is not release acceptance. Concrete action/library versions must undergo the normal pinning/security review before hosted release use.
+
+Next: owner connects GitHub; verify the real access chain before purchasing long-term hosting, then create the private remote and synchronize this existing history. GitVerse is a previously considered alternative, not the selected primary host.
