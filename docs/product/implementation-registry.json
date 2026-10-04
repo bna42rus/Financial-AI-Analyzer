@@ -2456,15 +2456,17 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "apps/web/src/Operations.tsx"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "apps/web/e2e/operations.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Обзор открывает Операции с выбранными IDs и общими фильтрами; карточка только для чтения искусственных данных. Реальное общее ядро, полные Review/actions/API и серверные права предстоят; полный пункт не закрыт."
     },
     {
       "id": "PDF-21.7",
@@ -2511,15 +2513,17 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "apps/web/src/Operations.tsx"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "apps/web/e2e/operations.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Обзор открывает Операции с выбранными IDs и общими фильтрами; карточка только для чтения искусственных данных. Реальное общее ядро, полные Review/actions/API и серверные права предстоят; полный пункт не закрыт."
     },
     {
       "id": "PDF-21.10",
@@ -2724,10 +2728,19 @@
       "title": "Экран «Операции»",
       "source_text": "Фильтры Основные: period, bank, account, category, search. Дополнительные: subcategory, operation kind, analytics role, amount, merchant, counterparty, review reason/status, confidence, classification source, inclusion, refunds, linked/unlinked, comment, rule, posted date, import, possible duplicates.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-23.2",
@@ -2737,10 +2750,19 @@
       "title": "Экран «Операции»",
       "source_text": "Колонки Default: checkbox, Date, Operation/Merchant, Amount, Account, Kind, Учёт, Category, Status. Дополнительно пользователь может включить bank, subcategory, counterparty, comment, confidence, source, rule, posted date, inclusion, import и source bank category.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-23.3",
@@ -2763,10 +2785,19 @@
       "title": "Экран «Операции»",
       "source_text": "Multi-select Поддерживается выбор отдельных строк, диапазонов и всех операций текущего filtered result. Ctrl/Cmd+A означает именно все подходящие операции, а не только загруженные на экран строки.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-23.5",
@@ -2802,10 +2833,19 @@
       "title": "Экран «Операции»",
       "source_text": "Keyboard shortcuts Desktop: ↑/↓ — перемещение; Enter — открыть карточку; Esc — закрыть; Space — selection; Shift+↑/↓, Shift+click, Shift+Space — range selection; Ctrl/Cmd+click — non-contiguous; Ctrl/Cmd+A — все filtered transactions. Хранится selection anchor.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-23.8",
@@ -2828,10 +2868,19 @@
       "title": "Экран «Операции»",
       "source_text": "Saved Operations Views, grouping и sortin g Operations View сохраняет filters, columns, column order/width, sort, grouping и density. Период может быть dynamic или fixed. Пользователь может назначить default view. Поддерживаемые grouping: date, category, subcategory, merchant, counterparty, account и kind; sorting минимум по date, amount, merchant, category, confidence и status.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-23.10",
@@ -2841,10 +2890,19 @@
       "title": "Экран «Операции»",
       "source_text": "Состояние списка и быстрые представлени я Интерфейс показывает не только загруженную порцию, но и общий результат фильтра: например «17 показано из 2 841». Quick filters: Все, Требуют внимания, Unresolved, Excluded; дополнительные returns/transfers можно показывать без перегрузки основного ряда. Для текущего фильтра отдельно показываются корректные Expenses и Income, а не бессмысленная арифметическая сумма всех положительных и отрицательных строк. Empty state отличается от «по фильтру ничего не найдено», server error и «данные обновились». Обновление данных не должно неожиданно прыгать пользователю в начало списка.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-23.11",
@@ -2880,10 +2938,19 @@
       "title": "Экран «Операции»",
       "source_text": "Technical ID и status tag s Каждая operation имеет immutable `transaction_id`. В обычном compact view он скрыт, но доступен как optional column/ действие Copy ID для поддержки, History и точного обращения Analyzer к конкретной записи. Пользовательские status tags включают как минимум «Нужно проверить», «Сомнительная/неопределённая», «Исключено из аналитики» и специальные cases вроде Possible Duplicate; tag не заменяет точные review_reasons внутри карточки.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-24",
@@ -2906,10 +2973,19 @@
       "title": "Карточка операции",
       "source_text": "Верхний блок Merchant, amount, date/account, operation kind, analytics role, category path и важные tags: Excluded, Requires Review, Verified, Possible Duplicate.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-24.2",
@@ -2932,10 +3008,19 @@
       "title": "Карточка операции",
       "source_text": "Source Data В collapsible section показываются sanitized imported fields: source dates, merchant/description, bank category, source amount, bank и account. Это позволяет сравнить текущую интерпретацию с исходными данными.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-24.4",
@@ -2958,10 +3043,19 @@
       "title": "Карточка операции",
       "source_text": "Как определено Показываются source, matched rule, AI/global/bank origin и независимые confidence. Внутренняя скрытая chain-of-thought модели не отображается; пользователь получает только необходимое объяснение результата.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-24.6",
@@ -5527,10 +5621,19 @@
       "title": "Mobile UX",
       "source_text": "Operations Вместо таблицы — карточки: merchant, amount, date, category/kind, account, important status. Filters открываются в bottom sheet/fullscreen. Long press включает selection mode; Select All означает весь filtered result.",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-47.4",
@@ -5540,10 +5643,19 @@
       "title": "Mobile UX",
       "source_text": "Operation Card Полноэкранный экран. Back возвращает в прежнее место списка. Простая смена category/kind/role выполняется через быстрый bottom sheet без необходимости открывать сложную форму.",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Operations.tsx",
+        "apps/web/src/OperationCard.tsx",
+        "apps/web/src/demo/operations.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/demo/operations.test.ts",
+        "apps/web/e2e/operations.spec.ts",
+        "docs/architecture/web-operations.md"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
     },
     {
       "id": "PDF-47.5",
