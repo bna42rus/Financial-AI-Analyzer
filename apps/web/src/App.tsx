@@ -9,8 +9,13 @@ import { Operations } from './Operations';
 import { OperationCard } from './OperationCard';
 import { defaultOperationsView } from './demo/operations';
 import type { OperationsView, OperationScope } from './demo/operations';
+import { Analyzer } from './Analyzer';
+import { newChatBook } from './demo/analyzer';
+import type { ChatBook } from './demo/analyzer';
 
 type Detail = { title: string; description: string; rows: readonly DemoOperation[]; calculation?: boolean };
+type Screen = 'overview'|'operations'|'analyzer';
+const currentScreen = ():Screen => window.location.hash==='#analyzer'?'analyzer':window.location.hash==='#operations'?'operations':'overview';
 const absolute = (minor: string) => BigInt(minor) < 0n ? -BigInt(minor) : BigInt(minor);
 const maximum = (values: readonly string[]) => values.reduce((max, value) => absolute(value) > max ? absolute(value) : max, 0n);
 
@@ -25,16 +30,17 @@ export function App() {
   const [loading, setLoading] = useState(false);
   const [filters, setFilters] = useState<OverviewFilters>(thisMonth);
   const [detail, setDetail] = useState<Detail | null>(null);
-  const [screen,setScreen] = useState<'overview'|'operations'>(()=>window.location.hash==='#operations'?'operations':'overview');
+  const [screen,setScreen] = useState<Screen>(currentScreen);
+  const [chatBook,setChatBook] = useState<ChatBook>(newChatBook);
   const [operationsView,setOperationsView] = useState<OperationsView>(defaultOperationsView);
   const [scope,setScope] = useState<OperationScope|null>(null);
   const [operationCard,setOperationCard] = useState<DemoOperation|null>(null);
   useEffect(()=>{
-    const restore=()=>{setScreen(window.location.hash==='#operations'?'operations':'overview');setDetail(null);setOperationCard(null);};
+    const restore=()=>{setScreen(currentScreen());setDetail(null);setOperationCard(null);};
     window.addEventListener('popstate',restore);window.addEventListener('hashchange',restore);
     return()=>{window.removeEventListener('popstate',restore);window.removeEventListener('hashchange',restore);};
   },[]);
-  function navigate(next:'overview'|'operations'){
+  function navigate(next:Screen){
     setScreen(next);setDetail(null);setOperationCard(null);
     if(window.location.hash!=='#'+next)window.history.pushState(null,'','#'+next);
   }
@@ -53,7 +59,7 @@ export function App() {
       setOperations(fixtures.demoOperations); setFilters(emptyFilters); setDemo(true); setOperationsView(defaultOperationsView); setScope(null);
     } finally { setLoading(false); }
   }
-  function clearDemo() { setOperations([]); setFilters(thisMonth()); setDetail(null); setDemo(false); setOperationCard(null); setScope(null); setOperationsView(defaultOperationsView); }
+  function clearDemo() { setOperations([]); setFilters(thisMonth()); setDetail(null); setDemo(false); setOperationCard(null); setScope(null); setOperationsView(defaultOperationsView); setChatBook(newChatBook()); }
   function updateFilters(update: Partial<OverviewFilters>) { setFilters(current => ({ ...current, ...update })); setDetail(null); setOperationCard(null); setScope(null); }
   function showRows(title: string, rows: readonly DemoOperation[]) {
     setScope({label:title,ids:rows.map(row=>row.id)});setOperationsView(defaultOperationsView);navigate('operations');
@@ -73,15 +79,15 @@ export function App() {
       <nav className={styles.nav} aria-label="Разделы сайта">
         <a href="#overview" onClick={event=>{event.preventDefault();navigate("overview");}} aria-current={screen==='overview'?'page':undefined}><LayoutDashboard size={17} aria-hidden="true" />Обзор</a>
         <a href="#operations" onClick={event=>{event.preventDefault();setScope(null);navigate("operations");}} aria-current={screen==='operations'?'page':undefined}><List size={17} aria-hidden="true" />Операции</a>
-        <button disabled><Sparkles size={17} aria-hidden="true" />Анализатор</button>
+        <a href="#analyzer" onClick={event=>{event.preventDefault();navigate('analyzer');}} aria-current={screen==='analyzer'?'page':undefined}><Sparkles size={17} aria-hidden="true" />Анализатор</a>
         <button disabled><Settings2 size={17} aria-hidden="true" />Настройки</button>
       </nav>
     </header>
-    <main id={screen} className={styles.main}>
+    <main id={screen} className={`${styles.main} ${screen==='analyzer'?styles.analyzerMain:''}`}>
       {demo && <div className={styles.demoBanner}><span>Демонстрационный режим · вымышленные данные</span><button onClick={clearDemo}>Закрыть пример <X size={15} aria-hidden="true" /></button></div>}
-      <div className={screen==='operations'?styles.operationFilters:undefined}><GlobalFilters operations={operations} filters={filters} onChange={updateFilters} /></div>
-      <div className={styles.titleLine}><div><h1>{screen==='overview'?'Обзор':'Операции'}</h1><p>{formatDate(filters.start)} — {formatDate(filters.end)} {filters.end.slice(0,4)}</p></div>{demo && <button className={styles.button} onClick={() => {updateFilters(emptyFilters);setOperationsView(defaultOperationsView);}}>Сбросить фильтры</button>}</div>
-      {screen==='operations' ? <Operations operations={operations} filters={filters} view={operationsView} scope={scope} loading={loading} onViewChange={setOperationsView} onFilterChange={updateFilters} onClearScope={()=>setScope(null)} onOpen={setOperationCard} onShowDemo={showDemo} /> : invalidPeriod ? <p className={styles.error} role="alert">Начальная дата должна быть раньше конечной или совпадать с ней.</p> : !operations.length ? <section className={styles.empty} aria-labelledby="empty-title"><div className={styles.emptyIcon}><Upload size={26} aria-hidden="true" /></div><h2 id="empty-title">Начните с первой выписки</h2><p>Здесь появятся ваши расходы, доходы и понятные графики по нескольким банкам.</p><div className={styles.emptyActions}><button className={styles.primaryButton} disabled><Upload size={16} aria-hidden="true" />Загрузить первую выписку</button><button className={styles.button} onClick={() => void showDemo()} disabled={loading}>{loading ? 'Открываем пример…' : 'Посмотреть пример'}</button></div><small>В примере используются только вымышленные операции.</small></section> : <>
+      <div className={screen==='operations'||screen==='analyzer'?styles.operationFilters:undefined}><GlobalFilters operations={operations} filters={filters} onChange={updateFilters} /></div>
+      <div className={styles.titleLine}><div><h1>{screen==='overview'?'Обзор':screen==='operations'?'Операции':'Анализатор'}</h1><p>{screen==='analyzer'?'Вопросы о ваших финансах':`${formatDate(filters.start)} — ${formatDate(filters.end)} ${filters.end.slice(0,4)}`}</p></div>{demo && screen!=='analyzer' && <button className={styles.button} onClick={() => {updateFilters(emptyFilters);setOperationsView(defaultOperationsView);}}>Сбросить фильтры</button>}</div>
+      {screen==='analyzer' ? <Analyzer operations={operations} filters={filters} book={chatBook} loading={loading} onBookChange={setChatBook} onFilterChange={updateFilters} onShowDemo={showDemo} onOpenOperations={result=>{setFilters(result.filters);setScope({label:result.key==='attention'?'Требуют внимания':result.key==='largest'?'Крупнейшие расходы':'Учтённые расходы',ids:result.operationIds,source:'Анализатора'});setOperationsView(defaultOperationsView);navigate('operations');}} /> : screen==='operations' ? <Operations operations={operations} filters={filters} view={operationsView} scope={scope} loading={loading} onViewChange={setOperationsView} onFilterChange={updateFilters} onClearScope={()=>setScope(null)} onOpen={setOperationCard} onShowDemo={showDemo} /> : invalidPeriod ? <p className={styles.error} role="alert">Начальная дата должна быть раньше конечной или совпадать с ней.</p> : !operations.length ? <section className={styles.empty} aria-labelledby="empty-title"><div className={styles.emptyIcon}><Upload size={26} aria-hidden="true" /></div><h2 id="empty-title">Начните с первой выписки</h2><p>Здесь появятся ваши расходы, доходы и понятные графики по нескольким банкам.</p><div className={styles.emptyActions}><button className={styles.primaryButton} disabled><Upload size={16} aria-hidden="true" />Загрузить первую выписку</button><button className={styles.button} onClick={() => void showDemo()} disabled={loading}>{loading ? 'Открываем пример…' : 'Посмотреть пример'}</button></div><small>В примере используются только вымышленные операции.</small></section> : <>
         <section className={styles.stats} aria-label="Основные показатели">
           <button className={styles.stat} onClick={() => setDetail({ title:'Как рассчитаны расходы', description:'Возвраты уменьшают расходы. Собственные и неразобранные переводы, а также исключённые операции в эту сумму не входят.', rows:overview.matching, calculation:true })}><span className={styles.statLabel}>Расходы</span><strong data-testid="expenses">{formatMoney(overview.expenseMinor)}</strong><small>{overview.offsetsMinor !== '0' ? `С учётом возвратов ${formatMoney(overview.offsetsMinor)}` : 'Возвратов в периоде нет'}</small></button>
           <button className={styles.stat} onClick={() => showRows('Доходы',overview.matching.filter(row => row.role === 'income' && !row.excluded))}><span className={styles.statLabel}>Доходы</span><strong data-testid="income">{formatMoney(overview.incomeMinor)}</strong><small>Учтённые поступления</small></button>
@@ -96,7 +102,7 @@ export function App() {
           <section className={`${styles.panel} ${styles.largest}`} aria-labelledby="largest-title"><div className={styles.panelHead}><h2 id="largest-title">Крупнейшие расходы</h2><button className={styles.linkButton} onClick={() => showRows('Все операции',overview.matching)}>Все операции <ArrowRight size={16} aria-hidden="true" /></button></div>{overview.largest.length ? overview.largest.map(row => <button className={styles.topRow} key={row.id} onClick={() => showRows(row.merchant,[row])}><span><span>{row.merchant}</span><small>{row.category} · {formatDate(row.date)} · {row.account}</small></span><span>{formatMoney((-BigInt(row.amountMinor)).toString())} <span aria-hidden="true">›</span></span></button>) : <p className={styles.muted}>В выборке нет списаний, учитываемых как расходы.</p>}</section>
         </>}
       </>}
-      <footer className={styles.footer}><span>Суммы в рублях · разница не является банковским балансом</span></footer>
+      {screen!=='analyzer'&&<footer className={styles.footer}><span>Суммы в рублях · разница не является банковским балансом</span></footer>}
     </main>
     <OperationCard row={operationCard} onClose={()=>setOperationCard(null)} />
     <Dialog.Root open={detail !== null} onOpenChange={open => !open && setDetail(null)}><Dialog.Portal><Dialog.Overlay className={styles.overlay} /><Dialog.Content className={styles.dialog} aria-describedby="detail-description"><div className={styles.dialogHead}><Dialog.Title>{detail?.title}</Dialog.Title><Dialog.Close className={styles.iconButton} aria-label="Закрыть"><X size={20} /></Dialog.Close></div><Dialog.Description id="detail-description">{detail?.description}</Dialog.Description>{detail?.calculation ? <dl className={styles.breakdown}><div><dt>Расходы до возвратов</dt><dd>{formatMoney(overview.grossMinor)}</dd></div><div><dt>Возвраты</dt><dd>−{formatMoney(overview.offsetsMinor)}</dd></div><div><dt>Итого расходы</dt><dd>{formatMoney(overview.expenseMinor)}</dd></div><div><dt>Исключено операций</dt><dd>{overview.excludedCount}</dd></div><div><dt>Нейтральные операции</dt><dd>{overview.neutralCount}</dd></div><div><dt>Не определён смысл</dt><dd>{overview.unresolvedCount}</dd></div></dl> : <ul className={styles.detailRows}>{detail?.rows.length ? detail.rows.map(row => <li key={row.id}><div><strong>{row.merchant}</strong><small>{formatDate(row.date)} · {row.bank} · {row.account}</small><small>{row.category || (row.role === 'neutral' ? 'Не учитывается' : 'Смысл не определён')}{row.excluded ? ' · Исключено' : ''}</small></div><span>{formatMoney(row.amountMinor)}</span></li>) : <li>Операций в этой выборке нет.</li>}</ul>}<Dialog.Close className={styles.button}>Закрыть</Dialog.Close></Dialog.Content></Dialog.Portal></Dialog.Root>

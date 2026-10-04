@@ -87,3 +87,9 @@
 @media (pointer: coarse) { .button,.primaryButton,.iconButton,.popover button,.popover label,.chartRow,.topRow { min-height: 44px; } .filters input,.filters select,.categoryPicker summary { height: 44px; font-size: 16px; } }
 @media (max-width: 380px) { .stat strong { font-size: 20px; } }
 @media (max-width: 600px) { .operationFilters { display:none; } }
+
+.app:has(.analyzerMain) { height:100dvh; display:flex; flex-direction:column; }
+.app:has(.analyzerMain) .header { flex-shrink:0; }
+.analyzerMain { display:flex; flex-direction:column; flex:1; min-height:0; width:100%; }
+.analyzerMain>div { flex-shrink:0; }
+@media(max-width:600px) { .analyzerMain { display:flex; flex-direction:column; height:auto; padding:12px 12px calc(75px + env(safe-area-inset-bottom)); } .analyzerMain .titleLine { margin-bottom:10px; } .analyzerMain .titleLine h1 { font-size:21px; } .analyzerMain .titleLine p { font-size:11px; } .analyzerMain .demoBanner { margin-bottom:10px; padding:7px 10px; font-size:10px; gap:4px; } }

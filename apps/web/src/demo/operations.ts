@@ -10,7 +10,7 @@ export interface OperationsView {
   readonly kind: string;
   readonly role: string;
 }
-export interface OperationScope { readonly label: string; readonly ids: readonly string[] }
+export interface OperationScope { readonly label: string; readonly source?: 'Обзора'|'Анализатора'; readonly ids: readonly string[] }
 export const defaultOperationsView: OperationsView = { query: '', quick: 'all', sort: 'date-desc', kind: '', role: '' };
 export const roleLabels: Record<DemoOperation['role'], string> = {
   expense: 'Расход', income: 'Доход', neutral: 'Нейтральная', unresolved: 'Не определён',
