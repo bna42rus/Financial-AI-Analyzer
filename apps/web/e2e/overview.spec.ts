@@ -48,11 +48,10 @@ test('explanation and drilldown preserve context and dialog keyboard behavior', 
   await page.keyboard.press('Escape');
   await expect(explanation).toBeHidden();
   await page.getByRole('button',{ name:'Жильё 32 000 ₽', exact:true }).click();
-  const drilldown = page.getByRole('dialog');
-  await expect(drilldown.getByText('Александр · аренда',{ exact:true })).toBeVisible();
-  await expect(drilldown.getByText('Зарплата',{ exact:true })).toHaveCount(0);
-  await drilldown.getByRole('button',{ name:'Закрыть', exact:true }).last().click();
-  await expect(drilldown).toBeHidden();
+  await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Александр · аренда',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Зарплата',exact:true})).toHaveCount(0);
+  await expect(page.getByTestId('operation-count')).toHaveText('Показано 1 из 1');
 });
 
 test('viewport remains readable without horizontal overflow and errors', async ({ page }) => {
@@ -63,6 +62,7 @@ test('viewport remains readable without horizontal overflow and errors', async (
   await expect(page.getByRole('heading',{ name:'Обзор', exact:true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole('button',{ name:/Требуют внимания/ }).click();
-  await expect(page.getByRole('dialog').getByText('Перевод Дмитрию')).toBeVisible();
+  await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
+  await expect(page.getByRole('button',{name:'Перевод Дмитрию',exact:true})).toBeVisible();
   expect(errors).toEqual([]);
 });
