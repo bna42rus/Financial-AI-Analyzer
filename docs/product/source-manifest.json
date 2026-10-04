@@ -1,0 +1,22 @@
+{
+  "product_baseline_version": "1.2",
+  "sources": [
+    {
+      "path": "docs/product/master_spec_v1.pdf",
+      "role": "primary_product_source",
+      "sha256": "5255d758534e74c9329cb8437e8a862f4bf989999172903a862462294b4ce9c8"
+    },
+    {
+      "path": "docs/product/context_handoff.docx",
+      "role": "decision_context",
+      "sha256": "50fb15bf485d7c5a570e6195833af8c167b811a2355fa7cfdc829b5cce8a7b26"
+    }
+  ],
+  "precedence": [
+    "Approved amendments A-01..A-11 and B-01..B-10 override the specifically named clauses",
+    "Other original PDF requirements remain active in full",
+    "Word supplies context, not overriding logic"
+  ],
+  "architecture": "Structure and principal stack accepted; provider purchases and Production release not approved",
+  "budget": "Russia seller/users; no additional development spend; infrastructure candidates in baseline part D"
+}

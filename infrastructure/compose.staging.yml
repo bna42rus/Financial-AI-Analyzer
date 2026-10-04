@@ -1,0 +1,17 @@
+name: finance-staging
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: finance_staging
+      POSTGRES_USER: staging_bootstrap_owner
+      POSTGRES_PASSWORD: ${STAGING_DB_PASSWORD:?Set a different random Staging password}
+    ports:
+      - "127.0.0.1:5411:5432"
+    volumes:
+      - staging_db:/var/lib/postgresql
+    networks: [staging]
+volumes:
+  staging_db:
+networks:
+  staging:

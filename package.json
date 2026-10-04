@@ -1,0 +1,14 @@
+{
+  "name": "personal-finance-analyzer",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "check:spec": "node scripts/check-spec.mjs",
+    "test": "node --test packages/finance-core/test/money.test.ts",
+    "check": "npm run check:spec && npm test"
+  }
+}
