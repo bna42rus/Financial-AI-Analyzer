@@ -3,12 +3,17 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.25.0",
   "engines": {
     "node": ">=24 <25"
   },
   "scripts": {
     "check:spec": "node scripts/check-spec.mjs",
     "test": "node --test packages/finance-core/test/money.test.ts",
-    "check": "npm run check:spec && npm test"
+    "dev:web": "pnpm --filter @finance/web dev",
+    "build:web": "pnpm --filter @finance/web build",
+    "check:web": "pnpm --filter @finance/web check",
+    "test:e2e": "pnpm --filter @finance/web test:e2e",
+    "check": "pnpm run check:spec && pnpm test && pnpm run check:web && pnpm run build:web"
   }
 }

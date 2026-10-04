@@ -1,0 +1,93 @@
+import { useMemo, useState } from 'react';
+import * as Dialog from '@radix-ui/react-dialog';
+import { ArrowRight, ChartNoAxesCombined, CircleAlert, LayoutDashboard, List, Settings2, Sparkles, Upload, UserRound, X } from 'lucide-react';
+import { barPercent, createOverview, emptyFilters, formatDate, formatMoney, weekBuckets } from './demo/overview';
+import type { DemoOperation, OverviewFilters } from './demo/overview';
+import styles from './App.module.css';
+
+type Detail = { title: string; description: string; rows: readonly DemoOperation[]; calculation?: boolean };
+const absolute = (minor: string) => BigInt(minor) < 0n ? -BigInt(minor) : BigInt(minor);
+const maximum = (values: readonly string[]) => values.reduce((max, value) => absolute(value) > max ? absolute(value) : max, 0n);
+
+function thisMonth(): OverviewFilters {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth();
+  return { ...emptyFilters, start: `${y}-${String(m + 1).padStart(2,'0')}-01`, end: `${y}-${String(m + 1).padStart(2,'0')}-${new Date(y,m+1,0).getDate()}` };
+}
+
+export function App() {
+  const [operations, setOperations] = useState<readonly DemoOperation[]>([]);
+  const [demo, setDemo] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [filters, setFilters] = useState<OverviewFilters>(thisMonth);
+  const [detail, setDetail] = useState<Detail | null>(null);
+  const overview = useMemo(() => createOverview(operations, filters), [operations, filters]);
+  const periods = useMemo(() => weekBuckets(operations, filters), [operations, filters]);
+  const categories = useMemo(() => [...new Set(operations.map(row => row.category).filter(Boolean))].sort((a,b) => a.localeCompare(b,'ru')), [operations]);
+  const banks = useMemo(() => [...new Set(operations.map(row => row.bank))], [operations]);
+  const accounts = useMemo(() => [...new Set(operations.filter(row => !filters.bank || row.bank === filters.bank).map(row => row.account))], [operations, filters.bank]);
+  const categoryMax = maximum(overview.categories.map(row => row.amountMinor));
+  const periodMax = maximum(periods.map(row => row.amountMinor));
+  const centeredCategories = overview.categories.some(row => BigInt(row.amountMinor) < 0n);
+  const centeredPeriods = periods.some(row => BigInt(row.amountMinor) < 0n);
+  const invalidPeriod = filters.start > filters.end;
+
+  async function showDemo() {
+    setLoading(true);
+    try {
+      const fixtures = await import('./demo/fixtures');
+      setOperations(fixtures.demoOperations); setFilters(emptyFilters); setDemo(true);
+    } finally { setLoading(false); }
+  }
+  function clearDemo() { setOperations([]); setFilters(thisMonth()); setDetail(null); setDemo(false); }
+  function updateFilters(update: Partial<OverviewFilters>) { setFilters(current => ({ ...current, ...update })); setDetail(null); }
+  function showRows(title: string, rows: readonly DemoOperation[], description = 'Операции в выбранном контексте.') {
+    setDetail({ title, rows, description });
+  }
+  function renderBar(minor: string, max: bigint, centered: boolean) {
+    const negative = BigInt(minor) < 0n;
+    return <div className={`${styles.track} ${centered ? styles.centered : ''}`} aria-hidden="true">
+      <span className={styles.fill} style={{ width: barPercent(minor,max,centered), ...(centered ? negative ? { right:'50%' } : { left:'50%' } : { left:0 }) }} />
+    </div>;
+  }
+
+  return <div className={styles.app}>
+    <a className={styles.skip} href="#overview">Перейти к содержимому</a>
+    <header className={styles.header}>
+      <a href="#overview" className={styles.brand}><span className={styles.brandMark}><ChartNoAxesCombined size={19} aria-hidden="true" /></span><span>Финансовый анализатор<span className={styles.brandNote}>Первая версия интерфейса</span></span></a>
+      <div className={styles.headerActions}><button className={styles.primaryButton} disabled><Upload size={17} aria-hidden="true" /><span className={styles.uploadLabel}>Загрузить файлы</span></button><button className={styles.button} disabled aria-label="Профиль"><UserRound size={17} aria-hidden="true" /></button></div>
+      <nav className={styles.nav} aria-label="Разделы сайта">
+        <a href="#overview" aria-current="page"><LayoutDashboard size={17} aria-hidden="true" />Обзор</a>
+        <button disabled><List size={17} aria-hidden="true" />Операции</button>
+        <button disabled><Sparkles size={17} aria-hidden="true" />Анализатор</button>
+        <button disabled><Settings2 size={17} aria-hidden="true" />Настройки</button>
+      </nav>
+    </header>
+    <main id="overview" className={styles.main}>
+      {demo && <div className={styles.demoBanner}><span>Демонстрационный режим · вымышленные данные</span><button onClick={clearDemo}>Закрыть пример <X size={15} aria-hidden="true" /></button></div>}
+      <section className={styles.filters} aria-label="Глобальные фильтры">
+        <div className={styles.dateFields}><label>С даты<input type="date" aria-label="С даты" value={filters.start} aria-invalid={invalidPeriod} onChange={event => event.target.value && updateFilters({ start:event.target.value })} /></label><label>По дату<input type="date" aria-label="По дату" value={filters.end} aria-invalid={invalidPeriod} onChange={event => event.target.value && updateFilters({ end:event.target.value })} /></label></div>
+        <label>Банк<select aria-label="Банк" value={filters.bank} onChange={event => updateFilters({ bank:event.target.value, account:'' })}><option value="">Все банки</option>{banks.map(bank => <option key={bank}>{bank}</option>)}</select></label>
+        <label>Счёт<select aria-label="Счёт" value={filters.account} onChange={event => updateFilters({ account:event.target.value })}><option value="">Все счета</option>{accounts.map(account => <option key={account}>{account}</option>)}</select></label>
+        <div className={styles.categoryField}><span className={styles.fieldLabel}>Категории</span><details className={styles.categoryPicker}><summary>{filters.categories.length ? `Выбрано: ${filters.categories.length}` : 'Все категории'}<span aria-hidden="true">⌄</span></summary><div className={styles.popover}>{categories.length ? <><button onClick={() => updateFilters({ categories:[] })}>Все категории</button>{categories.map(category => <label key={category}><input type="checkbox" checked={filters.categories.includes(category)} onChange={event => updateFilters({ categories:event.target.checked ? [...filters.categories,category] : filters.categories.filter(value => value !== category) })} />{category}</label>)}</> : <p>Категории появятся после загрузки данных.</p>}</div></details></div>
+      </section>
+      <div className={styles.titleLine}><div><h1>Обзор</h1><p>{formatDate(filters.start)} — {formatDate(filters.end)} {filters.end.slice(0,4)}</p></div>{demo && <button className={styles.button} onClick={() => updateFilters(emptyFilters)}>Сбросить фильтры</button>}</div>
+      {invalidPeriod ? <p className={styles.error} role="alert">Начальная дата должна быть раньше конечной или совпадать с ней.</p> : !operations.length ? <section className={styles.empty} aria-labelledby="empty-title"><div className={styles.emptyIcon}><Upload size={26} aria-hidden="true" /></div><h2 id="empty-title">Начните с первой выписки</h2><p>Здесь появятся ваши расходы, доходы и понятные графики по нескольким банкам.</p><div className={styles.emptyActions}><button className={styles.primaryButton} disabled><Upload size={16} aria-hidden="true" />Загрузить первую выписку</button><button className={styles.button} onClick={() => void showDemo()} disabled={loading}>{loading ? 'Открываем пример…' : 'Посмотреть пример'}</button></div><small>В примере используются только вымышленные операции.</small></section> : <>
+        <section className={styles.stats} aria-label="Основные показатели">
+          <button className={styles.stat} onClick={() => setDetail({ title:'Как рассчитаны расходы', description:'Возвраты уменьшают расходы. Собственные и неразобранные переводы, а также исключённые операции в эту сумму не входят.', rows:overview.matching, calculation:true })}><span className={styles.statLabel}>Расходы</span><strong data-testid="expenses">{formatMoney(overview.expenseMinor)}</strong><small>{overview.offsetsMinor !== '0' ? `С учётом возвратов ${formatMoney(overview.offsetsMinor)}` : 'Возвратов в периоде нет'}</small></button>
+          <button className={styles.stat} onClick={() => showRows('Доходы',overview.matching.filter(row => row.role === 'income' && !row.excluded))}><span className={styles.statLabel}>Доходы</span><strong data-testid="income">{formatMoney(overview.incomeMinor)}</strong><small>Учтённые поступления</small></button>
+          <div className={styles.stat}><span className={styles.statLabel}>Разница</span><strong data-testid="difference">{formatMoney(overview.differenceMinor)}</strong><small>Доходы минус расходы</small></div>
+          <button className={`${styles.stat} ${styles.attention}`} onClick={() => showRows('Требуют внимания',overview.matching.filter(row => row.requiresAttention),'Проверьте смысл перевода или категорию расхода.')}><span className={styles.statLabel}><CircleAlert size={16} aria-hidden="true" />Требуют внимания</span><strong data-testid="attention">{overview.attention}</strong><small>Показать операции <ArrowRight size={13} aria-hidden="true" /></small></button>
+        </section>
+        {!overview.matching.length ? <section className={styles.noResults}><h2>За выбранный период операций нет</h2><p>Измените период, банк, счёт или категории.</p><button className={styles.button} onClick={() => updateFilters(emptyFilters)}>Показать все примеры</button></section> : <>
+          <div className={styles.columns}>
+            <section className={styles.panel} aria-labelledby="category-title"><div className={styles.panelHead}><h2 id="category-title">Расходы по категориям</h2><span>₽</span></div><div className={styles.chartRows}>{overview.categories.length ? overview.categories.map(category => <button className={styles.chartRow} key={category.name} onClick={() => showRows(category.name,overview.matching.filter(row => row.category === category.name && row.role === 'expense' && !row.excluded))}><span className={styles.barLabel}><span>{category.name}</span><span>{formatMoney(category.amountMinor)}</span></span>{renderBar(category.amountMinor,categoryMax,centeredCategories)}</button>) : <p className={styles.muted}>Расходов в этой выборке нет.</p>}</div><p className={styles.chartNote}>Возвраты уменьшают расходы своей категории.</p></section>
+            <section className={styles.panel} aria-labelledby="period-title"><div className={styles.panelHead}><h2 id="period-title">Динамика расходов</h2><span>₽</span></div><div className={styles.chartRows}>{periods.map(period => <button className={styles.chartRow} key={period.from} onClick={() => showRows(`${formatDate(period.from)} — ${formatDate(period.to)}`,overview.matching.filter(row => row.date >= period.from && row.date <= period.to))}><span className={styles.barLabel}><span>{formatDate(period.from)} — {formatDate(period.to)}</span><span>{formatMoney(period.amountMinor)}</span></span>{renderBar(period.amountMinor,periodMax,centeredPeriods)}</button>)}</div><p className={styles.chartNote}>Точные суммы доступны текстом и по нажатию на период.</p></section>
+          </div>
+          <section className={`${styles.panel} ${styles.largest}`} aria-labelledby="largest-title"><div className={styles.panelHead}><h2 id="largest-title">Крупнейшие расходы</h2><button className={styles.linkButton} onClick={() => showRows('Все операции',overview.matching)}>Все операции <ArrowRight size={16} aria-hidden="true" /></button></div>{overview.largest.length ? overview.largest.map(row => <button className={styles.topRow} key={row.id} onClick={() => showRows(row.merchant,[row])}><span><span>{row.merchant}</span><small>{row.category} · {formatDate(row.date)} · {row.account}</small></span><span>{formatMoney((-BigInt(row.amountMinor)).toString())} <span aria-hidden="true">›</span></span></button>) : <p className={styles.muted}>В выборке нет списаний, учитываемых как расходы.</p>}</section>
+        </>}
+      </>}
+      <footer className={styles.footer}><span>Суммы в рублях · разница не является банковским балансом</span></footer>
+    </main>
+    <Dialog.Root open={detail !== null} onOpenChange={open => !open && setDetail(null)}><Dialog.Portal><Dialog.Overlay className={styles.overlay} /><Dialog.Content className={styles.dialog} aria-describedby="detail-description"><div className={styles.dialogHead}><Dialog.Title>{detail?.title}</Dialog.Title><Dialog.Close className={styles.iconButton} aria-label="Закрыть"><X size={20} /></Dialog.Close></div><Dialog.Description id="detail-description">{detail?.description}</Dialog.Description>{detail?.calculation ? <dl className={styles.breakdown}><div><dt>Расходы до возвратов</dt><dd>{formatMoney(overview.grossMinor)}</dd></div><div><dt>Возвраты</dt><dd>−{formatMoney(overview.offsetsMinor)}</dd></div><div><dt>Итого расходы</dt><dd>{formatMoney(overview.expenseMinor)}</dd></div><div><dt>Исключено операций</dt><dd>{overview.excludedCount}</dd></div><div><dt>Нейтральные операции</dt><dd>{overview.neutralCount}</dd></div><div><dt>Не определён смысл</dt><dd>{overview.unresolvedCount}</dd></div></dl> : <ul className={styles.detailRows}>{detail?.rows.length ? detail.rows.map(row => <li key={row.id}><div><strong>{row.merchant}</strong><small>{formatDate(row.date)} · {row.bank} · {row.account}</small><small>{row.category || (row.role === 'neutral' ? 'Не учитывается' : 'Смысл не определён')}{row.excluded ? ' · Исключено' : ''}</small></div><span>{formatMoney(row.amountMinor)}</span></li>) : <li>Операций в этой выборке нет.</li>}</ul>}<Dialog.Close className={styles.button}>Закрыть</Dialog.Close></Dialog.Content></Dialog.Portal></Dialog.Root>
+  </div>;
+}

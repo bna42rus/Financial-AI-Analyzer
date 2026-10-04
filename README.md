@@ -2,12 +2,12 @@
 
 Начальная подготовка репозитория. Продуктовая база: полный Master Specification + approved A/B + admin recovery E-04, версия 1.3. Структура, основной стек и базовый выбор сервисов согласованы. Текущие решения, домен/бюджет и ещё открытые условия записаны в baseline, часть E.
 
-Сейчас реализованы только точные integer money primitives, проверка component sums и проверка неизменности исходных документов. Web/admin/API, imports, Registry, authentication и database schema ещё не реализованы. Этот пакет не является работающим сайтом или Production release.
+В ветке `feature/web-overview` реализованы запускаемая оболочка React/Vite и первая часть «Обзора»: пустой вход, отдельный вымышленный пример, фильтры, итоги, простые графики и объяснения. [Запуск и границы первого экрана](apps/web/README.md); [состояние проекта](docs/architecture/bootstrap-status.md). Импорт, авторизация, API, база, полный финансовый движок и остальные экраны предстоят.
 
 ## Проверка без платных сервисов
 
-Требуется Node.js 24 LTS. Выполнить `npm run check`.
-Тесты не требуют npm install, API keys или реальных банковских данных. Native Node запускает TypeScript с type stripping; это не TypeScript typecheck. Compiler/build/lint/integration/e2e/security checks добавляются при bootstrap приложений и обязательны до Staging release.
+Требуются Node.js 24 LTS и pnpm 11.25.0. Выполнить `pnpm install --frozen-lockfile --ignore-scripts`, затем `pnpm run check`. Для просмотра первого экрана — `pnpm run dev:web`.
+Проверки включают источники, 10 тестов денежных primitives, strict TypeScript, 8 тестов искусственной проекции и сборку. Для браузерных проверок установить Chromium по [инструкции](apps/web/README.md) и выполнить `pnpm run test:e2e`: 8 сценариев на компьютере/мобильной эмуляции. API keys и реальные банковские данные не нужны. Полные integration/security/release проверки предстоят.
 
 ## Где источники
 
@@ -20,7 +20,7 @@
 
 Infrastructure содержит отдельные templates Development/Staging для PostgreSQL. Docker в текущем исполнении не установлен; запуск контейнеров здесь не проверялся. Пароли генерируются отдельно, не добавляются в Git. Production configuration отсутствует, поскольку providers/retention/RPO/RTO/security acceptance ещё не закрыты.
 
-Репозиторий владельца создан: https://github.com/bna42rus/Financial-AI-Analyzer — private. Чтение и сохранение изменений через подключение проверены; оригинальная история из двух коммитов и база 1.3 доступны. План сохранён в отдельной ветке, открыт [draft PR #1](https://github.com/bna42rus/Financial-AI-Analyzer/pull/1). [Bootstrap CI #2](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/37210531621) для коммита fee3c177c582041e03a4899439aab86723f888f5 завершился успешно. Это проверка источников и денежных primitives, а не всего сайта. Подписка Pro и защита main пока не подтверждены. Product data и credentials в Git не добавляются.
+Репозиторий владельца: https://github.com/bna42rus/Financial-AI-Analyzer — private. Чтение и запись проверены; история и база 1.3 доступны. Согласованные план и оформление объединены в main через [PR #1](https://github.com/bna42rus/Financial-AI-Analyzer/pull/1), commit 4bb5d77287d675f32fb9e65d6827e03908225e64. Предшествующий bootstrap CI прошёл. Первый экран сохраняется отдельно в feature branch с расширенными проверками. Подписка Pro и защита main пока не подтверждены. Product data и credentials в Git не добавляются.
 
 ## План и готовность сайта
 
