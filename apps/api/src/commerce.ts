@@ -81,7 +81,7 @@ export async function invitationAction(db:PoolClient,request:FastifyRequest,acto
 }
 export async function copyInvitation(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer) {
   const b=fields(request,['invitationId']);
-  const row=(await db.query(`SELECT i.sealed_token,i.expires_at FROM commerce.invitation i JOIN commerce.purchase p ON p.id=i.purchase_id WHERE i.id=$1 AND i.state='active' AND i.expires_at>clock_timestamp() AND p.state='paid_not_activated'`,[string(b.invitationId,100)])).rows[0];
+  const row=(await db.query(`SELECT i.sealed_token,i.expires_at FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE i.id=$1 AND i.state='active' AND i.expires_at>clock_timestamp() AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp()))`,[string(b.invitationId,100)])).rows[0];
   if(!row)throw new HttpError(409,'INVITATION_UNAVAILABLE');
   await event(db,'control',actorId,'invitation_link_copied');return {token:seal.open(row.sealed_token),expiresAt:row.expires_at};
 }

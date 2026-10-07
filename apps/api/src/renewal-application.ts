@@ -21,7 +21,7 @@ function validTariff(value:unknown):value is Tariff {
 async function tariffs(db:PoolClient):Promise<Tariff[]> {return (await db.query(`SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'availableForRenewal'='true' ORDER BY id`)).rows.map(r=>r.snapshot).filter(validTariff);}
 export async function ownRenewal(db:PoolClient,userId:string):Promise<OwnRenewal>{
  const cycle=await lockedCycle(db,userId),row=(await db.query(`SELECT data,state FROM commerce.renewal_request WHERE user_id=$1 ORDER BY (state='open') DESC,created_at DESC,id DESC LIMIT 1`,[userId])).rows[0];
- return {cycle,request:row?publicRenewal(row.data,row.state):null,tariffs:await tariffs(db)};
+ return {cycle,request:row?publicRenewal(row.data,row.state):null,tariffs:cycle.indefinite?[]:await tariffs(db)};
 }
 async function snapshot(db:PoolClient,id:unknown){const tariff=(await tariffs(db)).find(t=>t.id===string(id,100));if(!tariff)throw new HttpError(409,'TARIFF_UNAVAILABLE');return tariff;}
 export async function renewalApplication(db:PoolClient,request:FastifyRequest,user:User,seal:Sealer,action:'create'|'change'|'cancel'|'claim'){

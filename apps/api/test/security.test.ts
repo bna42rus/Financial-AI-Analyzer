@@ -22,7 +22,7 @@ before(async () => {
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
   await pg.owner.query(`TRUNCATE identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
-    identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle CASCADE`);
+    identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
 class Browser {
@@ -548,4 +548,150 @@ test('expiry while confirmation waits after BEGIN invalidates preview rather tha
  await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=clock_timestamp()-interval '1 month',access_end=clock_timestamp()");await blocker.query('COMMIT');const result=await pending;assert.equal(result.statusCode,409);assert.equal(result.json().code,'PREVIEW_CHANGED');assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,0);assert.equal((await pg.owner.query('SELECT * FROM commerce.action WHERE id=$1',[cmd.actionId])).rowCount,0);
  }finally{await blocker.query('ROLLBACK');blocker.release();if(pending)await pending;}
  const fresh=await renewalCommand(a,row);assert.equal(fresh.expectedMode,'restored');assert.equal((await a.admin.b.post('/control/renewal-review',fresh)).statusCode,200);
+});
+
+const manualInvite=(overrides:Record<string,unknown>={})=>({actionId:crypto.randomUUID(),mode:'invite',email:'manual@example.test',term:{kind:'days',count:7},accessType:'Free',quota:{source:'override',limit:75},reason:'Synthetic internal compensation note',inviteHours:72,...overrides});
+async function manualCommand(b:Browser,cmd:Record<string,unknown>){
+ const r=await b.post('/control/manual-preview',cmd);assert.equal(r.statusCode,200,r.body);
+ return {...cmd,expectedRevision:r.json().expectedRevision,expectedMode:r.json().previousMode,expectedQuota:r.json().quota};
+}
+async function manualRegistered(term:Record<string,unknown>={kind:'days',count:7}){
+ const admin=await enrolledAdmin(),cmd=await manualCommand(admin.b,manualInvite({term}));
+ assert.equal((await admin.b.post('/control/manual-access',cmd)).statusCode,200);
+ const invitationToken=(await mail('access','invitation',cc)).token,b=userBrowser();
+ assert.equal((await b.post('/access/registration-proof',{invitationToken})).statusCode,202);
+ const proof=(await mail('access','registration_verification')).proofToken;
+ assert.equal((await b.post('/access/register',registrationBody(invitationToken,proof))).statusCode,201);
+ assert.equal((await b.post('/auth/sign-in/email',{email:'manual@example.test',password:testPassword})).statusCode,200);
+ return {admin,b,cmd,userId:(await pg.owner.query('SELECT id FROM identity.auth_user')).rows[0].id as string,invitationToken};
+}
+test('manual access is TOTP gated, preview is read-only and inputs cannot inject actor or unlimited AI',async()=>{
+ const {b}=await enrolledAdmin(),cmd=manualInvite();
+ assert.equal((await adminBrowser().post('/control/manual-preview',cmd)).statusCode,401);
+ assert.equal((await userBrowser().post('/control/manual-preview',cmd)).statusCode,404);
+ for(const bad of [{...cmd,actorId:'injected'},{...cmd,reason:' '},{...cmd,quota:undefined},{...cmd,quota:{source:'override',limit:-1}},{...cmd,term:{kind:'fixed',end:'2027-02-31T00:00:00.000Z'}},{...cmd,term:{kind:'days',count:1.5}}])assert.equal((await b.post('/control/manual-preview',bad)).statusCode,400);
+ assert.equal((await b.post('/control/manual-preview',cmd)).statusCode,200);
+ for(const table of ['manual_grant','manual_access_audit','action','invitation','purchase'])assert.equal((await pg.owner.query('SELECT 1 FROM commerce.'+table)).rowCount,0);
+ assert.equal((await pg.owner.query('SELECT 1 FROM access.request')).rowCount,0);
+});
+test('manual invitation commit is idempotent, concurrent duplicate email conflicts, no payment is invented',async()=>{
+ const {b}=await enrolledAdmin(),first=await manualCommand(b,manualInvite()),second=await manualCommand(b,manualInvite());
+ const results=await Promise.all([b.post('/control/manual-access',first),b.clone().post('/control/manual-access',second)]);assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,409]);
+ const saved=results[0]!.statusCode===200?first:second;assert.equal((await b.post('/control/manual-access',saved)).json().status,'already_committed');
+ assert.equal((await b.post('/control/manual-access',{...saved,reason:'changed'})).statusCode,409);
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.manual_grant')).rowCount,1);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.invitation')).rowCount,1);
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.manual_access_audit')).rowCount,1);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,0);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.review_state')).rowCount,0);
+ const publicResponse=await userBrowser().post('/access/requests',{name:'Same email',email:'manual@example.test',tariffId:tariff.id});assert.equal(publicResponse.statusCode,202);assert.equal((await pg.owner.query('SELECT 1 FROM access.request')).rowCount,0);
+});
+test('manual registration needs independent email proof and activates days without leaking notes or creating purchase',async()=>{
+ const {b:admin}=await enrolledAdmin(),cmd=await manualCommand(admin,manualInvite());assert.equal((await admin.post('/control/manual-access',cmd)).statusCode,200);
+ const invitationToken=(await mail('access','invitation',cc)).token,b=userBrowser();
+ assert.equal((await b.post('/access/register',registrationBody(invitationToken,invitationToken))).statusCode,400);
+ assert.equal((await b.post('/access/registration-proof',{invitationToken})).statusCode,202);const proof=(await mail('access','registration_verification')).proofToken;
+ assert.equal((await b.post('/access/register',registrationBody(invitationToken,proof))).statusCode,201);
+ assert.equal((await b.post('/access/register',registrationBody(invitationToken,proof))).statusCode,400);
+ assert.equal((await b.post('/auth/sign-in/email',{email:'manual@example.test',password:testPassword})).statusCode,200);
+ const session=await b.get('/session');assert.equal(session.json().scope,'active');assert.equal(session.body.includes('compensation'),false);
+ const cycle=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.equal(cycle.access_end.getTime()-cycle.anchor_at.getTime(),7*86400000);assert.deepEqual(cycle.quota_policy,{source:'override',limit:75});
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,0);assert.equal((await pg.owner.query('SELECT state FROM commerce.manual_grant')).rows[0].state,'active');
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.account_directory')).rowCount,1);
+});
+test('manual fixed end survives activation and expired fixed grant cannot activate or be reissued',async()=>{
+ const end=new Date(Date.now()+5*86400000).toISOString(),a=await manualRegistered({kind:'fixed',end});
+ assert.equal((await a.b.get('/session')).json().accessEnd,end);
+ const initial=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(Number(initial.end_offset_ms)>0);
+ const next=await a.b.post('/access/renewal-create',{tariffId:tariff.id});assert.equal(next.statusCode,200);
+ const created=next.json().request;assert.equal((await a.b.post('/access/renewal-claim',{requestId:created.id,expectedRevision:created.revision,senderName:'Manual user',senderBank:'Bank'})).statusCode,200);
+ const row=(await a.b.get('/access/renewal')).json().request,{inviteHours,...base}=reviewCommand(row);
+ const p=await a.admin.b.post('/control/renewal-preview',base);assert.equal(p.statusCode,200);
+ const expected=(await pg.owner.query("SELECT ((($1::timestamptz AT TIME ZONE 'Europe/Moscow')+interval '1 month') AT TIME ZONE 'Europe/Moscow')+($2::text||' milliseconds')::interval AS finish",[initial.anchor_at,initial.end_offset_ms])).rows[0].finish.toISOString();
+ assert.equal(p.json().extension.accessEnd,expected);assert.equal((await a.admin.b.post('/control/renewal-review',{...base,expectedCycleRevision:p.json().cycleRevision,expectedMode:p.json().mode})).statusCode,200);
+});
+test('manual indefinite activation is finite-quota, suspension remains, and finite override supersedes identity fallback',async()=>{
+ const a=await manualRegistered({kind:'indefinite'});let s=(await a.b.get('/session')).json();assert.equal(s.scope,'active');assert.equal(s.indefinite,true);assert.equal(s.accessEnd,null);assert.equal((await a.b.get('/access/renewal')).json().cycle.indefinite,true);assert.equal((await a.b.post('/access/renewal-create',{tariffId:tariff.id})).statusCode,409);
+ await pg.owner.query("UPDATE identity.security_state SET status='suspended'");
+ let cmd=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'set_end',userId:a.userId,term:{kind:'fixed',end:new Date(Date.now()+86400000).toISOString()},reason:'Restore finite limit'});
+ assert.equal((await a.admin.b.post('/control/manual-access',cmd)).statusCode,200);s=(await a.b.get('/session')).json();assert.equal(s.scope,'restricted');assert.equal(s.blocked,true);assert.equal(s.indefinite,false);
+ assert.equal((await pg.owner.query('SELECT indefinite FROM identity.security_state')).rows[0].indefinite,true,'Canonical clock overrides compatibility value');
+ const q=(await a.admin.b.get('/control/accesses')).json();assert.equal(q.users[0].status,'suspended');assert.equal(q.users[0].cycle.quotaPolicy.limit,75);
+ await assert.rejects(pg.control.query('SELECT * FROM identity.security_state'),{code:'42501'});await assert.rejects(pg.control.query('SELECT * FROM finance.isolation_canary'),{code:'42501'});
+ await assert.rejects(pg.finance.query('SELECT * FROM commerce.account_directory'),{code:'42501'});await assert.rejects(pg.finance.query('SELECT reason FROM commerce.manual_grant'),{code:'42501'});
+ await assert.rejects(pg.control.query('SELECT commerce.project_account()'),{code:'42501'});
+});
+test('manual compensation preserves January anchor and is separate from payment history',async()=>{
+ const a=await registeredUser();await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at='2027-01-31T08:15:00Z',access_end='2027-02-28T08:15:00Z',calendar_months=1,extra_days=0");
+ const cmd=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'calendar_months',count:1},reason:'Incident compensation'});
+ assert.equal((await a.admin.b.post('/control/manual-access',cmd)).statusCode,200);
+ const cycle=(await a.b.get('/access/renewal')).json().cycle;assert.equal(cycle.anchorAt,'2027-01-31T08:15:00.000Z');assert.equal(cycle.accessEnd,'2027-03-31T08:15:00.000Z');assert.equal(cycle.quotaPolicy.limit,150);
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,1);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.invitation')).rowCount,1);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.access_extension')).rowCount,0);
+ const before=(await pg.owner.query('SELECT data FROM commerce.review_state')).rows[0].data;
+ assert.equal(before.payments.length,1);assert.equal((await a.admin.b.post('/control/manual-access',cmd)).json().status,'already_committed');
+});
+test('expired manual restoration uses commit time and explicit policy is required for account without cycle',async()=>{
+ await seedUser('identity','newuser');const {b}=await enrolledAdmin();
+ const body={actionId:crypto.randomUUID(),mode:'extend',userId:'newuser',term:{kind:'days',count:30},reason:'Free access'};
+ assert.equal((await b.post('/control/manual-preview',body)).json().code,'QUOTA_REQUIRED');
+ const cmd=await manualCommand(b,{...body,quota:{source:'tariff',tariffId:tariff.id}});assert.equal((await b.post('/control/manual-access',cmd)).statusCode,200);
+ const before=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.equal(before.access_end.getTime()-before.anchor_at.getTime(),30*86400000);
+ await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=clock_timestamp()-interval '40 days',access_end=clock_timestamp()-interval '1 day',end_offset_ms=999");
+ const fresh=await manualCommand(b,{...body,actionId:crypto.randomUUID(),term:{kind:'days',count:7}});const at=Date.now();assert.equal((await b.post('/control/manual-access',fresh)).statusCode,200);
+ const restored=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(restored.anchor_at.getTime()>=at-1);assert.equal(restored.end_offset_ms,'0');assert.equal(restored.extra_days,7);assert.equal(restored.quota_policy.limit,150);
+});
+test('manual preview conflicts with revision, tariff policy changes and renewal confirmation; never double extends',async()=>{
+ const a=await registeredUser(),row=await renewal(a),renew=await renewalCommand(a,row);
+ const cmd=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:7},reason:'Compensation'});
+ assert.equal((await a.admin.b.post('/control/manual-access',cmd)).statusCode,200);
+ assert.equal((await a.admin.b.post('/control/renewal-review',renew)).json().code,'PREVIEW_CHANGED');
+ const fresh=await renewalCommand(a,row);assert.equal((await a.admin.b.post('/control/renewal-review',fresh)).statusCode,200);
+ const pending=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'indefinite',userId:a.userId,term:{kind:'indefinite'},quota:{source:'tariff',tariffId:tariff.id},reason:'Finite AI policy'});
+ await pg.owner.query("UPDATE access.tariff SET snapshot=jsonb_set(snapshot,'{aiQuota}','200')");assert.equal((await a.admin.b.post('/control/manual-access',pending)).json().code,'PREVIEW_CHANGED');
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.manual_access_audit')).rowCount,1);
+});
+test('ending access changes canonical session immediately; later restoration retains own data and suspended flag',async()=>{
+ const a=await registeredUser(),original=(await a.b.get('/access/renewal')).json().cycle;
+ const cmd=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'end_now',userId:a.userId,reason:'Access ended'});
+ assert.equal((await a.admin.b.post('/control/manual-access',cmd)).statusCode,200);const restricted=(await a.b.get('/session')).json();assert.equal(restricted.scope,'restricted');assert.equal(restricted.capabilities.includes('finance'),false);
+ const restore=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:7},reason:'Restore same user'});assert.equal((await a.admin.b.post('/control/manual-access',restore)).statusCode,200);
+ assert.equal((await a.b.get('/session')).json().scope,'active');assert.equal((await pg.owner.query('SELECT 1 FROM identity.auth_user')).rowCount,1);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,1);assert.equal((await a.b.get('/access/renewal')).json().cycle.quotaPolicy.limit,original.quotaPolicy.limit);
+});
+test('manual invitation expiry, cancel/reissue retain entitlement and invalidate old independent proofs',async()=>{
+ const {b}=await enrolledAdmin(),cmd=await manualCommand(b,manualInvite());const saved=await b.post('/control/manual-access',cmd);assert.equal(saved.statusCode,200);
+ const old=saved.json().invitations[0],oldToken=(await mail('access','invitation',cc)).token,u=userBrowser();assert.equal((await u.post('/access/registration-proof',{invitationToken:oldToken})).statusCode,202);const oldProof=(await mail('access','registration_verification')).proofToken;
+ await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second'");
+ assert.equal((await u.post('/access/register',registrationBody(oldToken,oldProof))).statusCode,400);
+ const reissue={actionId:crypto.randomUUID(),invitationId:old.id,decision:'reissue',reason:'Expired link',inviteHours:24};assert.equal((await b.post('/control/manual-invitation-action',reissue)).statusCode,200);assert.equal((await b.post('/control/manual-invitation-action',reissue)).json().status,'already_committed');
+ const newToken=(await mail('access','invitation',cc)).token;assert.equal((await u.post('/access/register',registrationBody(newToken,oldProof))).statusCode,400);
+ const grant=(await pg.owner.query('SELECT * FROM commerce.manual_grant')).rows[0];assert.equal(grant.state,'pending');assert.equal(grant.activated_at,null);assert.equal(grant.term.count,7);
+ const q=(await b.get('/control/accesses')).json(),active=q.invitations.find((i:{state:string})=>i.state==='active');assert.equal((await b.post('/control/manual-invitation-action',{...reissue,actionId:crypto.randomUUID(),invitationId:active.id,decision:'cancel'})).statusCode,200);
+ assert.equal((await b.post('/control/invitation-link',{invitationId:active.id})).statusCode,409);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.invitation')).rowCount,2);
+});
+test('manual mutation/outbox and registration failures roll back clock, directory, action and audit atomically',async()=>{
+ const {b}=await enrolledAdmin(),cmd=await manualCommand(b,manualInvite());await pg.owner.query('REVOKE INSERT ON access.outbox FROM control_api');
+ try{assert.equal((await b.post('/control/manual-access',cmd)).statusCode,400);}finally{await pg.owner.query('GRANT INSERT ON access.outbox TO control_api');}
+ for(const table of ['manual_grant','manual_access_audit','action','invitation'])assert.equal((await pg.owner.query('SELECT 1 FROM commerce.'+table)).rowCount,0);
+ assert.equal((await b.post('/control/manual-access',cmd)).statusCode,200);const invitationToken=(await mail('access','invitation',cc)).token,u=userBrowser();assert.equal((await u.post('/access/registration-proof',{invitationToken})).statusCode,202);const proof=(await mail('access','registration_verification')).proofToken;
+ await pg.owner.query('REVOKE INSERT ON identity.outbox FROM finance_api');try{assert.equal((await u.post('/access/register',registrationBody(invitationToken,proof))).statusCode,400);}finally{await pg.owner.query('GRANT INSERT ON identity.outbox TO finance_api');}
+ for(const table of ['account_directory','access_cycle'])assert.equal((await pg.owner.query('SELECT 1 FROM commerce.'+table)).rowCount,0);assert.equal((await pg.owner.query('SELECT state FROM commerce.manual_grant')).rows[0].state,'pending');
+ assert.equal((await u.post('/access/register',registrationBody(invitationToken,proof))).statusCode,201);
+ const userId=(await pg.owner.query('SELECT id FROM identity.auth_user')).rows[0].id,change=await manualCommand(b,{actionId:crypto.randomUUID(),mode:'indefinite',userId,term:{kind:'indefinite'},reason:'Synthetic policy'}),before=(await b.get('/control/accesses')).json();
+ await pg.owner.query('REVOKE INSERT ON access.outbox FROM control_api');try{assert.equal((await b.post('/control/manual-access',change)).statusCode,400);}finally{await pg.owner.query('GRANT INSERT ON access.outbox TO control_api');}assert.deepEqual((await b.get('/control/accesses')).json(),before);
+});
+test('manual preview expiring during lock wait requires a fresh preview using wall clock',async()=>{
+ const a=await registeredUser(),cmd=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:7},reason:'Compensation'}),blocker=await pg.control.connect();let pending:ReturnType<Browser['post']>|undefined;
+ try{await blocker.query('BEGIN');await blocker.query('SELECT pg_advisory_xact_lock(92041)');pending=a.admin.b.post('/control/manual-access',cmd);let waiting=false;for(let i=0;i<100;i++){waiting=Boolean((await pg.owner.query("SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory'")).rowCount);if(waiting)break;await new Promise(resolve=>setTimeout(resolve,10));}assert.equal(waiting,true);
+ await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=clock_timestamp()-interval '1 month',access_end=clock_timestamp()");await blocker.query('COMMIT');const result=await pending;assert.equal(result.json().code,'PREVIEW_CHANGED');assert.equal((await pg.owner.query('SELECT 1 FROM commerce.manual_access_audit')).rowCount,0);
+ }finally{await blocker.query('ROLLBACK');blocker.release();if(pending)await pending;}
+});
+
+test('fixed manual grant that expires before registration cannot be activated or reissued',async()=>{
+ const {b}=await enrolledAdmin(),cmd=await manualCommand(b,manualInvite({term:{kind:'fixed',end:new Date(Date.now()+86400000).toISOString()}})),saved=await b.post('/control/manual-access',cmd);assert.equal(saved.statusCode,200);
+ const invite=saved.json().invitations[0],secret=(await mail('access','invitation',cc)).token,u=userBrowser();assert.equal((await u.post('/access/registration-proof',{invitationToken:secret})).statusCode,202);const proof=(await mail('access','registration_verification')).proofToken;
+ await pg.owner.query("UPDATE commerce.manual_grant SET term=jsonb_build_object('kind','fixed','end',clock_timestamp()-interval '1 second')");
+ assert.equal((await u.post('/access/register',registrationBody(secret,proof))).statusCode,400);assert.equal((await pg.owner.query('SELECT 1 FROM identity.auth_user')).rowCount,0);
+ assert.equal((await b.post('/control/manual-invitation-action',{actionId:crypto.randomUUID(),invitationId:invite.id,decision:'reissue',reason:'Expired fixed entitlement',inviteHours:24})).json().code,'INVALID_END');
+});
+test('pending public application or existing user cannot be silently replaced by manual invite',async()=>{
+ const a=await application('manual@example.test'),{b}=await enrolledAdmin();assert.equal((await b.post('/control/manual-preview',manualInvite())).json().code,'PENDING_ACCESS');
+ await seedUser('identity','existing');assert.equal((await b.post('/control/manual-preview',manualInvite({email:'existing@example.test'}))).json().code,'EXISTING_ACCOUNT');
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.manual_grant')).rowCount,0);assert.equal((await a.b.get('/access/request')).json().request.id,a.row.id);
 });

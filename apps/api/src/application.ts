@@ -14,11 +14,13 @@ function one(r: AccessRequest) { return { ...emptyAccessStore(), requests: [r] }
 export async function createApplication(db: PoolClient, request: FastifyRequest, seal: Sealer) {
   const input = fields(request, ['name', 'email', 'tariffId']), address = email(input.email), name = string(input.name, 100).trim(), tariffId = string(input.tariffId, 100);
   const now = await clock(db);
+  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['access-email:'+address]);
   const tariff = (await db.query('SELECT snapshot FROM access.tariff WHERE id=$1', [tariffId])).rows[0]?.snapshot as Tariff | undefined;
   if (!tariff) throw new HttpError(400, 'TARIFF_UNAVAILABLE');
   // An existing account receives its own route via email; the public response does not disclose it.
   const user = (await db.query('SELECT id FROM identity.auth_user WHERE email=$1', [address])).rows[0];
   if (user) { await outbox(db, 'access', seal, 'existing_account', { email: address }); return { status: 'accepted' }; }
+  if((await db.query("SELECT 1 FROM commerce.manual_grant WHERE email=$1 AND state='pending'",[address])).rowCount){await outbox(db,'access',seal,'existing_invitation',{email:address});return {status:'accepted'};}
   const previous = (await db.query('SELECT data FROM access.request WHERE email=$1 ORDER BY created_at DESC FOR UPDATE', [address])).rows.map(x => x.data as AccessRequest);
   let row = previous.find(r => !['expired', 'rejected'].includes(requestStatus(r, now)));
   if (!row) {

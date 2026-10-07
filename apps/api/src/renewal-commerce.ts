@@ -23,6 +23,7 @@ export async function reviewRenewal(db:PoolClient,request:FastifyRequest,actorId
  const cycle=await lockedCycle(db,ref.user_id),row=(await db.query('SELECT * FROM commerce.renewal_request WHERE id=$1 FOR UPDATE',[requestId])).rows[0];
  if(!preview&&await remember(db,id,actorId,{kind:'renewal',...cmd,expectedCycleRevision:b.expectedCycleRevision,expectedMode:b.expectedMode}))return {status:'already_committed',...await renewalQueue(db)};
  if(row.state!=='open')throw new HttpError(409,'RENEWAL_CONFLICT');
+ if(cycle.indefinite||!cycle.accessEnd)throw new HttpError(409,'CYCLE_INDEFINITE');
  const before={...row.review_state,requests:[row.data]} as AccessStore,now=await clock(db),mode=Date.parse(cycle.accessEnd)>Date.parse(now)?'continuous':'restored';
  if(!preview&&(cycle.revision!==b.expectedCycleRevision||mode!==b.expectedMode))throw new HttpError(409,'PREVIEW_CHANGED');
  let next:AccessStore;try{next=reviewRequest(before,cmd,now);}catch{throw new HttpError(409,'REVIEW_CONFLICT');}
@@ -35,7 +36,7 @@ export async function reviewRenewal(db:PoolClient,request:FastifyRequest,actorId
  await db.query('UPDATE commerce.renewal_request SET data=$1,review_state=$2,state=$3 WHERE id=$4',[next.requests[0],next,state,requestId]);
  if(result){
    const e=result.extension;
-   await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1 WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,ref.user_id]);
+   await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,ref.user_id,e.mode==='continuous']);
    await db.query('INSERT INTO commerce.access_extension(action_id,request_id,user_id,data) VALUES($1,$2,$3,$4)',[id,requestId,ref.user_id,e]);
  }
  await outbox(db,'access',seal,'renewal_decision',{email:row.data.email,status:state==='completed'?'completed':next.requests[0]!.status,remainingMinor:next.requests[0]!.remainingMinor,...(result?{accessEnd:result.extension.accessEnd}:{})});
