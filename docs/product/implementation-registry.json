@@ -4737,7 +4737,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4749,7 +4755,7 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-38.8",
@@ -5010,13 +5016,20 @@
         "packages/database/migrations/0003_access_renewal.sql",
         "apps/web/src/ServerRenewal.tsx",
         "apps/admin/src/ServerRenewals.tsx",
-        "docs/architecture/access-renewal.md"
+        "docs/architecture/access-renewal.md",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
+      "note": " Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-39.10",
@@ -5039,7 +5052,12 @@
         "packages/database/migrations/0003_access_renewal.sql",
         "apps/web/src/ServerRenewal.tsx",
         "apps/admin/src/ServerRenewals.tsx",
-        "docs/architecture/access-renewal.md"
+        "docs/architecture/access-renewal.md",
+        "apps/api/src/manual-access.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
@@ -5047,7 +5065,7 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-39.11",
@@ -5385,13 +5403,22 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "note": " Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-40.15",
@@ -5430,7 +5457,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
@@ -5438,7 +5471,7 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-40.17",
@@ -5543,7 +5576,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
@@ -5552,7 +5591,7 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.4",
@@ -5566,16 +5605,25 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.5",
@@ -5679,16 +5727,25 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.10",
@@ -5698,10 +5755,22 @@
       "title": "Административная панель",
       "source_text": "Compensation acces s Administrator может вручную добавить дни/период доступа конкретному пользователю, а при крупном incident — группе пользователей как компенсацию. Mass compensation всегда показывает scope и записывается в Admin History; это отдельное действие и не создаёт фиктивную payment record.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.11",
@@ -5720,7 +5789,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -5732,7 +5807,7 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.12",
@@ -5742,10 +5817,22 @@
       "title": "Административная панель",
       "source_text": "Административные роли и запрет impersonatio n Первая версия использует только пользовательскую роль и административный контур owner/admin без сложной иерархии support- ролей. Admin не impersonates пользователя и не открывает его финансовый интерфейс от его имени. Если для поддержки позже понадобится расширенный diagnostics mode, он проектируется отдельно с явным разрешением и audit trail.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.13",
@@ -5755,10 +5842,22 @@
       "title": "Административная панель",
       "source_text": "Recent Admin Actions и удалённый аккаун т Dashboard показывает последние значимые admin actions, чтобы владелец видел выдачи доступа, payment confirmations, email overrides, suspensions и maintenance changes. После permanent deletion прежний email при отсутствии юридического ограничения может быть приглашён заново как новый user с новым `user_id`; старая финансовая история при этом не восстанавливается автоматически.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "PDF-41.14",
@@ -7243,13 +7342,19 @@
         "packages/database/migrations/0003_access_renewal.sql",
         "apps/web/src/ServerRenewal.tsx",
         "apps/admin/src/ServerRenewals.tsx",
-        "docs/architecture/access-renewal.md"
+        "docs/architecture/access-renewal.md",
+        "apps/api/src/manual-access.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/browser.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "A-02",
@@ -7516,14 +7621,19 @@
         "packages/database/migrations/0003_access_renewal.sql",
         "apps/web/src/ServerRenewal.tsx",
         "apps/admin/src/ServerRenewals.tsx",
-        "docs/architecture/access-renewal.md"
+        "docs/architecture/access-renewal.md",
+        "apps/api/src/manual-access.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/browser.test.ts",
         "docs/architecture/invitation-registration.md"
       ],
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "B-07",
@@ -7605,7 +7715,12 @@
         "packages/database/migrations/0003_access_renewal.sql",
         "apps/web/src/ServerRenewal.tsx",
         "apps/admin/src/ServerRenewals.tsx",
-        "docs/architecture/access-renewal.md"
+        "docs/architecture/access-renewal.md",
+        "apps/api/src/manual-access.ts",
+        "packages/database/migrations/0004_manual_access.sql",
+        "packages/access/src/manual.ts",
+        "apps/admin/src/ServerManualAccess.tsx",
+        "docs/architecture/manual-access.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -7616,7 +7731,7 @@
         "apps/api/test/browser.test.ts",
         "docs/architecture/invitation-registration.md"
       ],
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
     },
     {
       "id": "C-01",

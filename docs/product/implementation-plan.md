@@ -62,3 +62,6 @@
 
 
 Четвёртый Development блок: [продление доступа](../architecture/access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.
+
+
+Пятый Development блок: [ручная выдача и изменение доступа](../architecture/manual-access.md). Отдельные manual grants/invitations, fixed/indefinite policy, индивидуальная компенсация и корректировка end; TOTP, preview/revision/action IDs, canonical session, metadata-only admin directory, атомарный audit/outbox. Деньги не выдумываются, suspension/usage не сбрасываются. Mass compensation, actual mail/AI/runtime/hosting и полный release acceptance впереди; exact-head checks фиксируются в PR.
