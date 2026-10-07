@@ -26,14 +26,14 @@ export async function createApplication(db: PoolClient, request: FastifyRequest,
     await db.query('INSERT INTO access.request(id,email,data) VALUES($1,$2,$3)', [row.id, address, row]);
   }
   const secret = token();
-  await db.query(`INSERT INTO access.email_token(verifier,request_id,expires_at) VALUES($1,$2,now()+interval '30 minutes')`, [digest(secret), row.id]);
+  await db.query(`INSERT INTO access.email_token(verifier,request_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '30 minutes')`, [digest(secret), row.id]);
   await outbox(db, 'access', seal, 'application_verification', { email: address, token: secret });
   return { status: 'accepted' };
 }
 export async function verifyApplication(db: PoolClient, request: FastifyRequest) {
   const input = fields(request, ['token']), secret = string(input.token, 100);
   const entry = (await db.query(`SELECT t.request_id,r.data FROM access.email_token t JOIN access.request r ON r.id=t.request_id
-    WHERE verifier=$1 AND consumed_at IS NULL AND t.expires_at>now() FOR UPDATE OF t,r`, [digest(secret)])).rows[0];
+    WHERE verifier=$1 AND consumed_at IS NULL AND t.expires_at>clock_timestamp() FOR UPDATE OF t,r`, [digest(secret)])).rows[0];
   if (!entry) throw new HttpError(400, 'INVALID_TOKEN');
   const now = await clock(db); let row = entry.data as AccessRequest;
   if (['expired', 'rejected'].includes(requestStatus(row, now))) throw new HttpError(400, 'INVALID_TOKEN');
@@ -41,9 +41,9 @@ export async function verifyApplication(db: PoolClient, request: FastifyRequest)
     row = recordVerifiedEmail(one(row), row.id, now).requests[0]!;
     await db.query('UPDATE access.request SET data=$1 WHERE id=$2', [row, row.id]);
   }
-  await db.query('UPDATE access.email_token SET consumed_at=now() WHERE request_id=$1', [row.id]);
+  await db.query('UPDATE access.email_token SET consumed_at=clock_timestamp() WHERE request_id=$1', [row.id]);
   const session = token();
-  await db.query(`INSERT INTO access.application_session(verifier,request_id,expires_at) VALUES($1,$2,now()+interval '72 hours')`, [digest(session), row.id]);
+  await db.query(`INSERT INTO access.application_session(verifier,request_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '72 hours')`, [digest(session), row.id]);
   return { row, session };
 }
 export async function ownedApplication(db: PoolClient, config: Config, request: FastifyRequest) {
@@ -51,7 +51,7 @@ export async function ownedApplication(db: PoolClient, config: Config, request: 
   if (!cookie) throw new HttpError(401, 'APPLICATION_SESSION_REQUIRED');
   const session = cookie.slice(cookie.indexOf('=') + 1);
   const entry = (await db.query(`SELECT r.data FROM access.application_session s JOIN access.request r ON r.id=s.request_id
-    WHERE s.verifier=$1 AND s.expires_at>now() FOR UPDATE OF r`, [digest(session)])).rows[0];
+    WHERE s.verifier=$1 AND s.expires_at>clock_timestamp() FOR UPDATE OF r`, [digest(session)])).rows[0];
   if (!entry || !entry.data.verifiedAt) throw new HttpError(401, 'APPLICATION_SESSION_REQUIRED');
   return entry.data as AccessRequest;
 }
