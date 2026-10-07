@@ -4539,7 +4539,12 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4547,10 +4552,12 @@
         "apps/admin/e2e/requests.spec.ts",
         "docs/architecture/access-admin-requests.md",
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-38.3",
@@ -4570,7 +4577,12 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4578,10 +4590,12 @@
         "apps/admin/e2e/requests.spec.ts",
         "docs/architecture/access-admin-requests.md",
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-38.4",
@@ -4601,7 +4615,12 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4609,10 +4628,12 @@
         "apps/admin/e2e/requests.spec.ts",
         "docs/architecture/access-admin-requests.md",
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-38.5",
@@ -4632,7 +4653,12 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4640,10 +4666,12 @@
         "apps/admin/e2e/requests.spec.ts",
         "docs/architecture/access-admin-requests.md",
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-38.6",
@@ -4657,16 +4685,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-38.7",
@@ -4680,16 +4716,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-38.8",
@@ -4709,7 +4753,12 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4717,10 +4766,12 @@
         "apps/admin/e2e/requests.spec.ts",
         "docs/architecture/access-admin-requests.md",
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-39",
@@ -4835,16 +4886,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-39.8",
@@ -4880,10 +4939,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Календарный месяц и граничные дат ы «1 месяц доступа» означает календарное смещение с сохранением времени активации, а не 30 суток. Для дат, которых нет в следующем месяце, используется последний допустимый день месяца: например access, начавшийся 31 января, при месячном продлении заканчивается в последний календарный день февраля в то же локальное время profile timezone. Точная библиотечная реализация фиксируется в технических tests.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-39.11",
@@ -4926,13 +4996,21 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-40.2",
@@ -4972,13 +5050,21 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-40.4",
@@ -5106,10 +5192,21 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Invitation securit y Invitation link ограничен по времени, одноразовый и после использования/отмены инвалидируется. Владение скопированной ссылкой само по себе не должно считаться доказательством владения email: регистрационный flow связывает приглашение с ожидаемым адресом и подтверждает его согласно выбранной auth- реализации.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-40.11",
@@ -5214,10 +5311,21 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Lifetime invitation lin k При ручной выдаче invitation administrator выбирает срок действия ссылки отдельно от оплаченного entitlement: например 24 часа, 3 дня, 7 дней или custom; рабочий default может быть 72 часа. Истечение ссылки не уменьшает уже подтверждённый оплаченный период — создаётся новая invitation link.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-40.17",
@@ -5227,10 +5335,21 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Критичные email- событи я Критичные transactional emails первой версии: email verification, invitation, password reset, password/email/security changes, significant new login, access reminders/expiry, payment accepted/rejected/clarification, maintenance scheduled/rescheduled/cancelled и admin 2FA recovery. Delivery status как минимум queued/sent/failed доступен там, где failure требует ручного resend. После SMS-recovery administrator не получает полный admin access до настройки нового TOTP. Особо опасные действия сразу после recovery должны требовать свежий TOTP из уже заново настроенного authenticator. ЧАСТЬ V. АДМИНИСТРИРОВАНИЕ, ЭКСПЛУАТАЦИЯ И РЕЛИЗЫ Доступы, maintenance, monitoring, Staging, Production и релизы",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-41",
@@ -5306,13 +5425,21 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-41.4",
@@ -5457,16 +5584,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "PDF-41.12",
@@ -7226,10 +7361,20 @@
         "33.7",
         "39.10"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
+      ],
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "B-07",
@@ -7299,15 +7444,23 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "C-01",
@@ -7343,13 +7496,20 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "C-03",
@@ -7473,13 +7633,20 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "E-03",
@@ -7505,13 +7672,20 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/commerce.ts",
+        "apps/api/src/registration.ts",
+        "packages/database/migrations/0002_invitation_registration.sql",
+        "apps/web/src/ServerAccess.tsx",
+        "apps/admin/src/ServerAdmin.tsx"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts",
+        "docs/architecture/invitation-registration.md"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
       "id": "E-05",

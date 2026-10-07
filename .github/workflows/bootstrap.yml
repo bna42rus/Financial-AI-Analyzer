@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:
@@ -43,5 +43,9 @@ jobs:
         run: pnpm run test:security
       - name: Install browser for interface checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check full application, payment review and registration over HTTP with PostgreSQL
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+        run: pnpm run test:access-browser
       - name: Check interface on desktop and mobile
         run: pnpm run test:e2e

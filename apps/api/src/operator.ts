@@ -15,6 +15,11 @@ try {
   if (mode === 'migrate') {
     const sql = await readFile(new URL('../../../packages/database/migrations/0001_access_security.sql', import.meta.url), 'utf8');
     await db.query(sql);
+  } else if(mode==='migrate-invitations') {
+    await db.query(await readFile(new URL('../../../packages/database/migrations/0002_invitation_registration.sql',import.meta.url),'utf8'));
+  } else if(mode==='seed-tariff-example') {
+    const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true};
+    await db.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);
   } else if (mode === 'seed-admin-example') {
     // Only synthetic address and data. Real owner provisioning is a separate verified-email bootstrap flow.
     if ((await db.query('SELECT 1 FROM control.auth_user')).rowCount) throw new Error('Example admin already exists');
@@ -30,7 +35,7 @@ try {
     await db.query(`INSERT INTO control.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Development example','owner@example.test',true,now(),now())`, [id]);
     await db.query(`INSERT INTO control.auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,now(),now())`, [randomUUID(), id, await hashPassword(chosen)]);
     await db.query('INSERT INTO control.security_state(user_id,bootstrap_pending) VALUES($1,true)', [id]);
-  } else throw new Error('Use migrate or seed-admin-example');
+  } else throw new Error('Use migrate, migrate-invitations, seed-tariff-example or seed-admin-example');
   await db.query('COMMIT'); process.stdout.write('Development operation completed.\n');
 } catch (error) { await db.query('ROLLBACK'); throw new Error('Development operation failed; no changes committed'); }
 finally { db.release(); await pool.end(); }

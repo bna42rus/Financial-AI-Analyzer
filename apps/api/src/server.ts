@@ -28,6 +28,8 @@ export async function createServer(config: Config) {
   const seal = envelope(config.wrappingKey), schema = realm(config.profile);
   // Finance repositories are never loaded by the control deployment profile.
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
+  const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
+  const commerce = config.profile === 'control' ? await import('./commerce.ts') : null;
   class RootModule {} Module({})(RootModule);
   const app = await NestFactory.create<NestFastifyApplication>(RootModule, new FastifyAdapter({ logger: false, trustProxy: false, bodyLimit: 8192 }), { logger: false });
   const fastify = app.getHttpAdapter().getInstance();
@@ -46,6 +48,8 @@ export async function createServer(config: Config) {
     const route = request.url.split('?')[0]!;
     const address = typeof (request.body as Record<string, unknown> | undefined)?.email === 'string' ? String((request.body as Record<string, unknown>).email).trim().toLowerCase() : '';
     const budgets: [string, number, number][] = [['ip:' + request.ip, 30, 60]];
+    const invitationSecret = (request.body as Record<string, unknown> | undefined)?.invitationToken;
+    if(typeof invitationSecret==='string') budgets.push(['invitation:'+route+':'+invitationSecret,5,300]);
     if (address) budgets.push(['account:' + route + ':' + address, route.endsWith('reset-request') ? 3 : 5, 300]);
     else budgets.push(['action:' + route + ':' + request.ip, 10, 60]);
     for (const [key, max, seconds] of budgets) {
@@ -138,17 +142,30 @@ export async function createServer(config: Config) {
           const s = await current(auth, request); if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
           const state = (await db.query('SELECT status,indefinite,access_end FROM identity.security_state WHERE user_id=$1', [s.user.id])).rows[0];
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
-          const now = (await db.query('SELECT now() AS now')).rows[0].now;
+          const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
           result = { name: s.user.name, scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
-        result = { requests: (await db.query('SELECT data FROM access.request ORDER BY created_at DESC LIMIT 100')).rows.map(r => r.data) };
+        result = await commerce!.queue(db);
+      } else if (commerce && ['/control/review-preview','/control/review'].includes(path) && request.method === 'POST') {
+        const s=await requireAdmin(auth,db,request);
+        result=await commerce.review(db,request,s.user.id,seal,path==='/control/review-preview');
+      } else if (commerce && path==='/control/invitation-action' && request.method==='POST') {
+        const s=await requireAdmin(auth,db,request);result=await commerce.invitationAction(db,request,s.user.id,seal);
+      } else if (commerce && path==='/control/invitation-link' && request.method==='POST') {
+        const s=await requireAdmin(auth,db,request);result=await commerce.copyInvitation(db,request,s.user.id,seal);
+      } else if (registration && path==='/access/registration-proof' && request.method==='POST') {
+        result=await registration.requestRegistrationProof(db,request,seal);status=202;
+      } else if (registration && path==='/access/register' && request.method==='POST') {
+        result=await registration.register(db,request,seal);status=201;
+      } else if (application && path==='/access/tariffs' && request.method==='GET') {
+        result={tariffs:(await db.query("SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'publicVisible'='true' AND snapshot->>'availableForNew'='true' ORDER BY id")).rows.map(r=>r.snapshot)};
       } else if (path === '/security/sessions' && request.method === 'GET') {
         const s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
-        result = { sessions: (await db.query(`SELECT id,created_at,expires_at FROM ${schema}.auth_session WHERE user_id=$1 AND expires_at>now()`, [s.user.id])).rows.map(r => ({ id: r.id, createdAt: r.created_at, expiresAt: r.expires_at, current: r.id === s.session.id })) };
+        result = { sessions: (await db.query(`SELECT id,created_at,expires_at FROM ${schema}.auth_session WHERE user_id=$1 AND expires_at>clock_timestamp()`, [s.user.id])).rows.map(r => ({ id: r.id, createdAt: r.created_at, expiresAt: r.expires_at, current: r.id === s.session.id })) };
       } else if (path === '/security/revoke-session' && request.method === 'POST') {
         const input = fields(request, ['sessionId']), s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
@@ -161,7 +178,7 @@ export async function createServer(config: Config) {
         const verified = await application.verifyApplication(db, request); result = { status: 'verified' }; cookies = [application.appCookie(config, verified.session)];
       } else if (application && path === '/access/request' && request.method === 'GET') {
         if (request.url.includes('?')) throw new HttpError(400, 'INVALID_INPUT');
-        result = { request: await application.ownedApplication(db, config, request) };
+        result = { request: application.publicRequest(await application.ownedApplication(db, config, request)) };
       } else if (application && path === '/access/payment-claim' && request.method === 'POST') {
         result = { request: await application.applicationClaim(db, config, request) };
       } else throw new HttpError(404, 'NOT_FOUND');

@@ -79,16 +79,16 @@ export async function recordAuthResult(auth: Auth, db: PoolClient, config: Confi
     return new Response(JSON.stringify(result), { status: response.status, headers: response.headers });
   } else if (path === '/auth/two-factor/verify-totp') {
     const code = String((request.body as Record<string, unknown>).code);
-    const used = await db.query(`INSERT INTO control.totp_replay(user_id,verifier,expires_at) VALUES($1,$2,now()+interval '90 seconds')
-      ON CONFLICT(user_id,verifier) DO UPDATE SET expires_at=EXCLUDED.expires_at WHERE control.totp_replay.expires_at<=now() RETURNING user_id`, [session.user.id, seal.rateKey(code)]);
+    const used = await db.query(`INSERT INTO control.totp_replay(user_id,verifier,expires_at) VALUES($1,$2,clock_timestamp()+interval '90 seconds')
+      ON CONFLICT(user_id,verifier) DO UPDATE SET expires_at=EXCLUDED.expires_at WHERE control.totp_replay.expires_at<=clock_timestamp() RETURNING user_id`, [session.user.id, seal.rateKey(code)]);
     if (!used.rowCount) throw new HttpError(409, 'TOTP_ALREADY_USED');
     const verified = (await db.query('SELECT two_factor_enabled FROM control.auth_user WHERE id=$1', [session.user.id])).rows[0];
     if (!verified?.two_factor_enabled) throw new HttpError(403, 'TOTP_REQUIRED');
-    await db.query(`INSERT INTO control.session_proof(session_id,user_id,epoch,level,verified_at) VALUES($1,$2,$3,'admin',now())
-      ON CONFLICT(session_id) DO UPDATE SET level='admin',epoch=EXCLUDED.epoch,verified_at=now()`, [session.session.id, session.user.id, state.epoch]);
+    await db.query(`INSERT INTO control.session_proof(session_id,user_id,epoch,level,verified_at) VALUES($1,$2,$3,'admin',clock_timestamp())
+      ON CONFLICT(session_id) DO UPDATE SET level='admin',epoch=EXCLUDED.epoch,verified_at=clock_timestamp()`, [session.session.id, session.user.id, state.epoch]);
     await db.query('UPDATE control.security_state SET bootstrap_pending=false WHERE user_id=$1', [session.user.id]);
     // Product recovery codes: returned once only after verified enrollment, hashed individually in storage.
-    if (enrollment) await db.query('UPDATE control.recovery_code SET consumed_at=coalesce(consumed_at,now()) WHERE user_id=$1', [session.user.id]);
+    if (enrollment) await db.query('UPDATE control.recovery_code SET consumed_at=coalesce(consumed_at,clock_timestamp()) WHERE user_id=$1', [session.user.id]);
     const existing = await db.query('SELECT 1 FROM control.recovery_code WHERE user_id=$1 AND consumed_at IS NULL', [session.user.id]);
     if (!existing.rowCount) {
       const { token, digest } = await import('./crypto.ts'); const codes = Array.from({ length: 8 }, token);
