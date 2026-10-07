@@ -15,8 +15,11 @@ import type { Config } from './types.ts';
 export async function createServer(config: Config) {
   if (!['development', 'test'].includes(config.environment)) throw new Error('Production requires a KMS adapter and separate security acceptance');
   const expectedRole = config.profile === 'control' ? 'control_api' : 'finance_api';
-  const role = (await config.pool.query(`SELECT current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user`)).rows[0];
+  const role = (await config.pool.query(`SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user`)).rows[0];
   if (role.name !== expectedRole || role.rolsuper || role.rolbypassrls) throw new Error('Runtime database credentials must use the scoped application role');
+  const owned = await config.pool.query(`SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE c.relowner=$1 AND n.nspname IN ('identity','control','access','commerce','finance','protected_keys') LIMIT 1`, [role.oid]);
+  if (owned.rowCount) throw new Error('Runtime database credentials must not own application objects');
   if (config.authSecret.length < 32 || config.wrappingKey.length !== 32) throw new Error('Independent runtime secrets are required');
   const seal = envelope(config.wrappingKey), schema = realm(config.profile);
   // Finance repositories are never loaded by the control deployment profile.
@@ -24,6 +27,10 @@ export async function createServer(config: Config) {
   class RootModule {} Module({})(RootModule);
   const app = await NestFactory.create<NestFastifyApplication>(RootModule, new FastifyAdapter({ logger: false, trustProxy: false, bodyLimit: 8192 }), { logger: false });
   const fastify = app.getHttpAdapter().getInstance();
+  fastify.addHook('onSend', async (_request, reply, payload) => {
+    reply.header('cache-control','no-store').header('referrer-policy','no-referrer').header('x-content-type-options','nosniff');
+    return payload;
+  });
   async function subjectRate(userId: string) {
     const result = await config.pool.query(`INSERT INTO ${schema}.rate_limit(key,hits,expires_at) VALUES($1,1,now()+interval '5 minutes')
       ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN 1 ELSE ${schema}.rate_limit.hits+1 END,
@@ -155,6 +162,12 @@ export async function createServer(config: Config) {
       return reply.code(error instanceof HttpError ? error.status : 400).send({ code: error instanceof HttpError ? error.code : 'REQUEST_FAILED' });
     }
   } });
-  await app.init(); await fastify.ready();
+  await app.init();
+  fastify.setErrorHandler((error, _request, reply) => {
+    // Parser/oversize failures must never reflect raw request fragments or tokens.
+    const oversized=error && typeof error==='object' && 'statusCode' in error && error.statusCode===413;
+    return reply.code(oversized ? 413 : 400).send({code:'INVALID_REQUEST'});
+  });
+  await fastify.ready();
   return { app, fastify, close: () => app.close() };
 }

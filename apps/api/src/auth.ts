@@ -27,7 +27,7 @@ export function makeAuth(config: Config, db: PoolClient, seal: Sealer) {
     },
     rateLimit: { enabled: false }, // Durable IP/account limits outside request transaction; see server.ts.
     plugins: config.profile === 'control' ? [twoFactor({ issuer: 'Financial AI Analyzer Admin', skipVerificationOnEnable: false,
-      backupCodeOptions: { amount: 1, length: 32 } })] : [],
+      backupCodeOptions: { amount: 1, length: 32 }, accountLockout: { enabled: true, maxFailedAttempts: 5, durationSeconds: 300 } })] : [],
   });
 }
 export type Auth = ReturnType<typeof makeAuth>;

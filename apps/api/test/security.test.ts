@@ -77,6 +77,11 @@ test('real PostgreSQL 18, non-owner runtime roles and database isolation', async
   for (const sql of ['SELECT * FROM finance.isolation_canary','SELECT * FROM protected_keys.isolation_canary','SELECT * FROM identity.auth_account','SELECT * FROM access.outbox']) await assert.rejects(pg.control.query(sql),{code:'42501'});
   await assert.rejects(pg.finance.query('SELECT * FROM control.auth_account'),{code:'42501'});
   await assert.rejects(createServer({...fc,pool:pg.owner}), /scoped application role/);
+  await pg.owner.query('GRANT CREATE ON SCHEMA control TO control_api');
+  try {
+    await pg.control.query('CREATE TABLE control.ownership_canary(marker text)');
+    await assert.rejects(createServer(cc), /must not own/);
+  } finally { await pg.owner.query('DROP TABLE IF EXISTS control.ownership_canary'); await pg.owner.query('REVOKE CREATE ON SCHEMA control FROM control_api'); }
 });
 test('transaction-local tenant context and FORCE RLS do not cross pool requests', async () => {
   await pg.owner.query(`INSERT INTO finance.isolation_canary VALUES('first','synthetic A'),('second','synthetic B')`);
@@ -207,6 +212,8 @@ test('CSRF/origin and JSON requirements; secure HttpOnly host-only cookies and n
   const fresh=userBrowser();await seedUser('identity');const login=await fresh.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
   const sessionCookie=login.cookies.find(c=>c.name.includes('session_token'));assert.ok(sessionCookie?.secure&&sessionCookie.httpOnly);assert.equal(sessionCookie.domain,undefined);assert.equal(sessionCookie.sameSite,'Strict');
   assert.equal(login.headers['cache-control'],'no-store');assert.equal(login.json().token,undefined);
+  const raw=token(), malformed=await finance.fastify.inject({method:'POST',url:'/security/reset',payload:'{"token":"'+raw+'",',headers:{origin:fc.origin,'content-type':'application/json'}});
+  assert.equal(malformed.statusCode,400);assert.ok(!malformed.body.includes(raw));assert.equal(malformed.headers['cache-control'],'no-store');
 });
 test('durable rate limits survive failed transactions and a new server instance', async () => {
   const b=adminBrowser();for(let i=0;i<5;i++)assert.equal((await b.post('/control/recovery',{email:'absent@example.test',password:testPassword,recoveryCode:token()})).statusCode,401);
