@@ -57,6 +57,9 @@
 .danger h3 { color:var(--color-warning); }
 .noResults { color:var(--color-secondary-text); padding:16px 12px; font-size:calc(13px * var(--text-scale, 1)); }
 .back { display:none; }
+.historyScope { padding:14px; border:1px solid var(--color-border); border-radius:9px; margin-bottom:20px; font-size:calc(13px * var(--text-scale, 1)); }
+.historyScope strong { font-weight:500; overflow-wrap:anywhere; }
+.historyScope small { display:block; color:var(--color-secondary-text); margin:4px 0 12px; }
 :global([data-density="compact"]) .menu button { padding:9px 12px; min-height:56px; }
 :global([data-density="compact"]) .account { padding:11px 14px; }
 :global([data-density="compact"]) .infoRow { padding:12px 0; }

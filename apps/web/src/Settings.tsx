@@ -67,9 +67,12 @@ interface Props {
   onAppearanceChange: (appearance: Appearance) => void;
   onShowDemo: () => Promise<void>;
   onOpenOperations: (label: string, rows: readonly DemoOperation[]) => void;
+  onUpload: () => void;
+  historyOperation: DemoOperation | null;
+  onClearHistory: () => void;
 }
 
-export function Settings({ operations, appearance, loading, onAppearanceChange, onShowDemo, onOpenOperations }: Props) {
+export function Settings({ operations, appearance, loading, onAppearanceChange, onShowDemo, onOpenOperations, onUpload, historyOperation, onClearHistory }: Props) {
   const [section, setSection] = useState<Section | null>(selectedSection);
   const [query, setQuery] = useState('');
   const [notice, setNotice] = useState('');
@@ -93,6 +96,7 @@ export function Settings({ operations, appearance, loading, onAppearanceChange, 
   });
   const excluded = operations.filter(row => row.excluded);
   function open(next: Section | null) {
+    onClearHistory();
     if (next) lastSection.current = next;
     setSection(next); setNotice('');
     const hash = next ? '#settings/' + next : '#settings';
@@ -113,7 +117,7 @@ export function Settings({ operations, appearance, loading, onAppearanceChange, 
         {accounts.length ? <div className={styles.accounts}>{accounts.map(account => <article className={styles.account} key={JSON.stringify([account.bank, account.name])}><div className={styles.accountIcon}><CreditCard size={20} aria-hidden="true" /></div><div><h3>{account.name}</h3><p>{account.bank} · Операций: {account.rows.length}</p></div><button className={common.button} aria-label={`Операции счёта: ${account.bank} — ${account.name}`} onClick={() => onOpenOperations(`${account.bank} — ${account.name}`, account.rows)}>Операции <ArrowRight size={15} aria-hidden="true" /></button></article>)}</div> : <>{empty('Счетов пока нет', 'Счета появятся после загрузки выписок. Здесь будут банк, понятное название и настройки каждого счёта.')}<div className={styles.emptyAction}><button className={common.button} onClick={() => void onShowDemo()} disabled={loading}>{loading ? 'Открываем пример…' : 'Посмотреть пример'}</button></div></>}
         <p className={styles.note}>В этой версии счета доступны для просмотра. Переименование, тип, видимость и объединение подключим позже. Номера карт и счетов здесь не отображаются.</p>
       </>;
-      case 'imports': return <>{empty('Загрузок пока нет', operations.length ? 'Вымышленный пример открыт без загрузки файлов. Он не создаёт запись в истории импорта.' : 'Здесь будут результаты загрузки: новые операции, повторы и записи, требующие проверки.')}<p className={styles.note}>Загрузка и отмена импорта пока недоступны. Отмена загрузки не восстанавливается обычным Undo.</p></>;
+      case 'imports': return <>{empty('Загрузок пока нет', operations.length ? 'Вымышленный пример открыт без загрузки файлов. Он не создаёт запись в истории импорта.' : 'Здесь будут результаты загрузки: новые операции, повторы и записи, требующие проверки.')}<div className={styles.emptyAction}><button className={common.primaryButton} onClick={onUpload}>Выбрать выписки</button></div><p className={styles.note}>Выбор файлов доступен. Их обработка и отмена импорта пока не подключены. Отмена загрузки не восстанавливается обычным Undo.</p></>;
       case 'categories': return <><p className={styles.description}>Стартовый справочник можно будет менять под себя: добавлять, переименовывать и объединять категории. Сейчас доступен просмотр.</p>{operations.length > 0 && <details className={styles.exampleCategories}><summary>Категории вымышленного примера</summary><p>{[...new Set(operations.map(row => row.category).filter(Boolean))].join(' · ')}</p></details>}<h3 className={styles.groupTitle}>Расходы</h3>{categories(starterExpenses)}<h3 className={styles.groupTitle}>Доходы</h3>{categories(starterIncome)}<p className={styles.note}>Переводы, возвраты и наличные — виды операций, а не отдельные экономические категории.</p></>;
       case 'rules': return <>{empty('Личных правил пока нет', 'Правила помогут узнавать повторяющиеся операции: магазин, аренду или регулярный платёж.')}<p className={styles.note}>Создание, приоритеты и применение правил к прошлым операциям появятся позже. Вымышленный пример не создаёт личных правил.</p></>;
       case 'counterparties': return <>{empty('Контрагентов пока нет', 'Здесь будут люди и организации, которых вы добавили или подтвердили. Разовые получатели переводов не добавляются автоматически.')}<p className={styles.note}>Предложения повторяющихся получателей будут показаны отдельно. Создание, объединение и исправление карточек пока недоступны.</p></>;
@@ -131,7 +135,7 @@ export function Settings({ operations, appearance, loading, onAppearanceChange, 
         <details className={styles.category}><summary>Стартовый экран и сохранённые представления</summary><p>Сейчас сайт начинает с Обзора или экрана из ссылки. Выбор стартового экрана и управление сохранёнными представлениями подключим позже.</p></details>
       </>;
       case 'privacy': return <><p className={styles.description}>Сейчас доступны только вымышленные данные в памяти страницы. При перезагрузке они исчезают; финансовые сведения не отправляются во внешние сервисы.</p><dl className={styles.info}>{info('AI-классификация', 'Не подключена', 'Будет отдельный переключатель автоматической классификации.')}{info('Поиск магазинов в интернете', 'Не подключён', 'Будет управляться отдельно от AI-классификации.')}{info('Интернет в Анализаторе', 'Не подключён', 'Будет отдельное разрешение для финансовых вопросов.')}</dl><div className={styles.danger}><h3>Удаление финансовых данных</h3><p>Удаление будет доступно после подключения хранения данных. Перед ним система покажет состав и количество удаляемых объектов. Физическое удаление не восстанавливается через Undo.</p><p>Для обратимого исключения используйте раздел «Аналитика».</p></div></>;
-      case 'history': return <>{empty('История пока пуста', 'Здесь будут изменения категорий, счетов, правил, бюджетов и других финансовых параметров. Навигация и временные фильтры не создают записи.')}<dl className={styles.info}>{info('Доступный период истории', '30 дней', 'Хранение истории и Undo пока не подключены.')}{info('Удаление и отмена импорта', 'Без обычного Undo', 'Перед восстановлением других изменений будут проверяться более поздние правки.')}</dl></>;
+      case 'history': return <>{historyOperation && <div className={styles.historyScope}><p>История операции: <strong>{historyOperation.merchant}</strong><small>{historyOperation.bank} · {historyOperation.account}</small></p><button className={common.button} onClick={onClearHistory}>Показать всю историю</button></div>}{empty('История пока пуста', historyOperation ? 'Изменения этой операции пока не записываются. Вымышленный пример открыт для просмотра.' : 'Здесь будут изменения категорий, счетов, правил, бюджетов и других финансовых параметров. Навигация и временные фильтры не создают записи.')}<dl className={styles.info}>{info('Доступный период истории', '30 дней', 'Хранение истории и Undo пока не подключены.')}{info('Удаление и отмена импорта', 'Без обычного Undo', 'Перед восстановлением других изменений будут проверяться более поздние правки.')}</dl></>;
     }
   }
   return <section className={`${styles.settings} ${section ? styles.detailOpen : ''}`} aria-label="Настройки сайта">

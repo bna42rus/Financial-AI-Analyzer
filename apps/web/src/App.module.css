@@ -33,6 +33,8 @@
 .titleLine { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
 .titleLine h1 { font-size:calc(25px * var(--text-scale, 1)); font-weight: 500; }
 .titleLine p { color: var(--color-secondary-text); margin-top: 4px; font-size:calc(13px * var(--text-scale, 1)); }
+.titleActions { display:flex; flex-wrap:wrap; gap:8px; justify-content:flex-end; min-width:0; }
+@media(max-width:700px) { .titleLine { flex-wrap:wrap; } .titleActions { justify-content:flex-start; } }
 .stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 13px; margin-bottom: 18px; }
 .stat { display: block; border: 1px solid var(--color-border); border-radius: 11px; background: var(--color-surface); padding: 17px; min-width: 0; text-align: left; }
 .statLabel { display: flex; align-items: center; gap: 6px; color: var(--color-secondary-text); font-size:calc(13px * var(--text-scale, 1)); }

@@ -1,13 +1,13 @@
 import { useRef } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowLeft, CircleAlert, X } from 'lucide-react';
+import { ArrowLeft, CircleAlert, History, X } from 'lucide-react';
 import { formatDate, formatMoney } from './demo/overview';
 import type { DemoOperation } from './demo/overview';
 import { roleLabels, statusLabel } from './demo/operations';
 import common from './App.module.css';
 import styles from './Operations.module.css';
 
-export function OperationCard({row,onClose}:{row:DemoOperation|null;onClose:()=>void}) {
+export function OperationCard({row,onClose,onOpenHistory}:{row:DemoOperation|null;onClose:()=>void;onOpenHistory:(row:DemoOperation)=>void}) {
   const opener=useRef<HTMLElement|null>(null);
   return <Dialog.Root open={row!==null} onOpenChange={open=>!open&&onClose()}><Dialog.Portal>
     <Dialog.Overlay className={common.overlay} />
@@ -22,6 +22,7 @@ export function OperationCard({row,onClose}:{row:DemoOperation|null;onClose:()=>
         <section className={styles.cardSection}><h3>Как определено</h3><p>Тип, смысл и категория заранее заданы в демонстрационном примере.</p></section>
         <details className={styles.source}><summary>Данные примера</summary><p>Банковская выписка не загружалась. Исходные значения этого примера:</p><dl className={styles.fields}><div><dt>Дата</dt><dd>{row.date}</dd></div><div><dt>Сумма</dt><dd>{formatMoney(row.amountMinor)}</dd></div><div><dt>Описание</dt><dd>{row.merchant}</dd></div><div><dt>Банк и счёт</dt><dd>{row.bank} · {row.account}</dd></div></dl></details>
         <p className={styles.readOnly}>Сейчас пример доступен для просмотра. Исправления, связи и сохранение добавим позже.</p>
+        <button className={common.button} onClick={()=>onOpenHistory(row)}><History size={16} aria-hidden="true" />История этой операции</button>
       </>}
     </Dialog.Content>
   </Dialog.Portal></Dialog.Root>;

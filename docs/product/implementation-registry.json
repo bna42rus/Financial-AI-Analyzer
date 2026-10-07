@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "baseline_version": "1.3",
-  "as_of": "2026-10-04",
+  "as_of": "2026-10-07",
   "base_commit": "1d8219e6966711c1bf5f1aa5b8ef638c329f4ad5",
   "source_manifest": "docs/product/source-manifest.json",
   "scope_note": "Карта покрытия разделов и подпунктов, не процент готовности. Внутри подпункта может быть несколько обязательных сценариев; перед закрытием его нужно проверить полностью, при необходимости добавить дочерние требования. Extracted source_text вспомогателен: PDF/согласованные overrides остаются авторитетными, схемы сверяются визуально при реализации. Исторические C/D не отменяют последующую E. Текущие источники не редактируются.",
@@ -648,15 +648,20 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
       ],
       "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-4.8",
@@ -669,15 +674,20 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
       ],
       "verification_plan": "Соответствие согласованным границам; четыре раздела, пустые состояния и приоритет текста Анализатора над фильтрами.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-4.9",
@@ -1909,10 +1919,19 @@
       "title": "Импорт банковских выписок",
       "source_text": "Пользовательский сценарий Пользователь нажимает «Загрузить файлы», выбирает один или несколько документов, после чего локальная обработка начинается автоматически. Если формат известен, используется deterministic parser. Если неизвестен, система пытается безопасно извлечь и санитизировать текст, после чего при необходимости применяет AI fallback.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/App.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-18.2",
@@ -2026,10 +2045,19 @@
       "title": "Импорт банковских выписок",
       "source_text": "Форматы и результат импорт а Известные PDF/CSV/XLSX форматы популярных банков обрабатываются deterministic parsers. Для неизвестных безопасно извлечённых таблиц/текста допускается AI structuring без общего ручного mapping wizard. Если AI временно недоступен, импорт всё равно должен сохранить валидно распознанные операции; часть классификации останется unresolved до повторной обработки. Финальный экран batch показывает минимум: сколько строк найдено, сколько создано новых transactions, сколько уже существовало как duplicates/source observations, сколько source facts обновлено, сколько операций требует review и какие новые accounts обнаружены.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/App.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-18.11",
@@ -3992,10 +4020,19 @@
       "title": "Настройки интерфейса",
       "source_text": "Язык, формат дат и timezon e Первая версия интерфейса — русскоязычная. Денежный формат в RUB отображается в привычном виде, например «124 500 ₽ »; календарная неделя начинается в понедельник, даты показываются в российском формате. Profile timezone первоначально определяется из браузера и может быть изменён пользователем. Банковские operation dates считаются source-local фактами выписки и не должны сдвигаться только потому, что пользователь путешествует между часовыми поясами. Системные понятия «сегодня», «текущий месяц», access expiry и timestamps интерфейса интерпретируются через profile timezone, а на сервере хранятся canonical timestamps там, где это технически необходимо.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/App.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-34",
@@ -4083,10 +4120,19 @@
       "title": "Change History и Undo",
       "source_text": "Восстановление по выборк е Помимо Undo конкретного action_id пользователь может открыть историю конкретной operation либо выбрать набор изменений по периоду/фильтру и инициировать rollback. Перед массовым восстановлением система показывает список затрагиваемых объектов и конфликты с более поздними edits.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/App.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-35",
@@ -5981,10 +6027,19 @@
       "title": "Поддержка",
       "source_text": "Форма Subject, message, optional attachment. Если пользователь прикладывает документ, интерфейс явно сообщает, что он будет передан службе поддержки.",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/ShellDialogs.tsx",
+        "apps/web/src/App.tsx",
+        "apps/web/src/Settings.tsx",
+        "apps/web/src/OperationCard.tsx"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/shell.spec.ts",
+        "docs/architecture/web-shell-completion.md"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
     },
     {
       "id": "PDF-50.2",
