@@ -569,7 +569,7 @@ test('manual access is TOTP gated, preview is read-only and inputs cannot inject
  const {b}=await enrolledAdmin(),cmd=manualInvite();
  assert.equal((await adminBrowser().post('/control/manual-preview',cmd)).statusCode,401);
  assert.equal((await userBrowser().post('/control/manual-preview',cmd)).statusCode,404);
- for(const bad of [{...cmd,actorId:'injected'},{...cmd,reason:' '},{...cmd,quota:undefined},{...cmd,quota:{source:'override',limit:-1}},{...cmd,term:{kind:'fixed',end:'2027-02-31T00:00:00.000Z'}},{...cmd,term:{kind:'days',count:1.5}}])assert.equal((await b.post('/control/manual-preview',bad)).statusCode,400);
+ for(const [index,bad] of [{...cmd,actorId:'injected'},{...cmd,reason:' '},{...cmd,quota:undefined},{...cmd,quota:{source:'override',limit:-1}},{...cmd,term:{kind:'fixed',end:'2027-02-31T00:00:00.000Z'}},{...cmd,term:{kind:'days',count:1.5}}].entries())assert.equal((await b.post('/control/manual-preview',{...bad,email:`validation-${index}@example.test`})).statusCode,400);
  assert.equal((await b.post('/control/manual-preview',cmd)).statusCode,200);
  for(const table of ['manual_grant','manual_access_audit','action','invitation','purchase'])assert.equal((await pg.owner.query('SELECT 1 FROM commerce.'+table)).rowCount,0);
  assert.equal((await pg.owner.query('SELECT 1 FROM access.request')).rowCount,0);
@@ -596,7 +596,7 @@ test('manual registration needs independent email proof and activates days witho
  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,0);assert.equal((await pg.owner.query('SELECT state FROM commerce.manual_grant')).rows[0].state,'active');
  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.account_directory')).rowCount,1);
 });
-test('manual fixed end survives activation and expired fixed grant cannot activate or be reissued',async()=>{
+test('manual fixed end survives activation and calendar renewal retains its explicit offset',async()=>{
  const end=new Date(Date.now()+5*86400000).toISOString(),a=await manualRegistered({kind:'fixed',end});
  assert.equal((await a.b.get('/session')).json().accessEnd,end);
  const initial=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(Number(initial.end_offset_ms)>0);
