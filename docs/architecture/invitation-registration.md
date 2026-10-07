@@ -16,7 +16,7 @@ Registration locks purchase then invitation, validates both and the proof, creat
 
 The first Development cycle snapshots `Europe/Moscow`. Calendar months use PostgreSQL local-calendar addition, preserving wall time and clamping month-end; the original activation timestamp/timezone/duration remain available as the future cycle anchor. Day periods use exact 24-hour units. Profile timezone selection, DST-zone policy, renewal/quota boundaries, manual fixed-end/indefinite/free grants and payment corrections/refunds are later blocks and are not claimed complete.
 
-Control receives no identity credentials, financial tables or protected-key access. Finance receives only named invitation metadata/verifier columns and activation updates, never encrypted copy-link secrets or control review/audit state. Both runtimes remain non-owners without BYPASSRLS. Cross-profile operations use the same purchase-before-invitation lock order; mutation transactions retain the temporary profile-wide lock from PR №8.
+Control receives no identity credentials, financial tables or protected-key access. Finance receives only named invitation metadata/verifier columns and activation updates, never encrypted copy-link secrets or control review/audit state. Both runtimes remain non-owners without BYPASSRLS. Authority deadlines use database wall-clock time after lock acquisition, not the earlier transaction-start timestamp. An integration fixture expires a proof while registration waits for the mutation lock and checks that no identity/entitlement is created. Cross-profile operations use the same purchase-before-invitation lock order; mutation transactions retain the temporary profile-wide lock from PR №8.
 
 ## Endpoints
 
