@@ -14,7 +14,7 @@
 
 Все четыре базовых экрана, окна загрузки/профиля и переходы к истории приняты и объединены с main через PR №2–6. Main после PR №6: `bf3e2db1e6314c84c8e28df8d9c71cbb2af21ac4`; все 88 проверок этой версии прошли в GitHub.
 
-Этап 1 и первая интерфейсная версия этапа 2 приняты. Начат первый блок этапа 3: модель первого доступа, тестовая заявка и отдельная админка сверки оплат/подготовки приглашений. [Результат и границы](../architecture/access-admin-requests.md). Это ещё не готовый access/security flow: auth/TOTP/recovery, API/DB, secure tokens, почта, регистрация/activation и renewal предстоят. Полные финансовые требования, импорт и AI также не реализованы интерфейсной версией. Подписка Pro, защита ветки и реальные подключения сервисов не подтверждены одним наличием репозитория.
+Этап 1 и первая интерфейсная версия этапа 2 приняты. Начат первый блок этапа 3: модель первого доступа, тестовая заявка и отдельная админка сверки оплат/подготовки приглашений. [Результат и границы](../architecture/access-admin-requests.md). Второй блок реализует Development API/DB/auth foundation с verification/application session, TOTP/recovery и reset/invalidation; [границы и security tests](../architecture/server-access-security.md). UI binding, почтовая доставка, real owner onboarding, invitation registration/activation и renewal ещё предстоят. Полные финансовые требования, импорт и AI также не реализованы интерфейсной версией. Подписка Pro, защита ветки и реальные подключения сервисов не подтверждены одним наличием репозитория.
 
 ## Порядок работы
 
@@ -55,4 +55,4 @@
 
 ### Первый доступ и админка
 
-[Модель, интерфейс и границы](../architecture/access-admin-requests.md). Этот блок представлен для проверки на synthetic примерах. Следующая часть этапа — server/DB/auth foundation, verified email/application session и обязательные TOTP/recovery codes админки; затем настоящие invitations/registration и renewal.
+[Модель, интерфейс и границы](../architecture/access-admin-requests.md). Этот блок представлен для проверки на synthetic примерах. Development server/DB/auth foundation с verified-email application session, обязательными TOTP/recovery codes админки и reset/invalidation реализован в PR №8; real DB evidence фиксируется в нём. Следующая часть — UI binding и настоящие invitations/registration/activation, затем renewal.

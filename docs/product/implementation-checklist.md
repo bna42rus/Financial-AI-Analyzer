@@ -57,7 +57,7 @@ A/B необходимо читать полностью вместе с исх�
 | [A-04](baseline.md) | Математика components и allocations | Частично: только денежные primitives |
 | [A-05](baseline.md) | Provenance и dedupe | Полная реализация/проверка предстоит |
 | [A-06](baseline.md) | Подтверждения jobs и concurrency | Полная реализация/проверка предстоит |
-| [A-07](baseline.md) | Password reset | Полная реализация/проверка предстоит |
+| [A-07](baseline.md) | Password reset | Частично: Development backend reset отзывает все sessions/reset tokens/contexts; real delivery/UI/полная acceptance предстоят |
 | [A-08](baseline.md) | Confidence | Полная реализация/проверка предстоит |
 | [A-09](baseline.md) | Состояния и справочники | Полная реализация/проверка предстоит |
 | [A-10](baseline.md) | Deletion финансовых ответов и backup restore | Полная реализация/проверка предстоит |
@@ -85,7 +85,7 @@ A/B необходимо читать полностью вместе с исх�
 | [E-01](baseline.md) | Цена, качество и полнота | Полная реализация/проверка предстоит |
 | [E-02](baseline.md) | Программная основа и private Git | Полная реализация/проверка предстоит |
 | [E-03](baseline.md) | Размещение и среды | Полная реализация/проверка предстоит |
-| [E-04](baseline.md) | Admin TOTP и аварийное восстановление | Полная реализация/проверка предстоит |
+| [E-04](baseline.md) | Admin TOTP и аварийное восстановление | Частично: mandatory TOTP, hashed recovery codes, atomic revocation и recovery-only re-enrollment в Development; real owner/KMS/UI/полная acceptance предстоят |
 | [E-05](baseline.md) | AI и email | Полная реализация/проверка предстоит |
 | [E-06](baseline.md) | Домен и HTTPS | Полная реализация/проверка предстоит |
 | [E-07](baseline.md) | Доступ агента и бюджет | Полная реализация/проверка предстоит |
@@ -176,3 +176,7 @@ A/B необходимо читать полностью вместе с исх�
 Частично реализованы правила первого доступа и модель ручной оплаты/приглашений: `packages/access/src/model.ts`, 16 domain tests; тестовый публичный путь `apps/web/src/AccessRequestPage.tsx`; отдельное `apps/admin` с 16 desktop/mobile сценариями. [Точные границы](../architecture/access-admin-requests.md). B-10 проверен в чистых state transitions; DB concurrency/auth/runtime isolation ещё не проверены.
 
 Public и admin UI работают только в явно обозначенном примере. Цена, AI quota, verified-email event и actor являются synthetic inputs; реальные письма, платежи и права не создаются. PDF 40.5/40.10, auth/DB/RLS/secure tokens и E-04 остаются not_verified. Этап 3 начат, но не завершён. PR №5 и №6 приняты и объединены с main; 88 проверок прежней интерфейсной версии прошли после объединения.
+
+### Сервер доступа и безопасности
+
+[Development backend, границы и проверки](../architecture/server-access-security.md): strict API types, две crypto проверки, 24 real PostgreSQL integration scenarios в GitHub CI. Реализованы verification/application ownership, scoped DB roles, TOTP/recovery-only flow и A-07 reset. Полные пункты остаются partial: UI binding, delivery, invitation registration/activation, actual finance schema/RLS, KMS и общая security/release acceptance впереди.

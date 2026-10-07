@@ -17,6 +17,9 @@
     "check:admin": "pnpm --filter @finance/admin check",
     "build:admin": "pnpm --filter @finance/admin build",
     "test:e2e": "pnpm --filter @finance/web test:e2e && pnpm --filter @finance/admin test:e2e",
-    "check": "pnpm run check:spec && pnpm test && pnpm run check:web && pnpm run check:admin && pnpm run build:web && pnpm run build:admin"
+    "check": "pnpm run check:spec && pnpm test && pnpm run check:web && pnpm run check:admin && pnpm run build:web && pnpm run build:admin && pnpm run check:api",
+    "dev:api": "pnpm --filter @finance/api dev",
+    "check:api": "pnpm --filter @finance/api check",
+    "test:security": "pnpm --filter @finance/api test:integration"
   }
 }
