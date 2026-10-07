@@ -17,7 +17,7 @@
   --color-shadow: light-dark(#1029271a, #00000055);
 }
 * { box-sizing: border-box; }
-body { margin: 0; color: var(--color-text); background: var(--color-background); font-size: 14px; line-height: 1.5; }
+body { margin: 0; color: var(--color-text); background: var(--color-background); font-size:calc(14px * var(--text-scale, 1)); line-height: 1.5; }
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea, summary { -webkit-tap-highlight-color: transparent; }
 button { cursor: pointer; color: inherit; }
@@ -26,4 +26,10 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
 input[type="checkbox"] { accent-color: var(--color-primary); }
 h1, h2, h3, p { margin: 0; }
 svg { flex-shrink: 0; }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { :root:not([data-motion="full"]) *, :root:not([data-motion="full"]) *::before, :root:not([data-motion="full"]) *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root[data-theme="system"] { color-scheme: light dark; }
+:root[data-text-size="large"] { --text-scale: 1.142857; }
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
