@@ -21,10 +21,11 @@ interface Props {
   onClearScope: () => void;
   onOpen: (row: DemoOperation) => void;
   onShowDemo: () => Promise<void>;
+  onUpload: () => void;
 }
 const quickFilters: readonly [QuickFilter,string][] = [['all','Все'],['attention','Требуют внимания'],['unresolved','Смысл не определён'],['excluded','Исключено']];
 
-export function Operations({operations,filters,view,scope,loading,onViewChange,onFilterChange,onClearScope,onOpen,onShowDemo}:Props) {
+export function Operations({operations,filters,view,scope,loading,onViewChange,onFilterChange,onClearScope,onOpen,onShowDemo,onUpload}:Props) {
   const [selected,setSelected] = useState<string[]>([]);
   const [anchor,setAnchor] = useState<string|null>(null);
   const [filterOpen,setFilterOpen] = useState(false);
@@ -54,7 +55,7 @@ export function Operations({operations,filters,view,scope,loading,onViewChange,o
   function tag(row:DemoOperation){return <span className={`${styles.badge} ${row.requiresAttention?styles.warning:''} ${row.excluded?styles.excluded:''}`}>{statusLabel(row)}</span>;}
   function extraFilters(){return <div className={styles.extraFilters}><label>Тип операции<select aria-label="Тип операции" value={view.kind} onChange={e=>update({kind:e.target.value})}><option value="">Все типы</option>{[...new Set(operations.map(row=>row.kind))].map(kind=><option key={kind}>{kind}</option>)}</select></label><label>Финансовый смысл<select aria-label="Финансовый смысл" value={view.role} onChange={e=>update({role:e.target.value})}><option value="">Любой смысл</option>{Object.entries(roleLabels).map(([role,label])=><option key={role} value={role}>{label}</option>)}</select></label></div>;}
 
-  if(!operations.length)return <section className={common.empty}><div className={common.emptyIcon}><Upload size={26} aria-hidden="true" /></div><h2>Здесь будут ваши операции</h2><p>Загрузите выписку, чтобы искать записи и проверять их смысл, категории и суммы.</p><div className={common.emptyActions}><button className={common.primaryButton} disabled>Загрузить первую выписку</button><button className={common.button} disabled={loading} onClick={()=>void onShowDemo()}>{loading?'Открываем пример…':'Посмотреть пример'}</button></div><small>В примере используются только вымышленные операции.</small></section>;
+  if(!operations.length)return <section className={common.empty}><div className={common.emptyIcon}><Upload size={26} aria-hidden="true" /></div><h2>Здесь будут ваши операции</h2><p>Загрузите выписку, чтобы искать записи и проверять их смысл, категории и суммы.</p><div className={common.emptyActions}><button className={common.primaryButton} onClick={onUpload}>Загрузить первую выписку</button><button className={common.button} disabled={loading} onClick={()=>void onShowDemo()}>{loading?'Открываем пример…':'Посмотреть пример'}</button></div><small>В примере используются только вымышленные операции.</small></section>;
 
   return <section aria-label="Список операций" className={styles.operations}>
     {scope&&<div className={styles.scope}><span>Из {scope.source??'Обзора'}: {scope.label}</span><button onClick={onClearScope}>Убрать ограничение <X size={14} aria-hidden="true" /></button></div>}
