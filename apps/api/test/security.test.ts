@@ -416,3 +416,24 @@ test('month-end clamping preserves Moscow wall time for leap years and original 
     const result=(await pg.owner.query("SELECT (($1::timestamptz AT TIME ZONE 'Europe/Moscow')+make_interval(months=>$2)) AT TIME ZONE 'Europe/Moscow' AS finish",[start,count])).rows[0].finish;assert.equal(result.toISOString(),expected);
   }
 });
+
+test('a proof expiring while registration waits for the mutation lock cannot activate an account',async()=>{
+  const a=await paidApplication(),proof=await registrationProof(a),blocker=await pg.finance.connect();
+  let pending:ReturnType<Browser['post']>|undefined;
+  try{
+    await blocker.query('BEGIN');await blocker.query('SELECT pg_advisory_xact_lock(92042)');
+    pending=a.b.post('/access/register',registrationBody(a.invitationToken,proof));
+    let waiting=false;
+    for(let i=0;i<100;i++){
+      waiting=Boolean((await pg.owner.query("SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory'")).rowCount);
+      if(waiting)break;await new Promise(resolve=>setTimeout(resolve,10));
+    }
+    assert.equal(waiting,true,'Registration is waiting after BEGIN');
+    // This deadline is later than transaction start but earlier than lock release.
+    await pg.owner.query('UPDATE access.registration_proof SET expires_at=clock_timestamp()');
+    await blocker.query('COMMIT');
+    const result=await pending;assert.equal(result.statusCode,400);assert.equal(result.json().code,'INVALID_REGISTRATION_PROOF');
+    assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
+    assert.equal((await pg.owner.query('SELECT state FROM commerce.purchase')).rows[0].state,'paid_not_activated');
+  }finally{await blocker.query('ROLLBACK');blocker.release();if(pending)await pending;}
+});
