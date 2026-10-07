@@ -1238,10 +1238,17 @@
       "title": "Счета (Accounts)",
       "source_text": "Что видит пользователь В Настройки → Счета пользователь видит понятные названия вроде «Т-Банк — Основная карта» или «Сбер — Кредитная карта». Он может переименовать счёт, изменить тип, исключить его из аналитики, открыть связанные операции, объединить ошибочно созданные счета, разделить ошибочно объединённый счёт либо удалить его финансовые данные.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-11.2",
@@ -1563,10 +1570,17 @@
       "title": "Стартовый справочник категорий",
       "source_text": "Расходы Продукты: Магазины; Доставка продуктов; Прочие продукты. Еда вне дома: Рестораны и кафе; Доставка готовой еды. Жильё и дом: Аренда; Коммунальные услуги; Ремонт; Товары для дома; Бытовые услуги. Транспорт: Такси; Общественный транспорт; Каршеринг; Самокаты и велосипеды; Топливо; Парковки и дороги; Обслуживание автомобиля; Прочий транспорт. Здоровье и спорт: Аптеки; Врачи; Анализы и диагностика; Фитнес и спорт; Спортивные товары. Одежда и аксессуары: Одежда; Обувь; Аксессуары. Красота и уход: Парикмахерские и салоны; Косметика и уход; Прочий уход. Связь и интернет: Мобильная связь; Домашний интернет; Прочая связь. Подписки и цифровые сервисы: Видео и музыка; Облачные сервисы; ПО и приложения; AI- сервисы; VPN; Прочие подписки. Развлечения и хобби: Кино и мероприятия; Игры; Хобби; Книги; Прочие развлечения. Образование: Курсы; Обучение; Учебные материалы. Путешествия: Авиабилеты; Ж/д билеты; Другой междугородний транспорт; Отели; Туры; Расходы в поездке. Подарки и благотворительность: Подарки; Благотворительность. Семья и дети: Детские товары; Образование детей; Кружки и секции; Прочие расходы на детей. Питомцы: Корм и товары; Ветеринар; Уход; Прочие расходы. Кредиты и долги: Платежи по кредитам; Проценты; Страхование по кредиту; Прочие расходы по кредитам. Банковские услуги: Обслуживание; Комиссии; Уведомления; Прочие банковские услуги. Налоги и обязательные платежи: Налоги; Штрафы; Госпошлины. Работа и бизнес: Рабочие расходы; Сервисы для работы; Реклама; Прочие бизнес-расходы. Прочие расходы.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-14.2",
@@ -1576,10 +1590,17 @@
       "title": "Стартовый справочник категорий",
       "source_text": "Доходы Зарплата: Основная зарплата; Премии. Подработка и фриланс: Фриланс; Разовые работы. Бизнес: Выручка; Прочие бизнес-доходы. Продажи: Продажа вещей; Прочие продажи. Кэшбэк и бонусы: Кэшбэк; Банковские бонусы. Проценты и инвестиции: Проценты по счетам и вкладам; Дивиденды; Прочие инвестиционные доходы. Арендный доход: Аренда недвижимости; Прочая аренда. Подарки и помощь: Денежные подарки; Финансовая помощь. Государственные выплаты: Пособия и выплаты; Налоговые возвраты/вычеты. Прочие доходы.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-14.3",
@@ -3734,10 +3755,17 @@
       "title": "Настройки",
       "source_text": "Структура Разделы: Accounts; Imports; Categories; Rules; Counterparties; Budgets; Analytics; Interface; Data & Privacy; Change History. На desktop допускается боковая навигация, на mobile каждый пункт открывается отдельным экраном.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-31.2",
@@ -3747,10 +3775,17 @@
       "title": "Настройки",
       "source_text": "До первой загрузки Даже без финансовых данных пользователь может настроить starter categories, интерфейс, privacy, budgets и часть rules. Accounts/Counterparties/Imports показывают понятные empty states, а не пустые таблицы без объяснения.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-31.3",
@@ -3760,10 +3795,17 @@
       "title": "Настройки",
       "source_text": "Поиск настроек Допускается поиск по самим параметрам конфигурации. Он не заменяет поиск финансовых операций.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-32",
@@ -3851,10 +3893,17 @@
       "title": "Настройки интерфейса",
       "source_text": "Theme и accessibility Theme: System / Light / Dark. Density: Compact / Comfortable. Text size: Standard / Large. Reduced Motion учитывает системную настройку и может быть переопределён пользователем.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-33.2",
@@ -3864,10 +3913,17 @@
       "title": "Настройки интерфейса",
       "source_text": "Стартовый экран Варианты: Overview, Operations, Analyzer или last used. Логотип при этом всегда ведёт на Overview.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-33.3",
@@ -3903,10 +3959,17 @@
       "title": "Настройки интерфейса",
       "source_text": "Reset Можно сбросить Overview layout, Operations table или все interface settings. Такие действия никогда не удаляют financial data.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_refs": [
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-33.6",
@@ -5635,15 +5698,19 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "apps/web/src/Settings.tsx",
+        "docs/architecture/web-settings.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "apps/web/e2e/settings.spec.ts",
+        "docs/architecture/web-settings.md"
       ],
       "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations. Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
     },
     {
       "id": "PDF-47.2",
