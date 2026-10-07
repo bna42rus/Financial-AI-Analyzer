@@ -77,6 +77,8 @@ test('real PostgreSQL 18, non-owner runtime roles and database isolation', async
   for (const sql of ['SELECT * FROM finance.isolation_canary','SELECT * FROM protected_keys.isolation_canary','SELECT * FROM identity.auth_account','SELECT * FROM access.outbox']) await assert.rejects(pg.control.query(sql),{code:'42501'});
   await assert.rejects(pg.finance.query('SELECT * FROM control.auth_account'),{code:'42501'});
   await assert.rejects(createServer({...fc,pool:pg.owner}), /scoped application role/);
+  await assert.rejects(createServer({...fc,origin:undefined as unknown as string}), /explicit valid origins/);
+  await assert.rejects(createServer({...cc,baseURL:'https://control.example.test/unexpected-path'}), /explicit valid origins/);
   await pg.owner.query('GRANT CREATE ON SCHEMA control TO control_api');
   try {
     await pg.control.query('CREATE TABLE control.ownership_canary(marker text)');
@@ -266,4 +268,10 @@ test('failed TOTP counter persists across challenges and different IP addresses'
   }
   const next=adminBrowser();next.ip='192.0.2.3';await next.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
   assert.equal((await next.post('/auth/two-factor/verify-totp',{code:invalidOTP(uri)})).statusCode,429);
+});
+test('parallel enrollment limits do not deadlock a saturated database pool', {timeout:10000}, async () => {
+  const {b,uri}=await enrolledAdmin();
+  const responses=await Promise.all(Array.from({length:15},()=>b.clone().post('/auth/two-factor/verify-totp',{code:invalidOTP(uri)})));
+  assert.ok(responses.every(r=>[401,429].includes(r.statusCode)));assert.ok(responses.some(r=>r.statusCode===429));
+  assert.equal((await b.get('/control/requests')).statusCode,200);
 });

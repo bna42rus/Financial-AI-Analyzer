@@ -20,7 +20,7 @@
 
 В `feature/server-access-security` / PR №8 реализованы NestJS/Fastify, PostgreSQL/Drizzle/Better Auth, два runtime DB roles и отдельные auth realms/cookies, single-use hashed verification/reset/recovery codes, owned application sessions, mandatory admin TOTP и recovery-only verified re-enrollment. Reset отзывает все старые sessions/tokens/contexts. Durable rate limits, no-store/CSRF и transactional encrypted outbox проверяются security tests. [Реализация, endpoints и ограничения](server-access-security.md).
 
-Локально прошли общий check, две crypto проверки и 78 browser scenarios. 23 integration scenarios выполняются на official PostgreSQL 18.4 в GitHub CI; локальная среда ограничивает OS users, поэтому локального DB success не заявляем. Итог конкретного head/run фиксируется в PR №8. RLS/tenant isolation проверяются на canary, actual finance schema ещё отсутствует.
+Локально прошли общий check, две crypto проверки и 78 browser scenarios. 24 integration scenarios выполняются на official PostgreSQL 18.4 в GitHub CI; локальная среда ограничивает OS users, поэтому локального DB success не заявляем. Итог конкретного head/run фиксируется в PR №8. RLS/tenant isolation проверяются на canary, actual finance schema ещё отсутствует.
 
 Следующий блок — UI binding, transactional manual payment/invitations и invitation-only registration/activation, затем renewal. PR №7/№8 не объединены с main. Delivery worker/provider, реальные owner onboarding/тарифы/KMS/credentials, auth UI и полный security/release acceptance остаются открытыми. Client actor/verification events UI не дают server authority. Production startup серверного foundation заблокирован.
 

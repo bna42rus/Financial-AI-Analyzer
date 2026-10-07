@@ -7,7 +7,7 @@
 ## Проверка без платных сервисов
 
 Требуются Node.js 24 LTS и pnpm 11.25.0. Выполнить `pnpm install --frozen-lockfile --ignore-scripts`, затем `pnpm run check`. Для просмотра первого экрана — `pnpm run dev:web`.
-Проверки включают исходные документы, 10 денежных и 16 тестов модели доступа, strict TypeScript обоих приложений, 20 тестов искусственных проекций и обе сборки. Для браузерных проверок установить Chromium по [инструкции](apps/web/README.md) и выполнить `pnpm run test:e2e`: 62 сценария пользовательского интерфейса и 16 сценариев админки. API keys и реальные банковские данные не нужны. API strict TypeScript и две crypto проверки входят в check; `pnpm test:security` запускает 23 integration scenarios на отдельном PostgreSQL 18 (GitHub CI предоставляет базу). Полная security/release acceptance ещё предстоит.
+Проверки включают исходные документы, 10 денежных и 16 тестов модели доступа, strict TypeScript обоих приложений, 20 тестов искусственных проекций и обе сборки. Для браузерных проверок установить Chromium по [инструкции](apps/web/README.md) и выполнить `pnpm run test:e2e`: 62 сценария пользовательского интерфейса и 16 сценариев админки. API keys и реальные банковские данные не нужны. API strict TypeScript и две crypto проверки входят в check; `pnpm test:security` запускает 24 integration scenarios на отдельном PostgreSQL 18 (GitHub CI предоставляет базу). Полная security/release acceptance ещё предстоит.
 
 ## Где источники
 

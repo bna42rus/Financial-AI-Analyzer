@@ -14,11 +14,15 @@ import type { Config } from './types.ts';
 
 export async function createServer(config: Config) {
   if (!['development', 'test'].includes(config.environment)) throw new Error('Production requires a KMS adapter and separate security acceptance');
+  try {
+    const base=new URL(config.baseURL), origin=new URL(config.origin);
+    if (base.origin!==config.baseURL || origin.origin!==config.origin || !['http:','https:'].includes(base.protocol) || !['http:','https:'].includes(origin.protocol)) throw new Error();
+  } catch { throw new Error('API and frontend must have explicit valid origins'); }
   const expectedRole = config.profile === 'control' ? 'control_api' : 'finance_api';
   const role = (await config.pool.query(`SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user`)).rows[0];
   if (role.name !== expectedRole || role.rolsuper || role.rolbypassrls) throw new Error('Runtime database credentials must use the scoped application role');
   const owned = await config.pool.query(`SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
-    WHERE c.relowner=$1 AND n.nspname IN ('identity','control','access','commerce','finance','protected_keys') LIMIT 1`, [role.oid]);
+    WHERE (c.relowner=$1 OR n.nspowner=$1) AND n.nspname IN ('identity','control','access','commerce','finance','protected_keys') LIMIT 1`, [role.oid]);
   if (owned.rowCount) throw new Error('Runtime database credentials must not own application objects');
   if (config.authSecret.length < 32 || config.wrappingKey.length !== 32) throw new Error('Independent runtime secrets are required');
   const seal = envelope(config.wrappingKey), schema = realm(config.profile);
@@ -65,6 +69,15 @@ export async function createServer(config: Config) {
     let db: PoolClient | undefined;
     try {
       await rate(request);
+      if (config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)) {
+        // Read the candidate before acquiring the mutation lock, release its connection,
+        // then persist the limit. Re-check all authority inside the locked transaction below.
+        // A second pool checkout while holding that lock can deadlock a saturated pool.
+        const candidate=await config.pool.connect();let userId:string|undefined;
+        try { userId=(await current(makeAuth(config,candidate,seal),request))?.user.id; }
+        finally { candidate.release(); }
+        if(userId)await subjectRate(userId);
+      }
       db = await config.pool.connect(); await db.query('BEGIN');
       // Serialize authentication mutations across instances. This foundation favors correctness over login throughput.
       await db.query('SELECT pg_advisory_xact_lock($1)', [config.profile === 'control' ? 92041 : 92042]);
@@ -79,13 +92,12 @@ export async function createServer(config: Config) {
         } else if (path === '/auth/two-factor/enable') {
           fields(request, ['password', 'method']);
           if ((request.body as Record<string, unknown>).method && (request.body as Record<string, unknown>).method !== 'totp') throw new HttpError(400, 'TOTP_ONLY');
-          const subject = await requireAdmin(auth, db, request, ['enrollment', 'recovery']);
-          await subjectRate(subject.user.id);
+          await requireAdmin(auth, db, request, ['enrollment', 'recovery']);
         } else if (path === '/auth/two-factor/verify-totp') {
           const input = fields(request, ['code']); if (!/^\d{6}$/.test(string(input.code, 6))) throw new HttpError(400, 'INVALID_INPUT');
           // A password-only session without the bootstrap/recovery proof cannot use enrollment verification as a bypass.
           const session = await current(auth, request);
-          if (session) { const proof = await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']); enrollment = proof.proof.level !== 'admin'; await subjectRate(session.user.id); }
+          if (session) { const proof = await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']); enrollment = proof.proof.level !== 'admin'; }
         } else fields(request, []);
         const headers = fromNodeHeaders(request.headers);
         headers.set('cookie', (headers.get('cookie') ?? '').split(';').filter(part => !part.includes('trust_device')).join(';'));
