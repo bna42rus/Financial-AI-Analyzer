@@ -20,6 +20,7 @@
     "check": "pnpm run check:spec && pnpm test && pnpm run check:web && pnpm run check:admin && pnpm run build:web && pnpm run build:admin && pnpm run check:api",
     "dev:api": "pnpm --filter @finance/api dev",
     "check:api": "pnpm --filter @finance/api check",
-    "test:security": "pnpm --filter @finance/api test:integration"
+    "test:security": "pnpm --filter @finance/api test:integration",
+    "test:access-browser": "pnpm --filter @finance/api test:browser"
   }
 }

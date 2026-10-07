@@ -28,6 +28,8 @@ export async function createServer(config: Config) {
   const seal = envelope(config.wrappingKey), schema = realm(config.profile);
   // Finance repositories are never loaded by the control deployment profile.
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
+  const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
+  const commerce = config.profile === 'control' ? await import('./commerce.ts') : null;
   class RootModule {} Module({})(RootModule);
   const app = await NestFactory.create<NestFastifyApplication>(RootModule, new FastifyAdapter({ logger: false, trustProxy: false, bodyLimit: 8192 }), { logger: false });
   const fastify = app.getHttpAdapter().getInstance();
@@ -46,6 +48,8 @@ export async function createServer(config: Config) {
     const route = request.url.split('?')[0]!;
     const address = typeof (request.body as Record<string, unknown> | undefined)?.email === 'string' ? String((request.body as Record<string, unknown>).email).trim().toLowerCase() : '';
     const budgets: [string, number, number][] = [['ip:' + request.ip, 30, 60]];
+    const invitationSecret = (request.body as Record<string, unknown> | undefined)?.invitationToken;
+    if(typeof invitationSecret==='string') budgets.push(['invitation:'+route+':'+invitationSecret,5,300]);
     if (address) budgets.push(['account:' + route + ':' + address, route.endsWith('reset-request') ? 3 : 5, 300]);
     else budgets.push(['action:' + route + ':' + request.ip, 10, 60]);
     for (const [key, max, seconds] of budgets) {
@@ -144,7 +148,20 @@ export async function createServer(config: Config) {
         }
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
-        result = { requests: (await db.query('SELECT data FROM access.request ORDER BY created_at DESC LIMIT 100')).rows.map(r => r.data) };
+        result = await commerce!.queue(db);
+      } else if (commerce && ['/control/review-preview','/control/review'].includes(path) && request.method === 'POST') {
+        const s=await requireAdmin(auth,db,request);
+        result=await commerce.review(db,request,s.user.id,seal,path==='/control/review-preview');
+      } else if (commerce && path==='/control/invitation-action' && request.method==='POST') {
+        const s=await requireAdmin(auth,db,request);result=await commerce.invitationAction(db,request,s.user.id,seal);
+      } else if (commerce && path==='/control/invitation-link' && request.method==='POST') {
+        const s=await requireAdmin(auth,db,request);result=await commerce.copyInvitation(db,request,s.user.id,seal);
+      } else if (registration && path==='/access/registration-proof' && request.method==='POST') {
+        result=await registration.requestRegistrationProof(db,request,seal);status=202;
+      } else if (registration && path==='/access/register' && request.method==='POST') {
+        result=await registration.register(db,request,seal);status=201;
+      } else if (application && path==='/access/tariffs' && request.method==='GET') {
+        result={tariffs:(await db.query("SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'publicVisible'='true' AND snapshot->>'availableForNew'='true' ORDER BY id")).rows.map(r=>r.snapshot)};
       } else if (path === '/security/sessions' && request.method === 'GET') {
         const s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');

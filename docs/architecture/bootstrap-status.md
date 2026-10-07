@@ -22,7 +22,7 @@
 
 Локально прошли общий check, две crypto проверки и 78 browser scenarios. 24 integration scenarios выполняются на official PostgreSQL 18.4 в GitHub CI; локальная среда ограничивает OS users, поэтому локального DB success не заявляем. Итог конкретного head/run фиксируется в PR №8. RLS/tenant isolation проверяются на canary, actual finance schema ещё отсутствует.
 
-Следующий блок — UI binding, transactional manual payment/invitations и invitation-only registration/activation, затем renewal. PR №7/№8 не объединены с main. Delivery worker/provider, реальные owner onboarding/тарифы/KMS/credentials, auth UI и полный security/release acceptance остаются открытыми. Client actor/verification events UI не дают server authority. Production startup серверного foundation заблокирован.
+Третий Development блок добавляет UI binding, transactional manual payment/invitations и invitation-only registration/activation; следующий — renewal. PR №7/№8 не объединены с main. Delivery worker/provider, реальные owner onboarding/тарифы/KMS/credentials и полный security/release acceptance остаются открытыми. Client actor/verification events UI не дают server authority. Production startup серверного foundation заблокирован.
 
 ## Остальная работа и запуск
 
@@ -31,3 +31,6 @@
 Облачные среды/доступ к провайдерам, legal/retention/RPO/RTO и конкретная смета ещё не подтверждены. Docker здесь не установлен; инфраструктурные шаблоны не запускались. Основа будущего размещения — Timeweb RU, managed PostgreSQL после проверки цены/возможностей. Домен и настоящие тарифы остаются открытыми. Услуги не приобретались, Production не публиковался.
 
 Для Production нужны все требования и проверки, принятие владельцем конкретного Staging artifact, миграции и план восстановления. Оплата/провайдеры/Production остаются отдельными решениями владельца. Админка не управляет deployment.
+
+
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding, renewal и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.

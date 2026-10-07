@@ -21,7 +21,7 @@ before(async () => {
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
   await pg.owner.query(`TRUNCATE identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
-    identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary CASCADE`);
+    identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
 class Browser {
@@ -274,4 +274,143 @@ test('parallel enrollment limits do not deadlock a saturated database pool', {ti
   const responses=await Promise.all(Array.from({length:15},()=>b.clone().post('/auth/two-factor/verify-totp',{code:invalidOTP(uri)})));
   assert.ok(responses.every(r=>[401,429].includes(r.statusCode)));assert.ok(responses.some(r=>r.statusCode===429));
   assert.equal((await b.get('/control/requests')).statusCode,200);
+});
+
+async function claimedApplication(address='visitor@example.test') {
+  const a=await application(address);
+  const claim=await a.b.post('/access/payment-claim',{senderName:'Synthetic sender',senderBank:'Synthetic bank'});
+  assert.equal(claim.statusCode,200);return {...a,row:claim.json().request};
+}
+function reviewCommand(row: {id:string;revision:number;tariff:{priceMinor:string}}) {
+  return {actionId:crypto.randomUUID(),requestId:row.id,expectedRevision:row.revision,actualMinor:row.tariff.priceMinor,receivedAt:new Date().toISOString(),decision:'confirm',reason:'',inviteHours:72};
+}
+async function paidApplication(address='visitor@example.test') {
+  const admin=await enrolledAdmin(),a=await claimedApplication(address),cmd=reviewCommand(a.row);
+  const r=await admin.b.post('/control/review',cmd);assert.equal(r.statusCode,200);
+  const invitation=r.json().invitations.at(-1),sent=await mail('access','invitation',cc);
+  return {...a,admin,cmd,invitation,invitationToken:sent.token as string};
+}
+async function registrationProof(a:Awaited<ReturnType<typeof paidApplication>>) {
+  assert.equal((await a.b.post('/access/registration-proof',{invitationToken:a.invitationToken})).statusCode,202);
+  return (await mail('access','registration_verification')).proofToken as string;
+}
+const registrationBody=(invitationToken:string,proofToken:string)=>({invitationToken,proofToken,name:'Registered example',password:testPassword});
+
+test('review preview is read-only; commit is TOTP-gated, revision-checked and idempotent',async()=>{
+  const {b}=await enrolledAdmin(),a=await claimedApplication(),cmd=reviewCommand(a.row);
+  assert.equal((await adminBrowser().post('/control/review',cmd)).statusCode,401);
+  assert.equal((await a.b.post('/control/review',cmd)).statusCode,404);
+  assert.equal((await b.post('/control/review-preview',cmd)).json().purchase.state,'paid_not_activated');
+  assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,0);
+  assert.equal((await b.post('/control/review',{...cmd,expectedRevision:0})).statusCode,409);
+  assert.equal((await b.post('/control/review',{...cmd,actorId:'injected'})).statusCode,400);
+  const committed=await b.post('/control/review',cmd);assert.equal(committed.statusCode,200);
+  assert.equal((await b.post('/control/review',cmd)).json().status,'already_committed');
+  assert.equal((await b.post('/control/review',{...cmd,inviteHours:24})).statusCode,409);
+  assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,1);
+  assert.equal((await pg.owner.query('SELECT * FROM commerce.invitation')).rowCount,1);
+  assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
+  assert.equal((await pg.owner.query('SELECT activated_at FROM commerce.purchase')).rows[0].activated_at,null);
+});
+test('copied invitation alone never verifies email; proof is scoped, secret and independently mailed',async()=>{
+  const a=await paidApplication(),attacker=userBrowser();
+  const sent=await attacker.post('/access/registration-proof',{invitationToken:a.invitationToken});assert.equal(sent.statusCode,202);
+  assert.equal(sent.json().proofToken,undefined);
+  const proofMail=await mail('access','registration_verification');assert.equal(proofMail.email,'visitor@example.test');
+  const failure=await attacker.post('/access/register',registrationBody(a.invitationToken,a.invitationToken));assert.equal(failure.statusCode,400);
+  assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
+  assert.equal((await attacker.post('/access/register',{...registrationBody(a.invitationToken,proofMail.proofToken),email:'attacker@example.test'})).statusCode,400);
+  assert.equal((await a.admin.b.post('/access/register',registrationBody(a.invitationToken,proofMail.proofToken))).statusCode,404);
+  assert.equal((await pg.owner.query('SELECT verifier FROM access.registration_proof')).rows[0].verifier,digest(proofMail.proofToken));
+});
+test('successful registration atomically activates exactly once, retains snapshot and requires fresh login',async()=>{
+  const a=await paidApplication(),proof=await registrationProof(a);
+  const body=registrationBody(a.invitationToken,proof),results=await Promise.all([a.b.post('/access/register',body),userBrowser().post('/access/register',body)]);
+  assert.deepEqual(results.map(r=>r.statusCode).sort(),[201,400]);
+  assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,1);
+  const purchase=(await pg.owner.query('SELECT * FROM commerce.purchase')).rows[0];assert.equal(purchase.state,'active');assert.equal(purchase.data.tariff.priceMinor,'119000');
+  assert.equal(purchase.timezone,'Europe/Moscow');assert.ok(purchase.access_end>purchase.activated_at);
+  assert.equal((await a.b.get('/session')).statusCode,401);
+  assert.equal((await a.b.get('/access/request')).statusCode,401);
+  assert.equal((await a.b.post('/auth/sign-in/email',{email:'visitor@example.test',password:testPassword})).statusCode,200);
+  assert.equal((await a.b.get('/session')).json().scope,'active');
+  const user=(await pg.owner.query('SELECT * FROM identity.auth_user')).rows[0];assert.equal(user.email_verified,true);
+  const account=(await pg.owner.query('SELECT password FROM identity.auth_account')).rows[0];assert.notEqual(account.password,testPassword);
+  assert.equal((await a.admin.b.get('/control/requests')).json().invitations[0].state,'used');
+  assert.equal((await a.admin.b.post('/control/invitation-action',{actionId:crypto.randomUUID(),invitationId:a.invitation.id,decision:'reissue',reason:'Synthetic test'})).statusCode,409);
+});
+test('cancel and reissue retain payment, use independent lifetime and invalidate prior link/proofs',async()=>{
+  const a=await paidApplication(),proof=await registrationProof(a);
+  const result=await a.admin.b.post('/control/invitation-action',{actionId:crypto.randomUUID(),invitationId:a.invitation.id,decision:'reissue',reason:'Synthetic replacement',inviteHours:24});assert.equal(result.statusCode,200);
+  assert.equal(result.json().invitations[0].state,'superseded');
+  assert.equal((await a.b.post('/access/register',registrationBody(a.invitationToken,proof))).statusCode,400);
+  const newMail=await mail('access','invitation',cc), latest=result.json().invitations.at(-1);
+  assert.equal((await a.b.post('/access/register',registrationBody(newMail.token,proof))).statusCode,400);
+  assert.equal(Math.round((Date.parse(latest.expiresAt)-Date.parse(latest.createdAt))/3600000),24);
+  assert.equal((await a.admin.b.post('/control/invitation-action',{actionId:crypto.randomUUID(),invitationId:latest.id,decision:'cancel',reason:'Synthetic cancellation'})).statusCode,200);
+  assert.equal((await a.b.post('/access/registration-proof',{invitationToken:newMail.token})).statusCode,400);
+  assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,1);
+  assert.equal((await pg.owner.query('SELECT activated_at FROM commerce.purchase')).rows[0].activated_at,null);
+});
+test('expired invitation can be replaced without another payment or an earlier period start',async()=>{
+  const a=await paidApplication();
+  await pg.owner.query("UPDATE commerce.invitation SET expires_at=now()-interval '1 second'");
+  // Keep domain metadata in sync with the real historical deadline for this expiry fixture.
+  await pg.owner.query("UPDATE commerce.review_state SET data=jsonb_set(data,'{invitations,0,expiresAt}',to_jsonb(to_char(now()-interval '1 second','YYYY-MM-DD\"T\"HH24:MI:SS.MS\"Z\"')))");
+  assert.equal((await a.b.post('/access/registration-proof',{invitationToken:a.invitationToken})).statusCode,400);
+  assert.equal((await a.admin.b.post('/control/invitation-action',{actionId:crypto.randomUUID(),invitationId:a.invitation.id,decision:'reissue',reason:'Expired link'})).statusCode,200);
+  assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,1);
+  assert.equal((await pg.owner.query('SELECT activated_at FROM commerce.purchase')).rows[0].activated_at,null);
+});
+test('registration proof expiry, password rules and closed public signup prevent activation',async()=>{
+  const a=await paidApplication(),proof=await registrationProof(a);
+  assert.equal((await a.b.post('/access/register',{...registrationBody(a.invitationToken,proof),password:'short'})).statusCode,400);
+  await pg.owner.query("UPDATE access.registration_proof SET expires_at=now()-interval '1 second'");
+  assert.equal((await a.b.post('/access/register',registrationBody(a.invitationToken,proof))).statusCode,400);
+  assert.equal((await a.b.post('/auth/sign-up/email',{name:'Bypass',email:'bypass@example.test',password:testPassword})).statusCode,404);
+  assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
+});
+test('payment mismatch requires explicit reason/decision and top-up accumulates separate actual records',async()=>{
+  const admin=await enrolledAdmin(),a=await claimedApplication(),cmd=reviewCommand(a.row);
+  assert.equal((await admin.b.post('/control/review',{...cmd,actualMinor:'50000'})).statusCode,409);
+  assert.equal((await admin.b.post('/control/review',{...cmd,actualMinor:'50000',decision:'accept_full'})).statusCode,409);
+  const topup=await admin.b.post('/control/review',{...cmd,actualMinor:'50000',decision:'topup',reason:'Need remaining transfer'});assert.equal(topup.statusCode,200);assert.equal(topup.json().purchases.length,0);
+  const updated=(await a.b.post('/access/payment-claim',{senderName:'Synthetic sender',senderBank:'Synthetic bank'})).json().request;
+  const completed=await admin.b.post('/control/review',{...reviewCommand(updated),actualMinor:'69000'});assert.equal(completed.statusCode,200);
+  assert.equal(completed.json().payments.length,2);assert.equal(completed.json().purchases[0].actualMinor,'119000');
+});
+test('outbox failure rolls back review ledger/invitation and registration identity/activation together',async()=>{
+  const admin=await enrolledAdmin(),a=await claimedApplication(),cmd=reviewCommand(a.row);
+  await pg.owner.query('REVOKE INSERT ON access.outbox FROM control_api');
+  try {assert.equal((await admin.b.post('/control/review',cmd)).statusCode,400);assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,0);}finally{await pg.owner.query('GRANT INSERT ON access.outbox TO control_api');}
+  assert.equal((await admin.b.post('/control/review',cmd)).statusCode,200);
+  const invitationToken=(await mail('access','invitation',cc)).token;
+  assert.equal((await a.b.post('/access/registration-proof',{invitationToken})).statusCode,202);const proof=(await mail('access','registration_verification')).proofToken;
+  await pg.owner.query('REVOKE INSERT ON identity.outbox FROM finance_api');
+  try {
+    assert.equal((await a.b.post('/access/register',registrationBody(invitationToken,proof))).statusCode,400);
+    assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
+    assert.equal((await pg.owner.query('SELECT state FROM commerce.invitation')).rows[0].state,'active');
+  }finally{await pg.owner.query('GRANT INSERT ON identity.outbox TO finance_api');}
+  assert.equal((await a.b.post('/access/register',registrationBody(invitationToken,proof))).statusCode,201);
+});
+test('runtime grants expose neither invitation plaintext to finance nor identity/financial data to control',async()=>{
+  const a=await paidApplication();
+  await assert.rejects(pg.finance.query('SELECT sealed_token FROM commerce.invitation'),{code:'42501'});
+  await assert.rejects(pg.finance.query('SELECT * FROM commerce.review_state'),{code:'42501'});
+  await assert.rejects(pg.control.query('SELECT * FROM identity.auth_account'),{code:'42501'});
+  await assert.rejects(pg.control.query('SELECT * FROM finance.isolation_canary'),{code:'42501'});
+  const link=await a.admin.b.post('/control/invitation-link',{invitationId:a.invitation.id});assert.equal(link.json().token,a.invitationToken);
+  const queue=await a.admin.b.get('/control/requests');assert.equal(queue.body.includes(a.invitationToken),false);assert.equal(queue.body.includes('sealed_token'),false);
+  assert.equal((await adminBrowser().post('/control/invitation-link',{invitationId:a.invitation.id})).statusCode,401);
+});
+test('month-end clamping preserves Moscow wall time for leap years and original activation anchor',async()=>{
+  for(const [start,count,expected] of [
+    ['2027-01-31T08:15:00Z',1,'2027-02-28T08:15:00.000Z'],
+    ['2028-01-31T08:15:00Z',1,'2028-02-29T08:15:00.000Z'],
+    ['2027-01-31T08:15:00Z',2,'2027-03-31T08:15:00.000Z'],
+    ['2027-12-31T08:15:00Z',3,'2028-03-31T08:15:00.000Z']
+  ] as const) {
+    const result=(await pg.owner.query("SELECT (($1::timestamptz AT TIME ZONE 'Europe/Moscow')+make_interval(months=>$2)) AT TIME ZONE 'Europe/Moscow' AS finish",[start,count])).rows[0].finish;assert.equal(result.toISOString(),expected);
+  }
 });

@@ -37,3 +37,6 @@ Infrastructure содержит отдельные templates Development/Staging
 ## Заявка и админка
 
 Пользовательский пример: http://127.0.0.1:5173/#access. Отдельная админка запускается через `pnpm run dev:admin` на http://127.0.0.1:5174. Примеры включаются явно и независимы: данные между origins не передаются и не сохраняются. Оплаты и письма не выполняются. [Описание реализации и следующий шаг](docs/architecture/access-admin-requests.md).
+
+
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](docs/architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding, renewal и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
