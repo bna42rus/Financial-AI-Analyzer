@@ -22,7 +22,7 @@
 
 Локально прошли общий check, две crypto проверки и 78 browser scenarios. 24 integration scenarios выполняются на official PostgreSQL 18.4 в GitHub CI; локальная среда ограничивает OS users, поэтому локального DB success не заявляем. Итог конкретного head/run фиксируется в PR №8. RLS/tenant isolation проверяются на canary, actual finance schema ещё отсутствует.
 
-Третий Development блок добавляет UI binding, transactional manual payment/invitations и invitation-only registration/activation; следующий — renewal. PR №7/№8 не объединены с main. Delivery worker/provider, реальные owner onboarding/тарифы/KMS/credentials и полный security/release acceptance остаются открытыми. Client actor/verification events UI не дают server authority. Production startup серверного foundation заблокирован.
+Третий Development блок добавляет UI binding, transactional manual payment/invitations и invitation-only registration/activation; четвёртый — renewal. PR №7/№8 не объединены с main. Delivery worker/provider, реальные owner onboarding/тарифы/KMS/credentials и полный security/release acceptance остаются открытыми. Client actor/verification events UI не дают server authority. Production startup серверного foundation заблокирован.
 
 ## Остальная работа и запуск
 
@@ -33,4 +33,7 @@
 Для Production нужны все требования и проверки, принятие владельцем конкретного Staging artifact, миграции и план восстановления. Оплата/провайдеры/Production остаются отдельными решениями владельца. Админка не управляет deployment.
 
 
-Третий Development блок: [оплата, приглашения, регистрация и UI/API](invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding, renewal и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+
+
+Четвёртый Development блок: [продление доступа](access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.

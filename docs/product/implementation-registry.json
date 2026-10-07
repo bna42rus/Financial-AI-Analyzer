@@ -4510,15 +4510,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4544,7 +4553,14 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4556,7 +4572,7 @@
         "apps/api/test/browser.test.ts",
         "docs/architecture/invitation-registration.md"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
@@ -4811,15 +4827,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4830,10 +4855,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Одна активная заявка Одновременно допускается одна незавершённая renewal request. До payment claim её можно изменить или отменить; после claim финансовые параметры фиксируются.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-39.4",
@@ -4843,10 +4879,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Срок продления Если доступ активен, новый календарный период добавляется к текущему end. «1 месяц» означает календарный месяц, а не 30 дней. Если доступ уже закончился, новый период начинается с восстановления доступа, если administrator не указал иначе.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-39.5",
@@ -4856,10 +4903,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Задержка подтверждения Если пользователь оплатил до expiry, а administrator подтвердил через день после expiry, новый срок всё равно считается от прежней даты окончания — пользователь не теряет оплаченные дни из-за задержки проверки.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-39.6",
@@ -4869,10 +4927,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "No Grace Period Сам клик «Я оплатил» не продлевает entitlement. Иначе пользователь мог бы каждый месяц создавать ложную заявку и получать бесплатные дни.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-39.7",
@@ -4891,7 +4960,14 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4902,7 +4978,7 @@
         "apps/api/test/browser.test.ts",
         "docs/architecture/invitation-registration.md"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
@@ -4926,10 +5002,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Suspension independent Оплата и право пользоваться продуктом — разные состояния. Подтверждённая оплата может продлить entitlement, но не снимает security/administrative suspension.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-39.10",
@@ -4945,14 +5032,21 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/browser.test.ts",
         "docs/architecture/invitation-registration.md"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
     },
     {
@@ -4963,10 +5057,21 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Уведомление administrator о payment clai m Когда пользователь нажимает «Я оплатил», administrator получает notification с account email/ именем пользователя, sender name, sender bank, expected amount, tariff snapshot, request creation time и payment claim time. В уведомление не включаются card numbers, account numbers или иные лишние банковские identifiers. Email timestamp не используется как финансовый source of truth — канонические timestamps уже сохранены сервером.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-40",
@@ -5081,13 +5186,21 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
-        "apps/api/test/crypto.test.ts"
+        "apps/api/test/crypto.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
     },
     {
       "id": "PDF-40.5",
@@ -5476,15 +5589,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -5499,15 +5621,24 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -7104,9 +7235,20 @@
         "39.4",
         "39.6"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
     },
     {
@@ -7367,7 +7509,14 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
@@ -7449,7 +7598,14 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -7501,7 +7657,14 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/renewal-application.ts",
+        "apps/api/src/renewal-commerce.ts",
+        "apps/api/src/entitlement.ts",
+        "packages/database/migrations/0003_access_renewal.sql",
+        "apps/web/src/ServerRenewal.tsx",
+        "apps/admin/src/ServerRenewals.tsx",
+        "docs/architecture/access-renewal.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",

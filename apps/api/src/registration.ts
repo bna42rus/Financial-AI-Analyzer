@@ -41,6 +41,8 @@ export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer)
   await db.query(`INSERT INTO identity.auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,$4,$4)`,[crypto.randomUUID(),id,hash,times.start]);
   await db.query(`INSERT INTO identity.security_state(user_id,status,access_end) VALUES($1,'active',$2)`,[id,times.finish]);
   await db.query(`UPDATE commerce.purchase SET state='active',user_id=$1,activated_at=$2,access_end=$3,timezone='Europe/Moscow' WHERE id=$4`,[id,times.start,times.finish,purchase.id]);
+  await db.query("SELECT set_config('app.user_id',$1,true)",[id]);
+  await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days) VALUES($1,$2,$3,'Europe/Moscow',$4,$5)`,[id,times.start,times.finish,duration.kind==='calendar_months'?duration.count:0,duration.kind==='days'?duration.count:0]);
   await db.query(`UPDATE commerce.invitation SET state='used',used_at=$1 WHERE id=$2`,[times.start,invite.id]);
   await db.query('UPDATE access.registration_proof SET consumed_at=$1 WHERE invitation_id=$2',[times.start,invite.id]);
   await db.query('DELETE FROM access.application_session WHERE request_id=$1',[purchase.request_id]);

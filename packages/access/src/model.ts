@@ -2,10 +2,10 @@ import { assertPersistableMinor, parsePersistedMinor } from '../../finance-core/
 
 /** Deterministic domain transitions. Not an authentication, database or delivery adapter. */
 export type Duration = { kind: 'calendar_months' | 'days'; count: number };
-export type Tariff = { id: string; name: string; duration: Duration; priceMinor: string; aiQuota: number; publicVisible: boolean; availableForNew: boolean; active: boolean };
+export type Tariff = { id: string; name: string; duration: Duration; priceMinor: string; aiQuota: number; publicVisible: boolean; availableForNew: boolean; availableForRenewal?: boolean; active: boolean };
 export type RequestStatus = 'awaiting_email' | 'awaiting_payment' | 'under_review' | 'needs_topup' | 'paid_not_activated' | 'rejected';
 export type AccessRequest = {
-  id: string; revision: number; name: string; email: string; tariff: Tariff; status: RequestStatus;
+  id: string; revision: number; name: string; email: string; tariff: Tariff; status: RequestStatus; kind?: 'renewal';
   createdAt: string; expiresAt: string; verifiedAt: string | null; claimedAt: string | null;
   senderName: string; senderBank: string; decisionNote: string; remainingMinor?: string; lastClaimedAt?: string;
 };
@@ -33,7 +33,7 @@ export function rublesFromMinor(value: string): string { const n = parsePersiste
 export function moneyLabel(value: string): string { const n = parsePersistedMinor(value), a = n < 0n ? -n : n; return `${n < 0n ? '−' : ''}${new Intl.NumberFormat('ru-RU').format(a / 100n)}${a % 100n ? ',' + (a % 100n).toString().padStart(2, '0') : ''} ₽`; }
 export function durationLabel(value: Duration): string { return value.kind === 'calendar_months' ? value.count === 1 ? '1 календарный месяц' : value.count === 3 ? '3 календарных месяца' : `${value.count} календарных месяцев` : `${value.count} дней`; }
 export function dateLabel(value: string | null): string { return value ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '—'; }
-export function requestStatus(request: AccessRequest, now: string): RequestStatus | 'expired' { return ['awaiting_email', 'awaiting_payment'].includes(request.status) && time(now) >= time(request.expiresAt) ? 'expired' : request.status; }
+export function requestStatus(request: AccessRequest, now: string): RequestStatus | 'expired' { return request.kind !== 'renewal' && ['awaiting_email', 'awaiting_payment'].includes(request.status) && time(now) >= time(request.expiresAt) ? 'expired' : request.status; }
 export function invitationStatus(invite: Invitation, now: string): Invitation['state'] { return invite.state === 'active' && time(now) >= time(invite.expiresAt) ? 'expired' : invite.state; }
 export const statusLabel: Record<RequestStatus | 'expired', string> = { awaiting_email: 'Подтверждение почты', awaiting_payment: 'Ожидает оплаты', under_review: 'На проверке', needs_topup: 'Ожидает доплаты', paid_not_activated: 'Оплачено — ожидает регистрации', rejected: 'Отклонена', expired: 'Срок заявки истёк' };
 export const invitationLabel: Record<Invitation['state'], string> = { active: 'Подготовлено', expired: 'Срок ссылки истёк', cancelled: 'Отменено', superseded: 'Заменено новым' };

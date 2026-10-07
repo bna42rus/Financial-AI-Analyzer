@@ -58,4 +58,7 @@
 [Модель, интерфейс и границы](../architecture/access-admin-requests.md). Этот блок представлен для проверки на synthetic примерах. Development server/DB/auth foundation с verified-email application session, обязательными TOTP/recovery codes админки и reset/invalidation реализован в PR №8; real DB evidence фиксируется в нём. Третий Development блок — UI/API, transactional invitations/registration/activation; далее renewal и доставка.
 
 
-Третий Development блок: [оплата, приглашения, регистрация и UI/API](../architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding, renewal и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](../architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+
+
+Четвёртый Development блок: [продление доступа](../architecture/access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.

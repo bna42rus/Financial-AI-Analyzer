@@ -25,9 +25,9 @@ before(async()=>{
   await Promise.all([ready(web),ready(admin)]);
 });
 after(async()=>{for(const c of children)c.kill('SIGTERM');await finance?.close();await control?.close();await pg?.close();});
-for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP review → independent email proof → registration (${mobile?'mobile':'desktop'})`,{timeout:60000},async()=>{
-  await pg.owner.query('TRUNCATE access.request,access.tariff,commerce.action,identity.auth_user,control.auth_user,access.outbox,identity.outbox,control.outbox,identity.rate_limit,control.rate_limit CASCADE');
-  const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true};
+for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP review → independent email proof → registration → renewal (${mobile?'mobile':'desktop'})`,{timeout:60000},async()=>{
+  await pg.owner.query('TRUNCATE access.request,access.tariff,commerce.action,identity.auth_user,control.auth_user,access.outbox,identity.outbox,control.outbox,identity.rate_limit,control.rate_limit,commerce.renewal_request,commerce.access_cycle CASCADE');
+  const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);
   await pg.owner.query("INSERT INTO control.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('owner','Synthetic owner','owner@example.test',true,now(),now())");
   await pg.owner.query("INSERT INTO control.auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES('owner-account','owner','credential','owner',$1,now(),now())",[await hashPassword(pw)]);
@@ -52,6 +52,17 @@ for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP
       await registration.getByLabel('Почта',{exact:true}).fill('visitor@example.test');await registration.getByLabel('Пароль',{exact:true}).fill(pw);await registration.getByRole('button',{name:'Продолжить'}).click();await expect(registration.getByText('Доступ активен.',{exact:true})).toBeVisible();
       await owner.getByRole('button',{name:'Обновить данные'}).click();await expect(owner.getByText(/Использовано · создано/)).toBeVisible();
       const purchase=(await pg.owner.query('SELECT * FROM commerce.purchase')).rows[0];assert.equal(purchase.state,'active');assert.equal((await pg.owner.query('SELECT * FROM identity.auth_session')).rowCount,1);
+      const originalEnd=purchase.access_end.toISOString();
+      await registration.getByRole('button',{name:'Продлить доступ',exact:true}).click();await expect(registration.getByText('Ожидает оплаты',{exact:true})).toBeVisible();
+      await registration.getByLabel('Имя отправителя').fill('Synthetic renewal sender');await registration.getByLabel('Банк отправителя').fill('Synthetic renewal bank');await registration.getByRole('button',{name:'Я оплатил — тестовая отметка'}).click();await expect(registration.getByText('На проверке',{exact:true})).toBeVisible();
+      assert.equal((await pg.owner.query('SELECT access_end FROM commerce.access_cycle')).rows[0].access_end.toISOString(),originalEnd,'Claim gives no extension');
+      await owner.getByRole('button',{name:'Продления',exact:true}).click();await owner.getByRole('button',{name:/Registered example/}).click();await owner.getByRole('button',{name:'Рассчитать продление'}).click();await expect(owner.getByRole('heading',{name:'Последствия продления'})).toBeVisible();
+      assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,0,'Preview is read-only');
+      await owner.getByRole('button',{name:'Подтвердить продление'}).click();await expect(owner.getByText(/Продлено до/)).toBeVisible();
+      await registration.getByRole('button',{name:'Обновить продление и доступ'}).click();await expect(registration.getByText('Продление подтверждено',{exact:true})).toBeVisible();
+      const cycle=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(cycle.access_end>purchase.access_end);assert.equal(cycle.anchor_at.toISOString(),purchase.activated_at.toISOString());assert.equal(cycle.calendar_months,2);
+      assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,1);assert.equal((await pg.owner.query('SELECT * FROM commerce.invitation')).rowCount,1,'Renewal creates no new invite');
+      await pg.owner.query("UPDATE identity.security_state SET status='suspended'");await registration.getByRole('button',{name:'Обновить продление и доступ'}).click();await expect(registration.getByText('Аккаунт заблокирован.',{exact:false})).toBeVisible();assert.equal(await registration.getByRole('button',{name:'Открыть экраны приложения'}).count(),0);
       for(const page of [visitor,owner,registration])assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false,'No horizontal mobile overflow');
       assert.deepEqual(await registration.evaluate(()=>Object.keys(localStorage)),[],'No identity/token storage in localStorage');
     }finally{await independent.close();}

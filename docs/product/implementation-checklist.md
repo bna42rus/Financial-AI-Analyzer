@@ -182,4 +182,7 @@ Public и admin UI работают только в явно обозначен�
 [Development backend, границы и проверки](../architecture/server-access-security.md): strict API types, две crypto проверки, 24 real PostgreSQL integration scenarios в GitHub CI. Реализованы verification/application ownership, scoped DB roles, TOTP/recovery-only flow и A-07 reset. Третий Development блок добавляет UI/API и transactional invitation registration/activation. Полные пункты остаются partial: delivery, renewal, actual finance schema/RLS, KMS и общая security/release acceptance впереди.
 
 
-Третий Development блок: [оплата, приглашения, регистрация и UI/API](../architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding, renewal и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](../architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+
+
+Четвёртый Development блок: [продление доступа](../architecture/access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.
