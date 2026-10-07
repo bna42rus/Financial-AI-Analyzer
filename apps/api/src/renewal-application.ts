@@ -13,7 +13,7 @@ export function publicRenewal(data:AccessRequest,state:RenewalRow['renewalState'
 }
 async function tariffs(db:PoolClient):Promise<Tariff[]> {return (await db.query(`SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'availableForRenewal'='true' ORDER BY id`)).rows.map(r=>r.snapshot);}
 export async function ownRenewal(db:PoolClient,userId:string):Promise<OwnRenewal>{
- const cycle=await lockedCycle(db,userId),row=(await db.query('SELECT data,state FROM commerce.renewal_request WHERE user_id=$1 ORDER BY (state='open') DESC,created_at DESC,id DESC LIMIT 1',[userId])).rows[0];
+ const cycle=await lockedCycle(db,userId),row=(await db.query(`SELECT data,state FROM commerce.renewal_request WHERE user_id=$1 ORDER BY (state='open') DESC,created_at DESC,id DESC LIMIT 1`,[userId])).rows[0];
  return {cycle,request:row?publicRenewal(row.data,row.state):null,tariffs:await tariffs(db)};
 }
 async function snapshot(db:PoolClient,id:unknown){const tariff=(await tariffs(db)).find(t=>t.id===string(id,100));if(!tariff||!/^\d+$/.test(tariff.priceMinor)||BigInt(tariff.priceMinor)<=0n||BigInt(tariff.priceMinor)>9223372036854775807n||!['days','calendar_months'].includes(tariff.duration.kind)||!Number.isInteger(tariff.duration.count)||tariff.duration.count<1||tariff.duration.count>36500||!Number.isSafeInteger(tariff.aiQuota)||tariff.aiQuota<0)throw new HttpError(409,'TARIFF_UNAVAILABLE');return tariff;}
