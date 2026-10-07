@@ -474,6 +474,11 @@ test('one unfinished renewal survives concurrent creation; only unclaimed revisi
  const row=results.find(r=>r.statusCode===200)!.json().request;
  await pg.owner.query("UPDATE access.tariff SET snapshot=jsonb_set(snapshot,'{priceMinor}','129000')");
  assert.equal((await a.b.get('/access/renewal')).json().request.tariff.priceMinor,'119000');
+ assert.equal((await a.b.get('/access/renewal')).json().tariffs.length,0,'Invalid money must not reach the tariff UI');
+ assert.equal((await a.b.post('/access/renewal-change',{requestId:row.id,expectedRevision:row.revision,tariffId:tariff.id})).json().code,'TARIFF_UNAVAILABLE','Reject a numeric JSON money value instead of accepting unsafe float authority');
+ await pg.owner.query("UPDATE access.tariff SET snapshot=jsonb_set(jsonb_set(jsonb_set(snapshot,'{priceMinor}',to_jsonb('129000'::text)),'{publicVisible}','false'),'{availableForNew}','false')");
+ assert.equal((await a.b.get('/access/tariffs')).json().tariffs.length,0);
+ assert.equal((await a.b.get('/access/renewal')).json().tariffs.length,1,'Renewal availability is independent of public/new-user visibility');
  const changed=await a.b.post('/access/renewal-change',{requestId:row.id,expectedRevision:row.revision,tariffId:tariff.id});assert.equal(changed.statusCode,200);assert.equal(changed.json().request.tariff.priceMinor,'129000');
  assert.equal((await a.b.post('/access/renewal-cancel',{requestId:row.id,expectedRevision:row.revision})).statusCode,409);
  assert.equal((await a.b.post('/access/renewal-cancel',{requestId:row.id,expectedRevision:changed.json().request.revision})).json().request.renewalState,'cancelled');
