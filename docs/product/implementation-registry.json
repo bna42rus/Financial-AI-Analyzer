@@ -4506,10 +4506,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Поля тарифа Tariff ID, name, duration, price, public visibility, available for new users, available for renewal, active/archive, AI quota, sort order.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.2",
@@ -4519,10 +4529,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Price Snapshot Если заявка создана на 990 ₽ , а через час tariff изменён на 1 190 ₽ , существующая заявка остаётся на 990 ₽ . История покупки хранит snapshot условий, а использованный tariff не удаляется — только архивируется.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.3",
@@ -4532,10 +4552,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "First Access Flow Публичный сайт → выбор tariff → имя/ email → email verification → secure application page → payment instructions → sender name + sender bank → «Я оплатил» → admin verification → invitation → registration → entitlement active.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.4",
@@ -4545,10 +4575,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Почему email подтверждается до оплаты Это снижает риск ошибочного или чужого email и гарантирует, что после оплаты система сможет доставить invitation и recovery messages.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.5",
@@ -4558,10 +4598,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Срок заявки Неоплаченная заявка имеет configurable expiry; стартовый ориентир 72 часа. После expiry создаётся новая заявка с актуальной ценой. После нажатия «Я оплатил» заявка не истекает автоматически до решения administrator.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.6",
@@ -4571,10 +4621,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Paid but not activated Подтверждённая оплата и регистрация — разные состояния. До регистрации пользователь отображается как «Оплачено — ожидает регистрации». Если invite истёк, administrator выдаёт новый без повторной оплаты.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.7",
@@ -4584,10 +4644,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Access Start Первая покупка «1 месяц» начинает отсчёт с успешной активации account, если администратор не задал конкретную fixed end date.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-38.8",
@@ -4597,10 +4667,20 @@
       "title": "Тарифы и получение первого доступа",
       "source_text": "Server timestamps и повторные заявк и Система автоматически фиксирует `request_created_at`, `payment_claimed_at` и `admin_notification_sent_at`; источником времени является server, а не введённая пользователем дата. Если email уже связан с existing user, pending application или active invitation, система не создаёт бесконтрольно новый аккаунт, а направляет человека в подходящий существующий flow — login, renewal или продолжение заявки.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-39",
@@ -4636,10 +4716,20 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Payment Data Перед «Я оплатил» обязательны sender name и sender bank. Amount пользователь не вводит — expected amount берётся из snapshot tariff. Номера карт и последние цифры не собираются.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-39.3",
@@ -4701,10 +4791,20 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Недоплата, переплата и idempotency Expected и actual amounts хранятся отдельно. Administrator может подтвердить фактически полученную сумму, отклонить либо зафиксировать дополнительный платёж. Повторное нажатие «Подтвердить» не продлевает доступ второй раз: критичные действия защищены idempotency/action IDs.",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-39.8",
@@ -5013,10 +5113,20 @@
       "title": "Административная панель",
       "source_text": "Основная структура Dashboard; Users; Accesses; Access Requests; Renewals; Payments; Tariffs & Renewal; AI Usage; Maintenance; System; Admin History; Settings.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.2",
@@ -5026,10 +5136,20 @@
       "title": "Административная панель",
       "source_text": "Dashboard Показывает активных пользователей, expiring soon, expired, suspended, active invitations, paid-not-activated, новые access requests, renewals на проверке, payment claims, AI usage, incidents, maintenance и текущую Production version.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.3",
@@ -5052,10 +5172,20 @@
       "title": "Административная панель",
       "source_text": "Access History Вся история выдачи доступа сохраняется, включая expired/cancelled/superseded invitations. Приглашение не исчезает после истечения, иначе невозможно восстановить последовательность событий.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.5",
@@ -5065,10 +5195,20 @@
       "title": "Административная панель",
       "source_text": "Access Requests и Renewals Заявки новых пользователей и продления хранятся отдельно, потому что у них разные жизненные циклы. В обоих случаях administrator видит status, tariff snapshot, expected amount, sender name/bank и timestamps, но не банковские реквизиты пользователя.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.6",
@@ -5078,10 +5218,20 @@
       "title": "Административная панель",
       "source_text": "Manual Payments Payment journal — административная бухгалтерская запись, а не банковская интеграция. Он хранит expected/actual amount, sender, bank, date/time, method, status, corrections, refunds и administrator action history.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.7",
@@ -5117,10 +5267,20 @@
       "title": "Административная панель",
       "source_text": "Ручная выдача доступа и приглашени е Administrator может вручную создать access/invitation с email, длительностью 7/30 дней, 3 месяца, год, custom end date или indefinite, внутренним типом Paid/Test/Free/Other и internal note. Lifetime invite-link задаётся отдельно от entitlement duration: например ссылка может действовать 72 часа, а оплаченный доступ — месяц после activation. Истёкшая ссылка не должна уничтожать уже подтверждённый entitlement.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.10",
@@ -5143,10 +5303,20 @@
       "title": "Административная панель",
       "source_text": "Invitation actions и Accesses tabl e Для active invitation доступны Copy link, Resend и Cancel. В Accesses table сохраняются email, created_at, link expiry/remaining time, entitlement duration, creator, internal note и current state. Used/expired/cancelled invitations не исчезают из истории; при необходимости создаётся новый invite, а старый остаётся аудиторной записью.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
+      "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "PDF-41.12",
@@ -6965,10 +7135,19 @@
         "41.9",
         "41.10"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/access/src/model.ts",
+        "apps/web/src/AccessRequestPage.tsx",
+        "apps/admin/src/AdminApp.tsx"
+      ],
+      "verification_refs": [
+        "packages/access/test/model.test.ts",
+        "apps/web/e2e/access.spec.ts",
+        "apps/admin/e2e/requests.spec.ts",
+        "docs/architecture/access-admin-requests.md"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
       "id": "C-01",
