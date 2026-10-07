@@ -9,7 +9,7 @@ async function invitation(db:PoolClient,secret:string) {
   const ref=(await db.query('SELECT purchase_id FROM commerce.invitation WHERE verifier=$1',[digest(secret)])).rows[0];
   if(!ref)throw new HttpError(400,'INVALID_INVITATION');
   const purchase=(await db.query('SELECT * FROM commerce.purchase WHERE id=$1 FOR UPDATE',[ref.purchase_id])).rows[0];
-  const invite=(await db.query(`SELECT id,purchase_id,email,state,expires_at FROM commerce.invitation WHERE verifier=$1 AND state='active' AND expires_at>now() FOR UPDATE`,[digest(secret)])).rows[0];
+  const invite=(await db.query(`SELECT id,purchase_id,email,state,expires_at FROM commerce.invitation WHERE verifier=$1 AND state='active' AND expires_at>clock_timestamp() FOR UPDATE`,[digest(secret)])).rows[0];
   if(!invite||purchase.state!=='paid_not_activated')throw new HttpError(400,'INVALID_INVITATION');
   return {invite,purchase};
 }
@@ -18,7 +18,7 @@ export async function requestRegistrationProof(db:PoolClient,request:FastifyRequ
   // A new independently random proof goes only to the expected address; never return it via this API.
   // Do not revoke earlier proofs on request: someone with a copied invite must not block its owner.
   const secret=token();
-  await db.query(`INSERT INTO access.registration_proof(verifier,invitation_id,expires_at) VALUES($1,$2,now()+interval '15 minutes')`,[digest(secret),invite.id]);
+  await db.query(`INSERT INTO access.registration_proof(verifier,invitation_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '15 minutes')`,[digest(secret),invite.id]);
   await outbox(db,'access',seal,'registration_verification',{email:invite.email,proofToken:secret});
   return {status:'accepted'};
 }
@@ -26,7 +26,7 @@ export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer)
   const b=fields(request,['invitationToken','proofToken','name','password']);
   const chosen=password(b.password), name=string(b.name,100).trim();
   const {invite,purchase}=await invitation(db,string(b.invitationToken,100));
-  const proof=(await db.query(`SELECT verifier FROM access.registration_proof WHERE verifier=$1 AND invitation_id=$2 AND consumed_at IS NULL AND expires_at>now() FOR UPDATE`,[digest(string(b.proofToken,100)),invite.id])).rows[0];
+  const proof=(await db.query(`SELECT verifier FROM access.registration_proof WHERE verifier=$1 AND invitation_id=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`,[digest(string(b.proofToken,100)),invite.id])).rows[0];
   if(!proof)throw new HttpError(400,'INVALID_REGISTRATION_PROOF');
   if((await db.query('SELECT 1 FROM identity.auth_user WHERE email=$1',[invite.email])).rowCount)throw new HttpError(409,'EXISTING_ACCOUNT');
   const duration=purchase.data.duration;
