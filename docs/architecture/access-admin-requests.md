@@ -30,3 +30,7 @@
 ## Следующий блок
 
 Проверка владельцем понятности этой части. Затем server/DB/auth foundation: защищённый путь подтверждения почты, application session, серверные permissions, admin login с обязательным TOTP и recovery codes E-04; PostgreSQL transitions/idempotency/outbox. После этого реальные invitation registration и renewal. Покупки providers и Production release остаются отдельными решениями.
+
+## Продолжение: серверная основа
+
+В PR №8 добавлен [Development backend](server-access-security.md) с email/application session, server roles/permissions, admin TOTP/recovery codes и reset/invalidation. Этот интерфейс всё ещё работает на своём независимом opt-in примере; runtime полномочия предоставляет только API. API binding, transactional review/invitations, registration/activation и renewal — следующие блоки.

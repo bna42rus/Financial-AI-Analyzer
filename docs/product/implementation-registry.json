@@ -4533,15 +4533,23 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4556,15 +4564,23 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4579,15 +4595,23 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4602,15 +4626,23 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4671,15 +4703,23 @@
       "implementation_refs": [
         "packages/access/src/model.ts",
         "apps/web/src/AccessRequestPage.tsx",
-        "apps/admin/src/AdminApp.tsx"
+        "apps/admin/src/AdminApp.tsx",
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
         "apps/web/e2e/access.spec.ts",
         "apps/admin/e2e/requests.spec.ts",
-        "docs/architecture/access-admin-requests.md"
+        "docs/architecture/access-admin-requests.md",
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
       "note": " Первый access flow: чистые state transitions и opt-in synthetic UI. Не подтверждает auth/email ownership, secure links, server timestamps, delivery, DB concurrency/isolation, activation или renewal. Полные условия пункта предстоят."
     },
     {
@@ -4879,10 +4919,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Пользовательская авторизация Verified email + password. Administrator никогда не видит и не назначает password. Login/password reset дают generic responses, не раскрывающие существование конкретного email.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.2",
@@ -4892,10 +4942,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Password Reset Reset-link одноразовый и короткоживущий, приходит только на verified email. После успешной смены инвалидируются остальные reset tokens и, предпочтительно, остальные user sessions. Отправляется security email.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.3",
@@ -4905,10 +4965,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Sessions и Security Events Пользователь видит свои sessions в понятном виде и может завершить конкретную либо все остальные. Отдельный Security History показывает входы, смену password/email, session revocation и admin-assisted recovery.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.4",
@@ -4918,10 +4988,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Restricted Mode После expiry обычная финансовая навигация скрывается. Доступны Account, Security, Access Status/Renewal, Support, Privacy/Legal, Delete Financial Data, Delete Account, Logout.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.5",
@@ -4931,10 +5011,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Administrator 2FA Основной вход administrator: email + password + mandatory TOTP через authenticator app. SMS не используется как обычный второй фактор.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.6",
@@ -4944,10 +5034,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Admin TOTP Recovery по SMS Если authenticator потерян, допускается recovery на заранее подтверждённый телефон. Flow: password → SMS one-time code → rate limiting → old TOTP invalidated → все старые admin sessions закрыты → обязательная настройка нового TOTP → security email + admin audit. Recovery codes остаются дополнительным резервом.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.7",
@@ -4970,10 +5070,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Уведомления Отдельный Notification Center в первой версии не обязателен. Используются email, inline banners и специальные status screens. Критичные письма имеют delivery status queued/sent/failed и возможность resend там, где failure требует ручного действия. Password reset URL administrator никогда не видит и не копирует.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.9",
@@ -5022,10 +5132,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Security notification s Пользователь получает уведомления минимум о новом значимом login, смене password, смене email и admin-assisted recovery. Сообщение о новом входе содержит дату/время и понятное описание browser/device без избыточного fingerprinting. Administrator получает отдельные alerts о критичных security/admin events согласно monitoring policy.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.13",
@@ -5048,10 +5168,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Suspensio n Suspended account может аутентифицироваться только в ограниченный recovery/support flow, аналогичный restricted mode, без доступа к financial functions. Administrator может завершить активные sessions при suspension. Возврат из suspended в active выполняется отдельным admin action и не происходит автоматически после оплаты.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.15",
@@ -5061,10 +5191,20 @@
       "title": "Авторизация, безопасность администратора и системные уведомления",
       "source_text": "Сессии после password rese t После успешного password reset старый password и все ранее выданные reset tokens становятся недействительными. Все другие пользовательские sessions завершаются; текущая recovery-session может сохраниться только если auth- реализация безопасно связывает её с только что завершённым reset flow. Пользователь получает security email о смене password.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-40.16",
@@ -5159,10 +5299,20 @@
       "title": "Административная панель",
       "source_text": "Users Таблица содержит email, status, access end, registered at, last login, suspension, AI usage и internal note. Из карточки можно продлить access, изменить end date, suspend/unsuspend, отправить password reset, завершить sessions, выполнить admin email override, посмотреть access/payment history или удалить account.",
       "group": "security",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
     },
     {
       "id": "PDF-41.4",
@@ -6915,10 +7065,20 @@
         "40.2",
         "40.15"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
     },
     {
       "id": "A-08",
@@ -7155,10 +7315,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "C-01",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
     },
     {
       "id": "C-02",
@@ -7166,10 +7336,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "C-02",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
     },
     {
       "id": "C-03",
@@ -7210,10 +7390,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "C-06",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
     },
     {
       "id": "C-07",
@@ -7276,10 +7466,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "E-02",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
     },
     {
       "id": "E-03",
@@ -7298,10 +7498,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "E-04",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/server.ts",
+        "apps/api/src/auth.ts",
+        "apps/api/src/security.ts",
+        "apps/api/src/application.ts",
+        "packages/database/migrations/0001_access_security.sql",
+        "docs/architecture/server-access-security.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/security.test.ts",
+        "apps/api/test/crypto.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Development server foundation added in PR #8; real PostgreSQL tests cover narrow auth/reset/recovery/isolation behavior. Complete source requirement, real delivery/KMS/security UX and release acceptance remain open."
     },
     {
       "id": "E-05",

@@ -5,8 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx src/main.ts",
-    "check": "tsc --noEmit",
-    "test:integration": "node --import tsx --test --test-concurrency=1 test/security.test.ts"
+    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts",
+    "test:integration": "node --import tsx --test --test-concurrency=1 test/security.test.ts",
+    "operator": "node --import tsx src/operator.ts"
   },
   "dependencies": {
     "@finance/access": "workspace:*",

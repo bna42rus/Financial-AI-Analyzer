@@ -24,6 +24,12 @@ export async function createServer(config: Config) {
   class RootModule {} Module({})(RootModule);
   const app = await NestFactory.create<NestFastifyApplication>(RootModule, new FastifyAdapter({ logger: false, trustProxy: false, bodyLimit: 8192 }), { logger: false });
   const fastify = app.getHttpAdapter().getInstance();
+  async function subjectRate(userId: string) {
+    const result = await config.pool.query(`INSERT INTO ${schema}.rate_limit(key,hits,expires_at) VALUES($1,1,now()+interval '5 minutes')
+      ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN 1 ELSE ${schema}.rate_limit.hits+1 END,
+      expires_at=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN EXCLUDED.expires_at ELSE ${schema}.rate_limit.expires_at END RETURNING hits`, [seal.rateKey('enrollment:'+userId)]);
+    if (result.rows[0].hits>5) throw new HttpError(429,'RATE_LIMITED');
+  }
   async function rate(request: FastifyRequest) {
     if (request.method !== 'POST') return;
     const route = request.url.split('?')[0]!;
@@ -60,27 +66,30 @@ export async function createServer(config: Config) {
       if (path.startsWith('/auth/')) {
         const allowed = ['/auth/sign-in/email', '/auth/sign-out', ...(config.profile === 'control' ? ['/auth/two-factor/enable', '/auth/two-factor/verify-totp'] : [])];
         if (request.method !== 'POST' || !allowed.includes(path)) throw new HttpError(404, 'NOT_FOUND');
+        let enrollment = false;
         if (path === '/auth/sign-in/email') {
           const input = fields(request, ['email', 'password']); email(input.email); string(input.password, 128);
         } else if (path === '/auth/two-factor/enable') {
           fields(request, ['password', 'method']);
           if ((request.body as Record<string, unknown>).method && (request.body as Record<string, unknown>).method !== 'totp') throw new HttpError(400, 'TOTP_ONLY');
-          await requireAdmin(auth, db, request, ['enrollment', 'recovery']);
+          const subject = await requireAdmin(auth, db, request, ['enrollment', 'recovery']);
+          await subjectRate(subject.user.id);
         } else if (path === '/auth/two-factor/verify-totp') {
           const input = fields(request, ['code']); if (!/^\d{6}$/.test(string(input.code, 6))) throw new HttpError(400, 'INVALID_INPUT');
           // A password-only session without the bootstrap/recovery proof cannot use enrollment verification as a bypass.
           const session = await current(auth, request);
-          if (session) await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']);
+          if (session) { const proof = await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']); enrollment = proof.proof.level !== 'admin'; await subjectRate(session.user.id); }
         } else fields(request, []);
         const headers = fromNodeHeaders(request.headers);
         headers.set('cookie', (headers.get('cookie') ?? '').split(';').filter(part => !part.includes('trust_device')).join(';'));
         let response = await auth.handler(new Request(new URL(path, config.baseURL), { method: 'POST', headers, body: JSON.stringify(request.body) }));
-        response = await recordAuthResult(auth, db, config, request, response, seal);
+        response = await recordAuthResult(auth, db, config, request, response, seal, enrollment);
         status = response.status; cookies = response.headers.getSetCookie();
         result = await response.json();
         if (!response.ok) {
-          // Native failed verification writes roll back; durable product rate limits above remain committed.
-          await db.query('ROLLBACK'); db.release(); db = undefined;
+          // Preserve the library's account-wide failed-TOTP/challenge counters across challenges and IPs.
+          // Unexpected library failures roll back. Capability proof is issued only after a successful response.
+          await db.query(path==='/auth/two-factor/verify-totp' && response.status<500 ? 'COMMIT' : 'ROLLBACK'); db.release(); db = undefined;
           return reply.code(status === 429 ? 429 : 401).send({ code: 'INVALID_CREDENTIALS' });
         }
         if (path === '/auth/sign-in/email') {

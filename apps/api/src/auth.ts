@@ -47,7 +47,7 @@ export async function requireAdmin(auth: Auth, db: PoolClient, request: FastifyR
 }
 
 /** Apply capability proof only after the native endpoint has completed successfully. */
-export async function recordAuthResult(auth: Auth, db: PoolClient, config: Config, request: FastifyRequest, response: Response, seal: Sealer) {
+export async function recordAuthResult(auth: Auth, db: PoolClient, config: Config, request: FastifyRequest, response: Response, seal: Sealer, enrollment = false) {
   if (!response.ok || config.profile !== 'control') return response;
   const result = await response.clone().json() as Record<string, unknown>;
   const path = request.url.split('?')[0];
@@ -88,6 +88,7 @@ export async function recordAuthResult(auth: Auth, db: PoolClient, config: Confi
       ON CONFLICT(session_id) DO UPDATE SET level='admin',epoch=EXCLUDED.epoch,verified_at=now()`, [session.session.id, session.user.id, state.epoch]);
     await db.query('UPDATE control.security_state SET bootstrap_pending=false WHERE user_id=$1', [session.user.id]);
     // Product recovery codes: returned once only after verified enrollment, hashed individually in storage.
+    if (enrollment) await db.query('UPDATE control.recovery_code SET consumed_at=coalesce(consumed_at,now()) WHERE user_id=$1', [session.user.id]);
     const existing = await db.query('SELECT 1 FROM control.recovery_code WHERE user_id=$1 AND consumed_at IS NULL', [session.user.id]);
     if (!existing.rowCount) {
       const { token, digest } = await import('./crypto.ts'); const codes = Array.from({ length: 8 }, token);

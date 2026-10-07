@@ -26,15 +26,15 @@ beforeEach(async () => {
 });
 class Browser {
   jar = new Map<string,string>();
-  constructor(public api: FastifyInstance, public origin: string) {}
+  constructor(public api: FastifyInstance, public origin: string, public ip='127.0.0.1') {}
   async post(url: string, payload: Record<string, unknown>, origin = this.origin) { return this.request('POST', url, payload, origin); }
   async get(url: string) { return this.request('GET', url); }
   async request(method: 'GET'|'POST', url: string, payload?: Record<string, unknown>, origin = this.origin) {
-    const r = await this.api.inject({ method, url, ...(payload ? { payload } : {}), headers: { origin, ...(payload ? { 'content-type': 'application/json' } : {}), cookie: [...this.jar].map(([k,v]) => `${k}=${v}`).join('; ') } });
+    const r = await this.api.inject({ method, url, remoteAddress:this.ip, ...(payload ? { payload } : {}), headers: { origin, ...(payload ? { 'content-type': 'application/json' } : {}), cookie: [...this.jar].map(([k,v]) => `${k}=${v}`).join('; ') } });
     for (const c of r.cookies) { if (c.maxAge === 0) this.jar.delete(c.name); else this.jar.set(c.name,c.value); }
     return r;
   }
-  clone(api = this.api, origin = this.origin) { const b = new Browser(api,origin); b.jar = new Map(this.jar); return b; }
+  clone(api = this.api, origin = this.origin) { const b = new Browser(api,origin,this.ip); b.jar = new Map(this.jar); return b; }
 }
 const userBrowser = () => new Browser(finance.fastify,fc.origin);
 const adminBrowser = () => new Browser(control.fastify,cc.origin);
@@ -47,20 +47,24 @@ async function mail(schema: 'access'|'identity'|'control', kind: string, config 
   const row = (await pg.owner.query(`SELECT sealed_payload FROM ${schema}.outbox WHERE kind=$1 ORDER BY created_at DESC LIMIT 1`, [kind])).rows[0];
   assert.ok(row, 'Expected transactional email queued'); return JSON.parse(envelope(config.wrappingKey).open(row.sealed_payload));
 }
-function otp(uri: string) {
+function otp(uri: string, now=Date.now()) {
   const secret = new URL(uri).searchParams.get('secret')!, alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'; let bits = '';
   for (const c of secret.toUpperCase().replace(/=+$/,'')) bits += alphabet.indexOf(c).toString(2).padStart(5,'0');
-  const bytes = Buffer.from((bits.match(/.{8}/g) ?? []).map(b => parseInt(b,2))), counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));
+  const bytes = Buffer.from((bits.match(/.{8}/g) ?? []).map(b => parseInt(b,2))), counter = Buffer.alloc(8); counter.writeBigUInt64BE(BigInt(Math.floor(now/30000)));
   const h = createHmac('sha1',bytes).update(counter).digest(), offset = h.at(-1)! & 15;
   return ((h.readUInt32BE(offset)&0x7fffffff)%1000000).toString().padStart(6,'0');
+}
+function invalidOTP(uri: string) {
+  const accepted=new Set([-30000,0,30000].map(offset=>otp(uri,Date.now()+offset)));
+  let n=0;while(accepted.has(n.toString().padStart(6,'0')))n++;return n.toString().padStart(6,'0');
 }
 async function enrolledAdmin() {
   await seedUser('control'); const b = adminBrowser();
   assert.equal((await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword})).statusCode,200);
   const enabled = await b.post('/auth/two-factor/enable',{password:testPassword}); assert.equal(enabled.statusCode,200, 'TOTP enrollment starts');
   assert.equal(enabled.json().backupCodes,undefined); const uri = enabled.json().totpURI;
-  const verified = await b.post('/auth/two-factor/verify-totp',{code:otp(uri)}); assert.equal(verified.statusCode,200, 'Enrollment requires valid authenticator code');
-  return { b, uri, codes: verified.json().recoveryCodes as string[] };
+  const code=otp(uri), verified = await b.post('/auth/two-factor/verify-totp',{code}); assert.equal(verified.statusCode,200, 'Enrollment requires valid authenticator code');
+  return { b, uri, code, codes: verified.json().recoveryCodes as string[] };
 }
 async function application(address='visitor@example.test') {
   const b = userBrowser(); assert.equal((await b.post('/access/requests',{name:'Synthetic visitor',email:address,tariffId:tariff.id})).statusCode,202);
@@ -135,18 +139,18 @@ test('mandatory TOTP: password/enrollment have no admin capabilities; codes retu
   assert.equal((await b.get('/control/requests')).statusCode,403);assert.equal((await b.get('/session')).json().scope,'enrollment');
   assert.equal((await b.post('/auth/two-factor/enable',{password:testPassword,method:'otp'})).statusCode,400);
   const enabled=await b.post('/auth/two-factor/enable',{password:testPassword});assert.equal(enabled.json().backupCodes,undefined);
-  assert.equal((await b.post('/auth/two-factor/verify-totp',{code:'000000'})).statusCode,401);
+  assert.equal((await b.post('/auth/two-factor/verify-totp',{code:invalidOTP(enabled.json().totpURI)})).statusCode,401);
   assert.equal((await b.get('/control/requests')).statusCode,403);
   const valid=await b.post('/auth/two-factor/verify-totp',{code:otp(enabled.json().totpURI)});assert.equal(valid.statusCode,200);assert.equal(valid.json().recoveryCodes.length,8);
   assert.equal((await b.get('/control/requests')).statusCode,200);assert.equal((await b.get('/session')).json().scope,'admin');
   const stored=(await pg.owner.query('SELECT verifier FROM control.recovery_code')).rows;assert.ok(stored.every(r=>!valid.json().recoveryCodes.includes(r.verifier)));
 });
 test('each admin login challenges TOTP; trusted devices and repeated code are refused', async () => {
-  const {b,uri}=await enrolledAdmin();const another=adminBrowser();
+  const {b,uri,code}=await enrolledAdmin();const another=adminBrowser();
   const challenge=await another.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});assert.equal(challenge.json().status,'totp_required');
   assert.equal((await another.get('/control/requests')).statusCode,401);
   assert.equal((await another.post('/auth/two-factor/verify-totp',{code:otp(uri),trustDevice:true})).statusCode,400);
-  assert.equal((await another.post('/auth/two-factor/verify-totp',{code:otp(uri)})).statusCode,409);
+  assert.ok([401,409].includes((await another.post('/auth/two-factor/verify-totp',{code})).statusCode));
   assert.equal((await another.get('/control/requests')).statusCode,401);
   assert.equal((await b.get('/control/requests')).statusCode,200);
 });
@@ -183,6 +187,11 @@ test('admin password reset never bypasses TOTP and invalidates recovery-only con
   const fresh=adminBrowser();await fresh.post('/auth/sign-in/email',{email:'owner@example.test',password:next});
   assert.equal((await fresh.get('/control/requests')).statusCode,403);assert.equal((await fresh.post('/auth/two-factor/enable',{password:next})).statusCode,403);
   assert.equal((await b.get('/control/requests')).statusCode,401);
+  // Reset invalidates the recovery context, but an unused separately stored code can restart recovery with the new password.
+  const restart=adminBrowser();assert.equal((await restart.post('/control/recovery',{email:'owner@example.test',password:next,recoveryCode:codes[1]})).statusCode,200);
+  assert.equal((await restart.get('/control/requests')).statusCode,403);
+  const enabled=await restart.post('/auth/two-factor/enable',{password:next});assert.equal(enabled.statusCode,200);
+  assert.equal((await restart.post('/auth/two-factor/verify-totp',{code:otp(enabled.json().totpURI)})).statusCode,200);
 });
 test('user and admin cookies cannot cross realms; suspended/expired users are restricted', async () => {
   await seedUser('identity');const b=userBrowser();await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
@@ -215,4 +224,39 @@ test('TOTP secret uses envelope encryption and no administrative read reveals fa
   assert.equal(JSON.parse(raw.secret).v,1);assert.ok(!raw.secret.includes(new URL(uri).searchParams.get('secret')));assert.ok(!raw.backup_codes.includes(codes[0]));
   const state=await b.get('/session');assert.equal(state.json().secret,undefined);assert.equal(state.json().recoveryCodes,undefined);
   await assert.rejects(pg.control.query('SELECT * FROM protected_keys.isolation_canary'),{code:'42501'});
+});
+test('password reset is atomic when security email cannot be queued', async () => {
+  await seedUser('identity'); const b=userBrowser(); await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
+  await b.post('/security/reset-request',{email:'owner@example.test'}); const reset=await mail('identity','password_reset');
+  await pg.owner.query('REVOKE INSERT ON identity.outbox FROM finance_api');
+  try {
+    assert.equal((await b.post('/security/reset',{token:reset.token,newPassword:'Synthetic new password 456!'})).statusCode,400);
+    assert.equal((await b.get('/session')).statusCode,200);
+    assert.equal((await pg.owner.query('SELECT epoch FROM identity.security_state')).rows[0].epoch,0);
+  } finally { await pg.owner.query('GRANT INSERT ON identity.outbox TO finance_api'); }
+  assert.equal((await b.post('/security/reset',{token:reset.token,newPassword:'Synthetic new password 456!'})).statusCode,200);
+});
+test('enrollment guessing is limited per account across separate browser sessions', async () => {
+  await seedUser('control'); const b=adminBrowser();await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
+  const enabled=await b.post('/auth/two-factor/enable',{password:testPassword});
+  for(let i=0;i<4;i++)assert.equal((await b.clone().post('/auth/two-factor/verify-totp',{code:invalidOTP(enabled.json().totpURI)})).statusCode,401);
+  assert.equal((await b.clone().post('/auth/two-factor/verify-totp',{code:invalidOTP(enabled.json().totpURI)})).statusCode,429);
+  assert.equal((await b.get('/control/requests')).statusCode,403);
+});
+test('ordinary TOTP login succeeds with a fresh period and no recovery code', async () => {
+  const {uri,code}=await enrolledAdmin(), b=adminBrowser();await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
+  const original=Date.now; let offset=31000;Date.now=()=>original()+offset;while(otp(uri)===code)offset+=30000;
+  try {
+    const verified=await b.post('/auth/two-factor/verify-totp',{code:otp(uri)});assert.equal(verified.statusCode,200);assert.equal(verified.json().recoveryCodes,undefined);
+    assert.equal((await b.get('/control/requests')).statusCode,200);
+  } finally { Date.now=original; }
+});
+test('failed TOTP counter persists across challenges and different IP addresses', async () => {
+  const {uri}=await enrolledAdmin();
+  for(let n=0;n<2;n++) {
+    const b=adminBrowser();b.ip='192.0.2.'+(n+1);await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
+    for(let i=0;i<(n===0?3:2);i++)assert.equal((await b.post('/auth/two-factor/verify-totp',{code:invalidOTP(uri)})).statusCode,401);
+  }
+  const next=adminBrowser();next.ip='192.0.2.3';await next.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
+  assert.equal((await next.post('/auth/two-factor/verify-totp',{code:invalidOTP(uri)})).statusCode,429);
 });

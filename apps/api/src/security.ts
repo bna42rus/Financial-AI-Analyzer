@@ -46,8 +46,8 @@ export async function recoverAdmin(auth: Auth, db: PoolClient, config: Config, r
   await db.query('DELETE FROM control.auth_two_factor WHERE user_id=$1', [user.id]);
   await db.query('UPDATE control.auth_user SET two_factor_enabled=false,updated_at=now() WHERE id=$1', [user.id]);
   await db.query('UPDATE control.security_state SET epoch=epoch+1,bootstrap_pending=false WHERE user_id=$1', [user.id]);
-  // All codes of the old enrollment become invalid; a new set is issued after verified enrollment.
-  await db.query('UPDATE control.recovery_code SET consumed_at=coalesce(consumed_at,now()) WHERE user_id=$1', [user.id]);
+  // Other unused codes remain available if this restricted recovery is interrupted/reset.
+  // The old set is rotated only after successful verification of the new authenticator.
   await db.query('DELETE FROM control.reset_token WHERE user_id=$1', [user.id]);
   const context = await auth.$context;
   const session = await context.internalAdapter.createSession(user.id, false);
