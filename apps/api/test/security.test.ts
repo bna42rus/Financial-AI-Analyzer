@@ -466,6 +466,7 @@ test('renewal requires verified identity, owns rows in API and RLS, and restores
  assert.equal((await pg.finance.query('SELECT * FROM commerce.access_cycle')).rowCount,0);
  assert.equal((await pg.finance.query('SELECT * FROM commerce.renewal_request')).rowCount,0);
  const db=await pg.finance.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[a.userId]);assert.equal((await db.query('SELECT * FROM commerce.renewal_request')).rowCount,1);await db.query('COMMIT');assert.equal((await db.query('SELECT * FROM commerce.renewal_request')).rowCount,0);}finally{db.release();}
+ await assert.rejects(pg.finance.query("UPDATE commerce.access_cycle SET access_end=clock_timestamp()+interval '1 year'"),{code:'42501'});
  await assert.rejects(pg.control.query('SELECT * FROM identity.security_state'),{code:'42501'});
 });
 test('one unfinished renewal survives concurrent creation; only unclaimed revision can change or cancel',async()=>{
