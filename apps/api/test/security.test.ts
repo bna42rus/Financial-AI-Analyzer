@@ -695,3 +695,15 @@ test('pending public application or existing user cannot be silently replaced by
  await seedUser('identity','existing');assert.equal((await b.post('/control/manual-preview',manualInvite({email:'existing@example.test'}))).json().code,'EXISTING_ACCOUNT');
  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.manual_grant')).rowCount,0);assert.equal((await a.b.get('/access/request')).json().request.id,a.row.id);
 });
+
+test('ended fixed grant can be explicitly replaced, while link expiry alone reserves the original entitlement',async()=>{
+ const {b}=await enrolledAdmin(),cmd=await manualCommand(b,manualInvite({term:{kind:'fixed',end:new Date(Date.now()+86400000).toISOString()}}));assert.equal((await b.post('/control/manual-access',cmd)).statusCode,200);
+ const oldToken=(await mail('access','invitation',cc)).token;await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second'");
+ assert.equal((await b.post('/control/manual-preview',manualInvite())).json().code,'PENDING_ACCESS');
+ await pg.owner.query("UPDATE commerce.manual_grant SET term=jsonb_build_object('kind','fixed','end',clock_timestamp()-interval '1 second')");
+ const fresh=await manualCommand(b,manualInvite({term:{kind:'days',count:30}}));assert.equal((await b.post('/control/manual-access',fresh)).statusCode,200);
+ assert.deepEqual((await pg.owner.query('SELECT state FROM commerce.manual_grant ORDER BY created_at')).rows.map(r=>r.state),['expired','pending']);
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.invitation')).rowCount,2);assert.equal((await userBrowser().post('/access/registration-proof',{invitationToken:oldToken})).statusCode,400);
+ const currentToken=(await mail('access','invitation',cc)).token;assert.equal((await userBrowser().post('/access/registration-proof',{invitationToken:currentToken})).statusCode,202);
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,0);
+});

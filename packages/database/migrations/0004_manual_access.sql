@@ -33,7 +33,7 @@ INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar
 CREATE TABLE commerce.manual_grant (
  id text PRIMARY KEY, email text NOT NULL, term jsonb NOT NULL, access_type text NOT NULL CHECK(access_type IN ('Paid','Test','Free','Other')),
  quota_policy jsonb NOT NULL, reason text NOT NULL, creator text NOT NULL, created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
- state text NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','active')),
+ state text NOT NULL DEFAULT 'pending' CHECK(state IN ('pending','active','expired')),
  user_id text REFERENCES identity.auth_user ON DELETE CASCADE, activated_at timestamptz, access_end timestamptz,
  CHECK((state='active')=(user_id IS NOT NULL AND activated_at IS NOT NULL))
 );

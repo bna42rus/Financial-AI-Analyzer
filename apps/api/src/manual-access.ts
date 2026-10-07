@@ -45,7 +45,7 @@ export async function manualQueue(db:PoolClient):Promise<ManualQueue>{
 }
 async function availableEmail(db:PoolClient,address:string,now:string){
  if((await db.query('SELECT 1 FROM commerce.account_directory WHERE email=$1',[address])).rowCount)throw new HttpError(409,'EXISTING_ACCOUNT');
- const existing=await db.query(`SELECT 1 FROM commerce.manual_grant WHERE email=$1 AND state='pending'
+ const existing=await db.query(`SELECT 1 FROM commerce.manual_grant WHERE email=$1 AND state='pending' AND (term->>'kind'!='fixed' OR (term->>'end')::timestamptz>$2::timestamptz)
   UNION ALL SELECT 1 FROM access.request WHERE email=$1 AND data->>'status'!='rejected'
    AND (data->>'status' NOT IN ('awaiting_email','awaiting_payment') OR (data->>'expiresAt')::timestamptz>$2::timestamptz)`,[address,now]);
  if(existing.rowCount)throw new HttpError(409,'PENDING_ACCESS');
@@ -96,6 +96,9 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
  const result:ManualPreview={mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
  if(preview)return result;
  if(address){
+  // Only an actually ended fixed grant can release this reservation. Link expiry alone never does.
+  const expired=await db.query("UPDATE commerce.manual_grant SET state='expired' WHERE email=$1 AND state='pending' AND term->>'kind'='fixed' AND (term->>'end')::timestamptz<=$2::timestamptz RETURNING id",[address,now]);
+  if(expired.rowCount)await db.query("UPDATE commerce.invitation SET state='expired' WHERE manual_grant_id=ANY($1::text[]) AND state='active'",[expired.rows.map(r=>r.id)]);
   const grantId='manual:'+id;
   await db.query('INSERT INTO commerce.manual_grant(id,email,term,access_type,quota_policy,reason,creator,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[grantId,address,t,b.accessType,q,reason,actorId,now]);
   await newInvitation(db,grantId,address,lifetime!,seal,now);
