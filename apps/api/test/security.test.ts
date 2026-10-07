@@ -375,7 +375,9 @@ test('payment mismatch requires explicit reason/decision and top-up accumulates 
   assert.equal((await admin.b.post('/control/review',{...cmd,actualMinor:'50000'})).statusCode,409);
   assert.equal((await admin.b.post('/control/review',{...cmd,actualMinor:'50000',decision:'accept_full'})).statusCode,409);
   const topup=await admin.b.post('/control/review',{...cmd,actualMinor:'50000',decision:'topup',reason:'Need remaining transfer'});assert.equal(topup.statusCode,200);assert.equal(topup.json().purchases.length,0);
-  const updated=(await a.b.post('/access/payment-claim',{senderName:'Synthetic sender',senderBank:'Synthetic bank'})).json().request;
+  const publicRow=(await a.b.get('/access/request')).json().request;assert.equal(publicRow.remainingMinor,'69000');assert.equal(publicRow.decisionNote,'');
+  const secondClaim=await a.b.post('/access/payment-claim',{senderName:'Synthetic sender',senderBank:'Synthetic bank'});assert.equal(secondClaim.statusCode,200);
+  const updated=secondClaim.json().request;assert.equal(updated.claimedAt,a.row.claimedAt);
   const completed=await admin.b.post('/control/review',{...reviewCommand(updated),actualMinor:'69000'});assert.equal(completed.statusCode,200);
   assert.equal(completed.json().payments.length,2);assert.equal(completed.json().purchases[0].actualMinor,'119000');
 });

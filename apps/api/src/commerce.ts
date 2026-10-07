@@ -61,7 +61,7 @@ export async function review(db:PoolClient,request:FastifyRequest,actorId:string
   let next:AccessStore;try {next=reviewRequest(before,cmd,await clock(db));}catch {throw new HttpError(409,'REVIEW_CONFLICT');}
   if(preview)return {request:next.requests[0],payment:next.payments.find(p=>p.actionId===id),purchase:next.purchases.find(p=>p.id==='purchase:'+id),inviteHours:lifetime};
   await save(db,before,next,seal,lifetime);
-  await outbox(db,'access',seal,'payment_decision',{email:before.requests[0]!.email,status:next.requests[0]!.status,reason:cmd.reason});
+  await outbox(db,'access',seal,'payment_decision',{email:before.requests[0]!.email,status:next.requests[0]!.status,remainingMinor:next.requests[0]!.remainingMinor});
   return {status:'committed',...(await queue(db))};
 }
 export async function invitationAction(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer) {

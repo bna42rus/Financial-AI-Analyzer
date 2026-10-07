@@ -59,5 +59,8 @@ export async function applicationClaim(db: PoolClient, config: Config, request: 
   const input = fields(request, ['senderName', 'senderBank']), row = await ownedApplication(db, config, request);
   const changed = claimPayment(one(row), row.id, { name: string(input.senderName, 100), bank: string(input.senderBank, 100) }, await clock(db)).requests[0]!;
   await db.query('UPDATE access.request SET data=$1 WHERE id=$2', [changed, row.id]);
-  return changed;
+  return publicRequest(changed);
 }
+
+/** Public application projection does not expose internal admin reasons/notes. */
+export function publicRequest(row:AccessRequest):AccessRequest {return {...row,decisionNote:row.status==='rejected'?'Заявка отклонена. Обратитесь к владельцу проекта для уточнения.':''};}

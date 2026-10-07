@@ -7,7 +7,7 @@ export type RequestStatus = 'awaiting_email' | 'awaiting_payment' | 'under_revie
 export type AccessRequest = {
   id: string; revision: number; name: string; email: string; tariff: Tariff; status: RequestStatus;
   createdAt: string; expiresAt: string; verifiedAt: string | null; claimedAt: string | null;
-  senderName: string; senderBank: string; decisionNote: string;
+  senderName: string; senderBank: string; decisionNote: string; remainingMinor?: string; lastClaimedAt?: string;
 };
 export type Payment = { id: string; requestId: string; expectedMinor: string; actualMinor: string; receivedAt: string; recordedAt: string; senderName: string; senderBank: string; method: 'manual_transfer'; disposition: 'recorded' | 'return_required'; actionId: string };
 export type Purchase = { id: string; requestId: string; tariff: Tariff; duration: Duration; actualMinor: string; paidAt: string; state: 'paid_not_activated' };
@@ -55,8 +55,8 @@ export function recordVerifiedEmail(store: AccessStore, requestId: string, now: 
   return replace(store, { ...r, status: 'awaiting_payment', verifiedAt: now, revision: r.revision + 1 });
 }
 export function claimPayment(store: AccessStore, requestId: string, sender: { name: string; bank: string }, now: string): AccessStore {
-  const r = find(store, requestId); if (requestStatus(r, now) !== 'awaiting_payment' || !r.verifiedAt) fail('Сначала подтвердите почту и проверьте срок заявки');
-  time(now); return replace(store, { ...r, status: 'under_review', senderName: text(sender.name, 100), senderBank: text(sender.bank, 100), claimedAt: now, revision: r.revision + 1 });
+  const r = find(store, requestId); if (!['awaiting_payment','needs_topup'].includes(requestStatus(r, now)) || !r.verifiedAt) fail('Сначала подтвердите почту и проверьте срок заявки');
+  time(now); return replace(store, { ...r, status: 'under_review', senderName: text(sender.name, 100), senderBank: text(sender.bank, 100), claimedAt: r.claimedAt ?? now, lastClaimedAt: now, revision: r.revision + 1 });
 }
 function replay(store: AccessStore, actionId: string, payload: unknown): boolean { const key = id(actionId), encoded = JSON.stringify(payload); if (!Object.hasOwn(store.replay, key)) return false; if (store.replay[key] !== encoded) fail('Идентификатор уже использован для другого действия'); return true; }
 function remember(store: AccessStore, actionId: string, payload: unknown): AccessStore { return { ...store, replay: { ...store.replay, [actionId]: JSON.stringify(payload) } }; }
@@ -79,7 +79,7 @@ export function reviewRequest(store: AccessStore, cmd: ReviewCommand, now: strin
   const isGrant = ['confirm', 'accept_full', 'custom'].includes(cmd.decision);
   if (isGrant && total <= 0n) fail('Нет полученной оплаты. Бесплатный доступ выдаётся отдельным действием');
   const status: RequestStatus = isGrant ? 'paid_not_activated' : cmd.decision === 'topup' ? 'needs_topup' : 'rejected';
-  let next = replace(store, { ...r, status, decisionNote: reason, revision: r.revision + 1 });
+  let next = replace(store, { ...r, status, decisionNote: reason, remainingMinor: cmd.decision === 'topup' ? (expected-total).toString() : undefined, revision: r.revision + 1 });
   if (incoming > 0n) next = { ...next, payments: [...next.payments, { id: 'payment:' + cmd.actionId, requestId: r.id, expectedMinor: r.tariff.priceMinor, actualMinor: incoming.toString(), receivedAt, recordedAt: now, senderName: r.senderName, senderBank: r.senderBank, method: 'manual_transfer', disposition: cmd.decision === 'reject' ? 'return_required' : 'recorded', actionId: cmd.actionId }] };
   if (cmd.decision === 'reject') next = { ...next, payments: next.payments.map(p => p.requestId === r.id ? { ...p, disposition: 'return_required' as const } : p) };
   if (isGrant) {

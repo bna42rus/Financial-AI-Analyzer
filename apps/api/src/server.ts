@@ -178,7 +178,7 @@ export async function createServer(config: Config) {
         const verified = await application.verifyApplication(db, request); result = { status: 'verified' }; cookies = [application.appCookie(config, verified.session)];
       } else if (application && path === '/access/request' && request.method === 'GET') {
         if (request.url.includes('?')) throw new HttpError(400, 'INVALID_INPUT');
-        result = { request: await application.ownedApplication(db, config, request) };
+        result = { request: application.publicRequest(await application.ownedApplication(db, config, request)) };
       } else if (application && path === '/access/payment-claim' && request.method === 'POST') {
         result = { request: await application.applicationClaim(db, config, request) };
       } else throw new HttpError(404, 'NOT_FOUND');
