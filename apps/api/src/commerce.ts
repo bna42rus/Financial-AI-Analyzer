@@ -6,7 +6,7 @@ import { clock, fields, string, HttpError, outbox, event } from './types.ts';
 import type { Sealer } from './types.ts';
 import { token, digest } from './crypto.ts';
 
-function actionId(value: unknown) { const v=string(value,36); if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)) throw new HttpError(400,'INVALID_INPUT'); return v; }
+export function actionId(value: unknown) { const v=string(value,36); if(!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v)) throw new HttpError(400,'INVALID_INPUT'); return v; }
 function hours(value: unknown) { const v=value ?? 72; if(typeof v!=='number'||!Number.isInteger(v)||v<1||v>720)throw new HttpError(400,'INVALID_INPUT');return v; }
 async function load(db:PoolClient,requestId:string):Promise<AccessStore> {
   const row=(await db.query('SELECT data FROM access.request WHERE id=$1 FOR UPDATE',[requestId])).rows[0];
@@ -16,7 +16,7 @@ async function load(db:PoolClient,requestId:string):Promise<AccessStore> {
   // Always re-read the application: a user may have submitted a top-up claim since the last review.
   return {...(store??emptyAccessStore()),requests:[row.data as AccessRequest]};
 }
-async function remember(db:PoolClient,id:string,actor:string,payload:Record<string,unknown>) {
+export async function remember(db:PoolClient,id:string,actor:string,payload:Record<string,unknown>) {
   const previous=(await db.query('SELECT actor_id,payload FROM commerce.action WHERE id=$1',[id])).rows[0];
   if(previous) {
     // JSONB equality does not depend on object-key order; actor is derived from the verified session.

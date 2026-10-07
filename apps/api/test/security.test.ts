@@ -6,12 +6,13 @@ import { createServer } from '../src/server.ts';
 import { hashPassword, envelope, digest, token } from '../src/crypto.ts';
 import type { Config } from '../src/types.ts';
 import type { FastifyInstance } from 'fastify';
+import {extensionAt} from '../src/entitlement.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>;
 let finance: Awaited<ReturnType<typeof createServer>>, control: Awaited<ReturnType<typeof createServer>>;
 let fc: Config, cc: Config;
 const testPassword = 'Synthetic test password 123!';
-const tariff = { id: 'development-month', name: 'Synthetic tariff', duration: { kind: 'calendar_months', count: 1 }, priceMinor: '119000', aiQuota: 150, active: true, publicVisible: true, availableForNew: true };
+const tariff = { id: 'development-month', name: 'Synthetic tariff', duration: { kind: 'calendar_months', count: 1 }, priceMinor: '119000', aiQuota: 150, active: true, publicVisible: true, availableForNew: true, availableForRenewal: true };
 before(async () => {
   pg = await postgresFixture();
   fc = { profile: 'finance', pool: pg.finance, baseURL: 'https://api.example.test', origin: 'https://app.example.test', authSecret: token(), wrappingKey: randomBytes(32), environment: 'test' };
@@ -21,7 +22,7 @@ before(async () => {
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
   await pg.owner.query(`TRUNCATE identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
-    identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action CASCADE`);
+    identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
 class Browser {
@@ -436,4 +437,115 @@ test('a proof expiring while registration waits for the mutation lock cannot act
     assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
     assert.equal((await pg.owner.query('SELECT state FROM commerce.purchase')).rows[0].state,'paid_not_activated');
   }finally{await blocker.query('ROLLBACK');blocker.release();if(pending)await pending;}
+});
+
+async function registeredUser(){
+ const a=await paidApplication(),proof=await registrationProof(a);
+ assert.equal((await a.b.post('/access/register',registrationBody(a.invitationToken,proof))).statusCode,201);
+ assert.equal((await a.b.post('/auth/sign-in/email',{email:'visitor@example.test',password:testPassword})).statusCode,200);
+ const user=(await pg.owner.query('SELECT id FROM identity.auth_user')).rows[0];return {...a,userId:user.id};
+}
+async function renewal(a:Awaited<ReturnType<typeof registeredUser>>,claim=true){
+ const created=await a.b.post('/access/renewal-create',{tariffId:tariff.id});assert.equal(created.statusCode,200);let row=created.json().request;
+ if(claim){const r=await a.b.post('/access/renewal-claim',{requestId:row.id,expectedRevision:row.revision,senderName:'Synthetic renewal sender',senderBank:'Synthetic renewal bank'});assert.equal(r.statusCode,200);row=r.json().request;}
+ return row;
+}
+async function renewalCommand(a:Awaited<ReturnType<typeof registeredUser>>,row:Parameters<typeof reviewCommand>[0],overrides:Record<string,unknown>={}){
+ const {inviteHours,...base}=reviewCommand(row),cmd={...base,...overrides};
+ const preview=await a.admin.b.post('/control/renewal-preview',cmd);assert.equal(preview.statusCode,200,preview.body);
+ return {...cmd,expectedCycleRevision:preview.json().cycleRevision,expectedMode:preview.json().mode};
+}
+test('renewal requires verified identity, owns rows in API and RLS, and restores no tenant context to the pool',async()=>{
+ const a=await registeredUser(),row=await renewal(a,false);
+ assert.equal((await userBrowser().get('/access/renewal')).statusCode,401);
+ await seedUser('identity','other');await pg.owner.query("INSERT INTO commerce.access_cycle VALUES('other',now(),now()+interval '1 month','Europe/Moscow',0,1,0)");
+ const other=userBrowser();assert.equal((await other.post('/auth/sign-in/email',{email:'other@example.test',password:testPassword})).statusCode,200);
+ assert.equal((await other.get('/access/renewal')).json().request,null);
+ assert.equal((await other.post('/access/renewal-cancel',{requestId:row.id,expectedRevision:row.revision})).statusCode,409);
+ assert.equal((await a.b.post('/access/renewal-create',{tariffId:tariff.id,userId:'other'})).statusCode,400);
+ assert.equal((await pg.finance.query('SELECT * FROM commerce.access_cycle')).rowCount,0);
+ assert.equal((await pg.finance.query('SELECT * FROM commerce.renewal_request')).rowCount,0);
+ const db=await pg.finance.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[a.userId]);assert.equal((await db.query('SELECT * FROM commerce.renewal_request')).rowCount,1);await db.query('COMMIT');assert.equal((await db.query('SELECT * FROM commerce.renewal_request')).rowCount,0);}finally{db.release();}
+ await assert.rejects(pg.finance.query("UPDATE commerce.access_cycle SET access_end=clock_timestamp()+interval '1 year'"),{code:'42501'});
+ await assert.rejects(pg.control.query('SELECT * FROM identity.security_state'),{code:'42501'});
+});
+test('one unfinished renewal survives concurrent creation; only unclaimed revision can change or cancel',async()=>{
+ const a=await registeredUser();const results=await Promise.all([a.b.post('/access/renewal-create',{tariffId:tariff.id}),a.b.clone().post('/access/renewal-create',{tariffId:tariff.id})]);assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,409]);
+ const row=results.find(r=>r.statusCode===200)!.json().request;
+ await pg.owner.query("UPDATE access.tariff SET snapshot=jsonb_set(snapshot,'{priceMinor}','129000')");
+ assert.equal((await a.b.get('/access/renewal')).json().request.tariff.priceMinor,'119000');
+ assert.equal((await a.b.get('/access/renewal')).json().tariffs.length,0,'Invalid money must not reach the tariff UI');
+ assert.equal((await a.b.post('/access/renewal-change',{requestId:row.id,expectedRevision:row.revision,tariffId:tariff.id})).json().code,'TARIFF_UNAVAILABLE','Reject a numeric JSON money value instead of accepting unsafe float authority');
+ await pg.owner.query("UPDATE access.tariff SET snapshot=jsonb_set(jsonb_set(jsonb_set(snapshot,'{priceMinor}',to_jsonb('129000'::text)),'{publicVisible}','false'),'{availableForNew}','false')");
+ assert.equal((await a.b.get('/access/tariffs')).json().tariffs.length,0);
+ assert.equal((await a.b.get('/access/renewal')).json().tariffs.length,1,'Renewal availability is independent of public/new-user visibility');
+ const changed=await a.b.post('/access/renewal-change',{requestId:row.id,expectedRevision:row.revision,tariffId:tariff.id});assert.equal(changed.statusCode,200);assert.equal(changed.json().request.tariff.priceMinor,'129000');
+ assert.equal((await a.b.post('/access/renewal-cancel',{requestId:row.id,expectedRevision:row.revision})).statusCode,409);
+ assert.equal((await a.b.post('/access/renewal-cancel',{requestId:row.id,expectedRevision:changed.json().request.revision})).json().request.renewalState,'cancelled');
+ const next=await renewal(a);assert.notEqual(next.id,row.id);
+ for(const action of ['change','cancel'])assert.equal((await a.b.post('/access/renewal-'+action,{requestId:next.id,expectedRevision:next.revision,...(action==='change'?{tariffId:tariff.id}:{})})).json().code,'RENEWAL_FROZEN');
+});
+test('renewal preview is read-only, commit extends once across concurrent retries and creates no invitation',async()=>{
+ const a=await registeredUser(),row=await renewal(a),before=(await a.b.get('/access/renewal')).json().cycle,cmd=await renewalCommand(a,row);
+ assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,0);assert.deepEqual((await a.b.get('/access/renewal')).json().cycle,before);
+ assert.equal((await adminBrowser().post('/control/renewal-review',cmd)).statusCode,401);
+ assert.equal((await a.admin.b.post('/control/renewal-review',{...cmd,actorId:'forged'})).statusCode,400);
+ const results=await Promise.all([a.admin.b.post('/control/renewal-review',cmd),a.admin.b.clone().post('/control/renewal-review',cmd)]);assert.ok(results.every(r=>r.statusCode===200));assert.deepEqual(results.map(r=>r.json().status).sort(),['already_committed','committed']);
+ const own=(await a.b.get('/access/renewal')).json();assert.equal(own.cycle.anchorAt,before.anchorAt);assert.equal(own.cycle.calendarMonths,2);assert.equal(own.request.renewalState,'completed');
+ assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,1);assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,1);assert.equal((await pg.owner.query('SELECT * FROM commerce.invitation')).rowCount,1);
+ assert.equal((await a.admin.b.post('/control/renewal-review',{...cmd,reason:'changed'})).statusCode,409);
+ assert.equal((await a.b.get('/session')).json().accessEnd,own.cycle.accessEnd);
+ const another={...cmd,actionId:crypto.randomUUID()};assert.equal((await a.admin.b.post('/control/renewal-review',another)).statusCode,409);
+});
+test('claim before expiry gives no grace; delayed confirmation starts a new cycle from real confirmation',async()=>{
+ const a=await registeredUser(),row=await renewal(a);assert.equal((await a.b.get('/session')).json().scope,'active');
+ await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=clock_timestamp()-interval '1 month',access_end=clock_timestamp()-interval '1 second'");
+ assert.equal((await a.b.get('/session')).json().scope,'restricted');const cmd=await renewalCommand(a,row);assert.equal(cmd.expectedMode,'restored');
+ const before=Date.now(),r=await a.admin.b.post('/control/renewal-review',cmd);assert.equal(r.statusCode,200);const after=Date.now(),own=(await a.b.get('/access/renewal')).json();
+ assert.ok(Date.parse(own.cycle.anchorAt)>=before&&Date.parse(own.cycle.anchorAt)<=after);assert.equal(own.cycle.calendarMonths,1);assert.equal(own.cycle.extraDays,0);assert.equal((await a.b.get('/session')).json().scope,'active');
+ assert.equal(r.json().extensions[0].at,own.cycle.anchorAt);
+});
+test('payment extends paid period of suspended identity without unsuspending or replacing status',async()=>{
+ const a=await registeredUser();await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id=$1",[a.userId]);
+ const row=await renewal(a),before=(await a.b.get('/access/renewal')).json().cycle.accessEnd,cmd=await renewalCommand(a,row);assert.equal((await a.admin.b.post('/control/renewal-review',cmd)).statusCode,200);
+ const s=(await a.b.get('/session')).json();assert.equal(s.scope,'restricted');assert.equal(s.blocked,true);assert.ok(Date.parse(s.accessEnd)>Date.parse(before));assert.ok(!s.capabilities.includes('finance'));
+ assert.equal((await pg.owner.query('SELECT status FROM identity.security_state')).rows[0].status,'suspended');
+});
+test('renewal mismatch and top-up keep snapshot, first claim and separate transfers, with no note leakage',async()=>{
+ const a=await registeredUser(),row=await renewal(a);
+ const {inviteHours,...bad}=reviewCommand(row);assert.equal((await a.admin.b.post('/control/renewal-preview',{...bad,actualMinor:'60000'})).statusCode,409);
+ const first=await renewalCommand(a,row,{actualMinor:'60000',decision:'topup',reason:'Internal synthetic note'});assert.equal((await a.admin.b.post('/control/renewal-review',first)).statusCode,200);
+ const pending=(await a.b.get('/access/renewal')).json().request;assert.equal(pending.remainingMinor,'59000');assert.equal(JSON.stringify(pending).includes('Internal synthetic note'),false);assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,0);
+ const claim=await a.b.post('/access/renewal-claim',{requestId:row.id,expectedRevision:pending.revision,senderName:'Top up sender',senderBank:'Top up bank'});assert.equal(claim.statusCode,200);assert.equal(claim.json().request.claimedAt,row.claimedAt);
+ const final=await renewalCommand(a,claim.json().request,{actualMinor:'59000'}),committed=await a.admin.b.post('/control/renewal-review',final);assert.equal(committed.statusCode,200);assert.deepEqual(committed.json().payments.map((p:any)=>p.actualMinor),['60000','59000']);assert.equal(committed.json().extensions.length,1);
+ const notice=await mail('access','renewal_decision',cc);assert.equal(JSON.stringify(notice).includes('Internal synthetic note'),false);
+});
+test('rejected renewal records manual return separately, does not change access, and permits new request',async()=>{
+ const a=await registeredUser(),row=await renewal(a),before=(await a.b.get('/access/renewal')).json().cycle;
+ const cmd=await renewalCommand(a,row,{actualMinor:'130000',decision:'reject',reason:'Internal rejection reason'});const r=await a.admin.b.post('/control/renewal-review',cmd);assert.equal(r.statusCode,200);assert.equal(r.json().payments[0].disposition,'return_required');assert.equal(r.json().extensions.length,0);
+ const own=(await a.b.get('/access/renewal')).json();assert.deepEqual(own.cycle,before);assert.equal(own.request.renewalState,'rejected');assert.equal(JSON.stringify(own).includes('Internal rejection reason'),false);
+ assert.equal((await a.b.post('/access/renewal-create',{tariffId:tariff.id})).statusCode,200);
+});
+test('continuous calendar grid restores 31st after February, preserves time and explicit day offsets',async()=>{
+ const db=await pg.owner.connect();try{
+ for(const [anchor,firstEnd,nextEnd] of [['2027-01-31T08:15:00.000Z','2027-02-28T08:15:00.000Z','2027-03-31T08:15:00.000Z'],['2028-01-31T08:15:00.000Z','2028-02-29T08:15:00.000Z','2028-03-31T08:15:00.000Z']] as const){
+   const cycle={anchorAt:anchor,accessEnd:firstEnd,timezone:'Europe/Moscow',revision:0,calendarMonths:1,extraDays:0};const next=await extensionAt(db,cycle,{kind:'calendar_months',count:1},anchor,'synthetic-request','synthetic-action');assert.equal(next.extension.accessEnd,nextEnd);assert.equal(next.extension.anchorAt,anchor);
+   const third=await extensionAt(db,{...cycle,accessEnd:nextEnd,calendarMonths:2},{kind:'calendar_months',count:1},anchor,'r','a');assert.equal(third.extension.accessEnd,anchor.replace('01-31','04-30'));
+   const days=await extensionAt(db,cycle,{kind:'days',count:7},anchor,'r','a');assert.equal(Date.parse(days.extension.accessEnd)-Date.parse(firstEnd),7*86400000);assert.equal(days.extension.anchorAt,anchor);
+   const monthAfterDays=await extensionAt(db,{...cycle,accessEnd:days.extension.accessEnd,extraDays:7},{kind:'calendar_months',count:1},anchor,'r','a');assert.equal(Date.parse(monthAfterDays.extension.accessEnd)-Date.parse(nextEnd),7*86400000);
+ }
+ }finally{db.release();}
+});
+test('outbox failure rolls back extension, payment, revision and action ID atomically',async()=>{
+ const a=await registeredUser(),row=await renewal(a),before=(await a.b.get('/access/renewal')).json(),cmd=await renewalCommand(a,row);
+ await pg.owner.query('REVOKE INSERT ON access.outbox FROM control_api');try{assert.equal((await a.admin.b.post('/control/renewal-review',cmd)).statusCode,400);}finally{await pg.owner.query('GRANT INSERT ON access.outbox TO control_api');}
+ assert.deepEqual((await a.b.get('/access/renewal')).json(),before);assert.equal((await pg.owner.query('SELECT * FROM commerce.action WHERE id=$1',[cmd.actionId])).rowCount,0);assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,0);
+ assert.equal((await a.admin.b.post('/control/renewal-review',cmd)).statusCode,200);
+});
+test('expiry while confirmation waits after BEGIN invalidates preview rather than using stale transaction time',async()=>{
+ const a=await registeredUser(),row=await renewal(a),cmd=await renewalCommand(a,row),blocker=await pg.control.connect();let pending:ReturnType<Browser['post']>|undefined;
+ try{await blocker.query('BEGIN');await blocker.query('SELECT pg_advisory_xact_lock(92041)');pending=a.admin.b.post('/control/renewal-review',cmd);let waiting=false;for(let i=0;i<100;i++){waiting=Boolean((await pg.owner.query("SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event='advisory'")).rowCount);if(waiting)break;await new Promise(resolve=>setTimeout(resolve,10));}assert.equal(waiting,true);
+ await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=clock_timestamp()-interval '1 month',access_end=clock_timestamp()");await blocker.query('COMMIT');const result=await pending;assert.equal(result.statusCode,409);assert.equal(result.json().code,'PREVIEW_CHANGED');assert.equal((await pg.owner.query('SELECT * FROM commerce.access_extension')).rowCount,0);assert.equal((await pg.owner.query('SELECT * FROM commerce.action WHERE id=$1',[cmd.actionId])).rowCount,0);
+ }finally{await blocker.query('ROLLBACK');blocker.release();if(pending)await pending;}
+ const fresh=await renewalCommand(a,row);assert.equal(fresh.expectedMode,'restored');assert.equal((await a.admin.b.post('/control/renewal-review',fresh)).statusCode,200);
 });

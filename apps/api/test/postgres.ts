@@ -17,6 +17,7 @@ export async function postgresFixture() {
   const migration = await readFile(new URL('../../../packages/database/migrations/0001_access_security.sql', import.meta.url), 'utf8');
   await owner.query(migration);
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0002_invitation_registration.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0003_access_renewal.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

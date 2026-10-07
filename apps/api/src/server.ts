@@ -29,6 +29,8 @@ export async function createServer(config: Config) {
   // Finance repositories are never loaded by the control deployment profile.
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
   const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
+  const renewalApplication = config.profile === 'finance' ? await import('./renewal-application.ts') : null;
+  const renewalCommerce = config.profile === 'control' ? await import('./renewal-commerce.ts') : null;
   const commerce = config.profile === 'control' ? await import('./commerce.ts') : null;
   class RootModule {} Module({})(RootModule);
   const app = await NestFactory.create<NestFastifyApplication>(RootModule, new FastifyAdapter({ logger: false, trustProxy: false, bodyLimit: 8192 }), { logger: false });
@@ -140,12 +142,24 @@ export async function createServer(config: Config) {
           result = { name: s.user.name, scope: s.proof.level, capabilities: s.proof.level === 'admin' ? ['review_requests'] : ['enroll_totp'] };
         } else {
           const s = await current(auth, request); if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
-          const state = (await db.query('SELECT status,indefinite,access_end FROM identity.security_state WHERE user_id=$1', [s.user.id])).rows[0];
+          await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
+          const state = (await db.query('SELECT s.status,s.indefinite,COALESCE(c.access_end,s.access_end) AS access_end,c.timezone FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1', [s.user.id])).rows[0];
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { name: s.user.name, scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          result = { name: s.user.name, accessEnd:state.access_end,timezone:state.timezone,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
+      } else if (renewalCommerce && path==='/control/renewals' && request.method==='GET') {
+        await requireAdmin(auth,db,request); result=await renewalCommerce.renewalQueue(db);
+      } else if (renewalCommerce && ['/control/renewal-preview','/control/renewal-review'].includes(path) && request.method==='POST') {
+        const s=await requireAdmin(auth,db,request);result=await renewalCommerce.reviewRenewal(db,request,s.user.id,seal,path==='/control/renewal-preview');
+      } else if (renewalApplication && ['/access/renewal','/access/renewal-create','/access/renewal-change','/access/renewal-cancel','/access/renewal-claim'].includes(path)) {
+        if(request.url.includes('?')||(path==='/access/renewal'?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
+        const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
+        await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
+        const state=(await db.query('SELECT indefinite FROM identity.security_state WHERE user_id=$1',[s.user.id])).rows[0];
+        if(!state||state.indefinite)throw new HttpError(409,'CYCLE_UNAVAILABLE');
+        result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
         result = await commerce!.queue(db);

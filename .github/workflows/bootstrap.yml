@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:

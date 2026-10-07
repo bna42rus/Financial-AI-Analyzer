@@ -17,12 +17,15 @@ No real tariff is seeded. Synthetic tariff fixtures exist only in tests. No paid
 ## Checks
 
 - `pnpm check`: original sources, existing model/projection/interface checks, strict API types and two cryptography checks.
-- `pnpm test:security`: 24 integration scenarios, requires `SECURITY_TEST_DATABASE_URL` for a **fresh dedicated** PostgreSQL 18 cluster on loopback. Creates/disposes a random test database and scoped roles. Refuses a cluster with existing runtime roles; do not point it at Development/Staging/Production with data.
+- `pnpm test:security`: 45 integration scenarios, requires `SECURITY_TEST_DATABASE_URL` for a **fresh dedicated** PostgreSQL 18 cluster on loopback. Creates/disposes a random test database and scoped roles. Refuses a cluster with existing runtime roles; do not point it at Development/Staging/Production with data.
 - GitHub CI supplies official `postgres:18.4`. Real connections, GRANT/RLS and concurrent requests are tested; no in-memory SQL substitute.
 
-Production startup is blocked: the Development environment KEK adapter is not an audited KMS provider. Email delivery, real owner onboarding, renewal, complete security screens, retention/cleanup, observability and release acceptance remain required.
+Production startup is blocked: the Development environment KEK adapter is not an audited KMS provider. Email delivery, real owner onboarding, complete security screens, retention/cleanup, observability and release acceptance remain required.
 
 
 ## Invitations / registration extension
 
 Apply forward migration `0002_invitation_registration.sql` using `operator migrate-invitations` once after `migrate`. `operator seed-tariff-example` adds only a synthetic tariff. Optional frontend API origins and the full HTTP/PostgreSQL browser fixture are described in [invitation-registration.md](../../docs/architecture/invitation-registration.md). Run `pnpm test:access-browser` against an isolated local PostgreSQL 18 cluster after installing Chromium. Mail remains encrypted queued; real delivery/owner onboarding and Production are not enabled.
+
+
+Apply `operator migrate-renewal` once after the first two migrations. [Renewal API, calendar rules, grants and limits](../../docs/architecture/access-renewal.md). Paid cycle is canonical in commerce, identity suspension stays separate. Two full HTTP/browser journeys now include renewal. No permanent/cloud server or email delivery was connected.

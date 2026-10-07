@@ -7,3 +7,6 @@ Run the migration transactionally via the Development operator command, never vi
 Financial RLS in this migration is an **isolation canary**, not implemented financial storage. Tests exercise explicit FORCE RLS, denied cross-tenant writes and transaction-local context reset; every future financial table needs its own user-scoped keys/policy and API ownership checks. Protected-key canary grants no runtime access.
 
 Migration is forward-only initial installation. Application has no Production runner. Before a release: review artifacts, rehearse migration/restore, define rollback/forward-fix, configure KMS and actual worker grants, validate every future table/role and obtain owner Staging acceptance.
+
+
+`0002_invitation_registration.sql` adds manual purchase/invitation/registration proof. `0003_access_renewal.sql` adds canonical paid cycle, separate renewal requests/extension ledger and scoped FORCE RLS with transaction-local owner context. It backfills active purchases without granting control any identity privileges. Both forward migrations run only through the Development operator; [renewal behavior](../../docs/architecture/access-renewal.md).
