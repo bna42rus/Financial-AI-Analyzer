@@ -6,7 +6,10 @@ export function cycleView(row:{anchor_at:Date;access_end:Date;timezone:string;re
  return {anchorAt:row.anchor_at.toISOString(),accessEnd:row.access_end.toISOString(),timezone:row.timezone,revision:row.revision,calendarMonths:row.calendar_months,extraDays:row.extra_days};
 }
 export async function lockedCycle(db:PoolClient,userId:string){
- const r=(await db.query('SELECT * FROM commerce.access_cycle WHERE user_id=$1 FOR UPDATE',[userId])).rows[0];
+ // SELECT FOR UPDATE would require finance UPDATE privileges over the paid clock.
+ // Both profiles instead take the same per-user transaction lock before reading/mutating it.
+ await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['access-cycle:'+userId]);
+ const r=(await db.query('SELECT * FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0];
  if(!r)throw new HttpError(409,'CYCLE_UNAVAILABLE');return cycleView(r);
 }
 export async function extensionAt(db:PoolClient,cycle:Cycle,duration:Duration,now:string,requestId:string,actionId:string):Promise<{extension:Extension;calendarMonths:number;extraDays:number}> {
