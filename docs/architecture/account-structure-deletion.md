@@ -45,3 +45,5 @@ UI этих действий пока не подключён. Реальных 
 Category/Counterparty migrations и отдельный counterparty scope реализуются следующим Development блоком: [категории и контрагенты](category-counterparty-structure.md); исходные ограничения этой account migration сохраняются.
 
 Следующий [блок исключений и выборочной истории](exclusions-history.md) добавляет journal/object-version Undo для новых действий. Описанный выше консервативный Undo остаётся fallback только для legacy actions без after snapshot; исходные ограничения финансовой/структурной модели сохраняются.
+
+Последующий [пятый серверный блок](financial-reset.md) реализует Development full financial reset, protected key custody/rotation и обязательные generation/key-version acceptance checks. Actual Import/local privacy pipeline, будущие cascades, recovery deletion journal/KMS и рабочий UI по-прежнему впереди.

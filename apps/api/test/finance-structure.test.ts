@@ -1,3 +1,4 @@
+import {importEpoch} from '../src/finance.ts';
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes,randomUUID} from 'node:crypto';
@@ -18,17 +19,17 @@ async function seed(id:string){await pg.owner.query("INSERT INTO identity.auth_u
 beforeEach(async()=>{
  await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');await seed('first');await seed('second');
  const login=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'first@example.test',password:pw},headers:{origin:fc.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');
- account=randomUUID();await within('first',async db=>acceptAccount(db,'first',(await financeView(db,'first')).generation,{id:account,bankId:'synthetic-bank',systemName:'Synthetic account',type:'bank_account'}));
+ account=randomUUID();await within('first',async db=>acceptAccount(db,'first',importEpoch((await financeView(db,'first'))),{id:account,bankId:'synthetic-bank',systemName:'Synthetic account',type:'bank_account'}));
 });
 async function request(path:string,payload?:unknown){return server.fastify.inject({method:payload===undefined?'GET':'POST',url:path,...(payload===undefined?{}:{payload:payload as Record<string,unknown>}),headers:{origin:fc.origin,cookie,...(payload===undefined?{}:{'content-type':'application/json'})}});}
 async function view(){const r=await request('/finance/state');assert.equal(r.statusCode,200,r.body);return r.json();}
 async function append(amount:string,kind:Kind='purchase',transactionId:string|null=null,bankAccount=account,day='2026-09-01'){
- return within('first',async db=>acceptObservation(db,'first',(await financeView(db,'first')).generation,randomUUID(),transactionId,{accountId:bankAccount,operationDate:{precision:'day',date:day},postedDate:null,amountMinor:amount,currency:'RUB',merchantText:'Synthetic shop',description:'Sanitized example',bankCategory:'Safe bank category',bankRefHmac:null,versions:{parser:'synthetic-1',normalizer:'1',sanitizer:'1'}},kind));
+ return within('first',async db=>acceptObservation(db,'first',importEpoch((await financeView(db,'first'))),randomUUID(),transactionId,{accountId:bankAccount,operationDate:{precision:'day',date:day},postedDate:null,amountMinor:amount,currency:'RUB',merchantText:'Synthetic shop',description:'Sanitized example',bankCategory:'Safe bank category',bankRefHmac:null,versions:{parser:'synthetic-1',normalizer:'1',sanitizer:'1'}},kind));
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string){return {kind:'link',link:{sourceId,targetId,kind:'refund',amountMinor,status:'confirmed'}};}
-async function extraAccount(){const id=randomUUID();await within('first',async db=>acceptAccount(db,'first',(await financeView(db,'first')).generation,{id,bankId:'synthetic-bank',systemName:'Second synthetic account',type:'bank_account'}));return id;}
-async function alias(accountId:string,fill='a'){const id=randomUUID();await within('first',async db=>acceptAccountAlias(db,'first',(await financeView(db,'first')).generation,{id,accountId,type:'bank_account',hmac:fill.repeat(64)}));return id;}
+async function extraAccount(){const id=randomUUID();await within('first',async db=>acceptAccount(db,'first',importEpoch((await financeView(db,'first'))),{id,bankId:'synthetic-bank',systemName:'Second synthetic account',type:'bank_account'}));return id;}
+async function alias(accountId:string,fill='a'){const id=randomUUID();await within('first',async db=>acceptAccountAlias(db,'first',importEpoch((await financeView(db,'first'))),{id,accountId,type:'bank_account',hmac:fill.repeat(64)}));return id;}
 async function accountRule(accountId:string){const {preview}=await command({kind:'rule',create:true,patch:{name:'Scoped synthetic rule',enabled:true,priority:1,conditions:{accountId,merchantContains:'Synthetic'},assignments:{role:'expense'}}});return preview.intent.id as string;}
 function newAccount(id:string){return {id,name:'Split destination',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null};}
 async function splitIntent(destination:string){const w=await view();return {kind:'split_account',id:account,newAccounts:[newAccount(destination)],observations:w.accountSources.filter((b:{assignedAccountId:string})=>b.assignedAccountId===account).map((b:{observationId:string})=>({id:b.observationId,accountId:destination})),operations:w.operations.filter((o:{accountId:string})=>o.accountId===account).map((o:{id:string})=>({id:o.id,accountId:destination})),aliases:w.accountAliases.filter((a:{accountId:string})=>a.accountId===account).map((a:{id:string})=>({id:a.id,accountId:destination}))};}
@@ -90,7 +91,7 @@ test('physical deletion preserves independently verified refund meaning and acti
 });
 test('period deletion uses corrected dates and Moscow calendar without changing bank precision',async()=>{
  const old=await append('-1000'),corrected=await append('-2000');await command({kind:'operation',id:corrected.transactionId,patch:{corrections:{operationDate:{precision:'day',date:'2026-10-08'}}}});
- const instant=await within('first',async db=>acceptObservation(db,'first',(await financeView(db,'first')).generation,randomUUID(),null,{accountId:account,operationDate:{precision:'instant',instant:'2026-10-08T22:30:00Z'},postedDate:null,amountMinor:'-3000',currency:'RUB',merchantText:'Safe',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}},'purchase'));
+ const instant=await within('first',async db=>acceptObservation(db,'first',importEpoch((await financeView(db,'first'))),randomUUID(),null,{accountId:account,operationDate:{precision:'instant',instant:'2026-10-08T22:30:00Z'},postedDate:null,amountMinor:'-3000',currency:'RUB',merchantText:'Safe',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}},'purchase'));
  const deletion=await command({kind:'delete_financial',scope:{kind:'period',from:'2026-10-08',through:'2026-10-08'}});assert.deepEqual(deletion.preview.impact.removedOperationIds,[corrected.transactionId]);const w=await view();assert.deepEqual(new Set(w.operations.map((o:{id:string})=>o.id)),new Set([old.transactionId,instant.transactionId]));assert.equal(w.summary.netExpensesMinor,'4000');
 });
 test('account deletion removes donor sources and aliases and retains disabled rules with setup status',async()=>{
@@ -105,10 +106,10 @@ test('deleting an old source account cannot erase operations assigned to a split
 });
 test('physical deletion invalidates stale acceptance and previews without touching other tenants',async()=>{
  const p=await append('-1000'),w=await view(),stale=randomUUID();await request('/finance/preview',{actionId:stale,generation:w.generation,revision:w.revision,intent:{kind:'operation',id:p.transactionId,patch:{comment:'Old preview'}}});
- await within('second',async db=>{const state=await financeView(db,'second');await acceptAccount(db,'second',state.generation,{id:randomUUID(),bankId:'safe',systemName:'Other user',type:'bank_account'});});
+ await within('second',async db=>{const state=await financeView(db,'second');await acceptAccount(db,'second',importEpoch(state),{id:randomUUID(),bankId:'safe',systemName:'Other user',type:'bank_account'});});
  await command({kind:'delete_financial',scope:{kind:'operations',operationIds:[p.transactionId]}});assert.equal((await request('/finance/commit',{actionId:stale})).statusCode,404);
- await assert.rejects(within('first',db=>acceptAccount(db,'first',w.generation,{id:randomUUID(),bankId:'safe',systemName:'Old payload',type:'bank_account'})),/GENERATION_CHANGED/);
- await assert.rejects(within('first',db=>acceptAccountAlias(db,'first',w.generation,{id:randomUUID(),accountId:account,type:'card',hmac:'c'.repeat(64)})),/GENERATION_CHANGED/);
+ await assert.rejects(within('first',db=>acceptAccount(db,'first',importEpoch(w),{id:randomUUID(),bankId:'safe',systemName:'Old payload',type:'bank_account'})),/GENERATION_CHANGED/);
+ await assert.rejects(within('first',db=>acceptAccountAlias(db,'first',importEpoch(w),{id:randomUUID(),accountId:account,type:'card',hmac:'c'.repeat(64)})),/GENERATION_CHANGED/);
  assert.equal((await pg.owner.query("SELECT count(*) FROM finance.account WHERE user_id='second'")).rows[0].count,'1');assert.equal((await view()).operations.length,0);
 });
 test('changed history dependencies after a delete preview reject commit atomically',async()=>{
@@ -120,7 +121,7 @@ test('successive deletions retain only metadata receipts and old retries never r
  assert.deepEqual((await request('/finance/commit',{actionId:first.actionId})).json(),first.result);assert.equal((await view()).operations.length,0);const history=JSON.stringify((await pg.owner.query('SELECT intent,preview,result,undo_patch FROM finance.action')).rows);assert.equal(history.includes(a.transactionId),false);assert.equal(history.includes(b.transactionId),false);assert.equal(history.includes('netExpensesMinor'),false);assert.equal((await request('/finance/history')).json().actions.length,2);
 });
 test('structural intents and new tables enforce ownership and explicit destructive scopes',async()=>{
- const a=await append('-1000'),w=await view(),foreign=randomUUID();await within('second',async db=>acceptAccount(db,'second',(await financeView(db,'second')).generation,{id:foreign,bankId:'safe',systemName:'Other',type:'bank_account'}));
+ const a=await append('-1000'),w=await view(),foreign=randomUUID();await within('second',async db=>acceptAccount(db,'second',importEpoch((await financeView(db,'second'))),{id:foreign,bankId:'safe',systemName:'Other',type:'bank_account'}));
  for(const intent of [{kind:'merge_accounts',id:account,sourceIds:[foreign]},{kind:'split_account',id:foreign,newAccounts:[newAccount(randomUUID())],observations:[],operations:[],aliases:[]},{kind:'delete_financial',scope:{kind:'account',accountId:foreign,deleteAccount:true}}])assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent})).statusCode,404);
  assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'delete_financial',scope:{kind:'all'}}})).statusCode,400);assert.equal((await request('/finance/edit',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'delete_financial',scope:{kind:'operations',operationIds:[a.transactionId]}}})).statusCode,400);
  await assert.rejects(within('first',db=>db.query('UPDATE finance.observation_account SET account_id=$2 WHERE user_id=$1',['first',foreign])),{code:'23503'});

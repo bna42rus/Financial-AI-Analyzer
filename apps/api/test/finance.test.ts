@@ -1,3 +1,4 @@
+import {importEpoch} from '../src/finance.ts';
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes,randomUUID} from 'node:crypto';
@@ -17,12 +18,12 @@ async function seed(id:string){await pg.owner.query("INSERT INTO identity.auth_u
 beforeEach(async()=>{
  await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');await seed('first');await seed('second');
  const login=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'first@example.test',password:pw},headers:{origin:fc.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');
- account=randomUUID();await within('first',async db=>{const w=(await financeView(db,'first'));await acceptAccount(db,'first',w.generation,{id:account,bankId:'synthetic-bank',systemName:'Synthetic account',type:'bank_account'});});
+ account=randomUUID();await within('first',async db=>{const w=(await financeView(db,'first'));await acceptAccount(db,'first',importEpoch(w),{id:account,bankId:'synthetic-bank',systemName:'Synthetic account',type:'bank_account'});});
 });
 async function request(path:string,payload?:unknown){return server.fastify.inject({method:payload===undefined?'GET':'POST',url:path,...(payload===undefined?{}:{payload:payload as Record<string,unknown>}),headers:{origin:fc.origin,cookie,...(payload===undefined?{}:{'content-type':'application/json'})}});}
 async function view(){const r=await request('/finance/state');assert.equal(r.statusCode,200,r.body);return r.json();}
 async function append(amount:string,kind:Kind='purchase',transactionId:string|null=null,bankAccount=account,day='2026-09-01'){
- return within('first',async db=>{const w=await financeView(db,'first');return acceptObservation(db,'first',w.generation,randomUUID(),transactionId,{accountId:bankAccount,operationDate:{precision:'day',date:day},postedDate:null,amountMinor:amount,currency:'RUB',merchantText:'Synthetic shop',description:'Sanitized example',bankCategory:'Safe bank category',bankRefHmac:null,versions:{parser:'synthetic-1',normalizer:'1',sanitizer:'1'}},kind);});
+ return within('first',async db=>{const w=await financeView(db,'first');return acceptObservation(db,'first',importEpoch(w),randomUUID(),transactionId,{accountId:bankAccount,operationDate:{precision:'day',date:day},postedDate:null,amountMinor:amount,currency:'RUB',merchantText:'Synthetic shop',description:'Sanitized example',bankCategory:'Safe bank category',bankRefHmac:null,versions:{parser:'synthetic-1',normalizer:'1',sanitizer:'1'}},kind);});
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
@@ -39,7 +40,7 @@ test('real HTTP snapshot respects session, active entitlement, suspension and ca
  await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/state')).statusCode,403);
 });
 test('RLS, composite source/component/link references and immutable identities block crossing users',async()=>{
- const first=await append('-1000'),otherAccount=randomUUID();let other:string='';await within('second',async db=>{const w=await financeView(db,'second');await acceptAccount(db,'second',w.generation,{id:otherAccount,bankId:'other-bank',systemName:'Other account',type:'bank_account'});other=(await acceptObservation(db,'second',w.generation,randomUUID(),null,{accountId:otherAccount,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'1000',currency:'RUB',merchantText:'Other',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}},'refund')).transactionId;});
+ const first=await append('-1000'),otherAccount=randomUUID();let other:string='';await within('second',async db=>{const w=await financeView(db,'second');await acceptAccount(db,'second',importEpoch(w),{id:otherAccount,bankId:'other-bank',systemName:'Other account',type:'bank_account'});other=(await acceptObservation(db,'second',importEpoch(w),randomUUID(),null,{accountId:otherAccount,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'1000',currency:'RUB',merchantText:'Other',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}},'refund')).transactionId;});
  const w=await view();assert.equal(w.operations.length,1);assert.equal((await request('/finance/operation',{id:other})).statusCode,404);
  const result=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:link(other,first.transactionId,'1000')});assert.equal(result.statusCode,404);
  await assert.rejects(within('first',db=>db.query("INSERT INTO finance.link(user_id,id,source_id,target_id,kind,amount_minor,status,confidence,created_by) VALUES('first',$1,$2,$3,'refund',1000,'confirmed',100,'user')",[randomUUID(),other,first.transactionId])),{code:'23503'});
@@ -67,7 +68,7 @@ test('changes, expiry, suspension and generation changes after preview block the
  w=await view();actionId=randomUUID();await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent:{kind:'operation',id:a.transactionId,patch:{comment:'New preview'}}});
  await pg.owner.query("UPDATE identity.security_state SET indefinite=false,access_end=now()-interval '1 second' WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId})).statusCode,403);
  await pg.owner.query("UPDATE identity.security_state SET indefinite=true WHERE user_id='first'");await pg.owner.query("UPDATE finance.workspace SET generation=gen_random_uuid() WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId})).json().code,'GENERATION_CHANGED');
- const stale=await pg.finance.connect();try{await stale.query('BEGIN');await assert.rejects(acceptAccount(stale,'first',w.generation,{id:randomUUID(),bankId:'stale',systemName:'Stale',type:'bank_account'}),/GENERATION_CHANGED/);await stale.query('ROLLBACK');}finally{stale.release();}
+ const stale=await pg.finance.connect();try{await stale.query('BEGIN');await assert.rejects(acceptAccount(stale,'first',importEpoch(w),{id:randomUUID(),bankId:'stale',systemName:'Stale',type:'bank_account'}),/GENERATION_CHANGED/);await stale.query('ROLLBACK');}finally{stale.release();}
 });
 test('simultaneous commits cannot oversubscribe a return capacity',async()=>{
  const p=await append('-1000'),r=await append('600','refund'),c=await append('600','transfer_in'),w=await view(),ids=[randomUUID(),randomUUID()];
@@ -106,7 +107,7 @@ test('raw identifiers, numeric money, foreign analytics currency, guessed dates 
  const p=await append('-1000'),w=await view();for(const patch of [{comment:'Карта 1234567890123456'},{corrections:{amountMinor:1}},{corrections:{operationDate:{precision:'day',date:'2026-02-30'}}},{sourceAmountMinor:'1'}])assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'operation',id:p.transactionId,patch}})).statusCode,400);
  assert.equal((await request('/finance/state?userId=second')).statusCode,404);assert.equal((await request('/finance/summary',{export:true})).statusCode,400);assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,userId:'second',intent:{kind:'operation',id:p.transactionId,patch:{comment:'Safe'}}})).statusCode,400);
  assert.equal((await request('/finance/operation',{id:p.transactionId})).json().comment,'');
- for(const bad of [{amountMinor:1},{currency:'EUR'},{operationDate:{precision:'day',date:'2026-02-30'}}])await assert.rejects(within('first',db=>acceptObservation(db,'first',w.generation,randomUUID(),null,{accountId:account,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'100',currency:'RUB',merchantText:'Safe',description:'',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'},...bad},'purchase')));
+ for(const bad of [{amountMinor:1},{currency:'EUR'},{operationDate:{precision:'day',date:'2026-02-30'}}])await assert.rejects(within('first',db=>acceptObservation(db,'first',importEpoch(w),randomUUID(),null,{accountId:account,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'100',currency:'RUB',merchantText:'Safe',description:'',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'},...bad},'purchase')));
  assert.equal((await view()).operations.length,1);
 });
 test('known expense without a category still counts; specific include overrides an excluded account',async()=>{
@@ -115,8 +116,8 @@ test('known expense without a category still counts; specific include overrides 
 });
 test('internal observation retry preserves the canonical ID and rejects a reused ID with new data',async()=>{
  const w=await view(),id=randomUUID(),input={accountId:account,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',merchantText:'Safe',description:'',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}};
- const first=await within('first',db=>acceptObservation(db,'first',w.generation,id,null,input,'purchase')),retry=await within('first',db=>acceptObservation(db,'first',w.generation,id,null,input,'purchase'));assert.equal(retry.transactionId,first.transactionId);assert.equal((await view()).operations.length,1);
- await assert.rejects(within('first',db=>acceptObservation(db,'first',w.generation,id,null,{...input,amountMinor:'-200'},'purchase')),/OBSERVATION_REUSED/);
+ const first=await within('first',db=>acceptObservation(db,'first',importEpoch(w),id,null,input,'purchase')),retry=await within('first',db=>acceptObservation(db,'first',importEpoch(w),id,null,input,'purchase'));assert.equal(retry.transactionId,first.transactionId);assert.equal((await view()).operations.length,1);
+ await assert.rejects(within('first',db=>acceptObservation(db,'first',importEpoch(w),id,null,{...input,amountMinor:'-200'},'purchase')),/OBSERVATION_REUSED/);
 });
 test('category parent and child roles cannot silently become contradictory',async()=>{
  const w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,child=w.categories.find((c:{parentId:string|null})=>c.parentId===food).id;
