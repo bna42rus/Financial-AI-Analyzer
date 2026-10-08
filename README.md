@@ -4,16 +4,16 @@
 
 ## Текущий статус
 
-В main принята первая версия четырёх экранов через PR №2–6. Следующая разработка находится в открытой последовательной цепочке PR №7–22; следующий блок находится в `feature/live-import-ui`. Его основа — `feature/safe-bank-source` ([PR №22](https://github.com/bna42rus/Financial-AI-Analyzer/pull/22)), `cfaf3b52b47e7784f3568472f8ba789024ec6012`. Не начинать дальнейшую финансовую разработку от раннего main.
+В main принята первая версия четырёх экранов через PR №2–6. Следующая разработка находится в открытой последовательной цепочке PR №7–23; следующий блок находится в `feature/live-operation-review`. Его основа — `feature/live-import-ui` ([PR №23](https://github.com/bna42rus/Financial-AI-Analyzer/pull/23)), `1bc5247335a081776061831d2e3c27eae027ff7b`. Не начинать дальнейшую финансовую разработку от раннего main.
 
 | Блок | Реализовано | Что впереди |
 | --- | --- | --- |
 | Доступ | Серверная заявка/оплаты/приглашения/регистрация, продления/ручной доступ, email outbox, admin TOTP/recovery | Реальные провайдеры, owner onboarding, эксплуатация и полная security acceptance |
-| Финансовая основа | Accounts/categories/counterparties/rules, observations/corrections, components/links/allocations, preview/commit, история, исключения, Merge/Split, удаления и reset | Редактирование рабочих финансовых экранов и будущие module dependencies |
+| Финансовая основа | Accounts/categories/counterparties/rules, observations/corrections, components/links/allocations, preview/commit, история, исключения, Merge/Split, удаления/reset, одиночные правки карточки, correction preview и Undo | Полные финансовые экраны/массовые действия и будущие module dependencies |
 | Импорт | Локальные PDF adapters/HMAC, ограниченные безопасные признаки/магазины, server validation/acceptance, durable provenance, account aliases, консервативный source dedupe, checkpoints/queue, privacy cascade, authenticated загрузка/история и чтение сохранённых операций | CSV/XLSX/OCR, более полный safe text profile, strict fingerprints, cancellation/dedupe decisions, final classification/link pass и полный review UI |
 | Анализатор и выпуск | Приняты базовые макеты; Registry/AI полностью не реализованы | AI/provider checks, бюджеты/виджеты/views, Staging acceptance и Production |
 
-Текущий блок — [подключённая загрузка PDF и восстановление результата](docs/architecture/live-import-ui.md). Локальные adapters и конечный safe source profile передают только проверенный payload; после приёма работа сохраняется на сервере. Полноценные review/editing, прочие форматы и финальная классификация остаются впереди. Text-free profile не закрывает полноценную source restoration или strict cross-file fingerprint. [Границы второго блока импорта](docs/architecture/import-ingestion.md). [Общий план](docs/product/implementation-plan.md). Исторический [bootstrap-status](docs/architecture/bootstrap-status.md) описывает ранние этапы, не текущую готовность.
+Текущий блок — [проверка и редактирование сохранённых операций](docs/architecture/live-operation-review.md). [Загрузка PDF и восстановление результата](docs/architecture/live-import-ui.md) уже подключены. Локальные adapters и конечный safe source profile передают только проверенный payload; после приёма работа сохраняется на сервере. Полный Review/History, массовые правки, прочие форматы и финальная классификация остаются впереди. Text-free profile не закрывает полноценную source restoration или strict cross-file fingerprint. [Границы второго блока импорта](docs/architecture/import-ingestion.md). [Общий план](docs/product/implementation-plan.md). Исторический [bootstrap-status](docs/architecture/bootstrap-status.md) описывает ранние этапы, не текущую готовность.
 
 ## Проверки и Development
 
@@ -38,3 +38,5 @@
 Безопасные банковские признаки и магазины: [профиль и ограничения](docs/architecture/safe-bank-source.md).
 
 Рабочая загрузка PDF, история и сохранённые операции: [сценарий и текущие границы](docs/architecture/live-import-ui.md).
+
+Сохранённые операции: [редактирование, проверка, corrections и конфликты](docs/architecture/live-operation-review.md).

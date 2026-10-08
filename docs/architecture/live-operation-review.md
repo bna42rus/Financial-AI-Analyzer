@@ -1,0 +1,33 @@
+# Saved operation review and editing — Development
+
+The authenticated finance workspace now opens a working operation drawer, preserving the list position and returning focus after close. It uses actual persisted facts and the server projection, with per-facet source/confidence/verification, active review reasons, sanitized source fields and current effective fields. Desktop uses the existing right-hand drawer; mobile uses the full viewport. Demo screens remain independent.
+
+## Changes and privacy
+
+Merchant, kind, role, category/subcategory, counterparty, comment and analytics override use the existing `/finance/edit` command. Select changes apply immediately; text changes apply when the field loses focus. The browser normalizes and sanitizes editable text before the request, then the server independently applies the existing safe-text guard. The guard addresses recognized sensitive identifiers; it is not a claim that arbitrary text is suitable for external AI. No AI/web lookup, raw statement upload, telemetry or persistent browser storage is introduced.
+
+Each changed or explicitly confirmed facet is verified independently. Confirming a category does not clear a possible-duplicate decision or verify the kind/role. A kind change does not guess the financial meaning. Category choices are compatible with the current role; the server rejects contradictory changes. Changing a parent category explicitly removes its old subcategory, with an explanatory note. Manual edits do not silently create personal rules or rewrite bank facts. For decomposed operations, parent facets do not change verified component facets.
+
+The last own reversible action in the open drawer has one-click Undo, routed through the existing server preview/commit and dependency-aware history policy. A later conflicting edit prevents Undo from overwriting it. Full persisted scoped History and Undo after reopening are separate pending work.
+
+## Correction mode
+
+Effective amount, operation date and account have a separate form and explicit consequences/confirmation. Money is parsed into bounded integer minor units without floating-point conversion. Day precision remains a source-local day. Exact timestamps stay intact for unrelated edits; an explicit timestamp input is labelled UTC and converted to canonical UTC. Changing precision clears the input and requires an explicit value rather than guessing a time. Impossible dates and ambiguous monetary strings are rejected locally and independently by the server.
+
+The complete corrections map preserves an existing posted-date correction even though editing that field is not exposed here. Returning the form to source values removes the supported amount/date/account corrections on confirmation; source facts remain separate. The default account follows the current source binding, including intentional account restructuring. Source display can resolve retained merged accounts while the editor offers only active target accounts.
+
+The existing backend preview simulates the correction under a savepoint, returns canonical before/after financial totals and affected operations, and retains a versioned action. The drawer displays this result, including unresolved amounts and link conflicts, before explicit commit. Dismissing the preview makes no financial mutation. Components replace the parent in totals; invalidated allocations remain visible but cannot become calculation bases. The UI does not recompute the financial graph.
+
+## Concurrency and recovery
+
+Operation detail now returns generation/revision from the same authenticated, lifecycle-locked snapshot as the facts and projection. It also returns computed outcomes for its related links. The fields grant no authority; every action still checks the current verified session, status, entitlement, generation, revision, scope and references on the server.
+
+A stale edit or correction shows the current values beside the attempted values. Refresh discards the attempt; applying it over the current version is explicit. Correction rebasing transfers only the attempted correction delta onto the latest map, preserving concurrent corrections in other fields, then requires a new preview/confirmation. Reset, deletion or lost access cannot be bypassed through this option.
+
+An uncertain edit/commit retains the exact safe request and action ID only in memory. Retry repeats that request, so the existing server idempotency returns a committed outcome instead of performing the change twice. Preview and commit are distinct stages: losing a commit acknowledgement retries the commit, not a new preview. New changes and drawer dismissal are blocked during an uncertain handoff, with a before-unload warning. A confirmed mutation with a failed detail reload leaves fields read-only until refreshed. Leaving the workspace disposes pending client state and suppresses late UI callbacks.
+
+## Evidence and remaining scope
+
+Six pure scenarios cover decimal bounds, date precision/validation, source restoration, preservation/rebase of unrelated corrections and pre-request text privacy. Ten flow scenarios cover epoch/safe handoff, exact retries/double clicks, preview cancellation, lost commit acknowledgement, conflict choices, new preview after explicit override, safe Undo refusal, access/reset invalidation, reload failures and disposal. PostgreSQL/HTTP checks verify coherent detail epochs and computed related-link outcomes, and reject stale edits. Two desktop/mobile full HTTP/browser journeys cover independent facet verification, unresolved duplicate retention, raw-comment omission, Undo, read-only preview/cancellation, exact commit retry, bank-fact preservation, recalculated totals, reload persistence, focus return, two-device refresh/override and suspended access. Existing financial, source, privacy, security and interface suites remain in full CI. Exact-head results are recorded in the PR.
+
+Bulk/inline editing, broader search/filtering/views, creating counterparties/categories/rules from the drawer, full scoped History, editing posted dates/descriptions, link/component editing, duplicate resolution, destructive actions and Analyzer Review remain pending. This is an operation-editing increment; baseline 1.3 and original PDF/Word stay unchanged, and full clauses remain partial. No merge, Production deployment or service purchase is performed by this block.

@@ -125,3 +125,10 @@ test('category parent and child roles cannot silently become contradictory',asyn
  const b=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'category',id:food,patch:{role:'income'}}});assert.equal(b.statusCode,409);assert.equal(b.json().code,'DEPENDENCY_MIGRATION_REQUIRED');
  assert.equal((await view()).categories.find((c:{id:string})=>c.id===food).role,'expense');
 });
+
+test('operation detail returns a coherent editing epoch and computed related-link outcome; stale edits fail',async()=>{
+ const purchase=await append('-10000'),refund=await append('1000','refund');await command(link(refund.transactionId,purchase.transactionId,'1000'));
+ const detail=(await request('/finance/operation',{id:purchase.transactionId})).json(),w=await view();assert.equal(detail.generation,w.generation);assert.equal(detail.revision,w.revision);assert.equal(detail.linkStates.length,1);assert.equal(detail.linkStates[0].active,true);assert.equal(detail.source.bankRefHmac,undefined);
+ await append('-2000');const stale=await request('/finance/edit',{actionId:randomUUID(),generation:detail.generation,revision:detail.revision,intent:{kind:'operation',id:purchase.transactionId,patch:{comment:'Stale device'}}});assert.equal(stale.statusCode,409);assert.equal(stale.json().code,'FINANCE_CHANGED');assert.equal((await request('/finance/operation',{id:purchase.transactionId})).json().comment,'');
+ const current=(await request('/finance/operation',{id:purchase.transactionId})).json();assert.notEqual(current.revision,detail.revision);assert.equal(current.generation,detail.generation);
+});

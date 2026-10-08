@@ -75,8 +75,10 @@ export function parseFilter(value:unknown):Filter{
  if('includeExcluded'in r)f.includeExcluded=bool(r.includeExcluded);return f;
 }
 export async function operationView(db:PoolClient,userId:string,id:unknown){
- const {graph}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===uuid(id));if(!op)throw new HttpError(404,'NOT_FOUND');
- const {bankRefHmac,...source}=op.source;return {...op,source,projection:reconcile(graph).operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links:graph.links.filter(l=>l.sourceId===op.id||l.targetId===op.id)};
+ const {graph,state}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===uuid(id));if(!op)throw new HttpError(404,'NOT_FOUND');
+ const resolved=reconcile(graph),related=(l:{sourceId:string;targetId:string})=>l.sourceId===op.id||l.targetId===op.id;
+ const links=graph.links.filter(related),linkIds=new Set(links.map(l=>l.id));
+ const {bankRefHmac,...source}=op.source;return {...op,source,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
 type Intent=BaseIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent;

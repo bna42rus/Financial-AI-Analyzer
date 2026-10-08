@@ -915,14 +915,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-6.4",
@@ -939,14 +947,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-6.5",
@@ -987,14 +1003,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-7",
@@ -1107,14 +1131,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-8",
@@ -1647,14 +1679,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-10.3",
@@ -1708,14 +1748,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-11",
@@ -2824,14 +2872,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-17.2",
@@ -2865,10 +2921,22 @@
       "title": "Confidence, Source и Verification",
       "source_text": "Links и Dedupe строже Ошибочно назначенная категория неприятна, но легко исправляется. Ошибочно склеенные две реальные операции могут исказить сами данные. Поэтому automatic link/dedupe thresholds должны быть существенно строже; для fuzzy dedupe ориентир 98–99%+.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-17.4",
@@ -2885,14 +2953,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-17.5",
@@ -4145,10 +4221,22 @@
       "title": "Экран «Операции»",
       "source_text": "Operations — основной рабочий экран для проверки, поиска и исправления финансовых записей. На desktop это гибкая таблица, на mobile — карточный список с теми же возможностями.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-23.1",
@@ -4302,13 +4390,22 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
+      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-23.9",
@@ -4410,10 +4507,22 @@
       "title": "Карточка операции",
       "source_text": "Карточка — место для полного контекста одной transaction. На desktop она открывается справа и сохраняет положение таблицы; на mobile — полноэкранно с возвратом в исходное место списка.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.1",
@@ -4427,15 +4536,24 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.2",
@@ -4445,10 +4563,22 @@
       "title": "Карточка операции",
       "source_text": "Editable fields Merchant, kind, role, category, subcategory, counterparty, comment, inclusion. Простое одиночное обратимое изменение применяется сразу и сопровождается Undo.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.3",
@@ -4462,15 +4592,24 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.4",
@@ -4480,10 +4619,22 @@
       "title": "Карточка операции",
       "source_text": "Correction Mode Если пользователь исправляет effective date, amount или account, оригинальные `source_*` значения сохраняются. История понимает, что это correction, а не исходный банковский факт.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.5",
@@ -4497,15 +4648,24 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.6",
@@ -4527,15 +4687,24 @@
         "packages/finance-core/src/graph.ts",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "apps/api/test/finance-history.test.ts",
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.7",
@@ -4570,10 +4739,22 @@
       "title": "Карточка операции",
       "source_text": "Verification, History и «Применять дальше » В карточке пользователь может подтвердить конкретный facet, открыть scoped Change History и перейти к matched rule. После ручного исправления интерфейс может предложить «Применять это в будущем», предварительно показав предполагаемые conditions будущего rule. Само исправление одной operation не должно автоматически создавать постоянное правило без согласованного намерения пользователя.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/finance.ts"
+      ],
+      "verification_refs": [
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "PDF-24.9",
@@ -9801,7 +9982,11 @@
         "docs/architecture/live-import-ui.md",
         "apps/web/src/ServerImport.tsx",
         "apps/web/src/import-flow.ts",
-        "apps/web/src/ServerFinance.tsx"
+        "apps/web/src/ServerFinance.tsx",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9813,11 +9998,13 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/web/src/import-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "A-07",
@@ -9858,13 +10045,21 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks.",
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "A-09",
@@ -10253,17 +10448,23 @@
         "apps/web/src/ServerImport.tsx",
         "apps/web/src/import-flow.ts",
         "apps/web/src/ServerFinance.tsx",
-        "apps/api/src/import-ingestion.ts"
+        "apps/api/src/import-ingestion.ts",
+        "docs/architecture/live-operation-review.md",
+        "apps/web/src/ServerOperation.tsx",
+        "apps/web/src/operation-flow.ts",
+        "apps/web/src/finance-client.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/web/src/import-flow.test.ts",
         "apps/api/test/import-ingestion.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/finance-client.test.ts",
+        "apps/web/src/operation-flow.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks.",
-      "implementation_note": " Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR."
+      "implementation_note": " Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {
       "id": "B-10",
