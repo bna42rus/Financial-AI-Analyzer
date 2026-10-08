@@ -6,6 +6,7 @@ import {envelope,token,digest} from '../src/crypto.ts';
 import {outbox} from '../src/types.ts';
 import {deliverBatch,enqueueReminders,sandboxTransport,assertMailRole,startMailWorker,DeliveryFailure} from '../src/mail-worker.ts';
 import type {WorkerConfig,Transport} from '../src/mail-worker.ts';
+import {installMailQueues} from '../src/mail-install.ts';
 let pg:Awaited<ReturnType<typeof postgresFixture>>,fc:WorkerConfig,cc:WorkerConfig;
 const origins={financeOrigin:'https://app.example.test',controlOrigin:'https://admin.example.test',adminRecipient:'owner@example.test'};
 before(async()=>{pg=await postgresFixture();fc={...origins,profile:'finance',pool:pg.mailFinance,wrappingKey:randomBytes(32),environment:'test'};cc={...origins,profile:'control',pool:pg.mailControl,wrappingKey:randomBytes(32),environment:'test'};});
@@ -22,6 +23,16 @@ async function invite(){
  const expiry=(await pg.owner.query('SELECT expires_at FROM commerce.invitation WHERE id=$1',[id])).rows[0].expires_at.toISOString();
  return {id,secret,delivery:await queue('invitation',{email:'user@example.test',token:secret,expiresAt:expiry},'access',cc,id)};
 }
+test('operator queue installation stays inside one transaction and rolls back schemas/DDL together',async()=>{
+ const db=await pg.owner.connect();
+ try{
+  await db.query('BEGIN');await db.query('DROP SCHEMA jobs_mail_finance, jobs_mail_control CASCADE');
+  await db.query('CREATE TABLE mail.rollback_probe(marker text)');
+  await installMailQueues(db);await db.query('ROLLBACK');
+  assert.equal((await db.query("SELECT to_regclass('mail.rollback_probe') AS probe")).rows[0].probe,null);
+  assert.equal((await db.query("SELECT 1 FROM jobs_mail_finance.queue WHERE name='mail-tick'")).rowCount,1);
+ }finally{await db.query('ROLLBACK');db.release();}
+});
 test('mail roles have no passwords/sessions/financial/keys, API cannot read encrypted mail or inbox',async()=>{
  for(const pool of [pg.mailFinance,pg.mailControl])for(const sql of ['SELECT * FROM identity.auth_account','SELECT * FROM control.auth_account','SELECT * FROM identity.auth_session','SELECT * FROM finance.isolation_canary','SELECT * FROM protected_keys.isolation_canary'])await assert.rejects(pool.query(sql),{code:'42501'});
  for(const pool of [pg.finance,pg.control])for(const sql of ['SELECT * FROM mail.sandbox_inbox','SELECT mail.project_delivery()'])await assert.rejects(pool.query(sql),{code:'42501'});
@@ -60,7 +71,7 @@ test('five failures stop; safe audited retry keeps cumulative attempts and hides
 });
 test('cancelled/used/expired invitations are suppressed before send and cannot be manually retried',async()=>{
  for(const target of ['cancelled','used','expired']){
-  const i=await invite();await pg.owner.query(target==='expired'?"UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1":'UPDATE commerce.invitation SET state=$2 WHERE id=$1',target==='expired'?[i.id]:[i.id,target]);
+  const i=await invite();await pg.owner.query(target==='expired'?"UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1":"UPDATE commerce.invitation SET state=$2,used_at=CASE WHEN $2='used' THEN clock_timestamp() ELSE NULL END WHERE id=$1",target==='expired'?[i.id]:[i.id,target]);
   await deliverBatch(cc,sandboxTransport(cc));assert.equal((await state(i.delivery)).last_error,'STALE');assert.equal((await pg.control.query('SELECT mail.retry_delivery($1) AS ok',[i.delivery])).rows[0].ok,false);
   await pg.owner.query('DELETE FROM commerce.invitation');await pg.owner.query('DELETE FROM commerce.manual_grant');
  }
