@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:

@@ -37,6 +37,24 @@ async function safeBatch(rows=[row({safeSource:{event:'purchase',merchant:'ozon'
 
 async function importedOperation(){const id=(await pg.owner.query('SELECT id FROM finance.transaction')).rows[0].id;const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
 
+test('import history restores accepted and completed batches without keys, payloads or filenames',async()=>{
+ const b=await batch();await accept(b);const pending=await request('/finance/imports');assert.equal(pending.statusCode,200);assert.equal(pending.json().batches[0].batchId,b.batchId);assert.equal(pending.json().batches[0].status,'accepted');
+ for(const secret of ['Private',account,b.files[0]!.fileHmac,b.files[0]!.rows[0]!.account.hmac,'-100','2026-09-01'])assert.equal(pending.body.includes(secret),false);
+ await drain(b.batchId);assert.equal((await request('/finance/imports')).json().batches[0].status,'completed');
+ assert.equal((await request('/finance/imports',undefined,{cookie:''})).statusCode,401);assert.equal((await request('/finance/imports?user=second')).statusCode,404);
+ assert.equal((await request('/finance/imports',{before:randomUUID(),raw:'Private'})).statusCode,400);
+ const otherCookie=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'second@example.test',password},headers:{origin:fc.origin,'content-type':'application/json'}});const foreign=otherCookie.cookies.map(c=>c.name+'='+c.value).join('; ');
+ assert.deepEqual((await request('/finance/imports',undefined,{cookie:foreign})).json().batches,[]);assert.equal((await request('/finance/imports',{before:b.batchId},{cookie:foreign})).statusCode,404);
+ assert.equal((await control.fastify.inject({method:'GET',url:'/finance/imports',headers:{origin:fc.origin,cookie}})).statusCode,404);
+ await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/imports')).statusCode,403);
+});
+test('history pagination remains bounded with tied timestamps and does not repeat or skip batch IDs',async()=>{
+ const c=await context(),ids=Array.from({length:51},()=>randomUUID());
+ for(const id of ids)await pg.owner.query("INSERT INTO finance.ingestion_batch(user_id,id,generation,key_version,request_digest,versions,status,created_at) VALUES('first',$1,$2,$3,$4,'{}','completed','2026-01-01T00:00:00.000123Z')",[id,c.generation,c.keyVersion,'a'.repeat(64)]);
+ const first=(await request('/finance/imports')).json();assert.equal(first.batches.length,50);assert.ok(first.nextCursor);const last=(await request('/finance/imports',{before:first.nextCursor})).json();assert.equal(last.batches.length,1);assert.equal(last.nextCursor,null);assert.equal(new Set([...first.batches,...last.batches].map(b=>b.batchId)).size,51);
+ await command({kind:'reset_financial',keepCategories:true,keepRules:true,keepInterface:true});assert.deepEqual((await request('/finance/imports')).json().batches,[]);
+});
+
 test('safe source codes persist canonical source fields before current personal rules',async()=>{
  await command({kind:'rule',id:randomUUID(),create:true,patch:{name:'Synthetic merchant rule',enabled:true,priority:1,conditions:{merchantEquals:'Ozon'},assignments:{merchant:'Personal shop',role:'neutral'}}});
  const b=await safeBatch();await accept(b);assert.equal((await drain(b.batchId)).counts.created,1);

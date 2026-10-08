@@ -49,6 +49,21 @@ export async function acceptImport(db:PoolClient,userId:string,input:unknown){
 export async function importStatus(db:PoolClient,userId:string,input:unknown){
  await prepareFinance(db,userId);const r=object(input,['batchId']);return importReport(db,userId,uuid(r.batchId));
 }
+/** Bounded, paginated tenant history. No payload, filenames, pseudonyms or source text. */
+export async function importHistory(db:PoolClient,userId:string,input:unknown={}){
+ await prepareFinance(db,userId);const r=object(input,['before']);
+ const before=r.before===undefined?null:uuid(r.before);
+ // Preserve PostgreSQL microseconds; a JS Date cursor can skip rows within the same millisecond.
+ const cursor=before?(await db.query('SELECT created_at::text AS created_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,before])).rows[0]:null;
+ if(before&&!cursor)throw new HttpError(404,'NOT_FOUND');
+ const rows=(await db.query(`SELECT b.id,b.status,b.created_at,b.finished_at,
+ (SELECT count(*)::int FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id) AS files,
+ (SELECT COALESCE(sum(f.rows_found),0)::int FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id) AS rows_found
+ FROM finance.ingestion_batch b WHERE b.user_id=$1 AND ($2::timestamptz IS NULL OR (b.created_at,b.id)<($2::timestamptz,$3::uuid))
+ ORDER BY b.created_at DESC,b.id DESC LIMIT 51`,[userId,cursor?.created_at??null,before])).rows;
+ const batches=rows.slice(0,50).map(b=>({batchId:b.id,status:b.status,createdAt:b.created_at,finishedAt:b.finished_at,files:b.files,rowsFound:b.rows_found}));
+ return {batches,nextCursor:rows.length>50?batches.at(-1)!.batchId:null};
+}
 async function importReport(db:PoolClient,userId:string,batchId:string){
  const batch=(await db.query('SELECT status,created_at,finished_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,batchId])).rows[0];
  if(!batch)throw new HttpError(404,'NOT_FOUND');
