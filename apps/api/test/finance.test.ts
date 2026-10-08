@@ -72,7 +72,8 @@ test('changes, expiry, suspension and generation changes after preview block the
 test('simultaneous commits cannot oversubscribe a return capacity',async()=>{
  const p=await append('-1000'),r=await append('600','refund'),c=await append('600','transfer_in'),w=await view(),ids=[randomUUID(),randomUUID()];
  for(const [index,source]of [r,c].entries())assert.equal((await request('/finance/preview',{actionId:ids[index],generation:w.generation,revision:w.revision,intent:link(source.transactionId,p.transactionId,'600',index===0?'refund':'expense_reimbursement')})).statusCode,200);
- const results=await Promise.all(ids.map(actionId=>request('/finance/commit',{actionId})));assert.deepEqual(results.map(r=>r.statusCode).sort(),[200,409]);assert.equal((await pg.owner.query('SELECT count(*) FROM finance.link')).rows[0].count,'1');
+ // Separate DB clients bypass the HTTP auth lock: test the financial mutation lock itself.
+ const results=await Promise.allSettled(ids.map(actionId=>within('first',db=>commitFinance(db,'first',{actionId}))));assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.filter(r=>r.status==='rejected'&&r.reason.status===409).length,1);assert.equal((await pg.owner.query('SELECT count(*) FROM finance.link')).rows[0].count,'1');
  const latest=await view(),newAttempt=await request('/finance/preview',{actionId:randomUUID(),generation:latest.generation,revision:latest.revision,intent:link(c.transactionId,p.transactionId,'600','expense_reimbursement')});assert.equal(newAttempt.statusCode,409);
 });
 test('linked refund inherits categories and changes only its own period',async()=>{
@@ -116,4 +117,10 @@ test('internal observation retry preserves the canonical ID and rejects a reused
  const w=await view(),id=randomUUID(),input={accountId:account,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',merchantText:'Safe',description:'',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}};
  const first=await within('first',db=>acceptObservation(db,'first',w.generation,id,null,input,'purchase')),retry=await within('first',db=>acceptObservation(db,'first',w.generation,id,null,input,'purchase'));assert.equal(retry.transactionId,first.transactionId);assert.equal((await view()).operations.length,1);
  await assert.rejects(within('first',db=>acceptObservation(db,'first',w.generation,id,null,{...input,amountMinor:'-200'},'purchase')),/OBSERVATION_REUSED/);
+});
+test('category parent and child roles cannot silently become contradictory',async()=>{
+ const w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,child=w.categories.find((c:{parentId:string|null})=>c.parentId===food).id;
+ const a=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'category',id:child,patch:{role:'income'}}});assert.equal(a.statusCode,409);assert.equal(a.json().code,'CATEGORY_ROLE_CONFLICT');
+ const b=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'category',id:food,patch:{role:'income'}}});assert.equal(b.statusCode,409);assert.equal(b.json().code,'DEPENDENCY_MIGRATION_REQUIRED');
+ assert.equal((await view()).categories.find((c:{id:string})=>c.id===food).role,'expense');
 });

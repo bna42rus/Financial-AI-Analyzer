@@ -104,6 +104,10 @@ async function row(db:PoolClient,userId:string,table:keyof typeof columns,id:str
 function ownRefs(graph:Graph,parties:{id:string}[],p:Record<string,unknown>){
  for(const [key,items]of [['accountId',graph.accounts],['categoryId',graph.categories],['subcategoryId',graph.categories],['counterpartyId',parties]]as const)if(p[key]!==undefined&&p[key]!==null&&!items.some(i=>i.id===p[key]))throw new HttpError(404,'NOT_FOUND');
 }
+function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subcategoryId:string|null){
+ const category=graph.categories.find(c=>c.id===categoryId),sub=graph.categories.find(c=>c.id===subcategoryId),allows=(r:string)=>!['expense','income'].includes(role)||r==='both'||r===role;
+ if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
+}
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string):Promise<Undo> {
  const {graph,parties}=await loadFinance(db,userId),p=intent.patch??{},id=intent.id;
  if(intent.kind==='operation'){
@@ -111,8 +115,7 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
   if(p.corrections!==undefined){ownRefs(graph,parties,p.corrections as Record<string,unknown>);values.corrections=p.corrections;}
   const map={kind:'kind',role:'role',categoryId:'category',subcategoryId:'subcategory',merchant:'merchant',counterpartyId:'counterparty'}as const;
   for(const [input,key]of Object.entries(map))if(input in p)(semantics as unknown as Record<string,unknown>)[key]=facet(p[input],'user',true);
-  const category=semantics.category.value?graph.categories.find(c=>c.id===semantics.category.value):null,sub=semantics.subcategory.value?graph.categories.find(c=>c.id===semantics.subcategory.value):null;
-  if(category&&(category.parentId!==null||['expense','income'].includes(semantics.role.value)&&category.role!=='both'&&category.role!==semantics.role.value)||sub&&sub.parentId!==category?.id)throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
+  categoryCompatible(graph,semantics.role.value,semantics.category.value,semantics.subcategory.value);
   values.semantics=semantics;if('comment'in p)values.comment=p.comment;if('analyticsOverride'in p)values.analytics_override=p.analyticsOverride;
   const cleared=new Set<string>();if('kind'in p)cleared.add('low_kind_confidence');if('role'in p)for(const r of ['low_role_confidence','unresolved_role','unresolved_transfer'])cleared.add(r);if('categoryId'in p||'subcategoryId'in p)cleared.add('low_category_confidence');
   values.review_reasons=before.review_reasons.filter((r:string)=>!cleared.has(r));await update(db,userId,'transaction',id,values);return {table:'transaction',id,before:Object.fromEntries(columns.transaction.map(k=>[k,before[k]]))};
@@ -121,8 +124,7 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
   await row(db,userId,'transaction',id);const before=(await db.query('SELECT * FROM finance.component WHERE user_id=$1 AND transaction_id=$2 ORDER BY id',[userId,id])).rows;
   for(const part of intent.parts!){
    ownRefs(graph,parties,{categoryId:part.category.value,subcategoryId:part.subcategory.value});
-   const cat=graph.categories.find(c=>c.id===part.category.value),sub=graph.categories.find(c=>c.id===part.subcategory.value);
-   if(cat&&(cat.parentId!==null||['expense','income'].includes(part.role.value)&&cat.role!=='both'&&cat.role!==part.role.value)||sub&&sub.parentId!==cat?.id)throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
+   categoryCompatible(graph,part.role.value,part.category.value,part.subcategory.value);
    const existing=(await db.query('SELECT transaction_id FROM finance.component WHERE user_id=$1 AND id=$2',[userId,part.id])).rows[0];if(existing&&existing.transaction_id!==id)throw new HttpError(404,'NOT_FOUND');
   }
   const sum=intent.parts!.reduce((s,p)=>s+BigInt(p.amountMinor),0n),op=graph.operations.find(o=>o.id===id)!;
@@ -151,13 +153,16 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  if(table==='category'){
   if(p.parentId&&graph.categories.some(c=>c.parentId===id))throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');
   if(!intent.create&&(('role'in p&&p.role!==before.role)||('parentId'in p&&p.parentId!==before.parent_id))&&(graph.operations.some(o=>o.semantics.category.value===id||o.semantics.subcategory.value===id)||graph.components.some(c=>c.category.value===id||c.subcategory.value===id)))throw new HttpError(409,'DEPENDENCY_MIGRATION_REQUIRED');
-  if(p.parentId){const parent=graph.categories.find(c=>c.id===p.parentId);if(!parent||parent.parentId!==null||parent.id===id)throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');if(p.role!==undefined&&parent.role!=='both'&&p.role!==parent.role)throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');}
+  const parentId=p.parentId===undefined?before?.parent_id:p.parentId,role=p.role??before?.role;
+  if(parentId){const parent=graph.categories.find(c=>c.id===parentId);if(!parent||parent.parentId!==null||parent.id===id)throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');if(parent.role!=='both'&&role!==parent.role)throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');}
+  if('role'in p&&p.role!=='both'&&graph.categories.some(c=>c.parentId===id&&c.role!==p.role))throw new HttpError(409,'DEPENDENCY_MIGRATION_REQUIRED');
   for(const [input,key]of Object.entries({name:'name',role:'role',parentId:'parent_id',hidden:'hidden'}))if(input in p)values[key]=p[input];
   if(intent.create){if(!p.name||!p.role)throw new TypeError('MISSING_CATEGORY');await db.query('INSERT INTO finance.category(user_id,id,name,role,parent_id,hidden) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,p.name,p.role,p.parentId??null,p.hidden??false]);}
  }
  if(table==='counterparty'){for(const [input,key]of Object.entries({name:'name',state:'state',isSelf:'is_self'}))if(input in p)values[key]=p[input];if(intent.create){if(!p.name)throw new TypeError('MISSING_NAME');await db.query('INSERT INTO finance.counterparty(user_id,id,name,state,is_self) VALUES($1,$2,$3,$4,$5)',[userId,id,p.name,p.state??'registered',p.isSelf??false]);}}
  if(table==='rule'){
-  const rule=p as unknown as Omit<Rule,'id'>;ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);Object.assign(values,p);
+  const rule=p as unknown as Omit<Rule,'id'>;ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);
+  if(rule.assignments.role)categoryCompatible(graph,rule.assignments.role,rule.assignments.categoryId??null,rule.assignments.subcategoryId??null);Object.assign(values,p);
   if(intent.create)await db.query('INSERT INTO finance.rule(user_id,id,name,enabled,priority,conditions,assignments) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,p.name,p.enabled,p.priority,JSON.stringify(p.conditions),JSON.stringify(p.assignments)]);
  }
  if(!intent.create)await update(db,userId,table,id,values);

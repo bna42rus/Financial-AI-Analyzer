@@ -39,7 +39,11 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
   }
   for(const n of base){
    if(!n.category.userVerified&&n.category.confidence<90){addReason(op.id,'low_category_confidence');if(n.category.confidence<70){n.category={...n.category,value:null};n.subcategory={...n.subcategory,value:null};}}
-   if(!compatible(n.role.value,n.category.value,n.subcategory.value))addReason(op.id,'category_conflict');
+   if(!compatible(n.role.value,n.category.value,n.subcategory.value)){
+    addReason(op.id,'category_conflict');
+    if(!compatible(n.role.value,n.category.value,null)){n.category={...n.category,value:null};n.subcategory={...n.subcategory,value:null};}
+    else n.subcategory={...n.subcategory,value:null};
+   }
   }
   nodes.set(op.id,base);
  }
