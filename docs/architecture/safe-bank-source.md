@@ -1,0 +1,27 @@
+# Finite bank source profile — Development
+
+Baseline 1.3 and the original product sources remain unchanged. This is a partial implementation of PDF 18.2–18.3, 18.6, 18.11–18.12, 19 and 35.2–35.6, layered on the local PDF adapters and durable import worker. It is not general-purpose safe text extraction or the live import UI.
+
+## Privacy contract
+
+`bank-source/1` is an explicit sanitizer profile for `bank-pdf/1`. Every prepared row includes `safeSource`, either null or a closed `{event, merchant}` object. Events are `purchase`, `refund`, `fee`; merchants are null or one of six registry codes: Ozon, Wildberries, Пятёрочка, Магнит, Перекрёсток, Лента. Only code-to-label constants produce persisted names and descriptions. No source substring is copied, even when it contains names, phones, opaque document/authorization/order IDs, addresses or URLs. This provides a finite output boundary instead of relying on incomplete identifier regex replacement.
+
+Local extraction recognizes only explicit purchase/refund/bank-fee prefixes. Transfers, recipient evidence, mixed events, contradictory signs, excessive text and invisible formatting do not produce a signal. Merchant matching requires an anchored registry alias after the payment prefix, not a brand mentioned inside a transfer. Unknown stores may retain an explicit bank event with a blank merchant; otherwise the money/date row remains unresolved. Names are canonical brands, not a claim to identify a particular legal entity, branch or recipient. No merchant category, own-transfer relation or refund link is inferred from these codes.
+
+The backend independently rejects unknown fields/codes/versions, missing structured fields, fee-plus-merchant combinations and event/sign contradictions. Closed source fields are inspected even when another source fact is invalid; raw smuggling cannot hide behind row issues. Malformed date/money facts still create technical issues while other valid rows survive. Reports remain financial-text-free. `text-free/1` remains accepted and rejects the new field; it never starts transmitting text implicitly. Passwords, raw files and aliases do not enter AI, telemetry or external lookup. This block invokes none of those services.
+
+## Persistence and repeat imports
+
+The worker derives `merchant_text`, `description`, `source_kind` from constants, records transport sanitizer/classification versions and the source/merchant sanitizer origin when earlier evidence is retained and appends observations in the existing tenant-protected tables. Known bank kinds precede current personal rules. Refunds remain unresolved until linkage evidence exists; a credit alone is not a refund.
+
+Same-file ordinals and reliable bank reference matching retain their earlier rules. Changed safe source facts update the current observation and unverified bank facets; manual/verified facets, corrections, comments, categories and other assignments survive. Current personal rules run on updated operations. An absent signal cannot erase earlier source fields, and a missing merchant for the same event cannot erase an earlier brand. Identical repeat imports append provenance without manufacturing extra transactions. A shared brand plus date/amount never becomes a cross-file strict fingerprint. Possible duplicates remain separate.
+
+Existing deletion/reset cascades clear source observations and staged codes; deletion invalidates pending jobs. No additional financial cache or table is introduced, so no migration is required beyond the parent branch's 0013.
+
+## Evidence and limits
+
+Unit tests cover finite-output privacy, canonical brands, unknown stores, misleading transfer/substring/invisible text, sign checks, closed schemas, old-profile compatibility, invalid-row smuggling and all three bank column layouts. PostgreSQL/HTTP checks cover initial rules, enrichment, repeat import, verified preservation, ambiguous dedupe, rejection before staging and physical deletion. Actual synthetic PDF bytes exercise the real browser worker on desktop/mobile with no upload or persistent storage. When PDF.js combines an Ozon document column with its description, the signal stays null while valid money/date facts survive; the browser fixture explicitly covers both distinct and combined columns.
+
+Previously supplied T-Bank and Sber PDFs were checked locally using outputs limited to fixed recognition flags. Purchase/refund signals were observed in the T-Bank sample; the checked Sber samples supplied no recognized row-level signal under this narrow profile. No real rows, identifiers, amounts or dates were used as fixtures, uploaded to CI/Staging or printed into model context. This is not evidence of full merchant coverage across all three banks. Reproducible automated tests use artificial data only.
+
+Remaining work: wider independently validated merchant/description extraction, unknown-format structuring, local OCR, CSV/XLSX, strict fingerprints, remembered duplicate decisions, cancellation, classification/link final pass, user privacy controls and live import screens. The small registry is an implementation increment, not a replacement for the accepted product requirements. Full exact-commit CI evidence is in the PR; Production deployment and service purchases are outside this block.

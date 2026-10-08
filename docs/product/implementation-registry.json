@@ -2982,7 +2982,9 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -2991,10 +2993,11 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "packages/imports/test/bank-pdf.test.ts",
-        "apps/web/e2e/import-local.spec.ts"
+        "apps/web/e2e/import-local.spec.ts",
+        "packages/imports/test/safe-source.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-18.3",
@@ -3009,15 +3012,20 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts",
+        "apps/api/src/import-ingestion.ts"
       ],
       "verification_refs": [
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "packages/imports/test/safe-source.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-18.4",
@@ -3094,7 +3102,9 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -3103,10 +3113,11 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "packages/imports/test/bank-pdf.test.ts",
-        "apps/web/e2e/import-local.spec.ts"
+        "apps/web/e2e/import-local.spec.ts",
+        "packages/imports/test/safe-source.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-18.7",
@@ -3231,9 +3242,19 @@
       "source_text": "Порядок классификации и финальный прохо д После нормализации сначала применяются надёжные банковские факты и deterministic signals, затем personal rules, global merchant/product logic, AI classification и, если разрешено, минимальный web merchant lookup. Links и transfer/refund matching выполняются после того, как обработан весь batch, потому что парная operation может находиться в другом файле той же загрузки. После batch система повторно проверяет ранее unlinked refunds/own transfers и link candidates, которые могли получить пару из новой загрузки. Если во время Review пользователь создал новый personal rule, финальный classification pass использует актуальную версию rules, а не snapshot на момент начала import.",
       "group": "imports",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "implementation_refs": [
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts",
+        "apps/api/src/import-ingestion.ts"
+      ],
+      "verification_refs": [
+        "packages/imports/test/safe-source.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/e2e/import-local.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-18.12",
@@ -3262,7 +3283,9 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
@@ -3272,10 +3295,11 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "packages/imports/test/bank-pdf.test.ts",
-        "apps/web/e2e/import-local.spec.ts"
+        "apps/web/e2e/import-local.spec.ts",
+        "packages/imports/test/safe-source.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-19",
@@ -3347,14 +3371,19 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "apps/web/e2e/import-local.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-19.4",
@@ -3417,9 +3446,19 @@
       "source_text": "Решение пользователя запоминается Если пользователь подтвердил «это разные операции», система сохраняет dedupe rejection A ≠ B и не должна задавать тот же вопрос после следующего импорта без нового основания. Если подтверждено «это одна операция», перед merge показываются конфликты пользовательских edits, если они существуют.",
       "group": "imports",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "implementation_refs": [
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts",
+        "apps/api/src/import-ingestion.ts"
+      ],
+      "verification_refs": [
+        "packages/imports/test/safe-source.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/e2e/import-local.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-19.7",
@@ -5726,7 +5765,10 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "apps/api/src/import-ingestion.ts"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -5734,10 +5776,11 @@
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "packages/imports/test/safe-source.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-35.3",
@@ -5775,14 +5818,19 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "apps/web/e2e/import-local.spec.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-35.5",
@@ -5793,9 +5841,19 @@
       "source_text": "AI context AI получает minimum necessary context. Например, чтобы определить merchant, не требуется отправлять зарплату пользователя, список кредитов и историю за год. HMAC aliases в AI payload также не нужны: backend сначала разрешает смысл объекта.",
       "group": "history",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "implementation_refs": [
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts",
+        "apps/api/src/import-ingestion.ts"
+      ],
+      "verification_refs": [
+        "packages/imports/test/safe-source.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/e2e/import-local.spec.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-35.6",
@@ -5806,9 +5864,19 @@
       "source_text": "Product Analytics Телеметрия продукта не должна включать amounts, merchants, categories, descriptions или содержимое financial chats. Для продуктовой аналитики достаточно технических событий без финансового содержимого.",
       "group": "history",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "implementation_refs": [
+        "docs/architecture/safe-bank-source.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/contract.ts",
+        "apps/api/src/import-ingestion.ts"
+      ],
+      "verification_refs": [
+        "packages/imports/test/safe-source.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/e2e/import-local.spec.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
     },
     {
       "id": "PDF-35.7",

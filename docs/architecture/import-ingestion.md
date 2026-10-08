@@ -4,7 +4,7 @@
 
 ## Граница
 
-Сервер принимает только проверенный normalized contract `text-free/1`. Нет реальных bank PDF/CSV/XLSX adapters, OCR, открытия защищённых файлов, safe merchant/description profile или AI. `source-adapter/1` — версия контракта, не поддержка конкретного банка. Это основа сохранения, не готовая функция загрузки выписки. Полноценный strict fingerprint и A-05 source restoration требуют следующего профиля с проверенными очищенными текстами. Фактический statement period отсутствует во входном contract и не выдумывается.
+Первый блок принимает проверенный normalized contract `text-free/1`. Следующие блоки добавили [локальные PDF adapters](local-bank-parsers.md) и [ограниченный safe source profile](safe-bank-source.md). CSV/XLSX, OCR, общее сохранение очищенных описаний и AI впереди. `source-adapter/1` — версия контракта, не поддержка конкретного банка. Это основа сохранения, не готовая функция загрузки выписки. Полноценный strict fingerprint и A-05 source restoration требуют следующего профиля с проверенными очищенными текстами. Фактический statement period отсутствует во входном contract и не выдумывается.
 
 ## Приём и checkpoint
 

@@ -1,3 +1,4 @@
+import {sourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
 import {createLocalPreparation} from '../../../packages/imports/src/local.ts';
 import type {LocalContext,ExtractedFile} from '../../../packages/imports/src/local.ts';
 import {bankPdfAdapter,BankPdfError,MAX_PDF_BYTES} from '../../../packages/imports/src/bank-pdf.ts';
@@ -9,7 +10,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 /** Device-only entry point. No File/filename/password/layout can be passed to a server client. */
 export async function prepareLocalBankPdfs(context:LocalContext,batchId:string,inputs:{fileId:string;file:File;password?:string}[],signal?:AbortSignal){
  if(inputs.length<1||inputs.length>10)throw new BankPdfError('LOCAL_LIMIT');
- const session=await createLocalPreparation(context,signal,bankPdfAdapter),files:ExtractedFile[]=[],issues:{fileId:string;code:PdfFailure}[]=[];
+ const session=await createLocalPreparation(context,signal,bankPdfAdapter,sourceSanitizer),files:ExtractedFile[]=[],issues:{fileId:string;code:PdfFailure}[]=[];
  try{
   const pdf=await import('pdfjs-dist');pdf.GlobalWorkerOptions.workerSrc=workerUrl;
   for(const input of inputs){

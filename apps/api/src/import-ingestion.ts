@@ -1,3 +1,4 @@
+import {sourceFields} from '../../../packages/imports/src/safe-source.ts';
 import {createHash,randomUUID} from 'node:crypto';
 import type {Pool,PoolClient} from 'pg';
 import {ImportContractError,parseContext,validatePreparedBatch} from '../../../packages/imports/src/contract.ts';
@@ -100,20 +101,37 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   const used=new Set<string>((await db.query('SELECT o.transaction_id FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE r.user_id=$1 AND r.file_id=$2',[userId,entry.file_id])).rows.map(r=>r.transaction_id));
   const match=matchSource(row,entry.file_hmac,candidates,used),transactionId=match.transactionId??randomUUID(),observationId=randomUUID();
   const prior=match.transactionId?(await db.query(`SELECT t.semantics,t.source_observation_id,o.*,r.direction FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.ingestion_row r ON (r.user_id,r.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.id=$2`,[userId,transactionId])).rows[0]:null;
-  const unchanged=prior&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:prior.direction??row.direction});
+  const signals=sourceFields(row.safeSource);
+  // Missing evidence from either profile cannot erase an earlier sanitized source.
+  if(prior&&row.safeSource&&!signals.merchantText&&prior.source_kind===signals.sourceKind)signals.merchantText=prior.merchant_text;
+  const source=prior&&!row.safeSource?{sourceKind:prior.source_kind,merchantText:prior.merchant_text,description:prior.description}:signals;
+  const unchanged=prior&&prior.source_kind===source.sourceKind&&prior.merchant_text===source.merchantText&&prior.description===source.description&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:prior.direction??row.direction});
   const parser=batch.versions.adapter===bankPdfAdapter&&bank!=='other'?pdfParserVersions[bank]:batch.versions.adapter;
-  const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,sourceKind:'other',merchantText:'',description:'',bankCategory:'',bankRefHmac:row.bankRefHmac,versions:{parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:'unclassified/1'}};
+  const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,...source,bankCategory:prior?.bank_category??'',bankRefHmac:row.bankRefHmac,versions:{parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:row.safeSource?'bank-signals/1':prior?.versions.classification??'unclassified/1',sourceSanitizer:row.safeSource?batch.versions.sanitizer:prior?.versions.sourceSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer,merchantSanitizer:row.safeSource?.merchant?batch.versions.sanitizer:prior?.versions.merchantSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer}};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
-   const semantics=initialSemantics('other');semantics.kind=facet('other','bank',false,0);
+   const semantics=initialSemantics(fact.sourceKind!,fact.merchantText);if(fact.sourceKind==='other')semantics.kind=facet('other','bank',false,0);
    const op=applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules);
    graph.operations.push(op);
    await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,transactionId,observationId,JSON.stringify(op.semantics),op.analyticsOverride,JSON.stringify(op.reviewReasons)]);
   }
-  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,source_kind,merchant_text,description,bank_category,bank_ref_hmac,versions) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$10,$10,$11,$12)',[userId,observationId,transactionId,accountId,JSON.stringify(row.operationDate),row.postedDate===null?null:JSON.stringify(row.postedDate),row.amountMinor,row.currency,'other','',row.bankRefHmac,JSON.stringify(fact.versions)]);
+  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,source_kind,merchant_text,description,bank_category,bank_ref_hmac,versions) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)',[userId,observationId,transactionId,accountId,JSON.stringify(row.operationDate),row.postedDate===null?null:JSON.stringify(row.postedDate),row.amountMinor,row.currency,fact.sourceKind,fact.merchantText,fact.description,fact.bankCategory,row.bankRefHmac,JSON.stringify(fact.versions)]);
   await db.query('INSERT INTO finance.observation_account(user_id,observation_id,account_id) VALUES($1,$2,$3)',[userId,observationId,accountId]);
   // Empty fields in this profile are absent evidence, never instructions to erase classification/text.
-  if(prior&&!unchanged)await db.query('UPDATE finance.transaction SET source_observation_id=$3,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId]);
+  if(prior&&!unchanged){
+   const current=graph.operations.find(o=>o.id===transactionId)!,op=structuredClone(current);op.source=fact;
+   if(row.safeSource){
+    const fresh=initialSemantics(fact.sourceKind!,fact.merchantText);
+    if(op.semantics.kind.source==='bank'&&!op.semantics.kind.userVerified){
+     const changed=op.semantics.kind.value!==fresh.kind.value;op.semantics.kind=fresh.kind;
+     if(changed&&op.semantics.role.source==='deterministic_system_rule'&&!op.semantics.role.userVerified)op.semantics.role=fresh.role;
+    }
+    if(op.semantics.merchant.source==='bank'&&!op.semantics.merchant.userVerified&&(fact.merchantText||prior.source_kind!==fact.sourceKind))op.semantics.merchant=fresh.merchant;
+   }
+   const classified=applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules);
+   graph.operations[graph.operations.indexOf(current)]=classified;
+   await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
+  }
   await db.query("UPDATE finance.ingestion_row SET status='imported',payload=NULL,outcome=$3,observation_id=$4,alias_kind=$5,alias_hmac=$6,direction=$7 WHERE user_id=$1 AND id=$2",[userId,entry.id,prior?(unchanged?'existing':'updated'):'created',observationId,row.account.kind,row.account.hmac,row.direction]);
   for(const candidateId of match.possibleIds){
    if(candidateId===transactionId)continue;const pair=[transactionId,candidateId].sort();
