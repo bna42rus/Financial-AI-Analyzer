@@ -7,7 +7,7 @@ import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import { fromNodeHeaders } from 'better-auth/node';
 import {accessWarning,describeDevice} from './mail-templates.ts';
-import {mailQueue,retryMail} from './mail-admin.ts';
+import {mailQueue,retryMail,resendInvitation} from './mail-admin.ts';
 import { envelope } from './crypto.ts';
 import { makeAuth, current, requireAdmin, recordAuthResult } from './auth.ts';
 import { resetRequest, resetPassword, recoverAdmin } from './security.ts';
@@ -156,6 +156,8 @@ export async function createServer(config: Config) {
         await requireAdmin(auth,db,request);result=await mailQueue(db);
       } else if (config.profile==='control'&&path==='/control/delivery-retry'&&request.method==='POST'){
         const s=await requireAdmin(auth,db,request);result=await retryMail(db,request,s.user.id);
+      } else if (config.profile==='control'&&path==='/control/invitation-resend'&&request.method==='POST'){
+        const s=await requireAdmin(auth,db,request);result=await resendInvitation(db,request,s.user.id,seal);
       } else if (manual && path==='/control/accesses' && request.method==='GET') {
         await requireAdmin(auth,db,request);result=await manual.manualQueue(db);
       } else if (manual && ['/control/manual-preview','/control/manual-access'].includes(path) && request.method==='POST') {

@@ -6,6 +6,7 @@ import { createServer } from '../src/server.ts';
 import { hashPassword, envelope, digest, token } from '../src/crypto.ts';
 import type { Config } from '../src/types.ts';
 import type { FastifyInstance } from 'fastify';
+import {deliverBatch,sandboxTransport} from '../src/mail-worker.ts';
 import {extensionAt} from '../src/entitlement.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>;
@@ -721,4 +722,20 @@ test('delivery metadata is TOTP-gated and never contains reset URLs, email proof
  assert.equal((await pg.owner.query('SELECT 1 FROM mail.resend_audit')).rowCount,1);assert.equal((await pg.owner.query('SELECT attempts FROM access.outbox WHERE id=$1',[row.id])).rows[0].attempts,5);
  assert.equal((await userBrowser().get('/control/deliveries')).statusCode,404);
  const secret=await mail('access','invitation',cc);assert.ok(!metadata.body.includes(secret.token));
+});
+
+
+test('active invitation resend is TOTP-gated, reuses link/expiry, rejects queued duplicates and is audited/idempotent',async()=>{
+ const {b}=await enrolledAdmin();const command=await manualCommand(b,manualInvite());const saved=await b.post('/control/manual-access',command);assert.equal(saved.statusCode,200);const invite=saved.json().invitations[0];
+ const action={actionId:crypto.randomUUID(),invitationId:invite.id,reason:'Requested resend'};
+ assert.equal((await userBrowser().post('/control/invitation-resend',action)).statusCode,404);
+ assert.equal((await b.post('/control/invitation-resend',action)).statusCode,409);
+ const old=await mail('access','invitation',cc),worker={profile:'control' as const,pool:pg.mailControl,wrappingKey:cc.wrappingKey,environment:'test' as const,financeOrigin:fc.origin,controlOrigin:cc.origin,adminRecipient:'owner@example.test'};
+ await deliverBatch(worker,sandboxTransport(worker));
+ assert.equal((await b.post('/control/invitation-resend',{...action,reason:''})).statusCode,400);
+ assert.equal((await b.post('/control/invitation-resend',action)).statusCode,200);assert.equal((await b.post('/control/invitation-resend',action)).json().status,'already_committed');
+ assert.equal((await pg.owner.query('SELECT 1 FROM mail.resend_audit')).rowCount,1);const next=await mail('access','invitation',cc);assert.equal(next.token,old.token);assert.equal(next.expiresAt,old.expiresAt);
+ assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='invitation'")).rowCount,2);
+ await deliverBatch(worker,sandboxTransport(worker));assert.equal((await pg.owner.query("SELECT 1 FROM mail.delivery WHERE kind='invitation' AND state='sent'")).rowCount,2);
+ await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",[invite.id]);assert.equal((await b.post('/control/invitation-resend',{...action,actionId:crypto.randomUUID()})).statusCode,409);
 });
