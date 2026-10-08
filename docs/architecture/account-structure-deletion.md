@@ -47,3 +47,5 @@ Category/Counterparty migrations и отдельный counterparty scope реа
 Следующий [блок исключений и выборочной истории](exclusions-history.md) добавляет journal/object-version Undo для новых действий. Описанный выше консервативный Undo остаётся fallback только для legacy actions без after snapshot; исходные ограничения финансовой/структурной модели сохраняются.
 
 Последующий [пятый серверный блок](financial-reset.md) реализует Development full financial reset, protected key custody/rotation и обязательные generation/key-version acceptance checks. Actual Import/local privacy pipeline, будущие cascades, recovery deletion journal/KMS и рабочий UI по-прежнему впереди.
+
+Последующий [шестой серверный блок](derived-allocations.md) добавляет links на автоматически выведенные allocation portions, итеративный пересчёт вложенных цепочек, зависимый Undo и transitive link deletion. Упоминание этих nested endpoints как будущей работы выше описывает историческую границу соответствующего блока; UI, actual Import и будущие module cascades по-прежнему не завершены.

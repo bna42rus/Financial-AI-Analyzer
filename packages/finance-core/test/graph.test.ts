@@ -101,3 +101,57 @@ test('a component ID equal to another transaction ID cannot share its capacity p
 test('a contradictory automatic subcategory requires review without hiding a known expense',()=>{
  const g=graph();g.categories.push({id:'bad-sub',name:'Income child',parentId:'food',role:'income',hidden:false});const p=op('p','-1000');p.semantics.subcategory=facet('bad-sub','personal_rule');g.operations=[p];const r=reconcile(g).operations;assert.equal(r[0]!.parts[0]!.subcategoryId,null);assert.ok(r[0]!.reviewReasons.includes('category_conflict'));assert.equal(aggregate(r).netExpensesMinor,'1000');
 });
+
+function refundChain(){const g=graph();g.operations=[op('food-p','-600'),op('clothes-p','-400','purchase','clothes'),op('r','1000','refund',null),op('v','-200','reversal',null,'2026-10-01')];g.links=[link('food-r','r','food-p','600'),link('clothes-r','r','clothes-p','400'),{...link('v-r','v','r','200','reversal'),targetAllocationId:'food-r'}];return g;}
+test('reversal of one derived refund portion keeps its category, date and exact signed contribution',()=>{
+ const g=refundChain(),r=reconcile(g),v=r.operations.find(o=>o.id==='v')!;assert.ok(r.links.every(l=>l.active));assert.equal(v.parts[0]!.categoryId,'food');assert.equal(v.parts[0]!.allocationId,'v-r');assert.ok(v.parts[0]!.basis.includes('food-r'));assert.equal(aggregate(r.operations).netExpensesMinor,'200');assert.equal(aggregate(r.operations,{from:'2026-10-01'}).netExpensesMinor,'200');assert.equal(aggregate(r.operations,{categoryIds:['clothes']}).netExpensesMinor,'0');assert.equal(aggregate(r.operations).incomeMinor,'0');
+});
+test('multiple generations of reversal preserve economic role instead of changing to the opposite role',()=>{
+ const g=refundChain();g.operations.push(op('w','200','reversal',null,'2026-11-01'));g.links.push({...link('w-v','w','v','200','reversal'),targetAllocationId:'v-r'});const r=reconcile(g);assert.ok(r.links.every(l=>l.active));assert.equal(aggregate(r.operations).netExpensesMinor,'0');assert.equal(aggregate(r.operations,{from:'2026-11-01'}).netExpensesMinor,'-200');assert.equal(r.operations.find(o=>o.id==='w')!.parts[0]!.categoryId,'food');
+});
+test('reversal of a derived income reversal restores income, without inventing an expense',()=>{
+ const g=graph(),salary=op('salary','1000','transfer_in','salary');salary.semantics.role=facet('income','user',true);g.operations=[salary,op('v','-1000','reversal',null),op('w','1000','reversal',null)];g.links=[link('v-s','v','salary','1000','reversal'),{...link('w-v','w','v','1000','reversal'),targetAllocationId:'v-s'}];const r=reconcile(g);assert.ok(r.links.every(l=>l.active));assert.equal(aggregate(r.operations).incomeMinor,'1000');assert.equal(aggregate(r.operations).netExpensesMinor,'0');
+});
+test('a neutral target-side allocation can be reversed without becoming an expense',()=>{
+ const g=graph();g.operations=[op('out','-1000','transfer_out',null),op('in','1000','transfer_in',null),op('v','-300','reversal',null)];g.links=[link('own','out','in','1000','own_transfer'),{...link('v-in','v','in','300','reversal'),targetAllocationId:'own'}];const r=reconcile(g);assert.ok(r.links.every(l=>l.active));assert.equal(r.operations.find(o=>o.id==='v')!.neutralMinor,'300');assert.equal(aggregate(r.operations).netExpensesMinor,'0');assert.equal(aggregate(r.operations).incomeMinor,'0');
+});
+test('source allocation endpoints replace only that portion, never adding its ancestor a second time',()=>{
+ const g=graph();g.operations=[op('p','-1000'),op('r','1000','refund',null),op('debt','-300','transfer_out',null)];g.links=[link('r-p','r','p','1000'),{...link('r-debt','r','debt','300','debt_repayment'),sourceAllocationId:'r-p'}];const r=reconcile(g);assert.ok(r.links.every(l=>l.active));const refund=r.operations.find(o=>o.id==='r')!;assert.equal(refund.parts.reduce((n,p)=>n+BigInt(p.amountMinor),0n),1000n);assert.equal(refund.neutralMinor,'300');assert.equal(aggregate(r.operations).netExpensesMinor,'300');assert.equal(refund.parts.length,2);
+});
+test('siblings share the exact derived target capacity and no input order can choose a winner',()=>{
+ const g=refundChain();g.operations.push(op('w','-500','reversal',null));g.links.push({...link('w-r','w','r','500','reversal'),targetAllocationId:'food-r'});const r=reconcile(g);assert.equal(r.links.find(l=>l.id==='food-r')!.active,true);assert.equal(r.links.find(l=>l.id==='v-r')!.reason,'CAPACITY_CONFLICT');assert.equal(r.links.find(l=>l.id==='w-r')!.reason,'CAPACITY_CONFLICT');assert.equal(aggregate(r.operations).netExpensesMinor,'0');
+});
+test('derived source capacity is checked separately from its ancestor and all oversubscribed siblings stop',()=>{
+ const g=graph();g.operations=[op('p','-1000'),op('r','1000','refund',null),op('a','-800','transfer_out',null),op('b','-300','transfer_out',null)];g.links=[link('r-p','r','p','1000'),{...link('a','r','a','800','debt_repayment'),sourceAllocationId:'r-p'},{...link('b','r','b','300','debt_repayment'),sourceAllocationId:'r-p'}];const r=reconcile(g);assert.equal(r.links[0]!.active,true);assert.equal(r.links[1]!.reason,'CAPACITY_CONFLICT');assert.equal(r.links[2]!.reason,'CAPACITY_CONFLICT');assert.equal(aggregate(r.operations).netExpensesMinor,'0');
+});
+test('an invalid ancestor disables all dependent links without clipping allocations or saving a stale category',()=>{
+ const g=refundChain();g.operations.push(op('w','200','reversal',null));g.links.push({...link('w-v','w','v','200','reversal'),targetAllocationId:'v-r'});g.operations[0]!.source.amountMinor='-500';const r=reconcile(g);assert.equal(r.links.find(l=>l.id==='food-r')!.reason,'CAPACITY_CONFLICT');assert.equal(r.links.find(l=>l.id==='v-r')!.reason,'DEPENDENCY_CONFLICT');assert.equal(r.links.find(l=>l.id==='w-v')!.reason,'DEPENDENCY_CONFLICT');assert.equal(r.operations.find(o=>o.id==='v')!.unresolvedMinor,'200');assert.equal(g.links.find(l=>l.id==='food-r')!.amountMinor,'600');
+});
+test('candidate and rejected ancestors never manufacture a usable derived endpoint',()=>{
+ for(const status of ['candidate','rejected']as const){const g=refundChain();g.links[0]!.status=status;assert.equal(reconcile(g).links.find(l=>l.id==='v-r')!.reason,'DEPENDENCY_CONFLICT');}
+});
+test('cycles and their dependent interpretations are rejected without recursion or partial results',()=>{
+ const g=graph();g.operations=[op('a','100','refund',null),op('b','-100','reversal',null),op('c','100','reversal',null)];g.links=[{...link('a-b','a','b','100','reversal'),targetAllocationId:'b-a'},{...link('b-a','b','a','100','reversal'),targetAllocationId:'a-b'},{...link('c-b','c','b','100','reversal'),targetAllocationId:'b-a'}];const r=reconcile(g);assert.ok(r.links.every(l=>!l.active&&l.reason==='CYCLIC_DEPENDENCY'));assert.equal(aggregate(r.operations).unresolvedMinor,'300');
+});
+test('foreign operation, missing allocation and mixed endpoint selectors cannot address another portion',()=>{
+ for(const patch of [{targetId:'clothes-p'},{targetAllocationId:'missing'},{targetComponentId:'other'}]){const g=refundChain();Object.assign(g.links[2]!,patch);assert.equal(reconcile(g).links.find(l=>l.id==='v-r')!.reason,'DEPENDENCY_CONFLICT');}
+});
+test('a transformed root cannot lend its old expense meaning to a return',()=>{
+ const g=graph();g.operations=[op('p','-1000'),op('in','1000','transfer_in',null),op('r','200','refund',null)];g.links=[link('own','p','in','1000','own_transfer'),link('r-p','r','p','200')];const r=reconcile(g);assert.equal(r.links.find(l=>l.id==='own')!.active,true);assert.equal(r.links.find(l=>l.id==='r-p')!.reason,'AMBIGUOUS_ENDPOINT');assert.equal(r.operations.find(o=>o.id==='r')!.unresolvedMinor,'200');
+});
+test('category inheritance flows through the chain while independent verified assignment retains priority',()=>{
+ const g=refundChain();g.operations[0]!.semantics.category=facet('clothes','user',true);assert.equal(reconcile(g).operations.find(o=>o.id==='v')!.parts[0]!.categoryId,'clothes');g.operations[3]!.semantics.category=facet('food','user',true);assert.equal(reconcile(g).operations.find(o=>o.id==='v')!.parts[0]!.categoryId,'food');assert.equal(g.operations[0]!.source.amountMinor,'-600');
+});
+test('inclusion decisions remain per operation throughout a linked chain',()=>{
+ const g=refundChain();g.operations[3]!.analyticsOverride='exclude';const r=reconcile(g);assert.equal(aggregate(r.operations).netExpensesMinor,'0');assert.equal(aggregate(r.operations,{includeExcluded:true}).netExpensesMinor,'200');assert.equal(r.operations.find(o=>o.id==='r')!.excludedMinor,'0');
+});
+test('shuffled dependency input produces identical operation totals, parts and link outcomes',()=>{
+ const g=refundChain(),first=reconcile(g);g.links.reverse();const second=reconcile(g);assert.deepEqual(second.operations,first.operations);assert.deepEqual([...second.links].sort((a,b)=>a.id.localeCompare(b.id)),[...first.links].sort((a,b)=>a.id.localeCompare(b.id)));
+});
+test('a long reversal dependency chain is iterative and each terminal amount is counted once',()=>{
+ const g=graph();g.operations=[op('p','-100')];for(let i=0;i<1500;i++){const id='r'+i,previous=i===0?'p':'r'+(i-1);g.operations.push(op(id,i%2===0?'100':'-100','reversal',null));g.links.push({...link('l'+i,id,previous,'100','reversal'),...(i?{targetAllocationId:'l'+(i-1)}:{})});}g.links.reverse();const r=reconcile(g);assert.ok(r.links.every(l=>l.active));assert.equal(aggregate(r.operations).netExpensesMinor,'100');assert.ok(r.operations.every(o=>o.parts.length===1));
+});
+
+test('a derived own-transfer portion cannot be reused as the source of a second matching pair',()=>{
+ const g=graph();g.operations=[op('out','-1000','transfer_out',null),op('in','1000','transfer_in',null),op('third','1000','transfer_in',null)];g.links=[link('own','out','in','1000','own_transfer'),{...link('reuse','out','third','1000','own_transfer'),sourceAllocationId:'own'}];const r=reconcile(g);assert.equal(r.links[0]!.active,true);assert.equal(r.links[1]!.reason,'SOURCE_ALREADY_PAIRED');assert.equal(r.operations.find(o=>o.id==='third')!.unresolvedMinor,'1000');
+});
