@@ -186,7 +186,7 @@ export async function createServer(config: Config) {
         else if(path==='/finance/preview')result=await finance.previewFinance(db,s.user.id,request.body);
         else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
-        else result={actions:(await db.query("SELECT id,committed_at,intent->'canonical' AS intent,undone FROM finance.action WHERE user_id=$1 AND status='committed' AND committed_at>clock_timestamp()-interval '30 days' ORDER BY committed_at DESC LIMIT 100",[s.user.id])).rows};
+        else result={actions:(await db.query("SELECT id,committed_at,intent->'canonical' AS intent,undone,(undo_patch IS NOT NULL AND NOT undone AND intent->'canonical'->>'kind'<>'undo') AS undoable FROM finance.action WHERE user_id=$1 AND status='committed' AND committed_at>clock_timestamp()-interval '30 days' ORDER BY committed_at DESC LIMIT 100",[s.user.id])).rows};
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
         result = await commerce!.queue(db);
