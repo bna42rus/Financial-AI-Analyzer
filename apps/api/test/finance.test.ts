@@ -125,3 +125,23 @@ test('category parent and child roles cannot silently become contradictory',asyn
  const b=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'category',id:food,patch:{role:'income'}}});assert.equal(b.statusCode,409);assert.equal(b.json().code,'DEPENDENCY_MIGRATION_REQUIRED');
  assert.equal((await view()).categories.find((c:{id:string})=>c.id===food).role,'expense');
 });
+
+test('operation detail returns a coherent editing epoch and computed related-link outcome; stale edits fail',async()=>{
+ const purchase=await append('-10000'),refund=await append('1000','refund');await command(link(refund.transactionId,purchase.transactionId,'1000'));
+ const detail=(await request('/finance/operation',{id:purchase.transactionId})).json(),w=await view();assert.equal(detail.generation,w.generation);assert.equal(detail.revision,w.revision);assert.equal(detail.linkStates.length,1);assert.equal(detail.linkStates[0].active,true);assert.equal(detail.source.bankRefHmac,undefined);
+ await append('-2000');const stale=await request('/finance/edit',{actionId:randomUUID(),generation:detail.generation,revision:detail.revision,intent:{kind:'operation',id:purchase.transactionId,patch:{comment:'Stale device'}}});assert.equal(stale.statusCode,409);assert.equal(stale.json().code,'FINANCE_CHANGED');assert.equal((await request('/finance/operation',{id:purchase.transactionId})).json().comment,'');
+ const current=(await request('/finance/operation',{id:purchase.transactionId})).json();assert.notEqual(current.revision,detail.revision);assert.equal(current.generation,detail.generation);
+});
+
+
+test('interactive finance reads and edits have separate durable limits without consuming authentication budgets',async()=>{
+ const a=await append('-1000');
+ for(let i=0;i<12;i++){const detail=await request('/finance/operation',{id:a.transactionId});assert.equal(detail.statusCode,200,detail.body);const d=detail.json(),r=await request('/finance/edit',{actionId:randomUUID(),generation:d.generation,revision:d.revision,intent:{kind:'operation',id:a.transactionId,patch:{comment:'Synthetic edit '+i}}});assert.equal(r.statusCode,200,r.body);}
+ const d=(await request('/finance/operation',{id:a.transactionId})).json();assert.equal(d.comment,'Synthetic edit 11');assert.equal(d.source.amountMinor,'-1000');
+ // Invalid writes consume the same durable budget, and a fresh server cannot bypass it.
+ for(let i=12;i<60;i++)assert.equal((await request('/finance/edit',{})).statusCode,400);
+ assert.equal((await request('/finance/edit',{})).statusCode,429);const fresh=await createServer(fc);try{assert.equal((await fresh.fastify.inject({method:'POST',url:'/finance/edit',payload:{},headers:{origin:fc.origin,cookie,'content-type':'application/json'}})).statusCode,429);}finally{await fresh.close();}
+ // The initial successful login counted once; four failed attempts exhaust the unchanged account budget.
+ for(let i=0;i<4;i++)assert.equal((await request('/auth/sign-in/email',{email:'first@example.test',password:'Synthetic wrong password'})).statusCode,401);
+ assert.equal((await request('/auth/sign-in/email',{email:'first@example.test',password:'Synthetic wrong password'})).statusCode,429);
+});
