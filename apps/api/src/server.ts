@@ -32,6 +32,7 @@ export async function createServer(config: Config) {
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
   const finance = config.profile === 'finance' ? await import('./finance.ts') : null;
   const importValidation = config.profile === 'finance' ? await import('./import-validation.ts') : null;
+  const importIngestion = config.profile === 'finance' ? await import('./import-ingestion.ts') : null;
   const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
   const renewalApplication = config.profile === 'finance' ? await import('./renewal-application.ts') : null;
   const renewalCommerce = config.profile === 'control' ? await import('./renewal-commerce.ts') : null;
@@ -178,7 +179,7 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation'].includes(path)) {
+      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status'].includes(path)) {
         if(request.url.includes('?')||(['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
@@ -190,6 +191,8 @@ export async function createServer(config: Config) {
         else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body,seal,s.session.id);
         else if(path==='/finance/import-context')result=await finance.prepareImportContext(db,s.user.id,await finance.prepareFinance(db,s.user.id),request.body,seal);
         else if(path==='/finance/import-validation')result=await importValidation!.validateImport(db,s.user.id,request.body);
+        else if(path==='/finance/import-accept'){result=await importIngestion!.acceptImport(db,s.user.id,request.body);status=202;}
+        else if(path==='/finance/import-status')result=await importIngestion!.importStatus(db,s.user.id,request.body);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
         else result=await finance.queryHistory(db,s.user.id,(await finance.prepareFinance(db,s.user.id)).generation,path==='/finance/history'?{}:request.body);
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
@@ -242,6 +245,7 @@ export async function createServer(config: Config) {
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});
   // Isolated normalized-contract budget; password/auth routes retain the 8 KiB default.
   if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:512*1024,handler:requestHandler});
+  if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:512*1024,handler:requestHandler});
   await app.init();
   fastify.setErrorHandler((error, _request, reply) => {
     // Parser/oversize failures must never reflect raw request fragments or tokens.

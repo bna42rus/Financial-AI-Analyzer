@@ -1,6 +1,7 @@
 import {dependentLinks} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
+import {invalidatePendingImports} from './import-ingestion.ts';
 import {object,choice,uuid,dateFact,effective,operationDay} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,Account} from '../../../packages/finance-core/src/model.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
@@ -118,10 +119,17 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  const removedAliases=aliasRows.filter(a=>accountIds.includes(a.account_id)),changedRules=rules.filter(r=>accountIds.includes(r.conditions.accountId as string));
  const cpAliases=counterpartyIds.length?(await db.query('SELECT count(*)::int AS n FROM finance.counterparty_alias WHERE user_id=$1 AND counterparty_id=ANY($2::uuid[])',[userId,counterpartyIds])).rows[0].n:0;
  const cpRules=rules.filter(r=>counterpartyIds.includes(r.conditions.counterpartyId as string)||counterpartyIds.includes(r.assignments.counterpartyId as string));
- const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:removedLinkIds.length,history:counts.history},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
+ const duplicateSurvivors=[...new Set((await db.query('SELECT left_id,right_id FROM finance.duplicate_candidate WHERE user_id=$1 AND (left_id=ANY($2::uuid[]) OR right_id=ANY($2::uuid[]))',[userId,selected])).rows.flatMap(r=>[r.left_id,r.right_id]).filter(id=>!chosen.has(id)))];
+ const ingestion=(await db.query(`SELECT
+ (SELECT count(*)::int FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE o.user_id=$1 AND o.transaction_id=ANY($2::uuid[])) AS sources,
+ (SELECT count(*)::int FROM finance.ingestion_row WHERE user_id=$1 AND status='pending') AS pending,
+ (SELECT count(*)::int FROM finance.duplicate_candidate WHERE user_id=$1 AND (left_id=ANY($2::uuid[]) OR right_id=ANY($2::uuid[]))) AS candidates`,[userId,selected])).rows[0];
+ const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:removedLinkIds.length,history:counts.history,importSources:ingestion.sources,pendingImportRowsInvalidated:ingestion.pending,duplicateCandidates:ingestion.candidates},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
  // Delete the closed link set in one statement before transaction FK cascades, including deep descendants.
  await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,removedLinkIds]);
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,selected]);
+ await invalidatePendingImports(db,userId);
+ await db.query(`UPDATE finance.transaction t SET review_reasons=review_reasons-'possible_duplicate',revision=revision+1 WHERE t.user_id=$1 AND t.id=ANY($2::uuid[]) AND review_reasons @> '["possible_duplicate"]'::jsonb AND NOT EXISTS(SELECT 1 FROM finance.duplicate_candidate d WHERE d.user_id=t.user_id AND (d.left_id=t.id OR d.right_id=t.id))`,[userId,duplicateSurvivors]);
  if(accountIds.length){
   await db.query('DELETE FROM finance.account_alias WHERE user_id=$1 AND account_id=ANY($2::uuid[])',[userId,accountIds]);
   for(const r of changedRules){const conditions={...r.conditions};delete conditions.accountId;await db.query("UPDATE finance.rule SET conditions=$3,enabled=false,dependency_status='needs_setup',revision=revision+1 WHERE user_id=$1 AND id=$2",[userId,r.id,JSON.stringify(conditions)]);}

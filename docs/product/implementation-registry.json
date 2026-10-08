@@ -2967,14 +2967,21 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.3",
@@ -3003,14 +3010,21 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.5",
@@ -3039,14 +3053,21 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.7",
@@ -3063,12 +3084,19 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.8",
@@ -3085,12 +3113,19 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.9",
@@ -3100,10 +3135,19 @@
       "title": "Импорт банковских выписок",
       "source_text": "Account matching и вопросы пользовател ю После sanitization система пытается сопоставить источник с существующим account через aliases/HMAC и банковский контекст. Если соответствие надёжно — вопрос не задаётся. Новый account создаётся автоматически с system name и предполагаемым type. Вопрос пользователю появляется только при блокирующей неоднозначности, например когда один source может относиться к двум уже существующим accounts.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.10",
@@ -3118,14 +3162,20 @@
         "apps/web/src/ShellDialogs.tsx",
         "apps/web/src/App.tsx",
         "apps/web/src/Settings.tsx",
-        "apps/web/src/OperationCard.tsx"
+        "apps/web/src/OperationCard.tsx",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "apps/web/e2e/shell.spec.ts",
-        "docs/architecture/web-shell-completion.md"
+        "docs/architecture/web-shell-completion.md",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят."
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят. Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-18.11",
@@ -3159,15 +3209,22 @@
         "packages/imports/src/contract.ts",
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19",
@@ -3190,10 +3247,19 @@
       "title": "Дедупликация",
       "source_text": "Уровень A — stable bank ID Если банк даёт стабильный transaction/document identifier, после локальной псевдонимизации он является сильнейшим признаком одной и той же операции.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.2",
@@ -3203,10 +3269,19 @@
       "title": "Дедупликация",
       "source_text": "Уровень B — strict fingerprint Если ID отсутствует, строится user-scoped fingerprint из account, source datetime, amount, currency, normalized sanitized description и других устойчивых source fields.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.3",
@@ -3216,10 +3291,19 @@
       "title": "Дедупликация",
       "source_text": "Уровень C — fuzzy matching Используется только при очень высокой уверенности. При сомнении обе строки сохраняются и получают `possible_duplicate` вместо рискованного автоматического merge.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.4",
@@ -3235,14 +3319,21 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.5",
@@ -3252,10 +3343,19 @@
       "title": "Дедупликация",
       "source_text": "Source Observations Если одна transaction встречается в нескольких statements, transaction остаётся одна, но `transaction_imports`/source observations показывают, в каких imports и строках она была обнаружена.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.6",
@@ -3278,10 +3378,19 @@
       "title": "Дедупликация",
       "source_text": "Повторное наблюдение той же банковской операци и Если стабильный bank identifier уже известен, но новый statement содержит обновлённые source facts той же операции, создаётся не новая transaction, а новая source observation/ обновление source- слоя существующей transaction. Пользовательские category, role, comment и verification при этом не перезаписываются банковскими данными.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.8",
@@ -3291,10 +3400,19 @@
       "title": "Дедупликация",
       "source_text": "Fingerprint после удаления и отмены импорт а Если transaction физически удалена пользователем, её dedupe fingerprint также удаляется: повторный импорт должен создать новую transaction с новым внутренним ID. Если же отменяется только один import, но transaction остаётся подтверждённой другими sources, fingerprint сохраняется вместе с ней.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-19.9",
@@ -3304,10 +3422,19 @@
       "title": "Дедупликация",
       "source_text": "Fingerprint файла и границы корреляци и Source file fingerprint используется для диагностики повторной загрузки файла, но не заменяет transaction-level dedupe. Fingerprint должен быть user-scoped/pseudonymous, чтобы одинаковый файл у двух разных пользователей не создавал глобально сравнимый идентификатор. Даже при совпадении file fingerprint система всё равно проверяет transactions: пользователь мог ранее физически удалить часть операций и вправе получить их заново при reimport.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-20",
@@ -3356,10 +3483,19 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Import Effects Фиксируются эффекты вроде transaction created/reused, source fields updated, link created, account detected/created, classification effect. Отмена опирается на эти данные, а не пытается угадать, что произошло.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-20.4",
@@ -3447,10 +3583,19 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Технические сущности Impor t `imports` хранит как минимум `import_id`, `batch_id`, bank, `account_id`, statement period, `imported_at`, source file hash и status. `transaction_imports` связывает transaction с import и хранит `source_row_ordinal` и `observed_at`. `import_effects` фиксирует обратимые эффекты конкретного import: created/reused transaction, source update, link creation, account detection и другие изменения, необходимые для корректной cancellation.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-20.11",
@@ -5558,10 +5703,19 @@
       "title": "Данные и конфиденциальность",
       "source_text": "Server-side data Сервер может хранить dates, amounts, RUB, bank, internal account, account type/name, normalized merchant, sanitized description, operation kind/role, categories, comments, classification metadata, links, pseudonymous counterparties, budgets, rules, views, UI settings, history и dedupe metadata.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-35.5",
@@ -5756,17 +5910,24 @@
         "packages/finance-core/src/graph.ts",
         "apps/api/src/finance-history.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance-entities.test.ts",
         "apps/api/test/finance-reset.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-36.3",
@@ -5839,7 +6000,11 @@
         "packages/finance-core/src/allocation-graph.ts",
         "packages/finance-core/src/graph.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
@@ -5847,10 +6012,13 @@
         "apps/api/test/finance-entities.test.ts",
         "apps/api/test/finance-history.test.ts",
         "apps/api/test/finance-reset.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-36.5",
@@ -5867,12 +6035,19 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-36.6",
@@ -5908,16 +6083,23 @@
         "apps/api/src/pseudonym-context.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance-entities.test.ts",
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "PDF-37",
@@ -9259,16 +9441,23 @@
         "packages/imports/src/contract.ts",
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия.",
-      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "A-03",
@@ -9362,7 +9551,11 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9370,9 +9563,12 @@
         "apps/api/test/finance-structure.test.ts",
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "A-06",
@@ -9410,7 +9606,11 @@
         "docs/architecture/financial-reset.md",
         "packages/finance-core/src/allocation-graph.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9418,10 +9618,13 @@
         "apps/api/test/finance-structure.test.ts",
         "apps/api/test/finance-history.test.ts",
         "apps/api/test/finance-reset.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
-      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations."
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "A-07",
@@ -9612,7 +9815,11 @@
         "packages/imports/src/contract.ts",
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9621,10 +9828,13 @@
         "apps/api/test/finance-reset.test.ts",
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR.",
-      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "B-04",
@@ -9803,14 +10013,21 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0012_import_ingestion.sql",
+        "docs/architecture/import-ingestion.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
       "id": "B-09",

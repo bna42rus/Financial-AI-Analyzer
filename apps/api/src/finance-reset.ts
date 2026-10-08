@@ -9,7 +9,7 @@ import {stableJSON} from './finance-history.ts';
 
 type ResetIntent={kind:'reset_financial';keepCategories:boolean;keepRules:boolean;keepInterface:boolean};
 type State={generation:string;revision:string;key_version:string;interface_epoch:string;loan_mode:string;config_revision:string};
-const tables=['transaction','source_observation','component','link','account','observation_account','account_alias','counterparty','observation_counterparty','counterparty_alias','category','rule','action','ingestion_context'] as const;
+const tables=['transaction','source_observation','component','link','account','observation_account','account_alias','counterparty','observation_counterparty','counterparty_alias','category','rule','action','ingestion_context','ingestion_batch','ingestion_file','ingestion_row','ingestion_account','duplicate_candidate'] as const;
 type Snapshot={counts:Record<string,number>;fingerprints:Record<string,string>;state:State;rulesNeedSetup:number};
 function parse(input:unknown):ResetIntent {
  const r=object(input,['kind','keepCategories','keepRules','keepInterface']);
@@ -34,7 +34,7 @@ async function snapshot(db:PoolClient,userId:string,id:string,intent:ResetIntent
 }
 function impact(s:Snapshot,intent:ResetIntent){
  const c=s.counts;
- return {details:{kind:intent.kind,scope:'all_financial_data',destructive:true,undoable:false,requiresConfirmation:true,reimportWarning:true,counts:{operations:c.transaction,observations:c.source_observation,components:c.component,links:c.link,accounts:c.account,accountAliases:c.account_alias,counterparties:c.counterparty,counterpartyAliases:c.counterparty_alias,sourceBindings:c.observation_account!+c.observation_counterparty!,history:c.action,preparedContexts:c.ingestion_context,categories:intent.keepCategories?0:c.category,rules:intent.keepRules?0:c.rule},preserved:{categories:intent.keepCategories?c.category:0,rules:intent.keepRules?c.rule:0,interface:intent.keepInterface},rulesNeedSetup:s.rulesNeedSetup,keyPolicy:'rotate',pendingPayloadPolicy:'invalidate_generation_and_key_version'}};
+ return {details:{kind:intent.kind,scope:'all_financial_data',destructive:true,undoable:false,requiresConfirmation:true,reimportWarning:true,counts:{operations:c.transaction,observations:c.source_observation,components:c.component,links:c.link,accounts:c.account,accountAliases:c.account_alias,counterparties:c.counterparty,counterpartyAliases:c.counterparty_alias,sourceBindings:c.observation_account!+c.observation_counterparty!,history:c.action,preparedContexts:c.ingestion_context,imports:c.ingestion_batch,importFiles:c.ingestion_file,importRows:c.ingestion_row,importAccounts:c.ingestion_account,duplicateCandidates:c.duplicate_candidate,categories:intent.keepCategories?0:c.category,rules:intent.keepRules?0:c.rule},preserved:{categories:intent.keepCategories?c.category:0,rules:intent.keepRules?c.rule:0,interface:intent.keepInterface},rulesNeedSetup:s.rulesNeedSetup,keyPolicy:'rotate',pendingPayloadPolicy:'invalidate_generation_and_key_version'}};
 }
 export async function previewReset(db:PoolClient,userId:string,id:string,input:unknown,state:State,existing:Record<string,any>|undefined){
  const intent=parse(input);
@@ -58,6 +58,7 @@ export async function commitReset(db:PoolClient,userId:string,id:string,action:R
  const intent=parse(action.intent.canonical),current=await snapshot(db,userId,id,intent,state);
  if(stableJSON(current)!==stableJSON(action.intent.snapshot))throw new HttpError(409,'DEPENDENCIES_CHANGED');
  // Remove all supported copies, including inactive components and prior deletion receipts.
+ await db.query('DELETE FROM finance.ingestion_batch WHERE user_id=$1',[userId]);
  await db.query('DELETE FROM finance.link WHERE user_id=$1',[userId]);
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1',[userId]);
  for(const table of ['account_alias','counterparty_alias','account','counterparty'])await db.query(`DELETE FROM finance.${table} WHERE user_id=$1`,[userId]);

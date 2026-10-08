@@ -1,8 +1,12 @@
-# Access/security API — Development foundation
+# API — Development foundation
 
 NestJS/Fastify + Better Auth 1.7.7 + Drizzle/PostgreSQL 18. Two processes use independent database credentials, auth secrets, wrapping keys, origins and cookie prefixes. Public registration and alternate authentication endpoints are closed. This block is an API foundation; the review UI of PR #7 still runs its explicit independent example.
 
 See [behavior, evidence and remaining work](../../docs/architecture/server-access-security.md).
+
+## Prepared import acceptance
+
+After migrations 0001–0011, apply `operator migrate-import-ingestion` once with the Development migration-owner connection. Start the API and a separate `pnpm --filter @finance/api dev:imports` worker with `APP_ENV=development`, `API_PROFILE=finance`, and scoped `finance_api` credentials. Worker startup rejects owner/superuser/BYPASSRLS. No external service is required. [Contract, matching, counters, privacy and remaining work](../../docs/architecture/import-ingestion.md). Actual bank parsers/source text/UI/cancellation remain incomplete.
 
 ## Run locally
 
@@ -17,7 +21,7 @@ No real tariff is seeded. Synthetic tariff fixtures exist only in tests. No paid
 ## Checks
 
 - `pnpm check`: original sources, existing model/projection/interface checks, strict API types and two cryptography checks.
-- `pnpm test:security`: 45 integration scenarios, requires `SECURITY_TEST_DATABASE_URL` for a **fresh dedicated** PostgreSQL 18 cluster on loopback. Creates/disposes a random test database and scoped roles. Refuses a cluster with existing runtime roles; do not point it at Development/Staging/Production with data.
+- `pnpm test:security`: integration scenarios, requires `SECURITY_TEST_DATABASE_URL` for a **fresh dedicated** PostgreSQL 18 cluster on loopback. Creates/disposes a random test database and scoped roles. Refuses a cluster with existing runtime roles; do not point it at Development/Staging/Production with data.
 - GitHub CI supplies official `postgres:18.4`. Real connections, GRANT/RLS and concurrent requests are tested; no in-memory SQL substitute.
 
 Production startup is blocked: the Development environment KEK adapter is not an audited KMS provider. Email delivery, real owner onboarding, complete security screens, retention/cleanup, observability and release acceptance remain required.

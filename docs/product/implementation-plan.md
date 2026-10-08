@@ -18,7 +18,9 @@
 
 ## Порядок работы
 
-Первый блок этапа 5: [локальная подготовка и серверная validation](../architecture/import-preparation.md). Реализован text-free versioned contract с per-user HMAC, row issues и защитой prepared context; он не создаёт financial transactions. Реальные банковские adapters, safe source texts, ingestion/provenance/dedupe/queue/cancellation и подключение экранов продолжаются следующими блоками. Этап 5 целиком не закрыт.
+Первый блок этапа 5: [локальная подготовка и серверная validation](../architecture/import-preparation.md). Реализован text-free versioned contract с per-user HMAC, row issues и защитой prepared context; validation route не создаёт financial transactions. Этап 5 целиком не закрыт.
+
+Второй блок этапа 5: [server acceptance/provenance/source-only dedupe](../architecture/import-ingestion.md). Durable batches/files/row issues, account alias matching, stable bank ID/one-to-one same-file instances, Possible Duplicate, checkpoints/retries/one-active-batch и privacy cascade. Следующий блок — проверенные bank adapters и безопасный source-text profile: text-free недостаточно для полноценного strict fingerprint/source restoration. Cancellation/remembered dedupe decisions/final classification-link pass/рабочий UI впереди. Источники неизменны, registry partial; результаты CI конкретного коммита в PR.
 
 | Этап | Что делаем | Что можно проверить | Условие завершения |
 | --- | --- | --- | --- |
