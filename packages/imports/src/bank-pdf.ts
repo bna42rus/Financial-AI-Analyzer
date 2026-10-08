@@ -68,7 +68,13 @@ function header(bank:Bank,page:Line[],index:number):Columns|null{
  }
  return null;
 }
-function rowStart(line:Line,c:Columns){const first=cell(line,c.date,c.posted??c.time??c.doc??c.description);return /^\d{2}\.\d{2}\./.test(first)&&(c.time===undefined||/^\d{2}:/.test(cell(line,c.time,c.description))||Boolean(cell(line,c.amount,c.end)));}
+function rowStart(line:Line,c:Columns){
+ const first=cell(line,c.date,c.posted??c.time??c.doc??c.description),amount=cell(line,c.amount,c.end);
+ if(/^\d{2}\.\d{2}\./.test(first)&&(c.time===undefined||/^\d{2}:/.test(cell(line,c.time,c.description))||Boolean(amount)))return true;
+ // A financial row with a missing/corrupted date is still an issue, never silently omitted.
+ const description=cell(line,c.description,c.description<c.amount?c.amount:Infinity);
+ if(!description)return false;try{pdfMoney(amount);return true;}catch{return false;}
+}
 function account(bank:Bank,first:Line[]){
  const label=bank==='tbank'?/номер лицевого счета\s*:?/:bank==='sber'?/номер счета\s*:?/:/номер договора\s*:/;
  const found=first.filter(l=>label.test(norm(l.text))).map(l=>{
@@ -104,12 +110,12 @@ export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):Ex
    if(!c||!active.length)return;
    const start=active[0]!,row:ExtractedRow={operationDate:undefined,postedDate:null,amountMinor:undefined,currency:'RUB',direction:'unknown',account:alias};
    const leftEnd=c.posted??c.time??c.doc??c.description;
-   const dateParts=active.map(l=>cell(l,c!.date,leftEnd)).filter(Boolean);
-   try{const timePart=dateParts.slice(1).find(s=>/^\d{2}:/.test(s));
-    row.operationDate=sourceDate(bank==='ozon'||bank==='tbank'?[dateParts[0],timePart].filter(Boolean).join(' '):dateParts[0]!,bank==='ozon'?ozonMoscow:c.moscow);
+   const startDate=cell(start,c.date,leftEnd),continuationDates=active.slice(1).map(l=>cell(l,c!.date,leftEnd)).filter(Boolean);
+   try{const timePart=continuationDates.find(s=>/^\d{2}:/.test(s));
+    row.operationDate=sourceDate(bank==='ozon'||bank==='tbank'?[startDate,timePart].filter(Boolean).join(' '):startDate,bank==='ozon'?ozonMoscow:c.moscow);
     if(bank==='sber'){
-     const time=cell(start,c.time!,c.description);if(time)row.operationDate=sourceDate(dateParts[0]+' '+time,c.moscow);
-     const posted=dateParts.slice(1).filter(v=>/^\d{2}\.\d{2}\.\d{4}$/.test(v));if(posted.length>1)throw new Error();if(posted[0])row.postedDate=sourceDate(posted[0],false);
+     const time=cell(start,c.time!,c.description);if(time)row.operationDate=sourceDate(startDate+' '+time,c.moscow);
+     const posted=continuationDates.filter(v=>/^\d{2}\.\d{2}\.\d{4}$/.test(v));if(posted.length>1)throw new Error();if(posted[0])row.postedDate=sourceDate(posted[0],false);
     }else if(c.posted!==undefined)row.postedDate=sourceDate(cell(start,c.posted,c.postedEnd),false);
    }catch{row.operationDate=undefined;}
    try{const amount=cell(start,c.amount,c.end);Object.assign(row,pdfMoney(amount,bank==='sber'));
@@ -121,8 +127,8 @@ export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):Ex
    const line=page[i]!,h=header(bank,page,i);
    if(h){flush();c=h;seenHeader=true;pageHeader=true;continue;}
    if(!c)continue;
-   if(rowStart(line,c)){flush();active=[line];continue;}
    if(/^итого|^продолжение|^дата и время операции|^операции по/.test(norm(line.text))){flush();c=null;continue;}
+   if(rowStart(line,c)){flush();active=[line];continue;}
    if(active.length)active.push(line);
   }
   flush();

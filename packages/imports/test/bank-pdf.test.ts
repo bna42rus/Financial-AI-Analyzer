@@ -38,6 +38,12 @@ test('invalid amount and impossible operation date quarantine only their rows, w
  const a=syntheticLayout('tbank');a[0]!.find(i=>i.x===290&&i.y===650)!.text='Private malformed amount';const b=await prepare('tbank',a);assert.deepEqual(b.files[0]!.issues,[{ordinal:1,code:'INVALID_AMOUNT'}]);assert.equal(b.files[0]!.rows.length,1);
  const d=syntheticLayout('sber');d[0]!.find(i=>i.x===50&&i.y===650)!.text='30.02.2026';assert.deepEqual((await prepare('sber',d)).files[0]!.issues,[{ordinal:1,code:'INVALID_DATE'}]);
 });
+test('missing or corrupted source dates remain counted row issues rather than disappearing',async()=>{
+ for(const bank of ['tbank','ozon','sber'] as const){const a=syntheticLayout(bank);a[0]!.find(i=>i.x===50&&i.y===650)!.text='Private broken date';
+  const f=(await prepare(bank,a)).files[0]!;assert.equal(f.rowsFound,2);assert.equal(f.rows.length,1);assert.deepEqual(f.issues,[{ordinal:1,code:'INVALID_DATE'}]);
+  const b=syntheticLayout(bank);b[0]=b[0]!.filter(i=>!(i.x===50&&i.y===650));const g=(await prepare(bank,b)).files[0]!;assert.equal(g.rowsFound,2);assert.deepEqual(g.issues,[{ordinal:1,code:'INVALID_DATE'}]);
+ }
+});
 test('unsupported currencies never become RUB, even for a recognized bank',async()=>{
  const a=syntheticLayout('sber');a[0]!.find(i=>i.text.startsWith('Валюта:'))!.text='Валюта: ДОЛЛАР США';assert.equal((await prepare('sber',a)).files[0]!.issues.every(i=>i.code==='INVALID_CURRENCY'),true);
  const b=syntheticLayout('tbank');b[0]!.find(i=>i.x===290&&i.y===650)!.text='10.01';assert.deepEqual((await prepare('tbank',b)).files[0]!.issues,[{ordinal:1,code:'INVALID_CURRENCY'}]);
