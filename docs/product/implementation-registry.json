@@ -2,7 +2,7 @@
   "schema_version": 1,
   "baseline_version": "1.3",
   "as_of": "2026-10-08",
-  "base_commit": "1d8219e6966711c1bf5f1aa5b8ef638c329f4ad5",
+  "base_commit": "5cce1312eeaf18fa5f1e7c061e4addde220a4607",
   "source_manifest": "docs/product/source-manifest.json",
   "scope_note": "Карта покрытия разделов и подпунктов, не процент готовности. Внутри подпункта может быть несколько обязательных сценариев; перед закрытием его нужно проверить полностью, при необходимости добавить дочерние требования. Extracted source_text вспомогателен: PDF/согласованные overrides остаются авторитетными, схемы сверяются визуально при реализации. Исторические C/D не отменяют последующую E. Текущие источники не редактируются.",
   "status_meaning": {
@@ -2133,14 +2133,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-13.1",
@@ -2157,14 +2162,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-13.2",
@@ -2174,10 +2184,19 @@
       "title": "Категории и подкатегории",
       "source_text": "Совместимость в интерфейсе Dropdown для расхода по умолчанию показывает расходные категории. Если пользователь явно выбирает доходную категорию, система предлагает одновременно изменить финансовый смысл: «Эта категория относится к доходам. Изменить учёт операции на Доход?».",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-entities.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-13.3",
@@ -2194,14 +2213,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-13.4",
@@ -2211,10 +2235,19 @@
       "title": "Категории и подкатегории",
       "source_text": "Почему нужен dependency check Если удалить категорию, на которую ссылаются два бюджета, четыре rules и три widget- а, молчаливое удаление разрушит аналитику. Поэтому структурные действия всегда сначала показывают последствия и предлагают корректную миграцию.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-entities.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-14",
@@ -2337,14 +2370,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-15.1",
@@ -2361,14 +2399,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-15.2",
@@ -2378,10 +2421,19 @@
       "title": "Контрагенты",
       "source_text": "Несколько карт одного человека Один человек может фигурировать под несколькими банковскими identifiers. Пользователь может сообщить, что это один контрагент; aliases объединяются под одной карточкой.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-entities.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-15.3",
@@ -2398,14 +2450,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-15.4",
@@ -2415,10 +2472,19 @@
       "title": "Контрагенты",
       "source_text": "Ignore, Merge и Split Ignore скрывает ненужное предложение. Merge объединяет ошибочно разделённых контрагентов после preview. Split разделяет ошибочно объединённых людей. Зарегистрированный и отредактированный пользователем counterparty не должен автоматически исчезать из-за отмены одного импорта.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-entities.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-15.5",
@@ -2435,14 +2501,19 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-15.6",
@@ -2465,10 +2536,19 @@
       "title": "Контрагенты",
       "source_text": "Удаление карточки и deep delet e Удалить карточку counterparty — не то же самое, что удалить все связанные финансовые операции. Обычное удаление убирает карточку/регистрацию и связанные настройки, сохраняя transactions. Deep delete, если он вообще выбран, отдельно показывает impact preview и относится к необратимым destructive actions.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-entities.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-entities.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-16",
@@ -5054,15 +5134,19 @@
         "docs/architecture/finance-foundation.md",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/finance-structure.test.ts"
+        "apps/api/test/finance-structure.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-34.5",
@@ -5316,14 +5400,18 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-36.3",
@@ -5338,14 +5426,18 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-36.4",
@@ -5360,14 +5452,18 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-36.5",
@@ -5408,14 +5504,18 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-37",
@@ -8138,15 +8238,19 @@
         "docs/architecture/finance-foundation.md",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/finance-structure.test.ts"
+        "apps/api/test/finance-structure.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
       "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-53",
@@ -8996,13 +9100,17 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "B-05",
@@ -9094,13 +9202,17 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-entities.ts",
+        "packages/database/migrations/0008_category_counterparty_structure.sql",
+        "docs/architecture/category-counterparty-structure.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-entities.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "B-08",

@@ -4,10 +4,11 @@ import {object,choice,uuid,dateFact,effective,operationDay} from '../../../packa
 import type {Graph,Account} from '../../../packages/finance-core/src/model.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
 import {HttpError} from './types.ts';
+import {partyRows,activeParty,partySources,removePartyCard} from './finance-entities.ts';
 
 type Assignment={id:string;accountId:string};
 type NewAccount={id:string;name:string;type:Account['type'];analyticsEnabled:boolean;defaultVisible:boolean;loanMode:Account['loanMode']};
-export type DeleteScope={kind:'operations';operationIds:string[]}|{kind:'period';from:string;through:string;accountIds?:string[]}|{kind:'account';accountId:string;deleteAccount:boolean};
+export type DeleteScope={kind:'operations';operationIds:string[]}|{kind:'period';from:string;through:string;accountIds?:string[]}|{kind:'account';accountId:string;deleteAccount:boolean}|{kind:'counterparty';counterpartyId:string;deleteCard:boolean};
 export type StructuralIntent={kind:'merge_accounts';id:string;sourceIds:string[]}|{kind:'split_account';id:string;newAccounts:NewAccount[];observations:Assignment[];operations:Assignment[];aliases:Assignment[]}|{kind:'delete_financial';id:string;scope:DeleteScope};
 export type StructuralUndo={table:'structure'|'delete';id:string;before:Record<string,unknown>|null;details:Record<string,unknown>};
 const structuralKinds=['merge_accounts','split_account','delete_financial'] as const;
@@ -26,12 +27,13 @@ export function parseStructuralIntent(value:unknown):StructuralIntent {
   const id=uuid(r.id),newAccounts=list(r.newAccounts,1,9).map(v=>{const a=object(v,['id','name','type','analyticsEnabled','defaultVisible','loanMode']),name=safeText(a.name,160);if(!name)throw new TypeError('EMPTY_NAME');return {id:a.id===undefined?randomUUID():uuid(a.id),name,type:choice(a.type,['debit_card','credit_card','bank_account','loan','savings','deposit','other']),analyticsEnabled:boolean(a.analyticsEnabled),defaultVisible:boolean(a.defaultVisible),loanMode:a.loanMode===null?null:choice(a.loanMode,['cashflow','economic'])};});
   unique([id,...newAccounts.map(a=>a.id)]);return {kind,id,newAccounts,observations:assignments(r.observations),operations:assignments(r.operations),aliases:assignments(r.aliases)};
  }
- object(value,['kind','scope']);const s=object(r.scope,['kind','operationIds','from','through','accountIds','accountId','deleteAccount']);let scope:DeleteScope;
+ object(value,['kind','scope']);const s=object(r.scope,['kind','operationIds','from','through','accountIds','accountId','deleteAccount','counterpartyId','deleteCard']);let scope:DeleteScope;
  if(s.kind==='operations'){object(r.scope,['kind','operationIds']);scope={kind:'operations',operationIds:unique(list(s.operationIds,1,1000).map(uuid))};}
  else if(s.kind==='period'){
   object(r.scope,['kind','from','through','accountIds']);const from=dateFact({precision:'day',date:s.from}),through=dateFact({precision:'day',date:s.through});if(from.precision!=='day'||through.precision!=='day'||from.date>through.date)throw new TypeError('INVALID_RANGE');
   scope={kind:'period',from:from.date,through:through.date,...(s.accountIds===undefined?{}:{accountIds:unique(list(s.accountIds,1,100).map(uuid))})};
  }else if(s.kind==='account'){object(r.scope,['kind','accountId','deleteAccount']);scope={kind:'account',accountId:uuid(s.accountId),deleteAccount:boolean(s.deleteAccount)};}
+ else if(s.kind==='counterparty'){object(r.scope,['kind','counterpartyId','deleteCard']);scope={kind:'counterparty',counterpartyId:uuid(s.counterpartyId),deleteCard:boolean(s.deleteCard)};}
  else throw new TypeError('INVALID_SCOPE');return {kind,id:randomUUID(),scope};
 }
 export function activeAccount(graph:Graph,id:string){const a=graph.accounts.find(a=>a.id===id);if(!a)throw new HttpError(404,'NOT_FOUND');if(a.mergedIntoId)throw new HttpError(409,'ACCOUNT_MERGED');return a;}
@@ -89,11 +91,15 @@ export async function applyStructural(db:PoolClient,userId:string,intent:Structu
  return {table:'structure',id:intent.id,before,details:{kind:intent.kind,newAccounts:intent.newAccounts,observations:intent.observations,operations:intent.operations,aliases:intent.aliases,linkDependencies,rulesNeedSetup:changedRules,sourceFactsPreserved:true}};
 }
 async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<StructuralIntent,{kind:'delete_financial'}>,graph:Graph,bindings:Binding[],aliasRows:Alias[],rules:RuleRow[],actionId:string):Promise<StructuralUndo>{
- const scope=intent.scope;let selected:string[],accountIds:string[]=[];
+ const scope=intent.scope;let selected:string[],accountIds:string[]=[],counterpartyIds:string[]=[];
  if(scope.kind==='operations'){for(const id of scope.operationIds)if(!graph.operations.some(o=>o.id===id))throw new HttpError(404,'NOT_FOUND');selected=scope.operationIds;}
  else if(scope.kind==='period'){
   for(const id of scope.accountIds??[])activeAccount(graph,id);
   selected=graph.operations.filter(o=>{const f=effective(o),day=operationDay(f.operationDate);return day>=scope.from&&day<=scope.through&&(!scope.accountIds||scope.accountIds.includes(f.accountId));}).map(o=>o.id);
+ }else if(scope.kind==='counterparty'){
+  const parties=await partyRows(db,userId);activeParty(parties,scope.counterpartyId);const bound=new Set((await partySources(db,userId)).filter(b=>b.counterparty_id===scope.counterpartyId).map(b=>b.transaction_id));
+  selected=graph.operations.filter(o=>o.semantics.counterparty.value===scope.counterpartyId||bound.has(o.id)).map(o=>o.id);
+  if(scope.deleteCard)counterpartyIds=parties.filter(p=>p.id===scope.counterpartyId||p.merged_into_id===scope.counterpartyId).map(p=>p.id);
  }else{
   activeAccount(graph,scope.accountId);const ids=new Set(bindings.filter(b=>b.account_id===scope.accountId).map(b=>b.transaction_id));selected=graph.operations.filter(o=>effective(o).accountId===scope.accountId||ids.has(o.id)).map(o=>o.id);
   if(scope.deleteAccount){accountIds=graph.accounts.filter(a=>a.id===scope.accountId||a.mergedIntoId===scope.accountId).map(a=>a.id);
@@ -101,7 +107,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
    const used=(await db.query('SELECT 1 FROM finance.source_observation WHERE user_id=$1 AND account_id=ANY($2::uuid[]) AND NOT(transaction_id=ANY($3::uuid[])) LIMIT 1',[userId,accountIds,selected])).rowCount;if(used)throw new HttpError(409,'SOURCE_ACCOUNT_STILL_REFERENCED');
   }
  }
- if(!selected.length&&!accountIds.length)throw new HttpError(409,'EMPTY_SCOPE');if(selected.length>1000)throw new HttpError(409,'DELETE_SCOPE_LIMIT');
+ if(!selected.length&&!accountIds.length&&!counterpartyIds.length)throw new HttpError(409,'EMPTY_SCOPE');if(selected.length>1000)throw new HttpError(409,'DELETE_SCOPE_LIMIT');
  const chosen=new Set(selected),survivingLinks=graph.links.filter(l=>chosen.has(l.sourceId)!==chosen.has(l.targetId)),survivingRelated=[...new Set(survivingLinks.map(l=>chosen.has(l.sourceId)?l.targetId:l.sourceId))].sort();
  const counts=(await db.query(`SELECT
  (SELECT count(*)::int FROM finance.source_observation WHERE user_id=$1 AND transaction_id=ANY($2::uuid[])) AS observations,
@@ -109,7 +115,9 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  (SELECT count(*)::int FROM finance.link WHERE user_id=$1 AND (source_id=ANY($2::uuid[]) OR target_id=ANY($2::uuid[]))) AS links,
  (SELECT count(*)::int FROM finance.action WHERE user_id=$1 AND id<>$3 AND NOT(status='committed' AND COALESCE(intent->'canonical'->>'receipt','false')='true')) AS history`,[userId,selected,actionId])).rows[0];
  const removedAliases=aliasRows.filter(a=>accountIds.includes(a.account_id)),changedRules=rules.filter(r=>accountIds.includes(r.conditions.accountId as string));
- const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,rulesNeedSetup:changedRules.map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:counts.links,history:counts.history},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
+ const cpAliases=counterpartyIds.length?(await db.query('SELECT count(*)::int AS n FROM finance.counterparty_alias WHERE user_id=$1 AND counterparty_id=ANY($2::uuid[])',[userId,counterpartyIds])).rows[0].n:0;
+ const cpRules=rules.filter(r=>counterpartyIds.includes(r.conditions.counterpartyId as string)||counterpartyIds.includes(r.assignments.counterpartyId as string));
+ const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:counts.links,history:counts.history},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,selected]);
  if(accountIds.length){
   await db.query('DELETE FROM finance.account_alias WHERE user_id=$1 AND account_id=ANY($2::uuid[])',[userId,accountIds]);
@@ -117,6 +125,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
   await db.query('UPDATE finance.account SET merged_into_id=NULL WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,accountIds]);
   await db.query('DELETE FROM finance.account WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,accountIds]);
  }
+ if(counterpartyIds.length)await removePartyCard(db,userId,counterpartyIds);
  // Old previews/results contain entire-workspace totals. Retain only metadata-only deletion receipts.
  await db.query("DELETE FROM finance.action WHERE user_id=$1 AND id<>$2 AND NOT(status='committed' AND COALESCE(intent->'canonical'->>'receipt','false')='true')",[userId,actionId]);
  await db.query('UPDATE finance.workspace SET generation=gen_random_uuid() WHERE user_id=$1',[userId]);
