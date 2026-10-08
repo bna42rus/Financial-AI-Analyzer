@@ -78,11 +78,11 @@ ALTER TABLE mail.sandbox_inbox ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mail.sandbox_inbox FORCE ROW LEVEL SECURITY;
 CREATE POLICY sandbox_scope ON mail.sandbox_inbox TO mail_finance,mail_control USING(source_scope=CASE current_user WHEN 'mail_finance' THEN 'finance' ELSE 'control' END) WITH CHECK(source_scope=CASE current_user WHEN 'mail_finance' THEN 'finance' ELSE 'control' END);
 -- A closed, token-free resend function. Reset links are never returned or admin-resendable.
-CREATE FUNCTION mail.retry_delivery(delivery uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+CREATE FUNCTION mail.retry_delivery(p_delivery uuid) RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
 DECLARE row mail.delivery; affected integer; BEGIN
- SELECT * INTO row FROM mail.delivery WHERE id=delivery;
+ SELECT * INTO row FROM mail.delivery WHERE id=p_delivery;
  IF row.source_schema!='access' OR row.kind NOT IN ('invitation','payment_claim','renewal_claim','payment_decision','renewal_decision','manual_access_changed') OR row.state!='failed' OR row.last_error IN ('STALE','DELIVERY_UNKNOWN','INVALID_PAYLOAD') THEN RETURN false; END IF;
- EXECUTE format('UPDATE %I.outbox SET state=''queued'',retry_count=0,next_attempt_at=clock_timestamp(),last_error=NULL,lease_id=NULL,lease_until=NULL WHERE id=$1 AND state=''failed'' AND lease_id IS NULL',row.source_schema) USING delivery;
+ EXECUTE format('UPDATE %I.outbox SET state=''queued'',retry_count=0,next_attempt_at=clock_timestamp(),last_error=NULL,lease_id=NULL,lease_until=NULL WHERE id=$1 AND state=''failed'' AND lease_id IS NULL',row.source_schema) USING p_delivery;
  GET DIAGNOSTICS affected=ROW_COUNT; RETURN affected=1;
 END $$;
 REVOKE ALL ON FUNCTION mail.retry_delivery(uuid) FROM PUBLIC,finance_api,mail_finance,mail_control;

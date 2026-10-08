@@ -27,6 +27,8 @@ test('mail roles have no passwords/sessions/financial/keys, API cannot read encr
  for(const pool of [pg.finance,pg.control])for(const sql of ['SELECT * FROM mail.sandbox_inbox','SELECT mail.project_delivery()'])await assert.rejects(pool.query(sql),{code:'42501'});
  await assert.rejects(assertMailRole({...fc,pool:pg.owner}),/MAIL_ROLE_DENIED/);
  await assert.rejects(assertMailRole({...fc,pool:pg.finance}),/MAIL_ROLE_DENIED/);
+ await assert.rejects(assertMailRole({...fc,financeOrigin:''}),/MAIL_CONFIGURATION_DENIED/);
+ await assert.rejects(assertMailRole({...fc,adminRecipient:'real@real.example'}),/MAIL_CONFIGURATION_DENIED/);
 });
 test('delivery reaches encrypted durable sandbox; sent is acceptance and metadata has no secrets',async()=>{
  const id=await queue();assert.equal((await state(id)).state,'queued');await deliverBatch(fc,sandboxTransport(fc));

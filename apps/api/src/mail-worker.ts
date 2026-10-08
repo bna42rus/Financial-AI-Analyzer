@@ -12,6 +12,10 @@ type Row={id:string;kind:string;sealed_payload:string;subject_id:string|null;exp
 type Schema='identity'|'control'|'access';
 export async function assertMailRole(config:WorkerConfig){
  if(!['development','test'].includes(config.environment)||config.wrappingKey.length!==32)throw new Error('MAIL_CONFIGURATION_DENIED');
+ try{
+  for(const origin of [config.financeOrigin,config.controlOrigin]){const u=new URL(origin);if(u.origin!==origin||!['http:','https:'].includes(u.protocol))throw new Error();}
+  if(!/^[^\s@]+@example\.test$/.test(config.adminRecipient))throw new Error();
+ }catch{throw new Error('MAIL_CONFIGURATION_DENIED');}
  const role=(await config.pool.query('SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user')).rows[0];
  if(role.name!=='mail_'+config.profile||role.rolsuper||role.rolbypassrls)throw new Error('MAIL_ROLE_DENIED');
  const owned=await config.pool.query(`SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE (c.relowner=$1 OR n.nspowner=$1) AND n.nspname IN ('identity','control','access','commerce','finance','protected_keys','mail','jobs_mail_finance','jobs_mail_control') LIMIT 1`,[role.oid]);
