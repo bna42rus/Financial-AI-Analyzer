@@ -70,7 +70,7 @@ test('an abort signal closes both key initialization and in-flight preparation',
 });
 test('expiry is checked during preparation as well as at key creation',async()=>{
  await assert.rejects(createLocalPreparation(context({expiresAt:'2020-01-01T00:00:00Z'})),/PREPARATION_EXPIRED/);
- const c=context(),s=await createLocalPreparation(c),now=Date.now;try{Date.now=()=>Date.parse(c.expiresAt)+1;await assert.rejects(s.prepare(randomUUID(),[file()]),/PREPARATION_EXPIRED/);}finally{Date.now=now;s.dispose();}
+ const c=context(),s=await createLocalPreparation(c),now=Date.now;try{Date.now=()=>Date.parse(c.expiresAt)+1;await assert.rejects(s.prepare(randomUUID(),[file()]),/PREPARATION_EXPIRED/);await assert.rejects(s.prepare(randomUUID(),[file()]),/PREPARATION_CLOSED/);}finally{Date.now=now;s.dispose();}
 });
 test('malformed or noncanonical keys are never accepted',async()=>{
  for(const bad of ['',Buffer.alloc(31).toString('base64url'),key+'=',key.slice(0,-1)+'B'])await assert.rejects(createLocalPreparation(context({key:bad})),/INVALID_PREPARATION_KEY/);

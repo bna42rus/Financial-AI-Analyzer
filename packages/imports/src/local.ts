@@ -40,7 +40,7 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
  function dispose(){active=false;key=null;signal?.removeEventListener('abort',dispose);}
  signal?.addEventListener('abort',dispose,{once:true});
  if(signal?.aborted){dispose();throw new LocalPreparationError('PREPARATION_CLOSED');}
- function check(){if(!active||!key||signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');if(Date.now()>=expiresAt)throw new LocalPreparationError('PREPARATION_EXPIRED');}
+ function check(){if(!active||!key||signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');if(Date.now()>=expiresAt){dispose();throw new LocalPreparationError('PREPARATION_EXPIRED');}}
  async function sign(bytes:Uint8Array){check();const signature=await crypto.subtle.sign('HMAC',key!,new Uint8Array(bytes));check();return Array.from(new Uint8Array(signature),n=>n.toString(16).padStart(2,'0')).join('');}
  async function identifier(bank:Bank,kind:AliasKind|'bank_reference',value:unknown){return sign(encoder.encode(JSON.stringify([versions.hmac,bank,kind,canonicalIdentifier(kind,value)])));}
  async function fileFingerprint(bytes:Uint8Array){const prefix=encoder.encode(JSON.stringify([versions.hmac,'file'])+'\n'),data=new Uint8Array(prefix.length+bytes.length);data.set(prefix);data.set(bytes,prefix.length);try{return await sign(data);}finally{data.fill(0);}}
