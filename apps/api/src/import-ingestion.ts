@@ -2,6 +2,7 @@ import {createHash,randomUUID} from 'node:crypto';
 import type {Pool,PoolClient} from 'pg';
 import {ImportContractError,parseContext,validatePreparedBatch} from '../../../packages/imports/src/contract.ts';
 import type {PreparedRow,Bank} from '../../../packages/imports/src/contract.ts';
+import {bankPdfAdapter,pdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
 import {matchSource,sameSource} from '../../../packages/imports/src/matching.ts';
 import type {SourceCandidate} from '../../../packages/imports/src/matching.ts';
 import {object,uuid,initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
@@ -100,7 +101,8 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   const match=matchSource(row,entry.file_hmac,candidates,used),transactionId=match.transactionId??randomUUID(),observationId=randomUUID();
   const prior=match.transactionId?(await db.query(`SELECT t.semantics,t.source_observation_id,o.*,r.direction FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.ingestion_row r ON (r.user_id,r.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.id=$2`,[userId,transactionId])).rows[0]:null;
   const unchanged=prior&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:prior.direction??row.direction});
-  const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,sourceKind:'other',merchantText:'',description:'',bankCategory:'',bankRefHmac:row.bankRefHmac,versions:{parser:batch.versions.adapter,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:'unclassified/1'}};
+  const parser=batch.versions.adapter===bankPdfAdapter&&bank!=='other'?pdfParserVersions[bank]:batch.versions.adapter;
+  const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,sourceKind:'other',merchantText:'',description:'',bankCategory:'',bankRefHmac:row.bankRefHmac,versions:{parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:'unclassified/1'}};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
    const semantics=initialSemantics('other');semantics.kind=facet('other','bank',false,0);

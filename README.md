@@ -32,3 +32,5 @@
 Денежные суммы — integer minor units; bank facts/user corrections/effective fields раздельны. AI использует только будущий closed versioned Registry. Подписка Pro/защита main и реальные сервисы не подтверждаются одним наличием репозитория. Услуги не приобретались, main не объединялся с новой цепочкой и Production не публиковался.
 
 Для Production нужны полные проверки, отдельные credentials/среды/KMS/retention, принятие владельцем конкретного Staging artifact, миграции и rollback/forward-fix план. Админка не деплоит приложение.
+
+Локальная подготовка банковских PDF: [версии парсеров, приватность и текущие границы](docs/architecture/local-bank-parsers.md).
