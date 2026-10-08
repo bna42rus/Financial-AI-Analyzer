@@ -51,15 +51,20 @@ export async function createServer(config: Config) {
       expires_at=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN EXCLUDED.expires_at ELSE ${schema}.rate_limit.expires_at END RETURNING hits`, [seal.rateKey(purpose+':'+userId)]);
     if (result.rows[0].hits>5) throw new HttpError(429,'RATE_LIMITED');
   }
+  const financeReads=new Set(['/finance/operation','/finance/summary','/finance/history-query','/finance/imports','/finance/import-status']);
+  const financeWrites=new Set(['/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept']);
   async function rate(request: FastifyRequest) {
     if (request.method !== 'POST') return;
     const route = request.url.split('?')[0]!;
     const address = typeof (request.body as Record<string, unknown> | undefined)?.email === 'string' ? String((request.body as Record<string, unknown>).email).trim().toLowerCase() : '';
-    const budgets: [string, number, number][] = [['ip:' + request.ip, 30, 60]];
+    // Interactive finance snapshots and field edits must not consume authentication budgets.
+    // These closed route budgets remain durable, bounded and subject to the normal server authority checks.
+    const financial=config.profile==='finance'&&(financeReads.has(route)||financeWrites.has(route)),scope=financial?'finance:':'';
+    const budgets: [string, number, number][] = [[scope+'ip:' + request.ip, financial?120:30, 60]];
     const invitationSecret = (request.body as Record<string, unknown> | undefined)?.invitationToken;
     if(typeof invitationSecret==='string') budgets.push(['invitation:'+route+':'+invitationSecret,5,300]);
     if (address) budgets.push(['account:' + route + ':' + address, route.endsWith('reset-request') ? 3 : 5, 300]);
-    else budgets.push(['action:' + route + ':' + request.ip, 10, 60]);
+    else budgets.push([scope+'action:' + route + ':' + request.ip, financial?(financeReads.has(route)?120:60):10, 60]);
     for (const [key, max, seconds] of budgets) {
       const entry = (await config.pool.query(`INSERT INTO ${schema}.rate_limit(key,hits,expires_at) VALUES($1,1,now()+$2*interval '1 second')
         ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN 1 ELSE ${schema}.rate_limit.hits+1 END,
