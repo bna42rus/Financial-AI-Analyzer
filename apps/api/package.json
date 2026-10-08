@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --import tsx src/main.ts",
     "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts",
-    "test:integration": "node --import tsx --test --test-concurrency=1 test/security.test.ts test/mail.test.ts test/finance.test.ts test/finance-structure.test.ts test/finance-entities.test.ts test/finance-history.test.ts test/finance-reset.test.ts test/finance-chains.test.ts",
+    "test:integration": "node --import tsx --test --test-concurrency=1 test/security.test.ts test/mail.test.ts test/finance.test.ts test/finance-structure.test.ts test/finance-entities.test.ts test/finance-history.test.ts test/finance-reset.test.ts test/finance-chains.test.ts test/import-validation.test.ts",
     "operator": "node --import tsx src/operator.ts",
     "test:browser": "node --import tsx --test test/browser.test.ts",
     "dev:mail": "node --import tsx src/mail-main.ts"

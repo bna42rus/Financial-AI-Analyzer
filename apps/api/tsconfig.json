@@ -16,6 +16,7 @@
   "include": [
     "src",
     "test",
-    "../../packages/database/src"
+    "../../packages/database/src",
+    "../../packages/imports"
   ]
 }
