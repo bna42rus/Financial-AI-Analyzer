@@ -6,7 +6,16 @@ test('real PDF worker prepares three bank formats locally without uploading file
  const external:string[]=[],writes:string[]=[];
  page.on('request',r=>{if(!r.url().startsWith('http://127.0.0.1:5173/')&&!r.url().startsWith('ws://127.0.0.1:5173/'))external.push(r.url());if(r.method()!=='GET')writes.push(r.url());});
  await page.goto('/');
- const fixtures=(['tbank','ozon','sber'] as const).map(bank=>{const layout=syntheticLayout(bank),x=bank==='tbank'?390:bank==='sber'?150:225;layout[0]!.find(i=>i.x===x&&i.y===650)!.text='Покупка OZON Private-ID';return {bank,bytes:[...syntheticPdf(layout)]};});
+ const fixtures=(['tbank','ozon','sber'] as const).map(bank=>{
+  const layout=syntheticLayout(bank),x=bank==='tbank'?390:bank==='sber'?150:225;
+  layout[0]!.find(i=>i.x===x&&i.y===650)!.text='Покупка OZON Private-ID';
+  // A short artificial document code leaves distinct columns in real PDF.js output.
+  if(bank==='ozon')layout[0]!.find(i=>i.x===160&&i.y===650)!.text='Doc1';
+  return {bank,bytes:[...syntheticPdf(layout)]};
+ });
+ // Adjacent glyphs can instead combine the document and description into one item.
+ const ambiguous=syntheticLayout('ozon');ambiguous[0]!.find(i=>i.x===225&&i.y===650)!.text='Покупка OZON Private-ID';
+ fixtures.push({bank:'ozon',bytes:[...syntheticPdf(ambiguous)]});
  const output=await page.evaluate(async fixtures=>{
   const path='/src/import-local.ts',module=await import(/* @vite-ignore */ path);
   const context={contextId:crypto.randomUUID(),generation:crypto.randomUUID(),keyVersion:crypto.randomUUID(),key:btoa(String.fromCharCode(...new Uint8Array(32).fill(17))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_'),expiresAt:new Date(Date.now()+60000).toISOString()};
@@ -14,9 +23,10 @@ test('real PDF worker prepares three bank formats locally without uploading file
   const result=await module.prepareLocalBankPdfs(context,crypto.randomUUID(),inputs);
   return {result,local:localStorage.length,session:sessionStorage.length};
  },fixtures);
- expect(output.result.localIssues).toEqual([]);expect(output.result.batch.files.map((f:{bank:string})=>f.bank)).toEqual(['tbank','ozon','sber']);
+ expect(output.result.localIssues).toEqual([]);expect(output.result.batch.files.map((f:{bank:string})=>f.bank)).toEqual(['tbank','ozon','sber','ozon']);
  expect(output.result.batch.versions.sanitizer).toBe('bank-source/1');
- expect(output.result.batch.files.every((f:any)=>f.rows[0].safeSource?.event==='purchase'&&f.rows[0].safeSource?.merchant==='ozon')).toBe(true);
+ expect(output.result.batch.files.slice(0,3).every((f:any)=>f.rows[0].safeSource?.event==='purchase'&&f.rows[0].safeSource?.merchant==='ozon')).toBe(true);
+ expect(output.result.batch.files[3].rows[0].safeSource).toBeNull();expect(output.result.batch.files[3].rows[0].amountMinor).toBe('-1001');
  expect(output.result.batch.files.every((f:{rows:unknown[]})=>f.rows.length===2)).toBe(true);
  const json=JSON.stringify(output.result);for(const secret of ['Sensitive','Private','Synthetic-Account-A','00000000000000000001','123456'])expect(json.includes(secret)).toBe(false);
  expect(output.local).toBe(0);expect(output.session).toBe(0);expect(external).toEqual([]);expect(writes).toEqual([]);
