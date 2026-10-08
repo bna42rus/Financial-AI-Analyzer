@@ -1,8 +1,12 @@
-# Access/security API — Development foundation
+# API — Development foundation
 
 NestJS/Fastify + Better Auth 1.7.7 + Drizzle/PostgreSQL 18. Two processes use independent database credentials, auth secrets, wrapping keys, origins and cookie prefixes. Public registration and alternate authentication endpoints are closed. This block is an API foundation; the review UI of PR #7 still runs its explicit independent example.
 
 See [behavior, evidence and remaining work](../../docs/architecture/server-access-security.md).
+
+## Prepared import acceptance
+
+After migrations 0001–0011, apply `operator migrate-import-ingestion` once with the Development migration-owner connection. Start the API and a separate `pnpm --filter @finance/api dev:imports` worker with `APP_ENV=development`, `API_PROFILE=finance`, and scoped `finance_api` credentials. Worker startup rejects owner/superuser/BYPASSRLS. No external service is required. [Contract, matching, counters, privacy and remaining work](../../docs/architecture/import-ingestion.md). Actual bank parsers/source text/UI/cancellation remain incomplete.
 
 ## Run locally
 
