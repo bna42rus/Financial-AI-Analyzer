@@ -50,7 +50,7 @@ test('full reset rejects old device generation and substituted fresh generation 
 test('selective deletion invalidates old prepared payloads while keeping fresh HMAC aliases stable',async()=>{
  const old=await context(),payload=await batch(old),operation=await within('first',async db=>{
   const id=randomUUID(),epoch=importEpoch(old);await acceptAccount(db,'first',epoch,{id,bankId:'synthetic',systemName:'Synthetic account',type:'bank_account'});
-  return acceptObservation(db,'first',epoch,randomUUID(),null,{accountId:id,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',merchantText:'Synthetic shop',description:'Sanitized',bankCategory:'',bankRefHmac:null,versions:{parser:'synthetic/1'}},'purchase');
+  return acceptObservation(db,'first',epoch,randomUUID(),null,{accountId:id,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',merchantText:'Synthetic shop',description:'Sanitized',bankCategory:'',bankRefHmac:null,versions:{parser:'synthetic/1',normalizer:'1',sanitizer:'1'}},'purchase');
  });await command({kind:'delete_financial',scope:{kind:'operations',operationIds:[operation.transactionId]}});assert.equal((await request('/finance/import-validation',payload)).statusCode,409);const fresh=await context(),next=await batch(fresh);assert.equal(next.files[0]!.rows[0]!.account.hmac,payload.files[0]!.rows[0]!.account.hmac);assert.equal((await request('/finance/import-validation',next)).statusCode,200);
 });
 test('server expiry rejects a still locally prepared payload with the recovery message',async()=>{
