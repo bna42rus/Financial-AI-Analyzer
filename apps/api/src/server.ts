@@ -43,10 +43,10 @@ export async function createServer(config: Config) {
     reply.header('cache-control','no-store').header('referrer-policy','no-referrer').header('x-content-type-options','nosniff');
     return payload;
   });
-  async function subjectRate(userId: string) {
+  async function subjectRate(userId: string,purpose='enrollment') {
     const result = await config.pool.query(`INSERT INTO ${schema}.rate_limit(key,hits,expires_at) VALUES($1,1,now()+interval '5 minutes')
       ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN 1 ELSE ${schema}.rate_limit.hits+1 END,
-      expires_at=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN EXCLUDED.expires_at ELSE ${schema}.rate_limit.expires_at END RETURNING hits`, [seal.rateKey('enrollment:'+userId)]);
+      expires_at=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN EXCLUDED.expires_at ELSE ${schema}.rate_limit.expires_at END RETURNING hits`, [seal.rateKey(purpose+':'+userId)]);
     if (result.rows[0].hits>5) throw new HttpError(429,'RATE_LIMITED');
   }
   async function rate(request: FastifyRequest) {
@@ -79,14 +79,15 @@ export async function createServer(config: Config) {
     let db: PoolClient | undefined;
     try {
       await rate(request);
-      if (config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)) {
+      const resetPasswordProof=config.profile==='finance'&&path==='/finance/commit'&&typeof request.body==='object'&&request.body!==null&&'password'in request.body;
+      if (config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)||resetPasswordProof) {
         // Read the candidate before acquiring the mutation lock, release its connection,
         // then persist the limit. Re-check all authority inside the locked transaction below.
         // A second pool checkout while holding that lock can deadlock a saturated pool.
         const candidate=await config.pool.connect();let userId:string|undefined;
         try { userId=(await current(makeAuth(config,candidate,seal),request))?.user.id; }
         finally { candidate.release(); }
-        if(userId)await subjectRate(userId);
+        if(userId)await subjectRate(userId,resetPasswordProof?'financial-reset':'enrollment');
       }
       db = await config.pool.connect(); await db.query('BEGIN');
       // Serialize authentication mutations across instances. This foundation favors correctness over login throughput.
@@ -176,15 +177,17 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/state','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query'].includes(path)) {
-        if(request.url.includes('?')||(path==='/finance/state'||path==='/finance/history'?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
+      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context'].includes(path)) {
+        if(request.url.includes('?')||(['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
         if(path==='/finance/state')result=await finance.financeView(db,s.user.id);
+        else if(path==='/finance/epoch'){const w=await finance.prepareFinance(db,s.user.id);result={generation:w.generation,revision:w.revision,keyVersion:w.key_version,interfaceEpoch:w.interface_epoch};}
         else if(path==='/finance/summary')result=await finance.financeView(db,s.user.id,finance.parseFilter(request.body));
         else if(path==='/finance/operation')result=await finance.operationView(db,s.user.id,fields(request,['id']).id);
         else if(path==='/finance/preview')result=await finance.previewFinance(db,s.user.id,request.body);
-        else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body);
+        else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body,seal,s.session.id);
+        else if(path==='/finance/import-context')result=await finance.prepareImportContext(db,s.user.id,await finance.prepareFinance(db,s.user.id),request.body,seal);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
         else result=await finance.queryHistory(db,s.user.id,(await finance.prepareFinance(db,s.user.id)).generation,path==='/finance/history'?{}:request.body);
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
@@ -229,7 +232,9 @@ export async function createServer(config: Config) {
     } catch (error) {
       if (db) { await db.query('ROLLBACK'); db.release(); }
       // No raw credentials, identifiers, payloads, SQL errors or reset links in responses/logs.
-      return reply.code(error instanceof HttpError ? error.status : 400).send({ code: error instanceof HttpError ? error.code : 'REQUEST_FAILED' });
+      const code=error instanceof HttpError ? error.code : 'REQUEST_FAILED';
+      const recovery=code==='IMPORT_CONTEXT_CHANGED'?'Данные были сброшены на другом устройстве. Загрузите файл заново.':code==='IMPORT_CONTEXT_EXPIRED'?'Срок подготовки загрузки истёк. Загрузите файл заново.':undefined;
+      return reply.code(error instanceof HttpError ? error.status : 400).send({code,...(recovery?{message:recovery}:{})});
     }
   } });
   await app.init();

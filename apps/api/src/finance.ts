@@ -12,6 +12,11 @@ import {applyRules,validateRule} from '../../../packages/finance-core/src/rules.
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
 import {HttpError} from './types.ts';
+import type {Sealer} from './types.ts';
+import {previewReset,commitReset} from './finance-reset.ts';
+import {assertImportEpoch,assertPreparedContext} from './pseudonym-context.ts';
+import type {ImportEpoch,PreparedImportContext} from './pseudonym-context.ts';
+export {importEpoch,prepareImportContext} from './pseudonym-context.ts';
 import {isStructural,parseStructuralIntent,applyStructural,restoreStructure,canonicalAccount,activeAccount} from './finance-structure.ts';
 import type {StructuralIntent,StructuralUndo} from './finance-structure.ts';
 import {isEntityKind,parseEntityIntent,applyEntity,restoreEntities,partyRows,activeParty,canonicalParty} from './finance-entities.ts';
@@ -40,14 +45,14 @@ export async function prepareFinance(db:PoolClient,userId:string){
   const parent=randomUUID();await db.query('INSERT INTO finance.category(user_id,id,name,role) VALUES($1,$2,$3,$4)',[userId,parent,names[0],role]);
   for(const name of names.slice(1))await db.query('INSERT INTO finance.category(user_id,id,parent_id,name,role) VALUES($1,$2,$3,$4,$5)',[userId,randomUUID(),parent,name,role]);
  }
- return (await db.query('SELECT * FROM finance.workspace WHERE user_id=$1 FOR UPDATE',[userId])).rows[0] as {generation:string;revision:string;loan_mode:'cashflow'|'economic'};
+ return (await db.query('SELECT * FROM finance.workspace WHERE user_id=$1 FOR UPDATE',[userId])).rows[0] as {generation:string;revision:string;loan_mode:'cashflow'|'economic';key_version:string;interface_epoch:string;config_revision:string};
 }
 export async function loadFinance(db:PoolClient,userId:string){
  const count=(await db.query('SELECT count(*) AS n FROM finance.transaction WHERE user_id=$1',[userId])).rows[0].n;
  if(BigInt(count)>10000n)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
  const orm=drizzle(db),a=await orm.select().from(tables.accounts).where(eq(tables.accounts.userId,userId)).orderBy(tables.accounts.id),c=await orm.select().from(tables.categories).where(eq(tables.categories.userId,userId)).orderBy(tables.categories.id),t=await orm.select().from(tables.transactions).where(eq(tables.transactions.userId,userId)).orderBy(tables.transactions.id),o=await orm.select().from(tables.observations).where(eq(tables.observations.userId,userId)).orderBy(tables.observations.id),p=await orm.select().from(tables.components).where(eq(tables.components.userId,userId)).orderBy(tables.components.id),l=await orm.select().from(tables.links).where(eq(tables.links.userId,userId)).orderBy(tables.links.id);
  const sourceMap=(await db.query<{observationId:string;transactionId:string;originalAccountId:string;assignedAccountId:string}>(`SELECT b.observation_id AS "observationId",o.transaction_id AS "transactionId",o.account_id AS "originalAccountId",b.account_id AS "assignedAccountId" FROM finance.observation_account b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
- const assignments=new Map(sourceMap.map(r=>[r.observationId,r.assignedAccountId])),observations=new Map(o.map(r=>[r.id,r])),state=(await db.query('SELECT generation,revision,loan_mode FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
+ const assignments=new Map(sourceMap.map(r=>[r.observationId,r.assignedAccountId])),observations=new Map(o.map(r=>[r.id,r])),state=(await db.query('SELECT generation,revision,loan_mode,key_version,interface_epoch FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
  const graph:Graph={accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.map(r=>{
   const source=observations.get(r.sourceObservationId);if(!source)throw new TypeError('SOURCE_MISSING');
   const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
@@ -59,7 +64,7 @@ export async function financeView(db:PoolClient,userId:string,filter:Filter={}){
  const {graph,state,parties,rules,sourceMap,aliases}=await loadFinance(db,userId),projection=reconcile(graph);
  const counterpartySources=(await db.query('SELECT b.observation_id AS "observationId",o.transaction_id AS "transactionId",b.counterparty_id AS "counterpartyId",b.alias_id AS "aliasId" FROM finance.observation_counterparty b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id',[userId])).rows;
  const counterpartyAliases=(await db.query('SELECT id,counterparty_id AS "counterpartyId",alias_type AS type FROM finance.counterparty_alias WHERE user_id=$1 ORDER BY id',[userId])).rows;
- return {generation:state.generation,revision:state.revision,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:sourceMap,accountAliases:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources,counterpartyAliases,rules,operations:projection.operations.map(p=>{const o=graph.operations.find(o=>o.id===p.id)!;return {...p,classification:o.semantics,comment:o.comment};}),links:projection.links,summary:aggregate(projection.operations,filter)};
+ return {generation:state.generation,revision:state.revision,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:sourceMap,accountAliases:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources,counterpartyAliases,rules,operations:projection.operations.map(p=>{const o=graph.operations.find(o=>o.id===p.id)!;return {...p,classification:o.semantics,comment:o.comment};}),links:projection.links,summary:aggregate(projection.operations,filter)};
 }
 export function parseFilter(value:unknown):Filter{
  const r=object(value,['from','through','accountIds','categoryIds','includeExcluded']),f:Filter={};
@@ -227,16 +232,18 @@ export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  const existing=(await db.query('SELECT * FROM finance.action WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
  if(existing){if(existing.intent.canonical.receipt)return existing.result;if(stable(existing.intent.request)!==stable(r.intent))throw new HttpError(409,'ACTION_REUSED');if(existing.status==='committed')return existing.result;}
  if(expected!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');
+ if(r.intent&&typeof r.intent==='object'&&(r.intent as {kind?:unknown}).kind==='reset_financial')return previewReset(db,userId,id,r.intent,state,existing);
  if(existing)return {status:'previewed',actionId:id,intent:existing.intent.canonical,impact:existing.preview};
  const intent=parseIntent(r.intent),before=await financeView(db,userId),historyBefore=await captureHistory(db,userId);let changes:ReturnType<typeof impact>,journal:Change[];
  await db.query('SAVEPOINT finance_preview');try{const undo=await apply(db,userId,intent,state.revision,id);journal=historyDelta(historyBefore,await captureHistory(db,userId));changes=impact(before,await financeView(db,userId),undo,journal);}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
  await db.query('INSERT INTO finance.action(user_id,id,generation,expected_revision,intent,preview,change_set) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,generation,expected,JSON.stringify({request:r.intent,canonical:intent}),JSON.stringify(changes),JSON.stringify(journal)]);
  return {status:'previewed',actionId:id,intent,impact:changes};
 }
-export async function commitFinance(db:PoolClient,userId:string,input:unknown){
- const r=object(input,['actionId']),id=uuid(r.actionId),state=await prepareFinance(db,userId),action=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
- if(!action)throw new HttpError(404,'NOT_FOUND');if(action.status==='committed'&&action.intent.canonical.receipt)return action.result;if(action.generation!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');if(action.status==='committed')return action.result;
+export async function commitFinance(db:PoolClient,userId:string,input:unknown,seal?:Sealer,sessionId?:string){
+ const r=object(input,['actionId','confirmReset','password']),id=uuid(r.actionId),state=await prepareFinance(db,userId),action=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
+ if(!action)throw new HttpError(404,'NOT_FOUND');if(action.intent.canonical.kind!=='reset_financial'&&('confirmReset'in r||'password'in r))throw new TypeError('INVALID_INPUT');if(action.status==='committed'&&action.intent.canonical.receipt)return action.result;if(action.generation!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');if(action.status==='committed')return action.result;
  if(action.expected_revision!==state.revision||!action.fresh)throw new HttpError(409,'FINANCE_CHANGED');
+ if(action.intent.canonical.kind==='reset_financial')return commitReset(db,userId,id,action,state,seal,r.confirmReset,sessionId,r.password);
  const before=await financeView(db,userId),historyBefore=await captureHistory(db,userId),undo=await apply(db,userId,action.intent.canonical,state.revision,id);
  if(undo.table==='history'&&(undo.details.conflicts as unknown[]).length)throw new HttpError(409,'ROLLBACK_CONFLICT');
  const journal=historyDelta(historyBefore,await captureHistory(db,userId)),actual=impact(before,await financeView(db,userId),undo,journal);
@@ -255,8 +262,8 @@ export async function editFinance(db:PoolClient,userId:string,input:unknown){
  await previewFinance(db,userId,r);return commitFinance(db,userId,{actionId:r.actionId});
 }
 /** Internal account matching hook; source aliases and local HMAC matching arrive with Import. */
-export async function acceptAccount(db:PoolClient,userId:string,generation:string,input:unknown){
- const state=await prepareFinance(db,userId);if(uuid(generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
+export async function acceptAccount(db:PoolClient,userId:string,epoch:ImportEpoch,input:unknown){
+ const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);
  const r=object(input,['id','bankId','systemName','type']),id=uuid(r.id),bank=safeText(r.bankId,80),name=safeText(r.systemName,160),type=choice(r.type,['debit_card','credit_card','bank_account','loan','savings','deposit','other']);
  if(!bank||!name)throw new TypeError('INVALID_ACCOUNT');const existing=(await db.query('SELECT bank_id FROM finance.account WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
  if(existing){if(existing.bank_id!==bank)throw new HttpError(409,'ACCOUNT_CONFLICT');return {id};}
@@ -265,8 +272,8 @@ export async function acceptAccount(db:PoolClient,userId:string,generation:strin
 }
 /** Internal import acceptance primitive. There is deliberately no public bank-fact upload route.
  * Parser/HMAC/dedupe/cancellation orchestration is a later block. Caller owns the transaction. */
-export async function acceptObservation(db:PoolClient,userId:string,generation:string,observationId:string,transactionId:string|null,input:unknown,kind:Kind){
- const state=await prepareFinance(db,userId);if(uuid(generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');uuid(observationId);choice(kind,kinds);
+export async function acceptObservation(db:PoolClient,userId:string,epoch:ImportEpoch,observationId:string,transactionId:string|null,input:unknown,kind:Kind){
+ const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);uuid(observationId);choice(kind,kinds);
  const r=object(input,['accountId','operationDate','postedDate','amountMinor','currency','operationAmountMinor','operationCurrency','merchantText','description','bankCategory','bankRefHmac','versions']);parsePersistedMinor(r.amountMinor);
  if((r.operationAmountMinor==null)!==(r.operationCurrency==null))throw new TypeError('INVALID_ORIGINAL_CURRENCY');
  if(r.operationAmountMinor!=null){parsePersistedMinor(r.operationAmountMinor);if(typeof r.operationCurrency!=='string'||!/^[A-Z]{3}$/.test(r.operationCurrency))throw new TypeError('INVALID_ORIGINAL_CURRENCY');}
@@ -294,16 +301,16 @@ export async function acceptObservation(db:PoolClient,userId:string,generation:s
  await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {transactionId:id,observationId,projection:reconcile((await loadFinance(db,userId)).graph).operations.find(o=>o.id===id)};
 }
 /** Internal sanitized alias hook. HMAC generation/key custody and full Import matching remain separate. */
-export async function acceptAccountAlias(db:PoolClient,userId:string,generation:string,input:unknown){
- const state=await prepareFinance(db,userId);if(uuid(generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
+export async function acceptAccountAlias(db:PoolClient,userId:string,epoch:ImportEpoch,input:unknown){
+ const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);
  const r=object(input,['id','accountId','type','hmac']),id=uuid(r.id),type=choice(r.type,['bank_account','card','loan_contract','bank_label']);if(typeof r.hmac!=='string'||!/^([0-9a-f]{64})$/.test(r.hmac))throw new TypeError('INVALID_PSEUDONYM');
  const account=canonicalAccount((await loadFinance(db,userId)).graph,uuid(r.accountId)),old=(await db.query('SELECT id,account_id,alias_type,alias_hmac FROM finance.account_alias WHERE user_id=$1 AND (id=$2 OR (alias_type=$3 AND alias_hmac=$4))',[userId,id,type,r.hmac])).rows;
  if(old.length){if(old.length!==1||old[0].account_id!==account.id||old[0].alias_type!==type||old[0].alias_hmac!==r.hmac)throw new HttpError(409,'ALIAS_CONFLICT');return {id:old[0].id as string,accountId:account.id};}
  await db.query('INSERT INTO finance.account_alias(user_id,id,account_id,alias_type,alias_hmac) VALUES($1,$2,$3,$4,$5)',[userId,id,account.id,type,r.hmac]);await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {id,accountId:account.id};
 }
 /** Internal matching primitive; only a sanitized HMAC enters the financial store. */
-export async function acceptCounterpartyAlias(db:PoolClient,userId:string,generation:string,input:unknown){
- const state=await prepareFinance(db,userId);if(uuid(generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
+export async function acceptCounterpartyAlias(db:PoolClient,userId:string,epoch:ImportEpoch,input:unknown){
+ const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);
  const r=object(input,['id','counterpartyId','type','hmac']),id=uuid(r.id),type=choice(r.type,['card','bank_account','phone','recipient']);if(typeof r.hmac!=='string'||!/^[0-9a-f]{64}$/.test(r.hmac))throw new TypeError('INVALID_PSEUDONYM');
  const party=canonicalParty(await partyRows(db,userId),uuid(r.counterpartyId)),old=(await db.query('SELECT id,counterparty_id,alias_type,alias_hmac FROM finance.counterparty_alias WHERE user_id=$1 AND (id=$2 OR (alias_type=$3 AND alias_hmac=$4))',[userId,id,type,r.hmac])).rows;
  if(old.length){if(old.length!==1||old[0].counterparty_id!==party.id||old[0].alias_type!==type||old[0].alias_hmac!==r.hmac)throw new HttpError(409,'ALIAS_CONFLICT');return {id:old[0].id as string,counterpartyId:party.id};}
@@ -311,8 +318,8 @@ export async function acceptCounterpartyAlias(db:PoolClient,userId:string,genera
 }
 /** Source-instance ownership is distinct from a user-verified operation label.
  * Import orchestration supplies the sanitized party/alias and owns this transaction. */
-export async function acceptCounterpartyObservation(db:PoolClient,userId:string,generation:string,input:unknown){
- const state=await prepareFinance(db,userId);if(uuid(generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
+export async function acceptCounterpartyObservation(db:PoolClient,userId:string,epoch:ImportEpoch,input:unknown){
+ const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);
  const r=object(input,['observationId','counterpartyId','aliasId']),observationId=uuid(r.observationId),aliasId=ref(r.aliasId),party=canonicalParty(await partyRows(db,userId),uuid(r.counterpartyId));
  const observation=(await db.query('SELECT transaction_id FROM finance.source_observation WHERE user_id=$1 AND id=$2',[userId,observationId])).rows[0];if(!observation)throw new HttpError(404,'NOT_FOUND');
  if(aliasId!==null&&!(await db.query('SELECT 1 FROM finance.counterparty_alias WHERE user_id=$1 AND id=$2 AND counterparty_id=$3',[userId,aliasId,party.id])).rowCount)throw new HttpError(404,'NOT_FOUND');
@@ -322,4 +329,11 @@ export async function acceptCounterpartyObservation(db:PoolClient,userId:string,
  const operation=await row(db,userId,'transaction',observation.transaction_id),semantics:Semantics=structuredClone(operation.semantics),cp=semantics.counterparty;
  if(operation.source_observation_id===observationId&&!cp.userVerified&&(cp.source==='bank'||cp.value===null&&cp.source==='deterministic_system_rule')){semantics.counterparty=facet(party.id,'bank');await update(db,userId,'transaction',operation.id,{semantics});}
  await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {observationId,counterpartyId:party.id,aliasId};
+}
+/** Future sanitized Import/worker entry point. Caller owns one DB transaction; no raw upload route. */
+export async function withPreparedImport<T>(db:PoolClient,userId:string,input:PreparedImportContext,write:(epoch:ImportEpoch)=>Promise<T>):Promise<T>{
+ const state=await prepareFinance(db,userId),context=await assertPreparedContext(db,userId,input,state);
+ const result=await write({generation:context.generation,keyVersion:context.keyVersion});
+ await assertPreparedContext(db,userId,input,await prepareFinance(db,userId));
+ return result;
 }

@@ -1751,13 +1751,19 @@
         "apps/api/src/finance-structure.ts",
         "apps/api/src/finance.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
       "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
@@ -2948,10 +2954,19 @@
       "title": "Импорт банковских выписок",
       "source_text": "Concurrent Imports Для одного пользователя одновременно выполняется один активный import batch. Это упрощает dedupe и предотвращает гонки, когда два загрузочных процесса одновременно пытаются создать одну и ту же transaction.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-18.8",
@@ -2961,10 +2976,19 @@
       "title": "Импорт банковских выписок",
       "source_text": "Закрытие браузера Пока идёт локальная стадия, показывается предупреждение не закрывать приложение. После отправки sanitized payload на сервер background processing может закончиться без открытого браузера.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-18.9",
@@ -3022,10 +3046,19 @@
       "title": "Импорт банковских выписок",
       "source_text": "Версии pipeline и отказоустойчивост ь Каждый import хранит parser/import-pipeline version и техническую версию classification engine/config, достаточную для диагностики результата без сохранения скрытого reasoning AI. Если browser закрыт до завершения local parsing/sanitization, незавершённая локальная стадия теряется и файл выбирается заново. После server accepted обработка может завершиться background job. Если сервер временно недоступен после безопасной локальной подготовки, приложение не должно отправлять raw file «на всякий случай»: пользователь может повторить отправку sanitized payload/ загрузку позже. Если AI provider недоступен, валидный import завершается, а зависимые classifications остаются unresolved до повторной обработки.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-19",
@@ -5432,10 +5465,19 @@
       "title": "Данные и конфиденциальность",
       "source_text": "Требование к per-user HMAC ke y Для псевдонимизации стабильных identifiers используется отдельный криптографически случайный key пользователя с достаточной энтропией; ориентир реализации — 256 бит. Key не должен попадать в logs, analytics или AI payload и хранится отдельно от обычных финансовых данных согласно выбранной security architecture. Zero-knowledge модель для первой версии не требуется.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-36",
@@ -5513,14 +5555,20 @@
         "docs/architecture/account-structure-deletion.md",
         "apps/api/src/finance-entities.ts",
         "packages/database/migrations/0008_category_counterparty_structure.sql",
-        "docs/architecture/category-counterparty-structure.md"
+        "docs/architecture/category-counterparty-structure.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance-entities.test.ts"
+        "apps/api/test/finance-entities.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
       "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
@@ -5544,15 +5592,20 @@
         "apps/api/src/finance-exclusions.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance-entities.test.ts",
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
       "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
     },
     {
@@ -5576,15 +5629,20 @@
         "apps/api/src/finance-exclusions.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance-entities.test.ts",
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
       "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
     },
     {
@@ -5595,10 +5653,19 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Full Financial Reset Полный reset может удалить transactions, accounts, imports, links, components, counterparties и финансовые fragments, сохранив по выбору categories/rules/UI. При полном wipe целесообразна rotation per-user HMAC secret.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-36.6",
@@ -5629,14 +5696,20 @@
         "docs/architecture/account-structure-deletion.md",
         "apps/api/src/finance-entities.ts",
         "packages/database/migrations/0008_category_counterparty_structure.sql",
-        "docs/architecture/category-counterparty-structure.md"
+        "docs/architecture/category-counterparty-structure.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance-entities.test.ts"
+        "apps/api/test/finance-entities.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
       "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
@@ -8235,10 +8308,19 @@
       "title": "Матрица подтверждений",
       "source_text": "Всегда с confirmation Physical delete transaction(s), delete period/account data, full financial reset, account deletion, deep counterparty deletion и иные необратимые действия.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-51.4",
@@ -8248,10 +8330,19 @@
       "title": "Матрица подтверждений",
       "source_text": "Reauthentication Особо чувствительные действия дополнительно требуют недавней authentication: delete account/all financial data, admin email override, admin user deletion, admin 2FA change.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-51.5",
@@ -8261,10 +8352,19 @@
       "title": "Матрица подтверждений",
       "source_text": "Не спрашивать дважды об одном и том же Если пользователь уже написал точный scope «исключи все операции Т-Банка за сентябрь», не нужно задавать бессмысленный вопрос «Вы точно хотите?». Но broad action всё равно показывает impact preview и единственное окончательное подтверждение.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "PDF-52",
@@ -8368,16 +8468,21 @@
         "apps/api/src/finance-exclusions.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/finance-structure.test.ts",
         "apps/api/test/finance-entities.test.ts",
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
       "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
     },
     {
@@ -8916,10 +9021,20 @@
         "36.5",
         "54.2"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия.",
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "A-03",
@@ -9035,15 +9150,21 @@
         "apps/api/src/finance-exclusions.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/finance-structure.test.ts",
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR.",
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "A-07",
@@ -9213,14 +9334,21 @@
         "docs/architecture/finance-foundation.md",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/finance-structure.test.ts"
+        "apps/api/test/finance-structure.test.ts",
+        "apps/api/test/finance-reset.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR.",
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "B-04",
@@ -9572,10 +9700,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "C-07",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-reset.ts",
+        "apps/api/src/pseudonym-context.ts",
+        "apps/api/src/finance.ts",
+        "apps/api/src/server.ts",
+        "packages/database/migrations/0010_financial_reset.sql",
+        "docs/architecture/financial-reset.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-reset.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия.",
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
     },
     {
       "id": "C-08",
