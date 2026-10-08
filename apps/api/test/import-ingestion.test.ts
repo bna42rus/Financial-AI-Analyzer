@@ -10,6 +10,8 @@ import {processImport,importStatus,runImportStage,IMPORT_CHUNK} from '../src/imp
 import {createLocalPreparation} from '../../../packages/imports/src/local.ts';
 import type {ExtractedRow,LocalContext} from '../../../packages/imports/src/local.ts';
 import type {PreparedBatch} from '../../../packages/imports/src/contract.ts';
+import {parseBankPdf,pdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
+import {syntheticLayout} from '../../../packages/imports/test/synthetic-layout.ts';
 import type {Config} from '../src/types.ts';
 let pg:Awaited<ReturnType<typeof postgresFixture>>,server:Awaited<ReturnType<typeof createServer>>,control:Awaited<ReturnType<typeof createServer>>,fc:Config,cookie:string;
 const password='Synthetic import password 123!',account='00000000000000000001';
@@ -32,6 +34,19 @@ test('acceptance is durable, count-only and does not yet write financial observa
  const b=await batch(),r=await request('/finance/import-accept',b);assert.equal(r.statusCode,202,r.body);assert.equal(r.headers['cache-control'],'no-store');assert.equal(r.json().status,'accepted');assert.equal(r.json().counts.pending,1);assert.equal((await counts()).transaction,0);assert.equal((await counts()).ingestion_row,1);
  for(const secret of [account,b.files[0]!.fileHmac,b.files[0]!.rows[0]!.account.hmac,'-100','2026-09-01','Private local'])assert.equal(r.body.includes(secret),false);
  assert.equal((await request('/finance/import-status',{batchId:b.batchId})).statusCode,200);
+});
+test('all three local bank adapters persist their actual parser version and Ozon contracts stay non-loan',async()=>{
+ const session=await createLocalPreparation(await context(),undefined,'bank-pdf/1');
+ try{
+  const b=await session.prepare(randomUUID(),(['tbank','ozon','sber'] as const).map(bank=>parseBankPdf(randomUUID(),new TextEncoder().encode('Synthetic '+bank),syntheticLayout(bank))));
+  await accept(b);const s=await drain(b.batchId);assert.equal(s.counts.created,6);assert.equal(s.counts.notImported,0);
+  const facts=(await pg.owner.query('SELECT a.bank_id,a.account_type,o.versions FROM finance.source_observation o JOIN finance.account a ON (a.user_id,a.id)=(o.user_id,o.account_id)')).rows;
+  for(const fact of facts)assert.equal(fact.versions.parser,pdfParserVersions[fact.bank_id as keyof typeof pdfParserVersions]);
+  assert.equal(facts.filter(f=>f.bank_id==='ozon').every(f=>f.account_type==='other'),true);
+  assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM finance.account_alias WHERE alias_type='bank_contract'")).rows[0].n,1);
+  const again=await session.prepare(randomUUID(),(['tbank','ozon','sber'] as const).map(bank=>parseBankPdf(randomUUID(),new TextEncoder().encode('Synthetic '+bank),syntheticLayout(bank))));
+  await accept(again);assert.equal((await drain(again.batchId)).counts.existing,6);assert.equal((await counts()).transaction,6);
+ }finally{session.dispose();}
 });
 test('a worker can finish an accepted import without the browser or a live preparation TTL',async()=>{
  const b=await batch();await accept(b);await pg.owner.query("UPDATE finance.ingestion_context SET expires_at=clock_timestamp()-interval '1 second'");assert.equal(await runImportStage(pg.finance),true);const s=await status(b.batchId);assert.equal(s.status,'completed');assert.equal(s.counts.created,1);assert.equal(s.counts.review,1);assert.equal(s.newAccountIds.length,1);assert.equal((await counts()).ingestion_dispatch,0);assert.equal((await counts()).source_observation,1);assert.equal((await pg.owner.query('SELECT payload FROM finance.ingestion_row')).rows[0].payload,null);

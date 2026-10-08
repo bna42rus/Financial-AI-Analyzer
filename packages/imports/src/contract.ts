@@ -4,9 +4,11 @@ import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 
 /** A deliberately text-free first preparation profile, not a bank parser. */
 export const versions=Object.freeze({pipeline:'local-prepare/1',normalizer:'strict-source/1',sanitizer:'text-free/1',hmac:'namespaced-hmac/1',adapter:'source-adapter/1'} as const);
+export const adapterVersions=['source-adapter/1','bank-pdf/1'] as const;
+export type ProcessingVersions=Omit<typeof versions,'adapter'>&{adapter:typeof adapterVersions[number]};
 export const banks=['tbank','ozon','sber','other'] as const;
 export type Bank=typeof banks[number];
-export const aliasKinds=['bank_account','card','loan_contract'] as const;
+export const aliasKinds=['bank_account','card','loan_contract','bank_contract'] as const;
 export type AliasKind=typeof aliasKinds[number];
 export const issueCodes=['INVALID_DATE','INVALID_AMOUNT','INVALID_CURRENCY','INVALID_ACCOUNT','INVALID_DIRECTION','INVALID_BANK_REFERENCE','INVALID_PSEUDONYM'] as const;
 export type IssueCode=typeof issueCodes[number];
@@ -14,7 +16,7 @@ export type RowIssue={ordinal:number;code:IssueCode};
 export type Context={contextId:string;generation:string;keyVersion:string};
 export type PreparedRow={ordinal:number;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:'RUB';direction:'debit'|'credit'|'unknown';account:{kind:AliasKind;hmac:string};bankRefHmac:string|null};
 export type PreparedFile={fileId:string;fileHmac:string;bank:Bank;rowsFound:number;status:'prepared'|'blocked';error:'LOCAL_READ_FAILED'|null;rows:PreparedRow[];issues:RowIssue[]};
-export type PreparedBatch={schemaVersion:1;versions:typeof versions;context:Context;batchId:string;files:PreparedFile[]};
+export type PreparedBatch={schemaVersion:1;versions:ProcessingVersions;context:Context;batchId:string;files:PreparedFile[]};
 // Development contract guards; these do not promise supported bank file/device limits.
 export const MAX_FILES=10,MAX_ROWS=1000;
 export class ImportContractError extends Error {constructor(){super('INVALID_IMPORT_PAYLOAD');}}
@@ -42,7 +44,7 @@ function parseRow(value:unknown):PreparedRow{
 /** The server independently validates; invalid facts become technical issues, never zero/date guesses. */
 export function validatePreparedBatch(input:unknown){
  const r=closed(input,['schemaVersion','versions','context','batchId','files']),v=closed(r.versions,Object.keys(versions));
- if(r.schemaVersion!==1||Object.entries(versions).some(([k,value])=>v[k]!==value))throw new ImportContractError();
+ if(r.schemaVersion!==1||Object.entries(versions).some(([k,value])=>k==='adapter'?!adapterVersions.includes(v[k] as ProcessingVersions['adapter']):v[k]!==value))throw new ImportContractError();
  const context=parseContext(r.context),batchId=id(r.batchId);
  if(!Array.isArray(r.files)||r.files.length<1||r.files.length>MAX_FILES)throw new ImportContractError();
  const fileIds=new Set<string>();let totalRows=0;
@@ -73,5 +75,5 @@ export function validatePreparedBatch(input:unknown){
  });
  const reportFiles=files.map(f=>({fileId:f.fileId,status:f.status,error:f.error,rowsFound:f.rowsFound,validRows:f.rows.length,rowsNotPrepared:f.rowsFound-f.rows.length,issues:f.issues}));
  const report={schemaVersion:1 as const,batchId,stage:'validation_only' as const,files:reportFiles,counts:{files:files.length,blockedFiles:files.filter(f=>f.status==='blocked').length,rowsFound:totalRows,validRows:files.reduce((n,f)=>n+f.rows.length,0),rowsNotPrepared:files.reduce((n,f)=>n+f.rowsFound-f.rows.length,0)}};
- return {batch:{schemaVersion:1 as const,versions:{...versions},context,batchId,files},report};
+ return {batch:{schemaVersion:1 as const,versions:{...versions,adapter:v.adapter as ProcessingVersions['adapter']},context,batchId,files},report};
 }

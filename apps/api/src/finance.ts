@@ -311,7 +311,7 @@ export async function acceptObservation(db:PoolClient,userId:string,epoch:Import
 /** Internal sanitized alias hook. HMAC generation/key custody and full Import matching remain separate. */
 export async function acceptAccountAlias(db:PoolClient,userId:string,epoch:ImportEpoch,input:unknown){
  const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);
- const r=object(input,['id','accountId','type','hmac']),id=uuid(r.id),type=choice(r.type,['bank_account','card','loan_contract','bank_label']);if(typeof r.hmac!=='string'||!/^([0-9a-f]{64})$/.test(r.hmac))throw new TypeError('INVALID_PSEUDONYM');
+ const r=object(input,['id','accountId','type','hmac']),id=uuid(r.id),type=choice(r.type,['bank_account','card','loan_contract','bank_contract','bank_label']);if(typeof r.hmac!=='string'||!/^([0-9a-f]{64})$/.test(r.hmac))throw new TypeError('INVALID_PSEUDONYM');
  const account=canonicalAccount((await loadFinance(db,userId)).graph,uuid(r.accountId)),old=(await db.query('SELECT id,account_id,alias_type,alias_hmac FROM finance.account_alias WHERE user_id=$1 AND (id=$2 OR (alias_type=$3 AND alias_hmac=$4))',[userId,id,type,r.hmac])).rows;
  if(old.length){if(old.length!==1||old[0].account_id!==account.id||old[0].alias_type!==type||old[0].alias_hmac!==r.hmac)throw new HttpError(409,'ALIAS_CONFLICT');return {id:old[0].id as string,accountId:account.id};}
  await db.query('INSERT INTO finance.account_alias(user_id,id,account_id,alias_type,alias_hmac) VALUES($1,$2,$3,$4,$5)',[userId,id,account.id,type,r.hmac]);await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {id,accountId:account.id};

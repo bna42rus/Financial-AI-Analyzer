@@ -1,7 +1,8 @@
 import {dateFact,uuid} from '../../finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 import {aliasKinds,banks,MAX_FILES,MAX_ROWS,parseContext,validatePreparedBatch,versions} from './contract.ts';
-import type {AliasKind,Bank,Context,IssueCode,PreparedBatch,PreparedFile,PreparedRow} from './contract.ts';
+import type {AliasKind,Bank,Context,IssueCode,PreparedBatch,PreparedFile,PreparedRow,ProcessingVersions} from './contract.ts';
+import {adapterVersions} from './contract.ts';
 
 export type LocalContext=Context&{key:string;expiresAt:string};
 /** Adapter extraction only. Text, names and extra columns are deliberately not copied into profile v1. */
@@ -27,7 +28,8 @@ function bytesFromKey(input:unknown){
 }
 const encoder=new TextEncoder();
 /** Browser WebCrypto only. No network, storage, telemetry, AI or raw-file upload dependency. */
-export async function createLocalPreparation(input:LocalContext,signal?:AbortSignal){
+export async function createLocalPreparation(input:LocalContext,signal?:AbortSignal,adapter:ProcessingVersions['adapter']='source-adapter/1'){
+ if(!adapterVersions.includes(adapter))throw new LocalPreparationError('INVALID_ADAPTER');
  if(signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');
  if(!globalThis.crypto?.subtle)throw new LocalPreparationError('LOCAL_CRYPTO_UNAVAILABLE');
  const context=parseContext({contextId:input.contextId,generation:input.generation,keyVersion:input.keyVersion}),expiresAt=Date.parse(input.expiresAt);
@@ -67,7 +69,7 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
    }
    prepared.push(result);
   }
-  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions},context:{...context},batchId,files:prepared}).batch;
+  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,adapter},context:{...context},batchId,files:prepared}).batch;
  }
  check();return {prepare,dispose};
 }

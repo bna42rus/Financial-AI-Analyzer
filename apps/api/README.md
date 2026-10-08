@@ -6,7 +6,7 @@ See [behavior, evidence and remaining work](../../docs/architecture/server-acces
 
 ## Prepared import acceptance
 
-After migrations 0001–0011, apply `operator migrate-import-ingestion` once with the Development migration-owner connection. Start the API and a separate `pnpm --filter @finance/api dev:imports` worker with `APP_ENV=development`, `API_PROFILE=finance`, and scoped `finance_api` credentials. Worker startup rejects owner/superuser/BYPASSRLS. No external service is required. [Contract, matching, counters, privacy and remaining work](../../docs/architecture/import-ingestion.md). Actual bank parsers/source text/UI/cancellation remain incomplete.
+After migrations 0001–0011, apply `operator migrate-import-ingestion` once with the Development migration-owner connection, then `operator migrate-bank-contract-alias` for 0013. Start the API and a separate `pnpm --filter @finance/api dev:imports` worker with `APP_ENV=development`, `API_PROFILE=finance`, and scoped `finance_api` credentials. Worker startup rejects owner/superuser/BYPASSRLS. No external service is required. [Contract and counters](../../docs/architecture/import-ingestion.md); [local PDF adapters and limits](../../docs/architecture/local-bank-parsers.md). Rich source text, other formats, live UI and cancellation remain incomplete.
 
 ## Run locally
 
