@@ -51,6 +51,9 @@ test('exact file instances dedupe one to one while identical real purchases rema
 test('a stable reference joins intersecting different files without duplicating transactions',async()=>{
  const a=await batch();await accept(a);await drain(a.batchId);const b=await batch([row()],'Different bytes');await accept(b);const s=await drain(b.batchId);assert.equal(s.counts.existing,1);assert.equal((await counts()).transaction,1);assert.equal((await counts()).source_observation,2);assert.equal((await counts()).account,1);
 });
+test('batch reports separate source-row outcomes from distinct canonical transaction counts',async()=>{
+ const c=await context(),a=await batch([row()],'First file',c),b=await batch([row()],'Second file',c);a.files.push(...b.files);await accept(a);const s=await drain(a.batchId);assert.equal(s.counts.rowsFound,2);assert.equal(s.counts.created,1);assert.equal(s.counts.existing,1);assert.deepEqual(s.transactionCounts,{total:1,created:1,existing:0,updated:0,review:1});assert.equal(s.files[1]!.transactionCounts.existing,1);assert.equal((await counts()).source_observation,2);
+});
 test('an explicitly unknown direction remains an unchanged source fact on reimport',async()=>{
  const a=await batch([row({direction:'unknown'})]);await accept(a);await drain(a.batchId);const b=await batch([row({direction:'unknown'})],'Another file');await accept(b);const s=await drain(b.batchId);assert.equal(s.counts.existing,1);assert.equal(s.counts.updated,0);
 });

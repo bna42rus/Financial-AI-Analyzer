@@ -31,7 +31,7 @@ HMAC shape не доказывает честность client parser. Unknown s
 
 ## Счётчики и privacy cascade
 
-Для файла/batch `rowsFound = pending + created + existing + updated + notImported + removed`. Created/existing/updated — исходы строк; одна shared transaction может встречаться в нескольких file outcomes. Review — число distinct surviving transactions, оно не прибавляется к outcomes. Blocked/missing-fact rows входят в notImported, а не Review transactions. Issue содержит ordinal/technical code/nextStep для local verification/reupload.
+Для файла/batch `counts.rowsFound = pending + created + existing + updated + notImported + removed`. Created/existing/updated в `counts` — исходы строк; одна shared transaction может встречаться в нескольких file outcomes. Отдельный `transactionCounts` считает distinct surviving canonical operations: total/created/existing/updated/review. Для одной transaction в пределах выбранного file/batch применяется приоритет created → updated → existing, поэтому первые три категории не пересекаются и складываются в total. Review не прибавляется к outcomes. Blocked/missing-fact rows входят в notImported, а не Review transactions. Issue содержит ordinal/technical code/nextStep для local verification/reupload.
 
 Physical deletion cascades observation provenance/candidate records. Старый отчёт вычисляется заново и отражает removed rows вместо финансовой копии прежнего результата. Reimport отсутствующего instance создаёт новый ID. Любое selective delete инвалидирует pending rows всего пользователя, очищает staged payload/dispatch и меняет generation. Preview считает pending/provenance/candidate effects. Full reset считает и очищает все новые tables перед key rotation. Старый worker не может воскресить удалённое.
 

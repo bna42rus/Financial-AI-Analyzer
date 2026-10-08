@@ -55,12 +55,18 @@ async function importReport(db:PoolClient,userId:string,batchId:string){
  LEFT JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE f.user_id=$1 AND f.batch_id=$2 ORDER BY f.position,r.ordinal`,[userId,batchId])).rows;
  const involved=new Set(rows.map(r=>r.transaction_id).filter(Boolean)),projection=reconcile((await loadFinance(db,userId)).graph);
  const review=new Set(projection.operations.filter(o=>involved.has(o.id)&&o.reviewReasons.length).map(o=>o.id));
+ const transactionCounts=(items:typeof rows)=>{
+  const outcomes=new Map<string,string>();
+  const rank:Record<string,number>={existing:0,updated:1,created:2};
+  for(const row of items)if(row.transaction_id&&row.outcome&&(!outcomes.has(row.transaction_id)||rank[row.outcome]!>rank[outcomes.get(row.transaction_id)!]!))outcomes.set(row.transaction_id,row.outcome);
+  return {total:outcomes.size,created:[...outcomes.values()].filter(v=>v==='created').length,existing:[...outcomes.values()].filter(v=>v==='existing').length,updated:[...outcomes.values()].filter(v=>v==='updated').length,review:[...outcomes.keys()].filter(id=>review.has(id)).length};
+ };
  const reports=files.map(f=>{
   const own=rows.filter(r=>r.file_id===f.id),imported=own.filter(r=>r.status==='imported'),removed=f.blocked?0:f.rows_found-own.length;
-  return {fileId:f.id,bank:f.bank,blocked:f.blocked,error:f.error,counts:{rowsFound:f.rows_found,pending:own.filter(r=>r.status==='pending').length,created:imported.filter(r=>r.outcome==='created').length,existing:imported.filter(r=>r.outcome==='existing').length,updated:imported.filter(r=>r.outcome==='updated').length,notImported:f.blocked?f.rows_found:own.filter(r=>r.status==='issue').length,removed,review:new Set(imported.filter(r=>review.has(r.transaction_id)).map(r=>r.transaction_id)).size},issues:own.filter(r=>r.status==='issue').map(r=>({ordinal:r.ordinal,code:r.issue,nextStep:r.issue==='IMPORT_INVALIDATED'?'reupload':'verify_local_source'}))};
+  return {fileId:f.id,bank:f.bank,blocked:f.blocked,error:f.error,counts:{rowsFound:f.rows_found,pending:own.filter(r=>r.status==='pending').length,created:imported.filter(r=>r.outcome==='created').length,existing:imported.filter(r=>r.outcome==='existing').length,updated:imported.filter(r=>r.outcome==='updated').length,notImported:f.blocked?f.rows_found:own.filter(r=>r.status==='issue').length,removed,review:new Set(imported.filter(r=>review.has(r.transaction_id)).map(r=>r.transaction_id)).size},transactionCounts:transactionCounts(own),issues:own.filter(r=>r.status==='issue').map(r=>({ordinal:r.ordinal,code:r.issue,nextStep:r.issue==='IMPORT_INVALIDATED'?'reupload':'verify_local_source'}))};
  });
  const sum=(key:'rowsFound'|'pending'|'created'|'existing'|'updated'|'notImported'|'removed')=>reports.reduce((n,f)=>n+f.counts[key],0);
- return {schemaVersion:1,batchId,stage:'server_accepted',status:batch.status,createdAt:batch.created_at,finishedAt:batch.finished_at,files:reports,counts:{files:files.length,blockedFiles:files.filter(f=>f.blocked).length,rowsFound:sum('rowsFound'),pending:sum('pending'),created:sum('created'),existing:sum('existing'),updated:sum('updated'),notImported:sum('notImported'),removed:sum('removed'),review:review.size},newAccountIds:(await db.query('SELECT account_id FROM finance.ingestion_account WHERE user_id=$1 AND batch_id=$2 ORDER BY account_id',[userId,batchId])).rows.map(r=>r.account_id)};
+ return {schemaVersion:1,batchId,stage:'server_accepted',status:batch.status,createdAt:batch.created_at,finishedAt:batch.finished_at,files:reports,counts:{files:files.length,blockedFiles:files.filter(f=>f.blocked).length,rowsFound:sum('rowsFound'),pending:sum('pending'),created:sum('created'),existing:sum('existing'),updated:sum('updated'),notImported:sum('notImported'),removed:sum('removed'),review:review.size},transactionCounts:transactionCounts(rows),newAccountIds:(await db.query('SELECT account_id FROM finance.ingestion_account WHERE user_id=$1 AND batch_id=$2 ORDER BY account_id',[userId,batchId])).rows.map(r=>r.account_id)};
 }
 
 /** One atomic checkpoint under access-cycle -> workspace locks. Caller owns the transaction. */
