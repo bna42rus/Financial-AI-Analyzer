@@ -53,7 +53,8 @@ export async function importStatus(db:PoolClient,userId:string,input:unknown){
 export async function importHistory(db:PoolClient,userId:string,input:unknown={}){
  await prepareFinance(db,userId);const r=object(input,['before']);
  const before=r.before===undefined?null:uuid(r.before);
- const cursor=before?(await db.query('SELECT created_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,before])).rows[0]:null;
+ // Preserve PostgreSQL microseconds; a JS Date cursor can skip rows within the same millisecond.
+ const cursor=before?(await db.query('SELECT created_at::text AS created_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,before])).rows[0]:null;
  if(before&&!cursor)throw new HttpError(404,'NOT_FOUND');
  const rows=(await db.query(`SELECT b.id,b.status,b.created_at,b.finished_at,
  (SELECT count(*)::int FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id) AS files,

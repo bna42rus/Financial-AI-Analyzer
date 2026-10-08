@@ -50,7 +50,7 @@ test('import history restores accepted and completed batches without keys, paylo
 });
 test('history pagination remains bounded with tied timestamps and does not repeat or skip batch IDs',async()=>{
  const c=await context(),ids=Array.from({length:51},()=>randomUUID());
- for(const id of ids)await pg.owner.query("INSERT INTO finance.ingestion_batch(user_id,id,generation,key_version,request_digest,versions,status,created_at) VALUES('first',$1,$2,$3,$4,'{}','completed','2026-01-01T00:00:00Z')",[id,c.generation,c.keyVersion,'a'.repeat(64)]);
+ for(const id of ids)await pg.owner.query("INSERT INTO finance.ingestion_batch(user_id,id,generation,key_version,request_digest,versions,status,created_at) VALUES('first',$1,$2,$3,$4,'{}','completed','2026-01-01T00:00:00.000123Z')",[id,c.generation,c.keyVersion,'a'.repeat(64)]);
  const first=(await request('/finance/imports')).json();assert.equal(first.batches.length,50);assert.ok(first.nextCursor);const last=(await request('/finance/imports',{before:first.nextCursor})).json();assert.equal(last.batches.length,1);assert.equal(last.nextCursor,null);assert.equal(new Set([...first.batches,...last.batches].map(b=>b.batchId)).size,51);
  await command({kind:'reset_financial',keepCategories:true,keepRules:true,keepInterface:true});assert.deepEqual((await request('/finance/imports')).json().batches,[]);
 });
