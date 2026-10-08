@@ -29,13 +29,13 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
    try {assertComponentSum(amount,parts.map(c=>parsePersistedMinor(c.amountMinor)));base=parts.map(c=>{
     let role=c.role;
     if(op.semantics.kind.value==='loan_payment'&&!role.userVerified){const mode=accounts.get(fact.accountId)!.loanMode??graph.loanMode;role={...role,value:mode==='cashflow'?'expense':c.type==='principal'?'neutral':['interest','fee','insurance'].includes(c.type)?'expense':role.value};}
-    return {id:c.id,operation:op,componentId:c.id,amount:parsePersistedMinor(c.amountMinor),role,category:c.category,subcategory:c.subcategory};
+    return {id:op.id+':component:'+c.id,operation:op,componentId:c.id,amount:parsePersistedMinor(c.amountMinor),role,category:c.category,subcategory:c.subcategory};
    });}
-   catch {addReason(op.id,'component_conflict');base=[{id:op.id,operation:op,componentId:null,amount,role:{...op.semantics.role,value:'unresolved',userVerified:false},category:op.semantics.category,subcategory:op.semantics.subcategory}];}
+   catch {addReason(op.id,'component_conflict');base=[{id:op.id+':root',operation:op,componentId:null,amount,role:{...op.semantics.role,value:'unresolved',userVerified:false},category:op.semantics.category,subcategory:op.semantics.subcategory}];}
   } else {
    let role=op.semantics.role;
    if(op.semantics.kind.value==='loan_payment'&&!role.userVerified&&(accounts.get(fact.accountId)!.loanMode??graph.loanMode)==='economic') {role={...role,value:'unresolved'};addReason(op.id,'incomplete_credit_data');}
-   base=[{id:op.id,operation:op,componentId:null,amount,role,category:op.semantics.category,subcategory:op.semantics.subcategory}];
+   base=[{id:op.id+':root',operation:op,componentId:null,amount,role,category:op.semantics.category,subcategory:op.semantics.subcategory}];
   }
   for(const n of base){
    if(!n.category.userVerified&&n.category.confidence<90){addReason(op.id,'low_category_confidence');if(n.category.confidence<70){n.category={...n.category,value:null};n.subcategory={...n.subcategory,value:null};}}
