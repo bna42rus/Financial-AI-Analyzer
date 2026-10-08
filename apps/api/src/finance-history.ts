@@ -60,7 +60,7 @@ function plan(rows:HistoryRow[],actionIds:string[],current:SnapshotMap,generatio
 }
 const jsonKeys=new Set(['corrections','semantics','review_reasons','conditions','assignments','role','category','subcategory']);
 async function put(db:PoolClient,userId:string,c:Change){
- const d=definitions[c.kind],values=c.before!.values,exists=c.after!==null,keys=d.keys.filter(k=>!exists||!(d.readonly as readonly string[]).includes(k)).filter(k=>k!=='transaction_id'||c.kind==='component'),params=keys.map(k=>jsonKeys.has(k)?JSON.stringify(values[k]):values[k]);
+ const d=definitions[c.kind],values=c.before!.values,exists=c.after!==null,keys=d.keys.filter(k=>!exists||!(d.readonly as readonly string[]).includes(k)).filter(k=>k!=='transaction_id'||c.kind==='component'),params=keys.map(k=>jsonKeys.has(k)&&(k!=='role'||c.kind==='component')?JSON.stringify(values[k]):values[k]);
  if(c.kind==='operation'&&!exists)throw new HttpError(409,'OBJECT_MISSING');
  if(exists)await db.query(`UPDATE finance.${d.table} SET ${keys.map((k,i)=>k+'=$'+(i+3)).join(',')} WHERE user_id=$1 AND ${d.id}=$2`,[userId,c.id,...params]);
  else await db.query(`INSERT INTO finance.${d.table}(user_id,${d.id},${keys.join(',')}) VALUES($1,$2,${keys.map((_k,i)=>'$'+(i+3)).join(',')})`,[userId,c.id,...params]);

@@ -115,7 +115,7 @@ type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:
 const jsonColumns=new Set(['corrections','semantics','review_reasons','conditions','assignments','role','category','subcategory']);
 async function update(db:PoolClient,userId:string,table:keyof typeof columns,id:string,values:Record<string,unknown>){
  const keys=Object.keys(values);if(!keys.length||keys.some(k=>!(columns[table]as readonly string[]).includes(k)))throw new TypeError('INVALID_INTERNAL_PATCH');
- const params=keys.map(k=>jsonColumns.has(k)?JSON.stringify(values[k]):values[k]);await db.query(`UPDATE finance.${table} SET ${keys.map((k,i)=>k+'=$'+(i+3)).join(',')},revision=revision+1 WHERE user_id=$1 AND id=$2`,[userId,id,...params]);
+ const params=keys.map(k=>jsonColumns.has(k)&&!(table==='category'&&k==='role')?JSON.stringify(values[k]):values[k]);await db.query(`UPDATE finance.${table} SET ${keys.map((k,i)=>k+'=$'+(i+3)).join(',')},revision=revision+1 WHERE user_id=$1 AND id=$2`,[userId,id,...params]);
 }
 async function row(db:PoolClient,userId:string,table:keyof typeof columns,id:string){const r=(await db.query(`SELECT * FROM finance.${table} WHERE user_id=$1 AND id=$2`,[userId,id])).rows[0];if(!r)throw new HttpError(404,'NOT_FOUND');return r;}
 function ownRefs(graph:Graph,parties:{id:string;mergedIntoId:string|null}[],p:Record<string,unknown>){
