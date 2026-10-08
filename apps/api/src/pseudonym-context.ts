@@ -26,7 +26,8 @@ function openKey(seal:Sealer,encoded:string,userId:string,version:string){
 }
 /** Only the authenticated local import preparation endpoint returns the key. Never an AI tool. */
 export async function prepareImportContext(db:PoolClient,userId:string,state:EpochState,input:unknown,seal:Sealer){
- const r=object(input,['contextId']),id=uuid(r.contextId),existing=(await db.query('SELECT generation,key_version,expires_at>clock_timestamp() AS fresh FROM finance.ingestion_context WHERE user_id=$1 AND id=$2 FOR UPDATE',[userId,id])).rows[0];
+ // Caller holds the per-user workspace lock; no extra UPDATE grant is needed for context reads.
+ const r=object(input,['contextId']),id=uuid(r.contextId),existing=(await db.query('SELECT generation,key_version,expires_at>clock_timestamp() AS fresh FROM finance.ingestion_context WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
  if(existing&&(existing.generation!==state.generation||existing.key_version!==state.key_version))throw new HttpError(409,'IMPORT_CONTEXT_CHANGED');
  if(existing&&!existing.fresh)throw new HttpError(409,'IMPORT_CONTEXT_EXPIRED');
  await db.query('DELETE FROM finance.ingestion_context WHERE user_id=$1 AND (expires_at<=clock_timestamp() OR generation<>$2 OR key_version<>$3)',[userId,state.generation,state.key_version]);
@@ -39,7 +40,7 @@ export async function prepareImportContext(db:PoolClient,userId:string,state:Epo
 export async function assertPreparedContext(db:PoolClient,userId:string,input:PreparedImportContext,state:EpochState){
  const r=object(input,['contextId','generation','keyVersion']),id=uuid(r.contextId);
  if(uuid(r.generation)!==state.generation||uuid(r.keyVersion)!==state.key_version)throw new HttpError(409,'IMPORT_CONTEXT_CHANGED');
- const context=(await db.query('SELECT generation,key_version,expires_at>clock_timestamp() AS fresh FROM finance.ingestion_context WHERE user_id=$1 AND id=$2 FOR UPDATE',[userId,id])).rows[0];
+ const context=(await db.query('SELECT generation,key_version,expires_at>clock_timestamp() AS fresh FROM finance.ingestion_context WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
  if(!context||context.generation!==state.generation||context.key_version!==state.key_version)throw new HttpError(409,'IMPORT_CONTEXT_CHANGED');
  if(!context.fresh)throw new HttpError(409,'IMPORT_CONTEXT_EXPIRED');
  return {contextId:id,generation:state.generation,keyVersion:state.key_version};
