@@ -710,10 +710,21 @@
       "title": "Финансовая модель: почему банковской строки недостаточно",
       "source_text": "Ключевое архитектурное решение — не считать банковскую строку готовым расходом или доходом. Одна строка сообщает, что произошло в банке, но не всегда сообщает экономический смысл для пользователя.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-5.1",
@@ -723,10 +734,21 @@
       "title": "Финансовая модель: почему банковской строки недостаточно",
       "source_text": "Четыре независимых слоя Каждая операция рассматривается через четыре слоя: 1. Bank fact — что фактически пришло из выписки. 2. operation_kind — что технически произошло. 3. analytics_role — как это влияет на расходы и доходы. 4. category/subcategory — к какой экономической теме относится операция.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-5.2",
@@ -736,10 +758,21 @@
       "title": "Финансовая модель: почему банковской строки недостаточно",
       "source_text": "Пример: перевод арендодателю Банк показывает исходящий перевод −50 000 ₽ . Его operation_kind может быть `transfer_out`. Но из этого ещё нельзя сделать вывод, что это расход: перевод мог уйти на собственную карту или быть возвратом долга. Если пользователь подтверждает, что это ежемесячная аренда, analytics_role становится `expense`, а категория — «Жильё и дом → Аренда».",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-5.3",
@@ -749,10 +782,21 @@
       "title": "Финансовая модель: почему банковской строки недостаточно",
       "source_text": "Пример: перевод самому себе Пользователь переводит 50 000 ₽ с Т-Банка на собственную карту Сбербанка. В выписках появляются две реальные строки: −50 000 ₽ и +50 000 ₽ . Система сохраняет обе transactions, связывает их как `own_transfer`, а analytics_role обеих становится `neutral`. В результате движение денег видно, но расходы и доходы не увеличиваются на 50 000 ₽ .",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-5.4",
@@ -762,10 +806,21 @@
       "title": "Финансовая модель: почему банковской строки недостаточно",
       "source_text": "Почему категории не заменяют тип операции «Возврат», «Перевод» и «Снятие наличных» не должны становиться обычными пользовательскими категориями. Это технические виды событий. Категория отвечает на другой вопрос: «на что были потрачены деньги?» или «откуда пришёл доход?».",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6",
@@ -775,10 +830,21 @@
       "title": "Сущность transaction",
       "source_text": "`transaction` — каноническое представление одной реальной банковской операции в системе. Если одна и та же операция встречается в двух пересекающихся выписках, в базе остаётся одна transaction, но у неё будет несколько source observations, подтверждающих происхождение.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6.1",
@@ -788,10 +854,21 @@
       "title": "Сущность transaction",
       "source_text": "Идентификаторы `transaction_id` создаётся внутри системы и остаётся неизменным. Он не должен зависеть от merchant, category, комментария или текущей классификации. Это позволяет безопасно менять смысл операции, не создавая новый объект.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6.2",
@@ -803,13 +880,21 @@
       "group": "finance",
       "status": "partial",
       "implementation_refs": [
-        "packages/finance-core/src/money.ts"
+        "packages/finance-core/src/money.ts",
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
       ],
       "verification_refs": [
-        "packages/finance-core/test/money.test.ts"
+        "packages/finance-core/test/money.test.ts",
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
       ],
       "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
-      "note": "Проверены только точные integer sums/serialization/range и сумма signed components. Схема БД, валюты, roles, allocations/capacities и общий расчёт ещё не реализованы."
+      "note": "Проверены только точные integer sums/serialization/range и сумма signed components. Схема БД, валюты, roles, allocations/capacities и общий расчёт ещё не реализованы. Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6.3",
@@ -819,10 +904,21 @@
       "title": "Сущность transaction",
       "source_text": "Source и effective значения Исходные банковские значения хранятся отдельно от пользовательских исправлений. Например, `source_operation_at` сохраняет дату из выписки, а effective operation date может быть скорректирована пользователем. Это позволяет одновременно уважать банковский источник и иметь рабочую исправленную аналитику.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6.4",
@@ -832,10 +928,21 @@
       "title": "Сущность transaction",
       "source_text": "Текст Хранятся нормализованный merchant, sanitized source merchant text, sanitized description, bank category и пользовательский комментарий. Чувствительные идентификаторы из текста удаляются или заменяются до серверного хранения там, где это возможно.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6.5",
@@ -845,10 +952,21 @@
       "title": "Сущность transaction",
       "source_text": "Каноническая техническая схема transactio n Чтобы разработчик не собирал модель по разным разделам, ниже зафиксирован минимальный набор полей одной transaction. Идентификаторы и связи: `transaction_id` — неизменный внутренний ID; `account_id` — текущий effective account; `source_account_id` — исходный account из импортированного источника для аудита; `bank_id`; `counterparty_id`; `created_at`; `updated_at`. Денежные данные: `operation_at`, `posted_at`, `amount_minor` со знаком, `currency`, а при необходимости исходная валютная сумма — `operation_amount_minor` и `operation_currency`. Source- слой хранит `source_operation_at`, `source_posted_at`, `source_amount_minor`, `source_currency`. Текстовые поля: `merchant_name` как нормализованное имя, `source_merchant_text` и `source_description` после sanitization, `source_bank_category`, `user_comment`. Классификация: `category_id`, `subcategory_id`, source и confidence для каждого facet, а также `classification_rule_id`, если решение пришло из rule.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-6.6",
@@ -858,10 +976,21 @@
       "title": "Сущность transaction",
       "source_text": "Analytics override и вычисляемое включени е Отдельно хранится `analytics_override = default / include / exclude`. Итоговое участие в аналитике вычисляется из общего правила, exclusions более широкого уровня и override конкретной operation. Это важно: физическое наличие transaction в базе не означает, что она обязана участвовать в totals. Более специфичный override имеет приоритет над более общим exclusion.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-7",
@@ -871,10 +1000,21 @@
       "title": "operation_kind и analytics_role",
       "source_text": "",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-7.1",
@@ -884,10 +1024,21 @@
       "title": "operation_kind и analytics_role",
       "source_text": "operation_kind — что технически произошло Базовые значения: `purchase`, `transfer_in`, `transfer_out`, `own_transfer`, `refund`, `reversal`, `cash_withdrawal`, `cash_deposit`, `credit_card_repayment`, `loan_disbursement`, `loan_payment`, `interest`, `fee`, `insurance`, `cashback`, `other`.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-7.2",
@@ -897,10 +1048,21 @@
       "title": "operation_kind и analytics_role",
       "source_text": "analytics_role — как это учитывать Допустимые значения: • `expense` — увеличивает расходы; • `income` — увеличивает доходы; • `neutral` — операция видна, но не входит в расходы и доходы; • `unresolved` — финансовый смысл ещё не определён; • `mixed` — одна банковская операция содержит компоненты с разным смыслом.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-7.3",
@@ -910,10 +1072,21 @@
       "title": "operation_kind и analytics_role",
       "source_text": "Почему эти поля независимы `transfer_in` может быть зарплатой (`income`), собственным переводом (`neutral`), компенсацией ранее понесённого расхода или пока неопределённой операцией (`unresolved`). Поэтому нельзя кодировать финансовый смысл только через operation_kind.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-7.4",
@@ -923,10 +1096,21 @@
       "title": "operation_kind и analytics_role",
       "source_text": "Источник и confidence по каждому полю Источник решения и уверенность хранятся независимо для kind, role, category и links. Пример: kind определён банком, role — системной логикой, category — AI, subcategory — вручную пользователем. Один общий `classification_source` для всей операции был бы недостаточен.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8",
@@ -936,10 +1120,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8.1",
@@ -949,10 +1144,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "Components — части одной банковской операции Если одна банковская строка экономически состоит из нескольких частей, используется `transaction_components`. Типичный пример — платёж по кредиту 25 000 ₽ : 20 000 ₽ principal, 4 500 ₽ interest и 500 ₽ insurance. Критическое правило: если активна аналитическая декомпозиция, аналитика использует components вместо полной суммы transaction. Иначе возникнет двойной учёт: 25 000 ₽ плюс ещё 20 000 + 4 500 + 500 ₽ .",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8.2",
@@ -962,10 +1168,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "Links — связь между разными операциями `transaction_links` связывает отдельные реальные банковские записи. Примеры: покупка ↔ возврат, исходящий перевод ↔ входящий собственный перевод, покупка по кредитной карте ↔ её погашение, расход ↔ компенсация.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8.3",
@@ -975,10 +1192,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "Allocation Одна операция может относиться к нескольким другим. Например возврат 10 000 ₽ может покрывать две покупки: 6 000 ₽ и 4 000 ₽ . В link хранится `allocated_amount_minor`. Сумма allocations не может превышать доступную сумму исходной операции.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8.4",
@@ -988,10 +1216,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "Статусы links `candidate` — система предполагает связь, но ещё не уверена; `confirmed` — связь подтверждена; `rejected` — пользователь или система подтвердили, что предполагаемая связь неверна.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8.5",
@@ -1001,10 +1240,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "Техническая схема transaction_link s Минимальные поля link: `link_id`, `source_transaction_id`, `target_transaction_id`, `link_type`, `allocated_amount_minor`, `currency`, `confidence`, `created_by`, `status`, `created_at`. `link_type` включает как минимум own_transfer, credit_card_repayment, refund, reversal, expense_reimbursement и debt_repayment. Link может быть создан системой, AI или пользователем, но подтверждённая пользователем связь имеет более высокий приоритет.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-8.6",
@@ -1014,10 +1264,21 @@
       "title": "Components, Links и Allocations",
       "source_text": "Техническая схема transaction_component s Минимальные поля component: `component_id`, `transaction_id`, `type`, `amount_minor`, `analytics_role`, `category_id`, `subcategory_id`, `source`, `confidence`, `user_verified`. Типы первой версии: principal, interest, fee, insurance, other. Сумма components должна быть согласована с суммой transaction; конфликт требует явного review, а не молчаливого исправления.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9",
@@ -1027,10 +1288,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.1",
@@ -1040,10 +1312,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Покупка Обычная покупка по умолчанию имеет `operation_kind = purchase` и `analytics_role = expense`. После этого определяется category/subcategory.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.2",
@@ -1053,10 +1336,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Входящий и исходящий перевод Обычные `transfer_in` и `transfer_out` по умолчанию получают `analytics_role = unresolved`, пока не понятен смысл. Это специально предотвращает автоматическое превращение любого перевода человеку в расход и любого входящего перевода в доход.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.3",
@@ -1066,10 +1360,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Возврат Refund — отдельная transaction, которая не считается доходом. После связи с исходной покупкой она уменьшает расход той же категории. Если покупка −10 000 ₽ , а позже получен refund +10 000 ₽ , net expense = 0 ₽ , income = 0 ₽ .",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.4",
@@ -1079,10 +1384,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Снятие и внесение наличных Снятие и внесение наличных по умолчанию `neutral`. Само перемещение денег между банковским и наличным состоянием ещё не говорит, на что деньги потрачены и являются ли они доходом.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.5",
@@ -1092,10 +1408,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Кэшбэк Cashback по умолчанию учитывается как `income` и относится к соответствующей доходной категории, если пользователь не определил другой подход.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.6",
@@ -1105,10 +1432,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Positive expense Положительная операция может иметь analytics_role `expense`, если она компенсирует ранее понесённый расход. В интерфейсе это формулируется понятнее: «Уменьшает расходы».",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.7",
@@ -1118,10 +1456,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Переводы, компенсации и возврат долг а Перевод между собственными счетами сохраняется как две реальные transactions, которые связываются `own_transfer` и становятся neutral. Если пара пока не найдена, операция может оставаться unpaired и быть связана позже. Комиссия за такой перевод не нейтральна: она учитывается как expense либо как отдельный component. Переводы другим людям и от других людей первоначально остаются unresolved, если нет надёжного rule или контекста. Если входящий перевод является компенсацией конкретного расхода, он может получить положительную сумму при `analytics_role = expense`: тогда он уменьшает net expense, а не создаёт доход. Подтверждённый возврат долга через link типа `debt_repayment` по умолчанию neutral, потому что сам по себе не создаёт новый доход или расход.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.8",
@@ -1131,10 +1480,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Возвраты и наличные: когда именно они влияют на перио д Refund уменьшает расходы в том периоде, когда фактически пришёл возврат, при этом сохраняет связь и category исходной покупки. Поэтому покупка в сентябре и возврат в октябре дают расход в сентябре и уменьшение расхода в октябре. Gross и net должны оставаться доступны отдельно. Cash withdrawal и cash deposit по умолчанию neutral, но пользователь может явно назначить экономический смысл. Например, внесение наличной зарплаты можно отметить как income, а конкретное снятие — как expense, если пользователь действительно хочет учитывать его на момент снятия.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-9.9",
@@ -1144,10 +1504,21 @@
       "title": "Базовая логика учёта по типам операций",
       "source_text": "Базовая математика аналитик и Для обычной transaction вклад в расходы рассчитывается как `-amount` при role = expense, а вклад в доходы как `amount` при role = income. Neutral и unresolved дают нулевой вклад. Для mixed transaction используются components вместо полной суммы transaction. Эта формула едина для Overview, Budgets и Analyzer, чтобы одинаковый фильтр не давал разные цифры в разных экранах.",
       "group": "finance",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-10",
@@ -1157,10 +1528,21 @@
       "title": "Review Reasons: почему операции могут требовать внимания",
       "source_text": "Одного флага «нужно проверить» недостаточно. У одной операции одновременно может быть несколько проблем: низкая уверенность в категории, возможный дубль и несвязанный возврат. Поэтому система хранит конкретные `review_reasons`.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-10.1",
@@ -1170,10 +1552,21 @@
       "title": "Review Reasons: почему операции могут требовать внимания",
       "source_text": "Примеры review_reasons `unresolved_role`, `low_kind_confidence`, `low_role_confidence`, `low_category_confidence`, `possible_duplicate`, `unlinked_refund`, `unresolved_transfer`, `parser_uncertainty`, `conflicting_rules`, `incomplete_credit_data`, `link_uncertainty`.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-10.2",
@@ -1183,10 +1576,21 @@
       "title": "Review Reasons: почему операции могут требовать внимания",
       "source_text": "Независимое снятие причины Если у операции были `low_category_confidence` и `possible_duplicate`, а пользователь подтвердил только категорию, первая причина снимается, вторая остаётся. Операция продолжает считаться требующей внимания, пока не будет решён duplicate case.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-10.3",
@@ -1196,10 +1600,21 @@
       "title": "Review Reasons: почему операции могут требовать внимания",
       "source_text": "Зачем это нужно в интерфейсе Карточка «Требуют внимания» на Обзоре должна считать именно операции с активными review reasons. Общесистемные предупреждения — например нераспознанный файл или недостающая выписка кредитной карты — показываются отдельными banners, чтобы число операций было понятным и проверяемым.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-10.4",
@@ -1222,10 +1637,21 @@
       "title": "Review Reasons: почему операции могут требовать внимания",
       "source_text": "user_verified по отдельным facet s Подтверждение не обязано означать «вся операция проверена целиком». Пользователь может подтвердить category, но не link или duplicate decision. Поэтому система должна хранить verification на уровне конкретного facet и снимать только соответствующие review_reasons. ЧАСТЬ II. СЧЕТА, КАТЕГОРИИ, ПРАВИЛА И ИМПОРТ Accounts, кредиты, категории, правила, import и deduplication",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11",
@@ -1235,10 +1661,21 @@
       "title": "Счета (Accounts)",
       "source_text": "Account — отдельный финансовый источник пользователя: дебетовая карта, кредитная карта, обычный банковский счёт, кредит, накопительный счёт, вклад или иной источник операций. Account нужен не только как подпись в интерфейсе: он влияет на дедупликацию, определение собственных переводов, кредитную логику, exclusions и фильтры.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11.1",
@@ -1251,14 +1688,23 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/Settings.tsx",
-        "docs/architecture/web-settings.md"
+        "docs/architecture/web-settings.md",
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/settings.spec.ts",
-        "docs/architecture/web-settings.md"
+        "docs/architecture/web-settings.md",
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
       ],
       "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
-      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11.2",
@@ -1268,10 +1714,21 @@
       "title": "Счета (Accounts)",
       "source_text": "Техническая модель Минимальные поля: `account_id`, `bank_id`, `account_type`, `currency`, `system_name`, `display_name`, `analytics_enabled`, `created_at`, `last_seen`. Технический `account_id` никогда не строится из последних цифр карты или пользовательского названия.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11.3",
@@ -1294,10 +1751,21 @@
       "title": "Счета (Accounts)",
       "source_text": "Определение и исправление типа Тип счёта определяется автоматически из структуры документа и банковских признаков. Пользователь может исправить его. Поскольку смена типа может изменить кредитную логику и интерпретацию операций, при существенном перерасчёте показывается impact preview.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11.5",
@@ -1307,10 +1775,21 @@
       "title": "Счета (Accounts)",
       "source_text": "Исключение счёта Если account исключён из аналитики, его операции не удаляются. Они остаются в Операциях с соответствующим статусом, но не входят в стандартные totals, графики и бюджеты. Явный запрос Анализатора может включить их и обязан сообщить, что обычно они исключены.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11.6",
@@ -1346,10 +1825,21 @@
       "title": "Счета (Accounts)",
       "source_text": "Что намеренно не используется в интерфейсе счёт а Полные банковские identifiers и последние цифры карты не нужны для обычного UI. Пользователь ориентируется на bank + собственное `display_name`. Last digits не должны становиться основным идентификатором account, передаваться AI ради удобства или использоваться как технический ключ.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-11.9",
@@ -1359,10 +1849,21 @@
       "title": "Счета (Accounts)",
       "source_text": "Default visibility accoun t Помимо analytics_enabled account может иметь настройку default visibility для интерфейсов, где пользователь выбирает счета. Это не заменяет exclusion: скрытый по умолчанию account можно явно включить фильтром, тогда как analytics exclusion влияет на расчёты по отдельным правилам.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12",
@@ -1372,10 +1873,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Кредитная карта и обычный кредит внешне похожи тем, что связаны с долгом, но аналитически работают по-разному. Это один из критических участков системы, потому что неверная модель легко создаёт двойной расход.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.1",
@@ -1385,10 +1897,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Кредитная карта Покупка по кредитной карте учитывается в момент покупки как expense. Последующее погашение задолженности — `credit_card_repayment` с `analytics_role = neutral`, потому что это перемещение денег на погашение уже учтённого расхода. Проценты, fees и insurance учитываются как отдельные расходы. Пример: 5 октября пользователь купил ноутбук за 100 000 ₽ с кредитной карты. Расход возникает 5 октября. 25 октября пользователь погасил 100 000 ₽ с дебетовой карты. Если посчитать и покупку, и погашение как расходы, система покажет 200 000 ₽ вместо 100 000 ₽ . Поэтому repayment нейтрален.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.2",
@@ -1398,10 +1921,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Неполная кредитная карта Если пользователь загружает только выписку дебетовой карты с погашением, но не загружает операции кредитной карты, система не должна самовольно превращать repayment в расход. Она показывает completeness warning. Для конкретного account можно включить исключительный режим «считать погашение расходом», но с предупреждением о риске двойного учёта.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.3",
@@ -1411,10 +1945,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Обычный кредит: режим Cashflow В выбранной базовой модели обычный loan payment целиком считается расходом. Пользователь фактически отдаёт 25 000 ₽ из своего денежного потока — именно это и отражает Cashflow mode.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.4",
@@ -1424,10 +1969,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Обычный кредит: Economic decomposition Альтернативный режим разделяет платёж на principal, interest, fee, insurance. Principal считается neutral, поскольку это уменьшение обязательства, а проценты и дополнительные расходы — expense. Для этого используются `transaction_components`. Пример: платёж 25 000 ₽ = principal 20 000 + interest 4 500 + insurance 500. В Cashflow mode расход = 25 000 ₽ . В Economic mode расход = 5 000 ₽ . Это не ошибка: это две разные модели анализа, и выбранная модель должна быть явно закреплена за account.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.5",
@@ -1437,10 +1993,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Глобальное правило и account override Настройки → Аналитика задаёт default для обычных кредитов, а конкретный loan account может его переопределить. Приоритет: `account override > global default`.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.6",
@@ -1463,10 +2030,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Получение обычного кредит а `loan_disbursement` — поступление суммы кредита — по умолчанию neutral. Это увеличение денежных средств одновременно с появлением обязательства, а не обычный доход. Дальнейшие repayments учитываются по выбранной модели Cashflow или Economic decomposition.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.8",
@@ -1476,10 +2054,21 @@
       "title": "Кредиты и кредитные карты",
       "source_text": "Где показывается выбранная кредитная модел ь Cashflow/Economic mode является настройкой account/Analytics. Overview не должен постоянно маркировать каждый loan widget техническим ярлыком только потому, что используется default mode; пояснение показывается там, где оно помогает понять конкретный расчёт, и всегда доступно через «Как рассчитано».",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-12.9",
@@ -1502,10 +2091,21 @@
       "title": "Категории и подкатегории",
       "source_text": "Категория отвечает на вопрос «на что был потрачен расход?» или «из какого источника получен доход?». Категории полностью принадлежат пользователю: продукт предлагает стартовую структуру, но не блокирует создание собственной.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-13.1",
@@ -1515,10 +2115,21 @@
       "title": "Категории и подкатегории",
       "source_text": "Роль категории Каждая категория имеет допустимую роль: `expense`, `income` или `both`. Это предотвращает противоречивые состояния. Например, категория «Зарплата» не должна молча назначаться операции с analytics_role `expense`.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-13.2",
@@ -1541,10 +2152,21 @@
       "title": "Категории и подкатегории",
       "source_text": "Rename, Merge, Delete, Hide Rename сохраняет `category_id`, поэтому зависимости не ломаются. Merge переносит зависимые operations, rules, budgets, widgets и saved views на каноническую категорию после impact preview. Delete не удаляет финансовые операции: пользователь выбирает новую категорию либо оставляет операции без категории. Hide убирает категорию из обычного выбора, сохраняя историю.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-13.4",
@@ -1567,10 +2189,21 @@
       "title": "Стартовый справочник категорий",
       "source_text": "Ниже приводится рекомендуемый starter set. Он создаётся автоматически для нового пользователя, но не считается жёсткой системной классификацией.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-14.1",
@@ -1583,14 +2216,23 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/Settings.tsx",
-        "docs/architecture/web-settings.md"
+        "docs/architecture/web-settings.md",
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/settings.spec.ts",
-        "docs/architecture/web-settings.md"
+        "docs/architecture/web-settings.md",
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-14.2",
@@ -1603,14 +2245,23 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/Settings.tsx",
-        "docs/architecture/web-settings.md"
+        "docs/architecture/web-settings.md",
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/settings.spec.ts",
-        "docs/architecture/web-settings.md"
+        "docs/architecture/web-settings.md",
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
       ],
       "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
-      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт."
+      "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-14.3",
@@ -1620,10 +2271,21 @@
       "title": "Стартовый справочник категорий",
       "source_text": "Что не является категорией Перевод, возврат, own transfer, cash withdrawal и cash deposit — виды финансового события, а не экономические категории. Они не должны засорять дерево категорий.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-15",
@@ -1633,10 +2295,21 @@
       "title": "Контрагенты",
       "source_text": "Counterparty — человек или организация, с которыми у пользователя существует устойчивое финансовое взаимодействие. Система намеренно не превращает каждого одноразового получателя перевода в отдельную карточку: иначе список быстро станет бесполезным.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-15.1",
@@ -1646,10 +2319,21 @@
       "title": "Контрагенты",
       "source_text": "Discovered и Registered `discovered` — система заметила повторяющегося получателя и может предложить зарегистрировать его. `registered` — пользователь подтвердил контрагента, дал понятное имя или создал правила.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-15.2",
@@ -1672,10 +2356,21 @@
       "title": "Контрагенты",
       "source_text": "Mark as Self Если получатель — сам пользователь, карточку можно отметить как self. Это сильный сигнал для определения own transfers.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-15.4",
@@ -1698,10 +2393,21 @@
       "title": "Контрагенты",
       "source_text": "Privacy имен После sanitization допустимо хранить и передавать в финансовом контексте сокращённое имя вида «Алексей И.», если оно действительно нужно для анализа. Полные номера карт, телефоны и устойчивые банковские identifiers остаются псевдонимизированными.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-15.6",
@@ -1737,10 +2443,21 @@
       "title": "Персональные правила классификации",
       "source_text": "Rules превращают повторяющиеся пользовательские исправления в автоматизацию. Главное требование — правило должно быть достаточно конкретным, чтобы не начать массово классифицировать несвязанные операции.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-16.1",
@@ -1750,10 +2467,21 @@
       "title": "Персональные правила классификации",
       "source_text": "Условия Условие может включать merchant equals/contains, counterparty, направление, bank, account, operation kind, amount range, currency, sanitized description, recurring pattern и комбинации через AND.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-16.2",
@@ -1763,10 +2491,21 @@
       "title": "Персональные правила классификации",
       "source_text": "Действия Rule может назначить role, category/subcategory, operation kind, merchant normalization, counterparty или analytics inclusion. У rule есть status, priority, scope и история изменений.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-16.3",
@@ -1776,10 +2515,21 @@
       "title": "Персональные правила классификации",
       "source_text": "Приоритет Приоритет: ручное решение конкретной операции → более специфичное personal rule → более широкое personal rule → global product rule → AI → bank category. Это правило предотвращает ситуацию, когда модель завтра «передумала» и переписала уже проверенную пользователем операцию.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-16.4",
@@ -1802,10 +2552,21 @@
       "title": "Персональные правила классификации",
       "source_text": "История Изменение или удаление rule не переписывает прошлое молча. Система отдельно предлагает «Применить новое правило к историческим операциям?».",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-16.6",
@@ -1815,10 +2576,21 @@
       "title": "Персональные правила классификации",
       "source_text": "Управление rules и предложения систем ы Personal rules можно включать и выключать, открывать список затрагиваемых операций и просматривать источник/ priority. Система может предложить создать recurring rule после повторяющегося паттерна, но не должна молча создавать его только потому, что увидела несколько похожих переводов. Исключение — когда пользователь сам явно сформулировал постоянное правило естественным языком.",
       "group": "classification",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Иерархия категорий, стартовый справочник, независимые контрагенты, приоритеты и ретроактивные правила, конфликты зависимостей.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-17",
@@ -1828,10 +2600,21 @@
       "title": "Confidence, Source и Verification",
       "source_text": "Confidence — оценка уверенности системы. Он не должен быть одним общим числом для всей операции, потому что система может точно знать тип операции и одновременно сомневаться в категории.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-17.1",
@@ -1841,10 +2624,21 @@
       "title": "Confidence, Source и Verification",
       "source_text": "Независимые показатели Минимум: kind confidence, role confidence, category/subcategory confidence, link confidence. Dedupe использует отдельную confidence- модель.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-17.2",
@@ -1854,10 +2648,21 @@
       "title": "Confidence, Source и Verification",
       "source_text": "Порог категорий Ориентир: ≥90% — уверенная автоматическая классификация; 70–89% — medium confidence; <70% — unresolved/review. Это стартовая бизнес-логика, а не окончательная статистическая гарантия; пороги могут калиброваться на реальных тестах.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-17.3",
@@ -1880,10 +2685,21 @@
       "title": "Confidence, Source и Verification",
       "source_text": "User Verification Пользователь независимо подтверждает facet: kind, role, category, link или duplicate decision. После этого соответствующий facet не должен молча переписываться будущим AI или обновлением глобальной merchant- базы.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-17.5",
@@ -1893,10 +2709,21 @@
       "title": "Confidence, Source и Verification",
       "source_text": "Приоритет зависит от face t Общая цепочка user → personal rule → global rule → AI → bank category относится прежде всего к семантической классификации. Надёжный банковский source fact и подтверждённый технический operation kind нельзя молча переписывать семантическим rule только потому, что rule выше в общем списке. Для каждого facet backend применяет собственный allowed-source priority: manual verification всегда сильней, а source fact меняется только через correction/reconciliation logic.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-18",
@@ -3843,10 +4670,21 @@
       "title": "Настройки аналитики",
       "source_text": "Analytics settings определяют, какие данные участвуют в стандартной аналитике и как работают глобальные модели учёта. Здесь не должно быть десятков опасных toggle- ов, позволяющих случайно сломать финансовую систему.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-32.1",
@@ -3856,10 +4694,21 @@
       "title": "Настройки аналитики",
       "source_text": "Exclusions Исключение можно задать по transaction, account, bank, period, kind, role, category/subcategory, merchant, counterparty, amount range или комбинации. Более специфичный override имеет приоритет над более общим; явное решение конкретной операции — самый высокий приоритет.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-32.2",
@@ -3882,10 +4731,21 @@
       "title": "Настройки аналитики",
       "source_text": "Global Loan Mode Для ordinary loans задаётся global default Cashflow/Economic, но конкретный loan account может иметь override. Credit card repayment, refunds, own transfers и cash сохраняют стабильную базовую системную логику и не превращаются в глобальные toggle- ы.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-32.4",
@@ -3895,10 +4755,21 @@
       "title": "Настройки аналитики",
       "source_text": "Unresolved и RUB Unresolved не входят в expenses/income. Общая аналитика первой версии — RUB-only. Эта логика должна быть одинаковой в Overview, Budgets и Analyzer.",
       "group": "settings",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Настройки аналитики, профиля, вида и сохранённых представлений; timezone не переписывает оплаченные периоды.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-33",
@@ -4042,10 +4913,21 @@
       "title": "Change History и Undo",
       "source_text": "История изменений защищает пользователя от ошибок и делает автоматизацию контролируемой. Базовый срок доступной пользовательской истории — 30 дней.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-34.1",
@@ -4055,10 +4937,21 @@
       "title": "Change History и Undo",
       "source_text": "Что логируется Category/subcategory, kind, role, comments, exclusions, mass actions, rules, accounts settings, category structure, budgets, analytics settings, links/components и значимые автоматические изменения.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-34.2",
@@ -4068,10 +4961,21 @@
       "title": "Change History и Undo",
       "source_text": "Что не логируется Навигация, scroll, временный filter, hover и незавершённое перетаскивание layout не должны создавать шум в истории.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-34.3",
@@ -4081,10 +4985,21 @@
       "title": "Change History и Undo",
       "source_text": "Delta и action_id По возможности хранится delta «было → стало». Массовое изменение группируется одним `action_id`, например «Категория изменена у 412 операций», чтобы Undo был понятным и атомарным.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-34.4",
@@ -4094,10 +5009,21 @@
       "title": "Change History и Undo",
       "source_text": "Conflicts Если объект после исходного действия уже изменён, rollback не должен молча вернуть старое значение поверх нового. Система показывает conflict.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-34.5",
@@ -4298,10 +5224,21 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Пользователь должен чётко понимать разницу между «не учитывать» и «удалить». Это особенно важно в финансовом приложении, где случайная физическая потеря истории может быть критична.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-36.1",
@@ -4311,10 +5248,21 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Exclude Операция остаётся в БД, видна в Operations с tag, но не входит в обычные totals. Явный запрос Analyzer может включить excluded data и должен сообщить об этом.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-36.2",
@@ -6794,10 +7742,21 @@
       "title": "Error States и Graceful Degradation",
       "source_text": "Atomicity и Idempotency Где возможно, mass action выполняется atomically. Критичные команды защищены от двойного применения: payment confirmation, import cancellation, deletion, mass action, entitlement extension.",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-49.5",
@@ -6907,10 +7866,21 @@
       "title": "Матрица подтверждений",
       "source_text": "й Confirmation policy нужна, чтобы интерфейс не раздражал вопросом после каждого мелкого действия, но и не позволял одной ошибочной командой массово изменить или удалить данные.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-51.1",
@@ -6920,10 +7890,21 @@
       "title": "Матрица подтверждений",
       "source_text": "Без confirmation Read/analysis; одно конкретное reversible edit; classification внутри Review; safe UI preference; explicit future rule с очевидным scope. После изменения доступен Undo.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-51.2",
@@ -6933,10 +7914,21 @@
       "title": "Матрица подтверждений",
       "source_text": "С confirmation Mass action вне Review; broad exclusion; merge/split; account type change с recalculation; loan model change; category migration; bulk rollback; import cancellation.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-51.3",
@@ -6985,10 +7977,21 @@
       "title": "Матрица зависимостей сущностей",
       "source_text": "Delete и Merge всегда выполняются после dependency check. Это защищает saved views, budgets, rules и links от «висячих» ссылок.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-52.1",
@@ -7050,10 +8053,21 @@
       "title": "Матрица зависимостей сущностей",
       "source_text": "Transaction dependencies Links, components, rule history, review reasons, chat references, cached aggregates, change deltas.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-53",
@@ -7323,10 +8337,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.1",
@@ -7336,10 +8361,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "operation_kind purchase; transfer_in; transfer_out; own_transfer; refund; reversal; cash_withdrawal; cash_deposit; credit_card_repayment; loan_disbursement; loan_payment; interest; fee; insurance; cashback; other.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.2",
@@ -7349,10 +8385,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "analytics_role expense; income; neutral; unresolved; mixed.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.3",
@@ -7362,10 +8409,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "Classification Source user; personal_rule; deterministic_system_rule; global_rule; ai; bank. Значение хранится по каждому facet независимо.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.4",
@@ -7375,10 +8433,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "Review Reasons unresolved_role; low_kind_confidence; low_role_confidence; low_category_confidence; possible_duplicate; unlinked_refund; unresolved_transfer; parser_uncertainty; conflicting_rules; incomplete_credit_data; import_issue; link_uncertainty.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.5",
@@ -7388,10 +8457,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "Link Types own_transfer; credit_card_repayment; refund; reversal; expense_reimbursement; debt_repayment. Link status: candidate / confirmed / rejected.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.6",
@@ -7401,10 +8481,21 @@
       "title": "Технический справочник и итоговые правила",
       "source_text": "Component Types principal; interest; fee; insurance; other.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
     },
     {
       "id": "PDF-55.7",
@@ -7532,10 +8623,20 @@
         "9.8",
         "24.6"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "A-04",
@@ -7548,12 +8649,20 @@
       ],
       "status": "partial",
       "implementation_refs": [
-        "packages/finance-core/src/money.ts"
+        "packages/finance-core/src/money.ts",
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
       ],
       "verification_refs": [
-        "packages/finance-core/test/money.test.ts"
+        "packages/finance-core/test/money.test.ts",
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
       ],
-      "note": "Проверены только точные integer sums/serialization/range и сумма signed components. Схема БД, валюты, roles, allocations/capacities и общий расчёт ещё не реализованы."
+      "note": "Проверены только точные integer sums/serialization/range и сумма signed components. Схема БД, валюты, roles, allocations/capacities и общий расчёт ещё не реализованы. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "A-05",
@@ -7561,10 +8670,20 @@
       "source_path": "docs/product/baseline.md",
       "source_anchor": "A-05",
       "source_clause_refs": [],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "A-06",
@@ -7580,10 +8699,20 @@
         "49.4",
         "54.9"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "A-07",
@@ -7617,10 +8746,20 @@
       "source_clause_refs": [
         "7.4"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "A-09",
@@ -7672,10 +8811,20 @@
         "9.7",
         "15.3"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "B-02",
@@ -7689,10 +8838,20 @@
         "19.7",
         "20.5"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "B-03",
@@ -7705,10 +8864,20 @@
         "35.11",
         "36.5"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "B-04",
@@ -7740,10 +8909,20 @@
         "55.1",
         "55.5"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "B-06",
@@ -7773,14 +8952,22 @@
         "packages/database/migrations/0004_manual_access.sql",
         "packages/access/src/manual.ts",
         "apps/admin/src/ServerManualAccess.tsx",
-        "docs/architecture/manual-access.md"
+        "docs/architecture/manual-access.md",
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/browser.test.ts",
-        "docs/architecture/invitation-registration.md"
+        "docs/architecture/invitation-registration.md",
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
       ],
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "B-07",
@@ -7829,10 +9016,20 @@
         "35.6",
         "50.2"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance.ts",
+        "packages/finance-core/src/model.ts",
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/rules.ts",
+        "packages/database/migrations/0006_finance_foundation.sql",
+        "docs/architecture/finance-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/graph.test.ts",
+        "apps/api/test/finance.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
     },
     {
       "id": "B-10",
