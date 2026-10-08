@@ -28,6 +28,8 @@ try {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0006_finance_foundation.sql',import.meta.url),'utf8'));
   } else if(mode==='migrate-account-structure') {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0007_account_structure_deletion.sql',import.meta.url),'utf8'));
+  } else if(mode==='migrate-entity-structure') {
+    await db.query(await readFile(new URL('../../../packages/database/migrations/0008_category_counterparty_structure.sql',import.meta.url),'utf8'));
   } else if(mode==='seed-tariff-example') {
     const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
     await db.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);
@@ -46,7 +48,7 @@ try {
     await db.query(`INSERT INTO control.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Development example','owner@example.test',true,now(),now())`, [id]);
     await db.query(`INSERT INTO control.auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,now(),now())`, [randomUUID(), id, await hashPassword(chosen)]);
     await db.query('INSERT INTO control.security_state(user_id,bootstrap_pending) VALUES($1,true)', [id]);
-  } else throw new Error('Use migrate, migrate-invitations, migrate-renewal, migrate-manual, migrate-mail, migrate-finance, migrate-account-structure, seed-tariff-example or seed-admin-example');
+  } else throw new Error('Use migrate, migrate-invitations, migrate-renewal, migrate-manual, migrate-mail, migrate-finance, migrate-account-structure, migrate-entity-structure, seed-tariff-example or seed-admin-example');
   await db.query('COMMIT'); process.stdout.write('Development operation completed.\n');
 } catch (error) { await db.query('ROLLBACK'); throw new Error('Development operation failed; no changes committed'); }
 finally { db.release(); await pool.end(); }
