@@ -12,7 +12,7 @@ The backend independently rejects unknown fields/codes/versions, missing structu
 
 ## Persistence and repeat imports
 
-The worker derives `merchant_text`, `description`, `source_kind` from constants, records sanitizer/classification versions and appends observations in the existing tenant-protected tables. Known bank kinds precede current personal rules. Refunds remain unresolved until linkage evidence exists; a credit alone is not a refund.
+The worker derives `merchant_text`, `description`, `source_kind` from constants, records transport sanitizer/classification versions and the source/merchant sanitizer origin when earlier evidence is retained and appends observations in the existing tenant-protected tables. Known bank kinds precede current personal rules. Refunds remain unresolved until linkage evidence exists; a credit alone is not a refund.
 
 Same-file ordinals and reliable bank reference matching retain their earlier rules. Changed safe source facts update the current observation and unverified bank facets; manual/verified facets, corrections, comments, categories and other assignments survive. Current personal rules run on updated operations. An absent signal cannot erase earlier source fields, and a missing merchant for the same event cannot erase an earlier brand. Identical repeat imports append provenance without manufacturing extra transactions. A shared brand plus date/amount never becomes a cross-file strict fingerprint. Possible duplicates remain separate.
 

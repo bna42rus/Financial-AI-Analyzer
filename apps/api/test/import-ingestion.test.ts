@@ -35,26 +35,28 @@ async function safeBatch(rows=[row({safeSource:{event:'purchase',merchant:'ozon'
  try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}
 }
 
+async function importedOperation(){const id=(await pg.owner.query('SELECT id FROM finance.transaction')).rows[0].id;const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
+
 test('safe source codes persist canonical source fields before current personal rules',async()=>{
  await command({kind:'rule',id:randomUUID(),create:true,patch:{name:'Synthetic merchant rule',enabled:true,priority:1,conditions:{merchantEquals:'Ozon'},assignments:{merchant:'Personal shop',role:'neutral'}}});
  const b=await safeBatch();await accept(b);assert.equal((await drain(b.batchId)).counts.created,1);
- const state=(await request('/finance/state')).json(),op=state.operations[0];assert.equal(op.source.merchantText,'Ozon');assert.equal(op.source.description,'Покупка');assert.equal(op.source.sourceKind,'purchase');assert.equal(op.source.versions.sanitizer,sourceSanitizer);assert.equal(op.semantics.kind.value,'purchase');assert.equal(op.semantics.merchant.value,'Personal shop');assert.equal(op.semantics.merchant.source,'personal_rule');assert.equal(op.semantics.role.value,'neutral');
+ const op=await importedOperation();assert.equal(op.source.merchantText,'Ozon');assert.equal(op.source.description,'Покупка');assert.equal(op.source.sourceKind,'purchase');assert.equal(op.source.versions.sanitizer,sourceSanitizer);assert.equal(op.semantics.kind.value,'purchase');assert.equal(op.semantics.merchant.value,'Personal shop');assert.equal(op.semantics.merchant.source,'personal_rule');assert.equal(op.semantics.role.value,'neutral');
 });
 test('enrichment appends provenance and upgrades unverified bank facets without duplicating a file instance',async()=>{
  const a=await batch([row({bankReference:undefined})],'Same synthetic PDF');await accept(a);await drain(a.batchId);
  const b=await safeBatch([row({bankReference:undefined,safeSource:{event:'purchase',merchant:'ozon'}})],'Same synthetic PDF');await accept(b);assert.equal((await drain(b.batchId)).counts.updated,1);
- const op=(await request('/finance/state')).json().operations[0];assert.equal(op.semantics.kind.value,'purchase');assert.equal(op.semantics.role.value,'expense');assert.equal(op.semantics.merchant.value,'Ozon');assert.equal((await counts()).transaction,1);assert.equal((await counts()).source_observation,2);
+ const op=await importedOperation();assert.equal(op.semantics.kind.value,'purchase');assert.equal(op.semantics.role.value,'expense');assert.equal(op.semantics.merchant.value,'Ozon');assert.equal((await counts()).transaction,1);assert.equal((await counts()).source_observation,2);
 });
 test('safe source updates preserve verified semantics, corrections, category and comments',async()=>{
  const a=await safeBatch();await accept(a);await drain(a.batchId);const t=(await pg.owner.query('SELECT id FROM finance.transaction')).rows[0].id;
  await command({kind:'operation',id:t,patch:{kind:'transfer_out',role:'neutral',merchant:'Verified shop',comment:'Synthetic preserved comment',corrections:{amountMinor:'-777'}}});
  const before=(await pg.owner.query('SELECT semantics,corrections,comment FROM finance.transaction WHERE id=$1',[t])).rows[0];
- const b=await safeBatch([row({safeSource:{event:'purchase',merchant:'magnit'}})],'Updated synthetic PDF');await accept(b);assert.equal((await drain(b.batchId)).counts.updated,1);assert.deepEqual((await pg.owner.query('SELECT semantics,corrections,comment FROM finance.transaction WHERE id=$1',[t])).rows[0],before);assert.equal((await request('/finance/state')).json().operations[0].source.merchantText,'Магнит');
+ const b=await safeBatch([row({safeSource:{event:'purchase',merchant:'magnit'}})],'Updated synthetic PDF');await accept(b);assert.equal((await drain(b.batchId)).counts.updated,1);assert.deepEqual((await pg.owner.query('SELECT semantics,corrections,comment FROM finance.transaction WHERE id=$1',[t])).rows[0],before);assert.equal((await importedOperation()).source.merchantText,'Магнит');
 });
 test('older and unknown descriptions cannot erase prior merchant source facts',async()=>{
  const a=await safeBatch();await accept(a);await drain(a.batchId);
  for(const b of [await batch([row()],'Older profile'),await safeBatch([row({safeSource:{event:'purchase',merchant:null}})],'Unknown store')]){await accept(b);const s=await drain(b.batchId);assert.equal(s.counts.existing,1);assert.equal(s.counts.updated,0);}
- const op=(await request('/finance/state')).json().operations[0];assert.equal(op.source.merchantText,'Ozon');assert.equal(op.source.description,'Покупка');assert.equal(op.semantics.merchant.value,'Ozon');assert.equal((await counts()).source_observation,3);
+ const op=await importedOperation();assert.equal(op.source.merchantText,'Ozon');assert.equal(op.source.description,'Покупка');assert.equal(op.semantics.merchant.value,'Ozon');assert.equal((await counts()).source_observation,3);const observations=(await pg.owner.query('SELECT versions FROM finance.source_observation')).rows;assert.equal(observations.every(o=>o.versions.sourceSanitizer===sourceSanitizer&&o.versions.merchantSanitizer===sourceSanitizer),true);
 });
 test('safe merchant equality alone never authorizes cross-file dedupe',async()=>{
  for(const bytes of ['Synthetic first PDF','Synthetic second PDF']){const b=await safeBatch([row({bankReference:undefined,safeSource:{event:'purchase',merchant:'ozon'}})],bytes);await accept(b);assert.equal((await drain(b.batchId)).counts.created,1);}
