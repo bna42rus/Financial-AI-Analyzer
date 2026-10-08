@@ -9,7 +9,6 @@ import type {Operation,BankFact} from '../../../packages/finance-core/src/model.
 import {applyRules} from '../../../packages/finance-core/src/rules.ts';
 import {reconcile} from '../../../packages/finance-core/src/graph.ts';
 import {prepareFinance,loadFinance,withPreparedImport} from './finance.ts';
-import {assertImportEpoch} from './pseudonym-context.ts';
 import {canonicalAccount} from './finance-structure.ts';
 import {stableJSON} from './finance-history.ts';
 import {HttpError} from './types.ts';
@@ -22,7 +21,8 @@ const bankNames:Record<Bank,string>={tbank:'Т-Банк',ozon:'Ozon Банк',sb
 export async function acceptImport(db:PoolClient,userId:string,input:unknown){
  try{
   const context=parseContext(input&&typeof input==='object'?(input as Record<string,unknown>).context:undefined);
-  const state=await prepareFinance(db,userId);assertImportEpoch(context,state);
+  const state=await prepareFinance(db,userId);
+  if(context.generation!==state.generation||context.keyVersion!==state.key_version)throw new HttpError(409,'IMPORT_CONTEXT_CHANGED');
   const {batch}=validatePreparedBatch(input);
   const digest=createHash('sha256').update(stableJSON({...batch,context:{generation:context.generation,keyVersion:context.keyVersion}})).digest('hex');
   const previous=(await db.query('SELECT request_digest FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,batch.batchId])).rows[0];
@@ -92,8 +92,8 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   WHERE r.user_id=$1 AND r.alias_kind=$2 AND r.alias_hmac=$3 AND f.bank=$4 AND r.status='imported'`,[userId,row.account.kind,row.account.hmac,bank])).rows;
   const used=new Set<string>((await db.query('SELECT o.transaction_id FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE r.user_id=$1 AND r.file_id=$2',[userId,entry.file_id])).rows.map(r=>r.transaction_id));
   const match=matchSource(row,entry.file_hmac,candidates,used),transactionId=match.transactionId??randomUUID(),observationId=randomUUID();
-  const prior=match.transactionId?(await db.query(`SELECT t.semantics,t.source_observation_id,o.* FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) WHERE t.user_id=$1 AND t.id=$2`,[userId,transactionId])).rows[0]:null;
-  const unchanged=prior&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:BigInt(prior.amount_minor)<0n?'debit':BigInt(prior.amount_minor)>0n?'credit':'unknown'});
+  const prior=match.transactionId?(await db.query(`SELECT t.semantics,t.source_observation_id,o.*,r.direction FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.ingestion_row r ON (r.user_id,r.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.id=$2`,[userId,transactionId])).rows[0]:null;
+  const unchanged=prior&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:prior.direction??row.direction});
   const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,sourceKind:'other',merchantText:'',description:'',bankCategory:'',bankRefHmac:row.bankRefHmac,versions:{parser:batch.versions.adapter,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:'unclassified/1'}};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
