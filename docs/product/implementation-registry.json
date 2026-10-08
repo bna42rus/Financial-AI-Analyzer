@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "baseline_version": "1.3",
-  "as_of": "2026-10-07",
+  "as_of": "2026-10-08",
   "base_commit": "1d8219e6966711c1bf5f1aa5b8ef638c329f4ad5",
   "source_manifest": "docs/product/source-manifest.json",
   "scope_note": "Карта покрытия разделов и подпунктов, не процент готовности. Внутри подпункта может быть несколько обязательных сценариев; перед закрытием его нужно проверить полностью, при необходимости добавить дочерние требования. Extracted source_text вспомогателен: PDF/согласованные overrides остаются авторитетными, схемы сверяются визуально при реализации. Исторические C/D не отменяют последующую E. Текущие источники не редактируются.",
@@ -4780,7 +4780,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -4793,7 +4799,13 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-39",
@@ -4816,10 +4828,23 @@
       "title": "Продление доступа и ручные оплаты",
       "source_text": "Reminders За 7 дней — app + email; за 3 дня — app; за 1 день — app + email; в день окончания — заметное предупреждение. После expiry restricted screen содержит основную кнопку «Продлить доступ».",
       "group": "public-access",
-      "status": "not_verified",
-      "implementation_refs": [],
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
+      ],
       "verification_refs": [],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor."
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-39.2",
@@ -5083,13 +5108,25 @@
         "packages/database/migrations/0003_access_renewal.sql",
         "apps/web/src/ServerRenewal.tsx",
         "apps/admin/src/ServerRenewals.tsx",
-        "docs/architecture/access-renewal.md"
+        "docs/architecture/access-renewal.md",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/browser.test.ts"
       ],
-      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены."
+      "verification_plan": "Заявка и подтверждённый email до оплаты; ручное подтверждение, invitation-only регистрация; snapshots, renewal/expiry и календарный anchor. Development renewal: проверяются A-01 override, own RLS, календарь, concurrency/idempotency, suspension, rollback и HTTP/browser flow; reminders/delivery/manual grants/refunds/AI quota/full release acceptance не завершены.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-40",
@@ -5150,13 +5187,25 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-40.3",
@@ -5294,13 +5343,25 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-40.9",
@@ -5329,7 +5390,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
@@ -5337,7 +5404,13 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-40.11",
@@ -5367,13 +5440,25 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-40.13",
@@ -5435,13 +5520,25 @@
         "apps/api/src/security.ts",
         "apps/api/src/application.ts",
         "packages/database/migrations/0001_access_security.sql",
-        "docs/architecture/server-access-security.md"
+        "docs/architecture/server-access-security.md",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
         "apps/api/test/crypto.test.ts"
       ],
-      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override."
+      "verification_plan": "Development backend security coverage documented in server-access-security.md. Real PostgreSQL 18 integration evidence recorded in PR #8; production/KMS, real delivery, UI binding, full onboarding/entitlements and complete clause acceptance remain open. PDF 40.6 applies with approved E-04 recovery-code override.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-40.16",
@@ -5487,7 +5584,13 @@
         "apps/api/src/registration.ts",
         "packages/database/migrations/0002_invitation_registration.sql",
         "apps/web/src/ServerAccess.tsx",
-        "apps/admin/src/ServerAdmin.tsx"
+        "apps/admin/src/ServerAdmin.tsx",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "apps/api/test/security.test.ts",
@@ -5495,7 +5598,13 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-41",
@@ -5795,7 +5904,13 @@
         "packages/database/migrations/0004_manual_access.sql",
         "packages/access/src/manual.ts",
         "apps/admin/src/ServerManualAccess.tsx",
-        "docs/architecture/manual-access.md"
+        "docs/architecture/manual-access.md",
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
       ],
       "verification_refs": [
         "packages/access/test/model.test.ts",
@@ -5807,7 +5922,13 @@
         "docs/architecture/invitation-registration.md"
       ],
       "verification_plan": "Session revocation, ownership/entitlement, отдельные полномочия; TOTP/recovery codes; admin не читает финансовую базу; ручной доступ и аудит.",
-      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial."
+      "note": "Development API/UI binding: transactional first-payment review, scoped single-use invitation and independent expected-email proof, exactly-once account activation, separate link lifetime and paid period. Synthetic only; real mail delivery/owner onboarding, manual grants, renewal, full timezone/DST and release acceptance remain. Full requirement is partial; real PostgreSQL and HTTP/browser evidence is recorded in the PR. Manual access Development: relative/fixed/indefinite grants, individual compensation/end correction, finite quota policy, canonical session, metadata-only directory, TOTP/preview/revision/idempotency and audit/outbox. Exact-head evidence in PR; full clause, real delivery/AI/mass compensation/release acceptance remain partial.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-41.12",
@@ -6075,10 +6196,23 @@
       "title": "Monitoring, Incidents и Degraded Mode",
       "source_text": "Degraded Mode AI outage не должен закрывать Operations. Web-search outage не блокирует внутренний финансовый анализ, но запрещает выдавать неподтверждённые актуальные внешние данные. Email outage ставит письма в retry queue. OCR outage затрагивает только сканы. AI classification outage не мешает импорту сохранить операции с unresolved status.",
       "group": "operations-infra",
-      "status": "not_verified",
-      "implementation_refs": [],
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
+      ],
       "verification_refs": [],
-      "verification_plan": "Maintenance и degraded mode; изоляция сред; backup restore с повторным удалением; неизменяемая сборка, migrations, принятие владельцем и восстановление."
+      "verification_plan": "Maintenance и degraded mode; изоляция сред; backup restore с повторным удалением; неизменяемая сборка, migrations, принятие владельцем и восстановление.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-43.7",
@@ -6257,10 +6391,23 @@
       "title": "Development, Staging и Production",
       "source_text": "Staging isolation Staging email уходят только в sandbox/test inbox, SMS — на allowlist, Production webhooks не вызываются, real-user notifications не отправляются, AI/Web могут использовать отдельные keys/quotas.",
       "group": "operations-infra",
-      "status": "not_verified",
-      "implementation_refs": [],
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/mail-worker.ts",
+        "apps/api/src/mail-templates.ts",
+        "apps/api/src/mail-admin.ts",
+        "packages/database/migrations/0005_mail_notifications.sql",
+        "apps/admin/src/ServerDeliveries.tsx",
+        "docs/architecture/mail-notifications.md"
+      ],
       "verification_refs": [],
-      "verification_plan": "Maintenance и degraded mode; изоляция сред; backup restore с повторным удалением; неизменяемая сборка, migrations, принятие владельцем и восстановление."
+      "verification_plan": "Maintenance и degraded mode; изоляция сред; backup restore с повторным удалением; неизменяемая сборка, migrations, принятие владельцем и восстановление.",
+      "test_refs": [
+        "apps/api/test/mail.test.ts",
+        "apps/api/test/mail-templates.test.ts",
+        "apps/api/test/browser.test.ts"
+      ],
+      "notes": " Development mail/sandbox delivery, status/retry and canonical reminders; real Postbox and full event/security/release acceptance remain."
     },
     {
       "id": "PDF-45.8",

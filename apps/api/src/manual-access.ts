@@ -37,7 +37,7 @@ export async function manualQueue(db:PoolClient):Promise<ManualQueue>{
  const users=(await db.query(`SELECT d.*,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
   FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id) ORDER BY d.registered_at DESC,d.user_id LIMIT 100`)).rows;
  const invites=(await db.query(`SELECT i.id,i.manual_grant_id AS "grantId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",
-  CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state,
+  COALESCE((SELECT d.state FROM mail.delivery d WHERE d.subject_id=i.id AND d.kind='invitation' ORDER BY d.created_at DESC LIMIT 1),'queued') AS delivery,CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state,
   g.term,g.access_type AS "accessType",g.quota_policy AS quota,g.reason FROM commerce.invitation i JOIN commerce.manual_grant g ON g.id=i.manual_grant_id ORDER BY i.created_at DESC,i.id DESC LIMIT 100`)).rows;
  return {users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null})),invitations:invites,
   audit:(await db.query('SELECT data FROM commerce.manual_access_audit ORDER BY created_at DESC,action_id DESC LIMIT 100')).rows.map(r=>r.data),
@@ -53,7 +53,7 @@ async function availableEmail(db:PoolClient,address:string,now:string){
 async function newInvitation(db:PoolClient,grantId:string,address:string,lifetime:number,seal:Sealer,now:string){
  const secret=token(),id=crypto.randomUUID(),expires=new Date(Date.parse(now)+lifetime*3600000).toISOString();
  await db.query(`INSERT INTO commerce.invitation(id,manual_grant_id,email,verifier,sealed_token,expires_at,state,created_at) VALUES($1,$2,$3,$4,$5,$6,'active',$7)`,[id,grantId,address,digest(secret),seal.seal(secret),expires,now]);
- await outbox(db,'access',seal,'invitation',{email:address,token:secret,expiresAt:expires});
+ await outbox(db,'access',seal,'invitation',{email:address,token:secret,expiresAt:expires},{subjectId:id,expiresAt:expires});
 }
 export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean){
  const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota']);
@@ -106,7 +106,7 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,revision,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET anchor_at=EXCLUDED.anchor_at,access_end=EXCLUDED.access_end,revision=EXCLUDED.revision,calendar_months=EXCLUDED.calendar_months,extra_days=EXCLUDED.extra_days,indefinite=EXCLUDED.indefinite,end_offset_ms=EXCLUDED.end_offset_ms,quota_policy=EXCLUDED.quota_policy`,
    [userId,next.anchorAt,next.accessEnd,next.timezone,next.revision,next.calendarMonths,next.extraDays,next.indefinite??false,next.endOffsetMs??0,q]);
-  await outbox(db,'access',seal,'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false});
+  await outbox(db,'access',seal,'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false},{subjectId:userId});
  }
  const audit={actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
  await db.query('INSERT INTO commerce.manual_access_audit(action_id,user_id,data,created_at) VALUES($1,$2,$3,$4)',[id,userId??null,audit,now]);

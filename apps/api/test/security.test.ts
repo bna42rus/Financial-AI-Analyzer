@@ -6,6 +6,7 @@ import { createServer } from '../src/server.ts';
 import { hashPassword, envelope, digest, token } from '../src/crypto.ts';
 import type { Config } from '../src/types.ts';
 import type { FastifyInstance } from 'fastify';
+import {deliverBatch,sandboxTransport} from '../src/mail-worker.ts';
 import {extensionAt} from '../src/entitlement.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>;
@@ -21,7 +22,7 @@ before(async () => {
 });
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
-  await pg.owner.query(`TRUNCATE identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
+  await pg.owner.query(`TRUNCATE mail.delivery,mail.resend_audit,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
     identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
@@ -706,4 +707,35 @@ test('ended fixed grant can be explicitly replaced, while link expiry alone rese
  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.invitation')).rowCount,2);assert.equal((await userBrowser().post('/access/registration-proof',{invitationToken:oldToken})).statusCode,400);
  const currentToken=(await mail('access','invitation',cc)).token;assert.equal((await userBrowser().post('/access/registration-proof',{invitationToken:currentToken})).statusCode,202);
  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.purchase')).rowCount,0);
+});
+
+
+test('delivery metadata is TOTP-gated and never contains reset URLs, email proofs or payloads; resend is audited and idempotent',async()=>{
+ const raw=adminBrowser();assert.equal((await raw.get('/control/deliveries')).statusCode,401);
+ const {b}=await enrolledAdmin();const i=await b.post('/control/manual-preview',manualInvite());assert.equal(i.statusCode,200);
+ const command={...manualInvite(),actionId:crypto.randomUUID(),expectedRevision:i.json().expectedRevision,expectedMode:i.json().previousMode,expectedQuota:i.json().quota};
+ assert.equal((await b.post('/control/manual-access',command)).statusCode,200);
+ const row=(await pg.owner.query("SELECT id FROM access.outbox WHERE kind='invitation' ORDER BY created_at DESC LIMIT 1")).rows[0];
+ await pg.owner.query("UPDATE access.outbox SET state='failed',last_error='TEMPORARY',attempts=5,retry_count=5 WHERE id=$1",[row.id]);
+ const metadata=await b.get('/control/deliveries');assert.equal(metadata.statusCode,200);assert.ok(!metadata.body.includes('sealed_payload'));assert.ok(!metadata.body.includes('manual@example.test'));
+ const action={actionId:crypto.randomUUID(),deliveryId:row.id,reason:'Retry after synthetic outage'};assert.equal((await b.post('/control/delivery-retry',action)).statusCode,200);assert.equal((await b.post('/control/delivery-retry',action)).json().status,'already_committed');
+ assert.equal((await pg.owner.query('SELECT 1 FROM mail.resend_audit')).rowCount,1);assert.equal((await pg.owner.query('SELECT attempts FROM access.outbox WHERE id=$1',[row.id])).rows[0].attempts,5);
+ assert.equal((await userBrowser().get('/control/deliveries')).statusCode,404);
+ const secret=await mail('access','invitation',cc);assert.ok(!metadata.body.includes(secret.token));
+});
+
+
+test('active invitation resend is TOTP-gated, reuses link/expiry, rejects queued duplicates and is audited/idempotent',async()=>{
+ const {b}=await enrolledAdmin();const command=await manualCommand(b,manualInvite());const saved=await b.post('/control/manual-access',command);assert.equal(saved.statusCode,200);const invite=saved.json().invitations[0];
+ const action={actionId:crypto.randomUUID(),invitationId:invite.id,reason:'Requested resend'};
+ assert.equal((await userBrowser().post('/control/invitation-resend',action)).statusCode,404);
+ assert.equal((await b.post('/control/invitation-resend',action)).statusCode,409);
+ const old=await mail('access','invitation',cc),worker={profile:'control' as const,pool:pg.mailControl,wrappingKey:cc.wrappingKey,environment:'test' as const,financeOrigin:fc.origin,controlOrigin:cc.origin,adminRecipient:'owner@example.test'};
+ await deliverBatch(worker,sandboxTransport(worker));
+ assert.equal((await b.post('/control/invitation-resend',{...action,reason:''})).statusCode,400);
+ assert.equal((await b.post('/control/invitation-resend',action)).statusCode,200);assert.equal((await b.post('/control/invitation-resend',action)).json().status,'already_committed');
+ assert.equal((await pg.owner.query('SELECT 1 FROM mail.resend_audit')).rowCount,1);const next=await mail('access','invitation',cc);assert.equal(next.token,old.token);assert.equal(next.expiresAt,old.expiresAt);
+ assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='invitation'")).rowCount,2);
+ await deliverBatch(worker,sandboxTransport(worker));assert.equal((await pg.owner.query("SELECT 1 FROM mail.delivery WHERE kind='invitation' AND state='sent'")).rowCount,2);
+ await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",[invite.id]);assert.equal((await b.post('/control/invitation-resend',{...action,actionId:crypto.randomUUID()})).statusCode,409);
 });

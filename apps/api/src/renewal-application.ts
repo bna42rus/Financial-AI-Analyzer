@@ -41,7 +41,7 @@ export async function renewalApplication(db:PoolClient,request:FastifyRequest,us
    if(action==='claim'){
      try{store=claimPayment({...store,requests:[data]},data.id,{name:string(b.senderName,100),bank:string(b.senderBank,100)},now);}catch{throw new HttpError(409,'RENEWAL_CONFLICT');}
      data=store.requests[0]!;
-     await outbox(db,'access',seal,'renewal_claim',{email:user.email,name:user.name,senderName:data.senderName,senderBank:data.senderBank,expectedMinor:data.tariff.priceMinor,tariff:data.tariff,createdAt:data.createdAt,claimedAt:data.claimedAt,lastClaimedAt:data.lastClaimedAt});
+     await outbox(db,'access',seal,'renewal_claim',{email:user.email,name:user.name,senderName:data.senderName,senderBank:data.senderBank,expectedMinor:data.tariff.priceMinor,tariff:data.tariff,createdAt:data.createdAt,claimedAt:data.claimedAt,lastClaimedAt:data.lastClaimedAt},{subjectId:data.id,dedupeKey:'renewal-claim:'+data.id+':'+data.revision});
    }else{
      if(data.claimedAt||data.status!=='awaiting_payment')throw new HttpError(409,'RENEWAL_FROZEN');
      data={...data,revision:data.revision+1,...(action==='change'?{tariff:await snapshot(db,b.tariffId)}:{})};

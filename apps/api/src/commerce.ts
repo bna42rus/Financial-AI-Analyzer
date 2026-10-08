@@ -38,7 +38,7 @@ async function save(db:PoolClient,before:AccessStore,next:AccessStore,seal:Seale
     const secret=token();
     invite.expiresAt=new Date(Date.parse(invite.createdAt)+lifetime*3600000).toISOString();
     await db.query(`INSERT INTO commerce.invitation(id,purchase_id,email,verifier,sealed_token,expires_at,state,created_at) VALUES($1,$2,$3,$4,$5,$6,'active',$7)`,[invite.id,invite.purchaseId,invite.email,digest(secret),seal.seal(secret),invite.expiresAt,invite.createdAt]);
-    await outbox(db,'access',seal,'invitation',{email:invite.email,token:secret,expiresAt:invite.expiresAt});
+    await outbox(db,'access',seal,'invitation',{email:invite.email,token:secret,expiresAt:invite.expiresAt},{subjectId:invite.id,expiresAt:invite.expiresAt});
   }
   // Persist the actual link lifetime alongside the immutable purchase duration.
   await db.query('UPDATE commerce.review_state SET data=$1 WHERE request_id=$2',[next,row.id]);
@@ -49,7 +49,7 @@ export async function queue(db:PoolClient) {
   const states=(await db.query('SELECT data FROM commerce.review_state WHERE request_id=ANY($1::text[])',[ids])).rows.map(r=>r.data as AccessStore);
   return {requests,payments:states.flatMap(s=>s.payments),audit:states.flatMap(s=>s.audit),
     purchases:(await db.query('SELECT data,state,activated_at,access_end FROM commerce.purchase WHERE request_id=ANY($1::text[])',[ids])).rows.map(r=>({...r.data,state:r.state,activatedAt:r.activated_at,accessEnd:r.access_end})),
-    invitations:(await db.query(`SELECT i.id,i.purchase_id AS "purchaseId",p.request_id AS "requestId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state FROM commerce.invitation i JOIN commerce.purchase p ON p.id=i.purchase_id WHERE p.request_id=ANY($1::text[]) ORDER BY i.created_at,i.id`,[ids])).rows.map(r=>({...r,delivery:'queued'}))};
+    invitations:(await db.query(`SELECT i.id,i.purchase_id AS "purchaseId",p.request_id AS "requestId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",COALESCE((SELECT d.state FROM mail.delivery d WHERE d.subject_id=i.id AND d.kind='invitation' ORDER BY d.created_at DESC LIMIT 1),'queued') AS delivery,CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state FROM commerce.invitation i JOIN commerce.purchase p ON p.id=i.purchase_id WHERE p.request_id=ANY($1::text[]) ORDER BY i.created_at,i.id`,[ids])).rows};
 }
 export async function review(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean) {
   const b=fields(request,['actionId','requestId','expectedRevision','actualMinor','receivedAt','decision','reason','customDays','inviteHours']);
@@ -61,7 +61,7 @@ export async function review(db:PoolClient,request:FastifyRequest,actorId:string
   let next:AccessStore;try {next=reviewRequest(before,cmd,await clock(db));}catch {throw new HttpError(409,'REVIEW_CONFLICT');}
   if(preview)return {request:next.requests[0],payment:next.payments.find(p=>p.actionId===id),purchase:next.purchases.find(p=>p.id==='purchase:'+id),inviteHours:lifetime};
   await save(db,before,next,seal,lifetime);
-  await outbox(db,'access',seal,'payment_decision',{email:before.requests[0]!.email,status:next.requests[0]!.status,remainingMinor:next.requests[0]!.remainingMinor});
+  await outbox(db,'access',seal,'payment_decision',{email:before.requests[0]!.email,status:next.requests[0]!.status,remainingMinor:next.requests[0]!.remainingMinor},{subjectId:requestId});
   return {status:'committed',...(await queue(db))};
 }
 export async function invitationAction(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer) {

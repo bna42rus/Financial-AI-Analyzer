@@ -29,7 +29,7 @@ export async function createApplication(db: PoolClient, request: FastifyRequest,
   }
   const secret = token();
   await db.query(`INSERT INTO access.email_token(verifier,request_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '30 minutes')`, [digest(secret), row.id]);
-  await outbox(db, 'access', seal, 'application_verification', { email: address, token: secret });
+  await outbox(db, 'access', seal, 'application_verification', { email: address, token: secret },{subjectId:row.id});
   return { status: 'accepted' };
 }
 export async function verifyApplication(db: PoolClient, request: FastifyRequest) {
@@ -57,10 +57,11 @@ export async function ownedApplication(db: PoolClient, config: Config, request: 
   if (!entry || !entry.data.verifiedAt) throw new HttpError(401, 'APPLICATION_SESSION_REQUIRED');
   return entry.data as AccessRequest;
 }
-export async function applicationClaim(db: PoolClient, config: Config, request: FastifyRequest) {
+export async function applicationClaim(db: PoolClient, config: Config, request: FastifyRequest, seal: Sealer) {
   const input = fields(request, ['senderName', 'senderBank']), row = await ownedApplication(db, config, request);
   const changed = claimPayment(one(row), row.id, { name: string(input.senderName, 100), bank: string(input.senderBank, 100) }, await clock(db)).requests[0]!;
   await db.query('UPDATE access.request SET data=$1 WHERE id=$2', [changed, row.id]);
+  await outbox(db,'access',seal,'payment_claim',{email:changed.email,name:changed.name,senderName:changed.senderName,senderBank:changed.senderBank,expectedMinor:changed.tariff.priceMinor,tariff:changed.tariff,createdAt:changed.createdAt,claimedAt:changed.claimedAt,lastClaimedAt:changed.lastClaimedAt},{subjectId:changed.id,dedupeKey:'payment-claim:'+changed.id+':'+changed.revision});
   return publicRequest(changed);
 }
 

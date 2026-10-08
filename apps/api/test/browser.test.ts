@@ -5,6 +5,7 @@ import type {ChildProcess} from 'node:child_process';
 import {randomBytes,createHmac} from 'node:crypto';
 import {chromium,expect} from '@playwright/test';
 import {postgresFixture} from './postgres.ts';
+import {deliverBatch,sandboxTransport} from '../src/mail-worker.ts';
 import {createServer} from '../src/server.ts';
 import {hashPassword,token,envelope} from '../src/crypto.ts';
 import type {Config} from '../src/types.ts';
@@ -13,7 +14,13 @@ let pg:Awaited<ReturnType<typeof postgresFixture>>,finance:Awaited<ReturnType<ty
 let fc:Config,cc:Config;const children:ChildProcess[]=[],pw='Synthetic browser password 123!';
 const web='http://127.0.0.1:5175',admin='http://127.0.0.1:5176';
 async function ready(url:string){for(let i=0;i<100;i++){try{if((await fetch(url)).ok)return;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw new Error('Synthetic UI did not start');}
-async function mail(kind:string,config=fc){const row=(await pg.owner.query('SELECT sealed_payload FROM access.outbox WHERE kind=$1 ORDER BY created_at DESC LIMIT 1',[kind])).rows[0];assert.ok(row);return JSON.parse(envelope(config.wrappingKey).open(row.sealed_payload));}
+async function mail(kind:string,config=fc){
+ const worker={profile:config.profile,pool:config.profile==='control'?pg.mailControl:pg.mailFinance,wrappingKey:config.wrappingKey,environment:'test' as const,financeOrigin:web,controlOrigin:admin,adminRecipient:'owner@example.test'};
+ await deliverBatch(worker,sandboxTransport(worker));
+ const row=(await pg.owner.query("SELECT inbox.sealed_message FROM mail.sandbox_inbox inbox JOIN mail.delivery d USING(id) WHERE d.kind=$1 ORDER BY d.created_at DESC LIMIT 1",[kind])).rows[0];assert.ok(row,'Expected message accepted by the sandbox');
+ const message=JSON.parse(envelope(config.wrappingKey).open(row.sealed_message)),secret=message.text.match(/(?:token=|\n)([A-Za-z0-9_-]{43})(?:\n|$)/)?.[1];assert.ok(secret,'Expected proof from actual delivered content');
+ return {email:message.to,token:secret,proofToken:secret};
+}
 function otp(secret:string){const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits='';for(const c of secret)bits+=alphabet.indexOf(c).toString(2).padStart(5,'0');const bytes=Buffer.from((bits.match(/.{8}/g)??[]).map(v=>parseInt(v,2))),counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(Math.floor(Date.now()/30000)));const h=createHmac('sha1',bytes).update(counter).digest(),offset=h.at(-1)!&15;return ((h.readUInt32BE(offset)&0x7fffffff)%1000000).toString().padStart(6,'0');}
 before(async()=>{
   pg=await postgresFixture();
@@ -26,7 +33,7 @@ before(async()=>{
 });
 after(async()=>{for(const c of children)c.kill('SIGTERM');await finance?.close();await control?.close();await pg?.close();});
 for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP review → independent email proof → registration → renewal (${mobile?'mobile':'desktop'})`,{timeout:60000},async()=>{
-  await pg.owner.query('TRUNCATE access.request,access.tariff,commerce.action,identity.auth_user,control.auth_user,access.outbox,identity.outbox,control.outbox,identity.rate_limit,control.rate_limit,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE');
+  await pg.owner.query('TRUNCATE mail.delivery,mail.resend_audit,mail.sandbox_inbox,access.request,access.tariff,commerce.action,identity.auth_user,control.auth_user,access.outbox,identity.outbox,control.outbox,identity.rate_limit,control.rate_limit,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE');
   const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);
   await pg.owner.query("INSERT INTO control.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('owner','Synthetic owner','owner@example.test',true,now(),now())");
@@ -42,7 +49,7 @@ for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP
     await owner.getByLabel('Текущий пароль').fill(pw);await owner.getByRole('button',{name:'Начать настройку'}).click();await expect(owner.getByLabel('Ключ для ручной настройки')).toBeVisible();const secret=await owner.getByLabel('Ключ для ручной настройки').inputValue();await owner.getByLabel('Код authenticator').fill(otp(secret));await owner.getByRole('button',{name:'Продолжить'}).click();await expect(owner.getByRole('heading',{name:'Сохраните резервные коды'})).toBeVisible();await owner.getByRole('button',{name:'Коды сохранены'}).click();
     await owner.getByRole('button',{name:/Synthetic visitor/}).click();await owner.getByRole('button',{name:'Показать последствия'}).click();await expect(owner.getByRole('heading',{name:'Последствия решения'})).toBeVisible();assert.equal((await pg.owner.query('SELECT * FROM commerce.purchase')).rowCount,0);
     await owner.getByRole('button',{name:'Подтвердить решение'}).click();await expect(owner.getByText('Оплачено — ожидает регистрации. Срок доступа ещё не начался.',{exact:true})).toBeVisible();
-    await owner.getByRole('button',{name:'Приглашения',exact:true}).click();await owner.getByRole('button',{name:'Показать ссылку'}).click();const link=await owner.getByLabel('Ссылка приглашения').inputValue();const invitation=await mail('invitation',cc);assert.ok(link.includes(invitation.token));
+    await owner.getByRole('button',{name:'Приглашения',exact:true}).click();await owner.getByRole('button',{name:'Показать ссылку'}).click();const link=await owner.getByLabel('Ссылка приглашения').inputValue();const invitation=await mail('invitation',cc);assert.ok(link.includes(invitation.token));await owner.getByRole('button',{name:'Обновить данные',exact:true}).click();await owner.getByRole('button',{name:'Отправить приглашение повторно',exact:true}).click();await owner.getByLabel('Причина повторной отправки приглашения').fill('Synthetic requested resend');await owner.getByRole('button',{name:'Подтвердить отправку приглашения',exact:true}).click();await expect(owner.getByText('Приглашение поставлено в очередь повторно. Срок ссылки сохранён.',{exact:true})).toBeVisible();assert.equal((await mail('invitation',cc)).token,invitation.token);await owner.getByRole('button',{name:'Письма',exact:true}).click();await expect(owner.getByRole('heading',{name:'Доставка писем'})).toBeVisible();await expect(owner.getByText('Принято тестовым ящиком · попыток: 1',{exact:true}).first()).toBeVisible();
     // A page without the application cookie can open the copied invite, but still needs an independent email proof.
     const independent=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},timezoneId:'Europe/Moscow'}),registration=await independent.newPage();
     try{
@@ -50,7 +57,7 @@ for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP
       await registration.getByRole('button',{name:'Запросить подтверждение почты'}).click();await expect(registration.getByText('Письмо с отдельным подтверждением поставлено в очередь.')).toBeVisible();const proof=await mail('registration_verification');assert.equal(proof.email,'visitor@example.test');
       await registration.getByLabel('Код подтверждения из отдельного письма').fill(proof.proofToken);await registration.getByLabel('Имя',{exact:true}).fill('Registered example');await registration.getByLabel('Новый пароль').fill(pw);await registration.getByRole('button',{name:'Зарегистрироваться'}).click();await expect(registration.getByRole('heading',{name:'Вход в аккаунт'})).toBeVisible();
       await registration.getByLabel('Почта',{exact:true}).fill('visitor@example.test');await registration.getByLabel('Пароль',{exact:true}).fill(pw);await registration.getByRole('button',{name:'Продолжить'}).click();await expect(registration.getByText('Доступ активен.',{exact:true})).toBeVisible();
-      await owner.getByRole('button',{name:'Обновить данные'}).click();await expect(owner.getByText(/Использовано · создано/)).toBeVisible();
+      await owner.getByRole('button',{name:'Приглашения',exact:true}).click();await owner.getByRole('button',{name:'Обновить данные'}).click();await expect(owner.getByText(/Использовано · создано/)).toBeVisible();
       const purchase=(await pg.owner.query('SELECT * FROM commerce.purchase')).rows[0];assert.equal(purchase.state,'active');assert.equal((await pg.owner.query('SELECT * FROM identity.auth_session')).rowCount,1);
       const originalEnd=purchase.access_end.toISOString();
       await registration.getByRole('button',{name:'Продлить доступ',exact:true}).click();await expect(registration.getByText('Ожидает оплаты',{exact:true})).toBeVisible();

@@ -6,6 +6,8 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import { fromNodeHeaders } from 'better-auth/node';
+import {accessWarning,describeDevice} from './mail-templates.ts';
+import {mailQueue,retryMail,resendInvitation} from './mail-admin.ts';
 import { envelope } from './crypto.ts';
 import { makeAuth, current, requireAdmin, recordAuthResult } from './auth.ts';
 import { resetRequest, resetPassword, recoverAdmin } from './security.ts';
@@ -123,7 +125,7 @@ export async function createServer(config: Config) {
             const newSession = await auth.api.getSession({ headers: new Headers({ ...Object.fromEntries(headers), cookie: cookies.map(c => c.split(';')[0]).join('; ') }), query: { disableCookieCache: true } });
             if (newSession && config.profile === 'finance') {
               await event(db, schema, newSession.user.id, 'password_login');
-              await outbox(db, schema, seal, 'security_login', { email: newSession.user.email, at: newSession.session.createdAt, profile: 'finance' });
+              await outbox(db, schema, seal, 'security_login', { email: newSession.user.email, at: newSession.session.createdAt, profile: 'finance',device:describeDevice(request.headers['user-agent']) },{subjectId:newSession.user.id});
             }
           }
           // Do not expose native user/session tokens in JSON. Cookies carry the opaque session.
@@ -148,8 +150,14 @@ export async function createServer(config: Config) {
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { name: s.user.name, accessEnd:state.access_end,timezone:state.timezone,indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          result = { name: s.user.name,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:state.timezone,indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
+      } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
+        await requireAdmin(auth,db,request);result=await mailQueue(db);
+      } else if (config.profile==='control'&&path==='/control/delivery-retry'&&request.method==='POST'){
+        const s=await requireAdmin(auth,db,request);result=await retryMail(db,request,s.user.id);
+      } else if (config.profile==='control'&&path==='/control/invitation-resend'&&request.method==='POST'){
+        const s=await requireAdmin(auth,db,request);result=await resendInvitation(db,request,s.user.id,seal);
       } else if (manual && path==='/control/accesses' && request.method==='GET') {
         await requireAdmin(auth,db,request);result=await manual.manualQueue(db);
       } else if (manual && ['/control/manual-preview','/control/manual-access'].includes(path) && request.method==='POST') {
@@ -201,7 +209,7 @@ export async function createServer(config: Config) {
         if (request.url.includes('?')) throw new HttpError(400, 'INVALID_INPUT');
         result = { request: application.publicRequest(await application.ownedApplication(db, config, request)) };
       } else if (application && path === '/access/payment-claim' && request.method === 'POST') {
-        result = { request: await application.applicationClaim(db, config, request) };
+        result = { request: await application.applicationClaim(db, config, request, seal) };
       } else throw new HttpError(404, 'NOT_FOUND');
       await db.query('COMMIT'); db.release(); db = undefined;
       if (cookies.length) reply.header('set-cookie', cookies);

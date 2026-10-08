@@ -21,7 +21,7 @@ export async function requestRegistrationProof(db:PoolClient,request:FastifyRequ
   // Do not revoke earlier proofs on request: someone with a copied invite must not block its owner.
   const secret=token();
   await db.query(`INSERT INTO access.registration_proof(verifier,invitation_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '15 minutes')`,[digest(secret),invite.id]);
-  await outbox(db,'access',seal,'registration_verification',{email:invite.email,proofToken:secret});
+  await outbox(db,'access',seal,'registration_verification',{email:invite.email,proofToken:secret},{subjectId:invite.id});
   return {status:'accepted'};
 }
 export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer) {
@@ -56,7 +56,7 @@ export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer)
   if(purchase){await db.query('DELETE FROM access.application_session WHERE request_id=$1',[purchase.request_id]);
   await db.query('UPDATE access.email_token SET consumed_at=$1 WHERE request_id=$2',[times.start,purchase.request_id]);}
   await event(db,'identity',id,'invitation_registration');
-  await outbox(db,'identity',seal,'access_activated',{email:invite.email,activatedAt:times.start,accessEnd:times.finish,indefinite});
+  await outbox(db,'identity',seal,'access_activated',{email:invite.email,activatedAt:times.start,accessEnd:times.finish,indefinite},{subjectId:id});
   // No implicit login/session. The chosen password must be used for a fresh normal sign-in.
   return {status:'registered',activatedAt:times.start,accessEnd:times.finish};
 }
