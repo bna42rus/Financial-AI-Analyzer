@@ -1,3 +1,4 @@
+import {extractSafeSource} from './safe-source.ts';
 import {dateFact} from '../../finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 import type {BankDate} from '../../finance-core/src/model.ts';
@@ -45,14 +46,15 @@ export function pdfMoney(input:string,unsignedDebit=false){
  const amountMinor=(minus?-n:n).toString();parsePersistedMinor(amountMinor);
  return {amountMinor,direction:n===0n?'unknown' as const:minus?'debit' as const:'credit' as const};
 }
-type Columns={date:number;posted?:number;postedEnd?:number;time?:number;amount:number;end:number;description:number;doc?:number;moscow:boolean};
+type Columns={date:number;posted?:number;postedEnd?:number;time?:number;amount:number;end:number;description:number;descriptionEnd?:number;doc?:number;moscow:boolean};
 function header(bank:Bank,page:Line[],index:number):Columns|null{
  const line=page[index]!,next=page[index+1];
  if(bank==='tbank'&&/дата и время/.test(norm(line.text))&&/сумма операции/.test(norm(line.text))){
   const date=anchor(line,/^дата и время$/),posted=anchor(line,/^дата$/),amount=anchor(line,/^сумма операции$/),description=anchor(line,/^описание$/);
   if(date===undefined||posted===undefined||amount===undefined||description===undefined)return null;
   const postedEnd=anchor(line,/^сумма в валюте$/);if(postedEnd===undefined)return null;
-  return {date,posted,postedEnd,amount,end:description,description,moscow:false};
+  const descriptionEnd=anchor(line,/^номер$/);if(descriptionEnd===undefined)return null;
+  return {date,posted,postedEnd,amount,end:description,description,descriptionEnd,moscow:false};
  }
  if(bank==='sber'&&/дата операции/.test(norm(line.text))&&/сумма в (?:рублях|валюте счета)/.test(norm(line.text))&&next){
   const below=page.slice(index+1,index+4),date=anchor(line,/^дата операции/),description=below.map(l=>anchor(l,/^описание операции$/)).find(x=>x!==undefined),amount=anchor(line,/^сумма в /),end=anchor(line,/^остаток средств/);
@@ -85,7 +87,7 @@ function account(bank:Bank,first:Line[]){
  if(found.length!==1||!found[0])throw new BankPdfError('UNSUPPORTED_LAYOUT');
  return {kind:bank==='ozon'?'bank_contract' as const:'bank_account' as const,value:found[0]};
 }
-/** Parse only observed versioned layouts. Raw descriptions/document/auth codes are discarded.
+/** Parse only observed versioned layouts. Only finite safe signals may survive; raw descriptions/document/auth codes are discarded.
  * Document/auth codes are not certified stable transaction IDs and cannot drive automatic dedupe. */
 export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):ExtractedFile{
  if(bytes.length>MAX_PDF_BYTES||layout.length>MAX_PDF_PAGES)throw new BankPdfError('LOCAL_LIMIT');
@@ -121,6 +123,7 @@ export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):Ex
    try{const amount=cell(start,c.amount,c.end);Object.assign(row,pdfMoney(amount,bank==='sber'));
     if(bank==='tbank'?!/(?:₽|руб\.?|р\.?|RUB)\s*$/iu.test(amount):bank==='ozon'?!declaredRub:!declaredRub&&!page.some(l=>/сумма в рублях/.test(norm(l.text))))row.currency='UNSUPPORTED';
    }catch{/* Preparation records INVALID_AMOUNT without raw fragments. */}
+   row.safeSource=extractSafeSource(active.map(l=>cell(l,c!.description,c!.descriptionEnd??c!.amount)).join(' '),row.amountMinor);
    rows.push(row);if(rows.length>1000)throw new BankPdfError('LOCAL_LIMIT');active=[];
   }
   for(let i=0;i<page.length;i++){

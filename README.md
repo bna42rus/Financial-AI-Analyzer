@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Доступ | Серверная заявка/оплаты/приглашения/регистрация, продления/ручной доступ, email outbox, admin TOTP/recovery | Реальные провайдеры, owner onboarding, эксплуатация и полная security acceptance |
 | Финансовая основа | Accounts/categories/counterparties/rules, observations/corrections, components/links/allocations, preview/commit, история, исключения, Merge/Split, удаления и reset | Подключение рабочих финансовых экранов и будущих module dependencies |
-| Импорт | Локальный text-free HMAC contract, server validation/acceptance, durable provenance, account aliases, консервативный source dedupe, checkpoints/queue и privacy cascade | Реальные bank adapters/safe texts, strict fingerprints, cancellation/dedupe decisions, final classification/link pass и UI |
+| Импорт | Локальные PDF adapters/HMAC, ограниченные безопасные признаки/магазины, server validation/acceptance, durable provenance, account aliases, консервативный source dedupe, checkpoints/queue и privacy cascade | CSV/XLSX/OCR, более полный safe text profile, strict fingerprints, cancellation/dedupe decisions, final classification/link pass и UI |
 | Анализатор и выпуск | Приняты базовые макеты; Registry/AI полностью не реализованы | AI/provider checks, бюджеты/виджеты/views, Staging acceptance и Production |
 
 Актуальный следующий блок — проверенные локальные bank adapters и безопасный source-text profile с sanitized merchant/description. Text-free profile не закрывает полноценную source restoration или strict cross-file fingerprint. [Границы второго блока импорта](docs/architecture/import-ingestion.md). [Общий план](docs/product/implementation-plan.md). Исторический [bootstrap-status](docs/architecture/bootstrap-status.md) описывает ранние этапы, не текущую готовность.
@@ -34,3 +34,5 @@
 Для Production нужны полные проверки, отдельные credentials/среды/KMS/retention, принятие владельцем конкретного Staging artifact, миграции и rollback/forward-fix план. Админка не деплоит приложение.
 
 Локальная подготовка банковских PDF: [версии парсеров, приватность и текущие границы](docs/architecture/local-bank-parsers.md).
+
+Безопасные банковские признаки и магазины: [профиль и ограничения](docs/architecture/safe-bank-source.md).

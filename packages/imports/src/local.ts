@@ -1,3 +1,4 @@
+import {parseSafeSource,sourceSanitizer} from './safe-source.ts';
 import {dateFact,uuid} from '../../finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 import {aliasKinds,banks,MAX_FILES,MAX_ROWS,parseContext,validatePreparedBatch,versions} from './contract.ts';
@@ -5,7 +6,7 @@ import type {AliasKind,Bank,Context,IssueCode,PreparedBatch,PreparedFile,Prepare
 import {adapterVersions} from './contract.ts';
 
 export type LocalContext=Context&{key:string;expiresAt:string};
-/** Adapter extraction only. Text, names and extra columns are deliberately not copied into profile v1. */
+/** Adapter extraction only. Raw text, names and extra columns are never copied. Structured codes need an explicit sanitizer profile. */
 export type ExtractedRow={operationDate:unknown;postedDate?:unknown;amountMinor:unknown;currency:unknown;direction:unknown;account:{kind:AliasKind;value:unknown};bankReference?:unknown;[localOnly:string]:unknown};
 export type ExtractedFile={fileId:string;bank:Bank;bytes:Uint8Array;rows:ExtractedRow[];error?:'LOCAL_READ_FAILED';[localOnly:string]:unknown};
 export class LocalPreparationError extends Error{readonly code:string;constructor(code:string){super(code);this.code=code;}}
@@ -28,7 +29,8 @@ function bytesFromKey(input:unknown){
 }
 const encoder=new TextEncoder();
 /** Browser WebCrypto only. No network, storage, telemetry, AI or raw-file upload dependency. */
-export async function createLocalPreparation(input:LocalContext,signal?:AbortSignal,adapter:ProcessingVersions['adapter']='source-adapter/1'){
+export async function createLocalPreparation(input:LocalContext,signal?:AbortSignal,adapter:ProcessingVersions['adapter']='source-adapter/1',sanitizer:ProcessingVersions['sanitizer']='text-free/1'){
+ if(!['text-free/1',sourceSanitizer].includes(sanitizer)||sanitizer===sourceSanitizer&&adapter!=='bank-pdf/1')throw new LocalPreparationError('INVALID_SANITIZER');
  if(!adapterVersions.includes(adapter))throw new LocalPreparationError('INVALID_ADAPTER');
  if(signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');
  if(!globalThis.crypto?.subtle)throw new LocalPreparationError('LOCAL_CRYPTO_UNAVAILABLE');
@@ -64,12 +66,12 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
      const amountMinor=row.amountMinor as string,direction=row.direction;
      if(!['debit','credit','unknown'].includes(direction as string)||direction==='debit'&&BigInt(amountMinor)>=0n||direction==='credit'&&BigInt(amountMinor)<=0n)throw new RowFailure('INVALID_DIRECTION');
      const account={kind:row.account.kind,hmac:await identifier(file.bank,row.account.kind,row.account.value)},bankRefHmac=row.bankReference===null||row.bankReference===undefined?null:await identifier(file.bank,'bank_reference',row.bankReference);
-     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac});
+     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(sanitizer===sourceSanitizer?{safeSource:parseSafeSource(row.safeSource??null,amountMinor)}:{})});
     }catch(error){if(!(error instanceof RowFailure))throw error;result.issues.push({ordinal,code:error.code});}
    }
    prepared.push(result);
   }
-  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,adapter},context:{...context},batchId,files:prepared}).batch;
+  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,adapter,sanitizer},context:{...context},batchId,files:prepared}).batch;
  }
  check();return {prepare,dispose};
 }
