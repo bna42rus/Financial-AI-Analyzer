@@ -16,6 +16,11 @@ import {isStructural,parseStructuralIntent,applyStructural,restoreStructure,cano
 import type {StructuralIntent,StructuralUndo} from './finance-structure.ts';
 import {isEntityKind,parseEntityIntent,applyEntity,restoreEntities,partyRows,activeParty,canonicalParty} from './finance-entities.ts';
 import type {EntityIntent,EntityUndo} from './finance-entities.ts';
+import {parseExclusionIntent,applyExclusion} from './finance-exclusions.ts';
+import type {ExclusionIntent,BatchUndo} from './finance-exclusions.ts';
+import {parseRestoreIntent,restoreHistory,captureHistory,historyDelta,publicChanges,associatedOperations} from './finance-history.ts';
+import type {RestoreIntent,HistoryUndo,Change} from './finance-history.ts';
+export {queryHistory} from './finance-history.ts';
 
 const bool=(v:unknown)=>{if(typeof v!=='boolean')throw new TypeError('INVALID_BOOLEAN');return v;};
 const ref=(v:unknown)=>v===null?null:uuid(v);
@@ -68,8 +73,9 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {bankRefHmac,...source}=op.source;return {...op,source,projection:reconcile(graph).operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links:graph.links.filter(l=>l.sourceId===op.id||l.targetId===op.id)};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type Intent=BaseIntent|StructuralIntent|EntityIntent;
+type Intent=BaseIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent;
 export function parseIntent(value:unknown):Intent {
+ if(value&&typeof value==='object'&&!Array.isArray(value)){const k=(value as Record<string,unknown>).kind;if(k==='set_exclusion')return parseExclusionIntent(value);if(k==='restore_history')return parseRestoreIntent(value);}
  if(value&&typeof value==='object'&&!Array.isArray(value)&&isStructural((value as Record<string,unknown>).kind as string))return parseStructuralIntent(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)&&isEntityKind((value as Record<string,unknown>).kind as string))return parseEntityIntent(value);
  const r=object(value,['kind','id','patch','parts','link','create','value']),kind=choice(r.kind,['operation','components','link','account','category','counterparty','rule','analytics','undo']as const),intent:BaseIntent={kind,id:r.id===undefined?randomUUID():uuid(r.id)};
@@ -105,11 +111,11 @@ export function parseIntent(value:unknown):Intent {
  if(['category','counterparty','rule'].includes(kind)&&!intent.create&&r.id===undefined)throw new TypeError('MISSING_ID');return intent;
 }
 const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self'],rule:['name','enabled','priority','conditions','assignments','dependency_status'],link:['source_id','target_id','source_component_id','target_component_id','kind','amount_minor','status','confidence','created_by']}as const;
-type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:Record<string,unknown>|Record<string,unknown>[]|null}|StructuralUndo|EntityUndo;
+type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:Record<string,unknown>|Record<string,unknown>[]|null}|StructuralUndo|EntityUndo|BatchUndo|HistoryUndo;
 const jsonColumns=new Set(['corrections','semantics','review_reasons','conditions','assignments','role','category','subcategory']);
 async function update(db:PoolClient,userId:string,table:keyof typeof columns,id:string,values:Record<string,unknown>){
  const keys=Object.keys(values);if(!keys.length||keys.some(k=>!(columns[table]as readonly string[]).includes(k)))throw new TypeError('INVALID_INTERNAL_PATCH');
- const params=keys.map(k=>jsonColumns.has(k)?JSON.stringify(values[k]):values[k]);await db.query(`UPDATE finance.${table} SET ${keys.map((k,i)=>k+'=$'+(i+3)).join(',')},revision=revision+1 WHERE user_id=$1 AND id=$2`,[userId,id,...params]);
+ const params=keys.map(k=>jsonColumns.has(k)&&!(table==='category'&&k==='role')?JSON.stringify(values[k]):values[k]);await db.query(`UPDATE finance.${table} SET ${keys.map((k,i)=>k+'=$'+(i+3)).join(',')},revision=revision+1 WHERE user_id=$1 AND id=$2`,[userId,id,...params]);
 }
 async function row(db:PoolClient,userId:string,table:keyof typeof columns,id:string){const r=(await db.query(`SELECT * FROM finance.${table} WHERE user_id=$1 AND id=$2`,[userId,id])).rows[0];if(!r)throw new HttpError(404,'NOT_FOUND');return r;}
 function ownRefs(graph:Graph,parties:{id:string;mergedIntoId:string|null}[],p:Record<string,unknown>){
@@ -122,9 +128,15 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='set_exclusion')return applyExclusion(db,userId,intent,(await loadFinance(db,userId)).graph);
+ if(intent.kind==='restore_history')return replayHistory(db,userId,intent);
  if(isStructural(intent.kind))return applyStructural(db,userId,intent as StructuralIntent,(await loadFinance(db,userId)).graph,actionId);
  if(isEntityKind(intent.kind))return applyEntity(db,userId,intent as EntityIntent,(await loadFinance(db,userId)).graph);
  return applyBase(db,userId,intent as BaseIntent,currentRevision);
+}
+async function replayHistory(db:PoolClient,userId:string,intent:RestoreIntent){
+ const before=await loadFinance(db,userId),links=new Map(reconcile(before.graph).links.map(l=>[l.id,l]));
+ return restoreHistory(db,userId,intent,before.state.generation,async()=>reconcile((await loadFinance(db,userId)).graph).links.filter(l=>l.reason!==null&&(links.get(l.id)?.reason!==l.reason||links.get(l.id)?.active)).map(l=>({kind:'link' as const,id:l.id,reason:'DEPENDENCY_CONFLICT'})));
 }
 async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRevision:string):Promise<Undo> {
  const {graph,parties}=await loadFinance(db,userId),p=intent.patch??{},id=intent.id;
@@ -163,6 +175,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
  if(intent.kind==='analytics'){const before={loan_mode:graph.loanMode};await db.query('UPDATE finance.workspace SET loan_mode=$2 WHERE user_id=$1',[userId,intent.value]);return {table:'workspace',id:userId,before};}
  if(intent.kind==='undo'){
   const original=(await db.query("SELECT *,committed_at>clock_timestamp()-interval '30 days' AS recent FROM finance.action WHERE user_id=$1 AND id=$2",[userId,intent.value])).rows[0];
+  if(original?.change_set){const result=await replayHistory(db,userId,{kind:'restore_history',id:intent.id,actionIds:[intent.value as string]});if((result.details.conflicts as unknown[]).length)throw new HttpError(409,'UNDO_CONFLICT');return result;}
   if(!original||original.status!=='committed'||original.undone||!original.recent||!original.undo_patch||original.intent.canonical.kind==='undo'||original.intent.canonical.kind==='delete_financial'||original.committed_revision!==currentRevision)throw new HttpError(409,'UNDO_CONFLICT');
   await restore(db,userId,original.undo_patch);await db.query('UPDATE finance.action SET undone=true WHERE user_id=$1 AND id=$2',[userId,intent.value]);return {table:'workspace',id:userId,before:null};
  }
@@ -190,6 +203,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
  return {table,id,before:before?Object.fromEntries(columns[table].map(k=>[k,before[k]])):null};
 }
 async function restore(db:PoolClient,userId:string,undo:Undo){
+ if(undo.table==='batch'||undo.table==='history')throw new HttpError(409,'UNDO_CONFLICT');
  if(undo.table==='entities'){await restoreEntities(db,userId,undo.before);return;}
  if(undo.table==='structure'){await restoreStructure(db,userId,undo.before!);return;}
  if(undo.table==='delete')throw new HttpError(409,'UNDO_CONFLICT');
@@ -203,9 +217,9 @@ async function restore(db:PoolClient,userId:string,undo:Undo){
  if(!(undo.table in columns))throw new TypeError('INVALID_UNDO');
  if(undo.before)await update(db,userId,undo.table,undo.id,undo.before as Record<string,unknown>);else await db.query(`DELETE FROM finance.${undo.table} WHERE user_id=$1 AND id=$2`,[userId,undo.id]);
 }
-function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo){
+function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo,journal:Change[]=[]){
  const removedOperationIds=before.operations.filter(o=>!after.operations.some(p=>p.id===o.id)).map(o=>o.id);
- return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),...((undo?.table==='structure'||undo?.table==='delete'||undo?.table==='entities')?{details:undo.details}:{})};
+ return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
 }
 export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId','generation','revision','intent']),id=uuid(r.actionId),generation=uuid(r.generation),expected=revision(r.revision),state=await prepareFinance(db,userId);
@@ -214,24 +228,26 @@ export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  if(existing){if(existing.intent.canonical.receipt)return existing.result;if(stable(existing.intent.request)!==stable(r.intent))throw new HttpError(409,'ACTION_REUSED');if(existing.status==='committed')return existing.result;}
  if(expected!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');
  if(existing)return {status:'previewed',actionId:id,intent:existing.intent.canonical,impact:existing.preview};
- const intent=parseIntent(r.intent),before=await financeView(db,userId);let changes:ReturnType<typeof impact>;
- await db.query('SAVEPOINT finance_preview');try{const undo=await apply(db,userId,intent,state.revision,id);changes=impact(before,await financeView(db,userId),undo);}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
- await db.query('INSERT INTO finance.action(user_id,id,generation,expected_revision,intent,preview) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,generation,expected,JSON.stringify({request:r.intent,canonical:intent}),JSON.stringify(changes)]);
+ const intent=parseIntent(r.intent),before=await financeView(db,userId),historyBefore=await captureHistory(db,userId);let changes:ReturnType<typeof impact>,journal:Change[];
+ await db.query('SAVEPOINT finance_preview');try{const undo=await apply(db,userId,intent,state.revision,id);journal=historyDelta(historyBefore,await captureHistory(db,userId));changes=impact(before,await financeView(db,userId),undo,journal);}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
+ await db.query('INSERT INTO finance.action(user_id,id,generation,expected_revision,intent,preview,change_set) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,generation,expected,JSON.stringify({request:r.intent,canonical:intent}),JSON.stringify(changes),JSON.stringify(journal)]);
  return {status:'previewed',actionId:id,intent,impact:changes};
 }
 export async function commitFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId']),id=uuid(r.actionId),state=await prepareFinance(db,userId),action=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
  if(!action)throw new HttpError(404,'NOT_FOUND');if(action.status==='committed'&&action.intent.canonical.receipt)return action.result;if(action.generation!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');if(action.status==='committed')return action.result;
  if(action.expected_revision!==state.revision||!action.fresh)throw new HttpError(409,'FINANCE_CHANGED');
- const before=isStructural(action.intent.canonical.kind)||isEntityKind(action.intent.canonical.kind)?await financeView(db,userId):null,undo=await apply(db,userId,action.intent.canonical,state.revision,id);
- if(before&&stable(impact(before,await financeView(db,userId),undo))!==stable(action.preview))throw new HttpError(409,'DEPENDENCIES_CHANGED');
+ const before=await financeView(db,userId),historyBefore=await captureHistory(db,userId),undo=await apply(db,userId,action.intent.canonical,state.revision,id);
+ if(undo.table==='history'&&(undo.details.conflicts as unknown[]).length)throw new HttpError(409,'ROLLBACK_CONFLICT');
+ const journal=historyDelta(historyBefore,await captureHistory(db,userId)),actual=impact(before,await financeView(db,userId),undo,journal);
+ if(stable(actual)!==stable(action.preview)||stable(journal)!==stable(action.change_set))throw new HttpError(409,'DEPENDENCIES_CHANGED');
  const next=(await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1 RETURNING generation,revision',[userId])).rows[0];
  const cleanup=undo.table==='delete'?{destructive:true,undoable:false,counts:undo.details.counts,accounts:((undo.details.accountsDeleted as string[])??[]).length,aliases:undo.details.aliasesDeleted,counterparties:((undo.details.counterpartiesDeleted as string[])??[]).length,counterpartyAliases:undo.details.counterpartyAliasesDeleted}:null;
  const result={status:'committed',actionId:id,generation:next.generation,revision:next.revision,...(cleanup?{cleanup}:{impact:action.preview})};
- if(cleanup)await db.query("UPDATE finance.action SET status='committed',generation=$3,intent=$4,preview=$5,result=$6,undo_patch=NULL,committed_at=clock_timestamp(),committed_revision=$7 WHERE user_id=$1 AND id=$2",[userId,id,next.generation,JSON.stringify({canonical:{kind:'delete_financial',receipt:true}}),JSON.stringify(cleanup),JSON.stringify(result),next.revision]);
- else await db.query("UPDATE finance.action SET status='committed',result=$3,undo_patch=$4,committed_at=clock_timestamp(),committed_revision=$5 WHERE user_id=$1 AND id=$2",[userId,id,JSON.stringify(result),JSON.stringify(undo),next.revision]);
+ if(cleanup)await db.query("UPDATE finance.action SET status='committed',generation=$3,intent=$4,preview=$5,result=$6,undo_patch=NULL,change_set=NULL,affected_operation_ids='{}',committed_at=clock_timestamp(),committed_revision=$7 WHERE user_id=$1 AND id=$2",[userId,id,next.generation,JSON.stringify({canonical:{kind:'delete_financial',receipt:true}}),JSON.stringify(cleanup),JSON.stringify(result),next.revision]);
+ else await db.query("UPDATE finance.action SET status='committed',result=$3,undo_patch=$4,committed_at=clock_timestamp(),committed_revision=$5,change_set=$6,affected_operation_ids=$7 WHERE user_id=$1 AND id=$2",[userId,id,JSON.stringify(result),['undo','restore_history'].includes(action.intent.canonical.kind)?null:JSON.stringify(undo),next.revision,JSON.stringify(journal),associatedOperations(journal,actual.affectedOperationIds)]);
  // Retire old history during writes. Scheduled cleanup/deletion cascade is a later block.
- await db.query("DELETE FROM finance.action WHERE user_id=$1 AND created_at<clock_timestamp()-interval '30 days'",[userId]);return result;
+ await db.query("DELETE FROM finance.action WHERE user_id=$1 AND COALESCE(committed_at,created_at)<clock_timestamp()-interval '30 days'",[userId]);return result;
 }
 export async function editFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId','generation','revision','intent']),raw=object(r.intent,['kind','id','patch']);
