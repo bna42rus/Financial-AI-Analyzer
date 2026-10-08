@@ -2,7 +2,7 @@ import type {PreparedRow} from './contract.ts';
 import type {BankDate} from '../../finance-core/src/model.ts';
 
 export type SourceCandidate={transactionId:string;fileHmac:string;ordinal:number;bankRefHmac:string|null;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:string;direction:string};
-const sameDate=(a:BankDate|null,b:BankDate|null)=>JSON.stringify(a)===JSON.stringify(b);
+const sameDate=(a:BankDate|null,b:BankDate|null)=>a===null||b===null?a===b:a.precision==='day'?b.precision==='day'&&a.date===b.date:b.precision==='instant'&&a.instant===b.instant;
 export function sameSource(a:PreparedRow,b:SourceCandidate){return sameDate(a.operationDate,b.operationDate)&&sameDate(a.postedDate,b.postedDate)&&a.amountMinor===b.amountMinor&&a.currency===b.currency&&a.direction===b.direction&&a.bankRefHmac===b.bankRefHmac;}
 /** Caller restricts candidates to the same user, bank and source alias, never effective edits.
  * One transaction may be consumed at most once per file, including across durable checkpoints. */

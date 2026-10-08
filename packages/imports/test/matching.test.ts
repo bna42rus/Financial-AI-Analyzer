@@ -16,3 +16,4 @@ test('file instance disambiguates repeated bank references',()=>assert.equal(mat
 test('no remaining observation means physical deletion permits reimport',()=>assert.equal(matchSource(row,'file',[],new Set()).transactionId,null));
 test('source precision is preserved, never inferred from equal calendar dates',()=>assert.deepEqual(matchSource(row,'new',[source({operationDate:{precision:'instant',instant:'2026-09-01T00:00:00.000Z'}})],new Set()),{transactionId:null,possibleIds:[]}));
 test('posting date and direction are source facts, not mutable effective corrections',()=>{assert.equal(sameSource(row,source({postedDate:{precision:'day',date:'2026-09-02'}})),false);assert.equal(sameSource(row,source({direction:'unknown'})),false);});
+test('JSONB key ordering does not change source-date identity',()=>assert.equal(sameSource(row,source({operationDate:{date:'2026-09-01',precision:'day'}})),true));
