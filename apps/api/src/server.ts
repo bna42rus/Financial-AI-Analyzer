@@ -30,6 +30,7 @@ export async function createServer(config: Config) {
   const seal = envelope(config.wrappingKey), schema = realm(config.profile);
   // Finance repositories are never loaded by the control deployment profile.
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
+  const finance = config.profile === 'finance' ? await import('./finance.ts') : null;
   const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
   const renewalApplication = config.profile === 'finance' ? await import('./renewal-application.ts') : null;
   const renewalCommerce = config.profile === 'control' ? await import('./renewal-commerce.ts') : null;
@@ -175,6 +176,17 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
+      } else if (finance && ['/finance/state','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history'].includes(path)) {
+        if(request.url.includes('?')||(path==='/finance/state'||path==='/finance/history'?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
+        const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
+        await finance.prepareFinance(db,s.user.id);
+        if(path==='/finance/state')result=await finance.financeView(db,s.user.id);
+        else if(path==='/finance/summary')result=await finance.financeView(db,s.user.id,finance.parseFilter(request.body));
+        else if(path==='/finance/operation')result=await finance.operationView(db,s.user.id,fields(request,['id']).id);
+        else if(path==='/finance/preview')result=await finance.previewFinance(db,s.user.id,request.body);
+        else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body);
+        else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
+        else result={actions:(await db.query("SELECT id,committed_at,intent->'canonical' AS intent,undone FROM finance.action WHERE user_id=$1 AND status='committed' AND committed_at>clock_timestamp()-interval '30 days' ORDER BY committed_at DESC LIMIT 100",[s.user.id])).rows};
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
         result = await commerce!.queue(db);

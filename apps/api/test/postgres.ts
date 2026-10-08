@@ -25,6 +25,7 @@ export async function postgresFixture() {
     await (await import('../src/mail-install.ts')).installMailQueues(mailOwner);
     await mailOwner.query('COMMIT');
   }catch(error){await mailOwner.query('ROLLBACK');throw error;}finally{mailOwner.release();}
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0006_finance_foundation.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

@@ -68,3 +68,5 @@
 
 
 Шестой Development блок: [письма, доставка и напоминания](../architecture/mail-notifications.md). Encrypted outbox → отдельные scoped pg-boss workers → durable synthetic inbox; queued/sent/failed, backoff/leases/crash handling, TOTP admin resend/audit, реальные HTTP/browser сценарии через доставленное письмо, reminders из текущего доступа. Реальная Postbox доставка, обслуживание почтового домена, будущие maintenance/email-change события и release acceptance впереди. Источники неизменны, registry partial.
+
+Этап 4, первый серверный блок: [финансовая модель и общее ядро](../architecture/finance-foundation.md). Собственные accounts/categories/counterparties/rules, append-only source observations и отдельные corrections, signed components/allocations, canonical totals, частичные возвраты/own transfers и loan modes. Generation/revision, backend access/RLS, preview/commit, idempotency и ограниченный Undo. Импорт, entity migrations/deletion, nested derived links, broad exclusions и подключение рабочих экранов следуют отдельными блоками; финансовая основа в целом ещё не завершена. Exact-head проверки фиксируются в PR.
