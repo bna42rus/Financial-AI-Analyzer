@@ -176,7 +176,7 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/state','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history'].includes(path)) {
+      } else if (finance && ['/finance/state','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query'].includes(path)) {
         if(request.url.includes('?')||(path==='/finance/state'||path==='/finance/history'?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
@@ -186,7 +186,7 @@ export async function createServer(config: Config) {
         else if(path==='/finance/preview')result=await finance.previewFinance(db,s.user.id,request.body);
         else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
-        else result={actions:(await db.query("SELECT id,committed_at,intent->'canonical' AS intent,undone,(undo_patch IS NOT NULL AND NOT undone AND intent->'canonical'->>'kind'<>'undo') AS undoable FROM finance.action WHERE user_id=$1 AND status='committed' AND committed_at>clock_timestamp()-interval '30 days' ORDER BY committed_at DESC LIMIT 100",[s.user.id])).rows};
+        else result=await finance.queryHistory(db,s.user.id,(await finance.prepareFinance(db,s.user.id)).generation,path==='/finance/history'?{}:request.body);
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
         result = await commerce!.queue(db);
