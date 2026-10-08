@@ -179,8 +179,9 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status'].includes(path)) {
-        if(request.url.includes('?')||(['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method!=='GET':request.method!=='POST'))throw new HttpError(404,'NOT_FOUND');
+      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports'].includes(path)) {
+        const methodAllowed=path==='/finance/imports'?['GET','POST'].includes(request.method):['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method==='GET':request.method==='POST';
+        if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
         if(path==='/finance/state')result=await finance.financeView(db,s.user.id);
@@ -193,6 +194,7 @@ export async function createServer(config: Config) {
         else if(path==='/finance/import-validation')result=await importValidation!.validateImport(db,s.user.id,request.body);
         else if(path==='/finance/import-accept'){result=await importIngestion!.acceptImport(db,s.user.id,request.body);status=202;}
         else if(path==='/finance/import-status')result=await importIngestion!.importStatus(db,s.user.id,request.body);
+        else if(path==='/finance/imports')result=await importIngestion!.importHistory(db,s.user.id,request.method==='GET'?{}:request.body);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
         else result=await finance.queryHistory(db,s.user.id,(await finance.prepareFinance(db,s.user.id)).generation,path==='/finance/history'?{}:request.body);
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {

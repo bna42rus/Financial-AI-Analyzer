@@ -9,6 +9,9 @@ import {deliverBatch,sandboxTransport} from '../src/mail-worker.ts';
 import {createServer} from '../src/server.ts';
 import {hashPassword,token,envelope} from '../src/crypto.ts';
 import type {Config} from '../src/types.ts';
+import {runImportStage} from '../src/import-ingestion.ts';
+import {syntheticLayout} from '../../../packages/imports/test/synthetic-layout.ts';
+import {syntheticPdf} from '../../../packages/imports/test/synthetic-pdf.ts';
 
 let pg:Awaited<ReturnType<typeof postgresFixture>>,finance:Awaited<ReturnType<typeof createServer>>,control:Awaited<ReturnType<typeof createServer>>;
 let fc:Config,cc:Config;const children:ChildProcess[]=[],pw='Synthetic browser password 123!';
@@ -85,4 +88,41 @@ for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP
       assert.deepEqual(await registration.evaluate(()=>Object.keys(localStorage)),[],'No identity/token storage in localStorage');
     }finally{await independent.close();}
   }finally{await context.close();await browser.close();}
+});
+
+for(const mobile of [false,true])test(`authenticated local PDF import → lost acknowledgement → reload → durable history → no duplicate transactions (${mobile?'mobile':'desktop'})`,{timeout:90000},async()=>{
+ await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
+ await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('importer','Synthetic importer','importer@example.test',true,now(),now())");
+ await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('importer-account','importer','importer','credential',$1,now(),now())",[await hashPassword(pw)]);
+ await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('importer',true)");
+ const browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--disable-dev-shm-usage']}),context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},locale:'ru-RU',timezoneId:'Europe/Moscow'}),page=await context.newPage();
+ const requests:{path:string;body:string}[]=[];
+ page.on('request',request=>{if(request.url().startsWith(fc.baseURL+'/finance/'))requests.push({path:new URL(request.url()).pathname,body:request.postData()??''});});
+ const tbank=syntheticLayout('tbank');tbank[0]!.find(i=>i.x===390&&i.y===650)!.text='Покупка OZON Private-ID';
+ const sber=syntheticLayout('sber');sber[0]!.find(i=>i.x===50&&i.y===650)!.text='30.02.2026';
+ const files=[{name:'Private bank statement.pdf',mimeType:'application/pdf',buffer:Buffer.from(syntheticPdf(tbank))},{name:'Private malformed.pdf',mimeType:'application/pdf',buffer:Buffer.from(syntheticPdf(sber))}];
+ async function tableCount(table:string){return Number((await pg.owner.query(`SELECT count(*) AS n FROM finance.${table} WHERE user_id='importer'`)).rows[0].n);}
+ async function finish(){for(let n=0;n<10;n++){if(!await tableCount('ingestion_dispatch'))return;assert.equal(await runImportStage(pg.finance),true);}throw new Error('Synthetic import did not finish');}
+ function count(label:string){return page.getByRole('region',{name:'Результат загрузки'}).locator('dl > div').filter({has:page.getByText(label,{exact:true})}).locator('dd');}
+ try{
+  await page.goto(web+'/#login');await page.getByLabel('Почта',{exact:true}).fill('importer@example.test');await page.getByLabel('Пароль',{exact:true}).fill(pw);await page.getByRole('button',{name:'Продолжить',exact:true}).click();await expect(page.getByText('Доступ активен.',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Открыть экраны приложения'}).click();await expect(page.getByRole('heading',{name:'Здесь будут ваши операции'})).toBeVisible();
+  // Hold history discovery while we exercise an explicit retry after the server accepted the first POST.
+  await page.route('**/finance/imports',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({batches:[],nextCursor:null})}));
+  let lost=false;
+  await page.route('**/finance/import-accept',async route=>{if(!lost){lost=true;const response=await route.fetch();assert.equal(response.status(),202);await route.abort('failed');}else await route.continue();});
+  await page.getByRole('button',{name:'Загрузить файлы',exact:true}).click();await page.getByLabel('Файлы выписок').setInputFiles([...files,{name:'Private.csv',mimeType:'text/csv',buffer:Buffer.from('Artificial unsupported file')}]);
+  await expect(page.getByRole('button',{name:'Повторить отправку'})).toBeVisible({timeout:20000});await expect(page.getByText('Пока поддерживаются PDF. CSV и XLSX ещё недоступны.')).toBeVisible();assert.equal(await tableCount('ingestion_batch'),1);assert.equal(await tableCount('transaction'),0);
+  assert.equal(await page.evaluate(()=>window.dispatchEvent(new Event('beforeunload',{cancelable:true}))),false,'Unconfirmed local handoff warns before leaving');
+  await page.getByRole('button',{name:'Повторить отправку'}).click();await expect(page.getByText('Загрузка принята сервером. Результат сохранён в истории загрузок.')).toBeVisible();assert.equal(await page.evaluate(()=>window.dispatchEvent(new Event('beforeunload',{cancelable:true}))),true,'Accepted work no longer depends on the page');
+  const handoffs=requests.filter(r=>r.path==='/finance/import-accept');assert.equal(handoffs.length,2);assert.equal(handoffs[0]!.body,handoffs[1]!.body,'Same sanitized batch on retry');
+  await page.unroute('**/finance/imports');await page.getByRole('button',{name:'Закрыть',exact:true}).click();await page.reload();await expect(page.getByRole('button',{name:'Открыть экраны приложения'})).toBeVisible();await page.getByRole('button',{name:'Открыть экраны приложения'}).click();await expect(page.getByRole('heading',{name:'История загрузок',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Результат загрузки'}).getByRole('status')).toHaveText('Принята сервером');await expect(page.getByText('Сервер продолжает обработку. Страницу можно закрыть; результат останется в истории.')).toBeVisible();
+  await page.getByRole('button',{name:'Загрузить файлы',exact:true}).click();await expect(page.getByRole('button',{name:'Выбрать файлы'})).toBeDisabled();await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+  await finish();await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await expect(page.getByRole('region',{name:'Результат загрузки'}).getByRole('status')).toHaveText('Завершена с ошибками');await expect(count('Новых операций')).toHaveText('3');await expect(count('Строк не импортировано')).toHaveText('1');await expect(count('Найдено строк')).toHaveText('4');await expect(count('Требуют внимания')).toHaveText('3');await expect(page.getByText(/Строка 1: Не распознана обязательная дата/)).toBeVisible();assert.equal(await tableCount('transaction'),3);
+  await page.getByRole('link',{name:'Операции',exact:true}).click();await expect(page.getByRole('list',{name:'Сохранённые операции'}).locator('li')).toHaveCount(3);await page.getByRole('button').filter({hasText:'Ozon'}).click();await expect(page.getByRole('dialog',{name:'Операция'})).toBeVisible();await expect(page.getByRole('dialog',{name:'Операция'}).getByText('Покупка',{exact:true}).first()).toBeVisible();assert.equal((await page.textContent('body'))?.includes('Private-ID'),false);await page.getByRole('button',{name:'Закрыть операцию'}).click();
+  await page.getByRole('button',{name:'Загрузить файлы',exact:true}).click();await page.getByLabel('Файлы выписок').setInputFiles(files);await expect(page.getByText('Загрузка принята сервером. Результат сохранён в истории загрузок.')).toBeVisible({timeout:20000});await page.getByRole('button',{name:'Закрыть',exact:true}).click();await finish();await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await expect(count('Уже существовало')).toHaveText('3');await expect(count('Новых операций')).toHaveText('0');assert.equal(await tableCount('transaction'),3);assert.equal(await tableCount('source_observation'),6);assert.equal(await tableCount('ingestion_batch'),2);
+  const bodies=requests.map(r=>r.body).join('\n');for(const secret of ['%PDF','Private','00000000000000000001','123456','password','filename','"key"'])assert.equal(bodies.includes(secret),false,'Raw statement fields never cross the browser boundary');
+  assert.deepEqual(await page.evaluate(()=>Object.keys(localStorage)),[]);assert.deepEqual(await page.evaluate(()=>Object.keys(sessionStorage)),[]);assert.deepEqual(await page.evaluate(()=>indexedDB.databases()),[]);assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'No mobile overflow');
+  await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='importer'");await page.getByRole('button',{name:'Аккаунт',exact:true}).click();await page.getByRole('button',{name:'Обновить доступ',exact:true}).click();await expect(page.getByText('Аккаунт заблокирован.',{exact:false})).toBeVisible();await expect(page.getByRole('button',{name:'Открыть экраны приложения'})).toHaveCount(0);
+ }finally{await context.close();await browser.close();}
 });

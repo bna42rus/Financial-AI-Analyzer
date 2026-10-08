@@ -1,7 +1,7 @@
 import {assertComponentSum,parsePersistedMinor,sumMinor} from './money.ts';
 import {effective,operationDay} from './model.ts';
 import {allocationOrder,allocationParents} from './allocation-graph.ts';
-import type {Graph,Operation,Component,Facet,Role,Link} from './model.ts';
+import type {Graph,Operation,Facet,Role,Link} from './model.ts';
 
 type Node={id:string;operation:Operation;componentId:string|null;amount:bigint;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;allocationId?:string|null;basis?:string[]};
 export type Part={id:string;componentId:string|null;allocationId:string|null;amountMinor:string;role:Role;categoryId:string|null;subcategoryId:string|null;basis:string[];included:boolean};
@@ -13,7 +13,7 @@ const family=(l:Link)=>['refund','expense_reimbursement','reversal'].includes(l.
 /** Rebuild from the current source + decisions on every revision. Invalid decisions are retained,
  * but never used as a calculation basis. No DB/network/AI or silent allocation clipping. */
 export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcome[]} {
- const ops=new Map(graph.operations.map(o=>[o.id,o])),accounts=new Map(graph.accounts.map(a=>[a.id,a])),cats=new Map(graph.categories.map(c=>[c.id,c]));
+ const accounts=new Map(graph.accounts.map(a=>[a.id,a])),cats=new Map(graph.categories.map(c=>[c.id,c]));
  const nodes=new Map<string,Node[]>(),reasons=new Map<string,Set<string>>(),invalid=new Map<string,string>();
  const addReason=(id:string,reason:string)=>reasons.get(id)?.add(reason);
  const compatible=(role:Role,catId:string|null,subId:string|null)=>{

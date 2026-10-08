@@ -2948,17 +2948,25 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/api/src/import-ingestion.ts",
+        "apps/api/src/server.ts"
       ],
       "verification_refs": [
         "apps/web/e2e/shell.spec.ts",
         "docs/architecture/web-shell-completion.md",
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.2",
@@ -2984,7 +2992,11 @@
         "apps/web/src/import-local.ts",
         "docs/architecture/local-bank-parsers.md",
         "docs/architecture/safe-bank-source.md",
-        "packages/imports/src/safe-source.ts"
+        "packages/imports/src/safe-source.ts",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -2994,10 +3006,12 @@
         "apps/api/test/import-ingestion.test.ts",
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
-        "packages/imports/test/safe-source.test.ts"
+        "packages/imports/test/safe-source.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.3",
@@ -3045,17 +3059,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.5",
@@ -3138,15 +3158,21 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.8",
@@ -3167,15 +3193,21 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.9",
@@ -3190,14 +3222,21 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/api/src/server.ts"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.10",
@@ -3220,7 +3259,12 @@
         "packages/imports/src/bank-pdf.ts",
         "packages/imports/src/pdf-reader.ts",
         "apps/web/src/import-local.ts",
-        "docs/architecture/local-bank-parsers.md"
+        "docs/architecture/local-bank-parsers.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/api/src/server.ts"
       ],
       "verification_refs": [
         "apps/web/e2e/shell.spec.ts",
@@ -3228,10 +3272,12 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "packages/imports/test/bank-pdf.test.ts",
-        "apps/web/e2e/import-local.spec.ts"
+        "apps/web/e2e/import-local.spec.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят. Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md."
+      "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят. Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-18.11",
@@ -3285,7 +3331,11 @@
         "apps/web/src/import-local.ts",
         "docs/architecture/local-bank-parsers.md",
         "docs/architecture/safe-bank-source.md",
-        "packages/imports/src/safe-source.ts"
+        "packages/imports/src/safe-source.ts",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
@@ -3296,10 +3346,12 @@
         "apps/api/test/import-ingestion.test.ts",
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
-        "packages/imports/test/safe-source.test.ts"
+        "packages/imports/test/safe-source.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
     },
     {
       "id": "PDF-19",
@@ -9745,7 +9797,11 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9755,11 +9811,13 @@
         "apps/api/test/finance-reset.test.ts",
         "apps/api/test/finance-chains.test.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR."
     },
     {
       "id": "A-07",
@@ -10152,17 +10210,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR."
     },
     {
       "id": "B-09",
@@ -10184,13 +10248,22 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/live-import-ui.md",
+        "apps/web/src/ServerImport.tsx",
+        "apps/web/src/import-flow.ts",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/api/src/import-ingestion.ts"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/import-flow.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks.",
+      "implementation_note": " Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR."
     },
     {
       "id": "B-10",
