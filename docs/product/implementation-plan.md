@@ -65,3 +65,6 @@
 
 
 Пятый Development блок: [ручная выдача и изменение доступа](../architecture/manual-access.md). Отдельные manual grants/invitations, fixed/indefinite policy, индивидуальная компенсация и корректировка end; TOTP, preview/revision/action IDs, canonical session, metadata-only admin directory, атомарный audit/outbox. Деньги не выдумываются, suspension/usage не сбрасываются. Mass compensation, actual mail/AI/runtime/hosting и полный release acceptance впереди; exact-head checks фиксируются в PR.
+
+
+Шестой Development блок: [письма, доставка и напоминания](../architecture/mail-notifications.md). Encrypted outbox → отдельные scoped pg-boss workers → durable synthetic inbox; queued/sent/failed, backoff/leases/crash handling, TOTP admin resend/audit, реальные HTTP/browser сценарии через доставленное письмо, reminders из текущего доступа. Реальная Postbox доставка, обслуживание почтового домена, будущие maintenance/email-change события и release acceptance впереди. Источники неизменны, registry partial.

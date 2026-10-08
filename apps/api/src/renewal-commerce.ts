@@ -39,6 +39,6 @@ export async function reviewRenewal(db:PoolClient,request:FastifyRequest,actorId
    await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,ref.user_id,e.mode==='continuous']);
    await db.query('INSERT INTO commerce.access_extension(action_id,request_id,user_id,data) VALUES($1,$2,$3,$4)',[id,requestId,ref.user_id,e]);
  }
- await outbox(db,'access',seal,'renewal_decision',{email:row.data.email,status:state==='completed'?'completed':next.requests[0]!.status,remainingMinor:next.requests[0]!.remainingMinor,...(result?{accessEnd:result.extension.accessEnd}:{})});
+ await outbox(db,'access',seal,'renewal_decision',{email:row.data.email,status:state==='completed'?'completed':next.requests[0]!.status,remainingMinor:next.requests[0]!.remainingMinor,...(result?{accessEnd:result.extension.accessEnd}:{})},{subjectId:requestId});
  return {status:'committed',...await renewalQueue(db)};
 }

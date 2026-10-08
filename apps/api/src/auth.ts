@@ -7,6 +7,7 @@ import { authSchema } from '@finance/database';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import { hashPassword, verifyPassword } from './crypto.ts';
+import {describeDevice} from './mail-templates.ts';
 import { realm, HttpError, event, outbox } from './types.ts';
 import type { Config, Sealer } from './types.ts';
 
@@ -96,7 +97,7 @@ export async function recordAuthResult(auth: Auth, db: PoolClient, config: Confi
       result.recoveryCodes = codes;
     }
     await event(db, 'control', session.user.id, 'totp_login');
-    await outbox(db, 'control', seal, 'security_login', { email: session.user.email, at: new Date().toISOString(), profile: 'control' });
+    await outbox(db, 'control', seal, 'security_login', { email: session.user.email, at: new Date().toISOString(), profile: 'control',device:describeDevice(request.headers['user-agent']) },{subjectId:session.user.id});
     return new Response(JSON.stringify(result), { status: response.status, headers: response.headers });
   }
   return response;
