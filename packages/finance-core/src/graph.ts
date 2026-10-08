@@ -1,9 +1,10 @@
 import {assertComponentSum,parsePersistedMinor,sumMinor} from './money.ts';
 import {effective,operationDay} from './model.ts';
+import {allocationOrder,allocationParents} from './allocation-graph.ts';
 import type {Graph,Operation,Component,Facet,Role,Link} from './model.ts';
 
-type Node={id:string;operation:Operation;componentId:string|null;amount:bigint;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>};
-export type Part={id:string;componentId:string|null;amountMinor:string;role:Role;categoryId:string|null;subcategoryId:string|null;basis:string[];included:boolean};
+type Node={id:string;operation:Operation;componentId:string|null;amount:bigint;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;allocationId?:string|null;basis?:string[]};
+export type Part={id:string;componentId:string|null;allocationId:string|null;amountMinor:string;role:Role;categoryId:string|null;subcategoryId:string|null;basis:string[];included:boolean};
 export type Projection={id:string;date:ReturnType<typeof effective>['operationDate'];accountId:string;amountMinor:string;analyticsRole:Role|'mixed';parts:Part[];reviewReasons:string[];decompositionActive:boolean;unresolvedMinor:string;neutralMinor:string;excludedMinor:string};
 export type LinkOutcome={id:string;active:boolean;reason:string|null};
 const abs=(n:bigint)=>n<0n?-n:n;
@@ -48,25 +49,40 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
   nodes.set(op.id,base);
  }
  type Valid={link:Link;source:Node;target:Node;amount:bigint};
- const proposed:Valid[]=[];
- const endpoint=(opId:string,id:string|null)=>{const list=nodes.get(opId);return id?list?.find(n=>n.componentId===id):list?.length===1&&list[0]!.componentId===null?list[0]:undefined;};
- for(const link of graph.links){
+ const proposed:Valid[]=[],generated=new Map<string,Map<string,Node>>(),byId=new Map(graph.links.map(l=>[l.id,l]));
+ const baseEndpoint=(opId:string,id:string|null)=>{const list=nodes.get(opId);return id?list?.find(n=>n.componentId===id):list?.length===1&&list[0]!.componentId===null?list[0]:undefined;};
+ const endpoint=(opId:string,component:string|null,allocation:string|null|undefined)=>allocation?generated.get(allocation)?.get(opId):baseEndpoint(opId,component);
+ const neutral=(link:Link)=>['own_transfer','debt_repayment','credit_card_repayment'].includes(link.kind);
+ const transformsTarget=(link:Link)=>['own_transfer','debt_repayment'].includes(link.kind);
+ const ordered=allocationOrder(graph.links);
+ for(const id of ordered.cyclic)invalid.set(id,'CYCLIC_DEPENDENCY');
+ for(const link of ordered.order){
   if(link.status!=='confirmed')continue;
-  const s=endpoint(link.sourceId,link.sourceComponentId),t=endpoint(link.targetId,link.targetComponentId),amount=parsePersistedMinor(link.amountMinor);
+  const s=endpoint(link.sourceId,link.sourceComponentId,link.sourceAllocationId),t=endpoint(link.targetId,link.targetComponentId,link.targetAllocationId),amount=parsePersistedMinor(link.amountMinor);
   let error:string|null=null;
-  if(!s||!t||link.sourceId===link.targetId||amount<=0n||reasons.get(link.sourceId)?.has('component_conflict')||reasons.get(link.targetId)?.has('component_conflict'))error='DEPENDENCY_CONFLICT';
+  if(!s||!t||link.sourceId===link.targetId||amount<=0n||link.sourceComponentId&&link.sourceAllocationId||link.targetComponentId&&link.targetAllocationId||allocationParents(link).some(id=>!byId.has(id)||invalid.has(id))||reasons.get(link.sourceId)?.has('component_conflict')||reasons.get(link.targetId)?.has('component_conflict'))error='DEPENDENCY_CONFLICT';
+  else if(link.sourceAllocationId&&transformsTarget(byId.get(link.sourceAllocationId)!))error='SOURCE_ALREADY_PAIRED';
   else if(amount>abs(s.amount)||amount>abs(t.amount))error='CAPACITY_CONFLICT';
   else if(['refund','expense_reimbursement'].includes(link.kind)&&(s.amount<=0n||t.amount>=0n||t.role.value!=='expense'))error='INCOMPATIBLE_RETURN';
   else if(link.kind==='reversal'&&(s.amount*t.amount>=0n||t.role.value==='unresolved'))error='INCOMPATIBLE_REVERSAL';
   else if(['own_transfer','debt_repayment'].includes(link.kind)&&s.amount*t.amount>=0n)error='INCOMPATIBLE_TRANSFER';
   else if(link.kind==='credit_card_repayment'&&(s.operation.semantics.kind.value!=='credit_card_repayment'||!(t.operation.semantics.kind.value==='credit_card_repayment'||accounts.get(effective(t.operation).accountId)?.type==='credit_card'&&t.role.value==='expense')))error='INCOMPATIBLE_REPAYMENT';
   if(!error&&s&&t){
-   const desired=['own_transfer','debt_repayment','credit_card_repayment'].includes(link.kind)?'neutral':t.role.value;
-   if(s.role.userVerified&&s.role.value!==desired||['own_transfer','debt_repayment'].includes(link.kind)&&t.role.userVerified&&t.role.value!=='neutral')error='VERIFIED_FACET_CONFLICT';
+   const desired=neutral(link)?'neutral':t.role.value;
+   if(s.role.userVerified&&s.role.value!==desired||transformsTarget(link)&&t.role.userVerified&&t.role.value!=='neutral')error='VERIFIED_FACET_CONFLICT';
    const cat=s.category.userVerified?s.category.value:t.category.value,sub=s.subcategory.userVerified?s.subcategory.value:s.category.userVerified&&s.category.value!==t.category.value?null:t.subcategory.value;
    if(!compatible(desired,cat,sub))error='CATEGORY_CONFLICT';
   }
-  if(error)invalid.set(link.id,error);else proposed.push({link,source:s!,target:t!,amount});
+  if(error){invalid.set(link.id,error);continue;}
+  const v={link,source:s!,target:t!,amount};proposed.push(v);
+  const parts=new Map<string,Node>();
+  for(const node of [v.source,...(transformsTarget(link)?[v.target]:[])]){
+   const isNeutral=neutral(link),category=node.category.userVerified||isNeutral?node.category.value:v.target.category.value,subcategory=node.subcategory.userVerified||isNeutral?node.subcategory.value:node.category.userVerified&&node.category.value!==v.target.category.value?null:v.target.subcategory.value;
+   parts.set(node.operation.id,{...node,id:link.id+':'+node.operation.id+':allocation',allocationId:link.id,amount:node.amount<0n?-amount:amount,
+    role:{...node.role,value:isNeutral?'neutral':v.target.role.value},category:{...node.category,value:category},subcategory:{...node.subcategory,value:subcategory},
+    basis:[...new Set([link.id,...allocationParents(link),...(!isNeutral?[v.target.operation.id]:[])])]});
+  }
+  generated.set(link.id,parts);
  }
  // Reject all members of an oversubscribed pool. Order cannot pick an arbitrary winner.
  const pools=new Map<string,{capacity:bigint;entries:Valid[]}>();
@@ -75,23 +91,26 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
  for(const p of pools.values())if(sumMinor(p.entries.map(v=>v.amount))>p.capacity)for(const v of p.entries)invalid.set(v.link.id,'CAPACITY_CONFLICT');
  // Neutralized target portions and source allocations cannot cover the same signed money twice.
  const effects=new Map<string,Valid[]>();
- for(const v of proposed){for(const n of [v.source,...(['own_transfer','debt_repayment'].includes(v.link.kind)?[v.target]:[])]){const p=effects.get(n.id)??[];p.push(v);effects.set(n.id,p);}}
+ for(const v of proposed)for(const n of [v.source,...(transformsTarget(v.link)?[v.target]:[])]){const p=effects.get(n.id)??[];p.push(v);effects.set(n.id,p);}
  for(const [id,p]of effects){const node=p[0]!.source.id===id?p[0]!.source:p[0]!.target;if(sumMinor(p.map(v=>v.amount))>abs(node.amount))for(const v of p)invalid.set(v.link.id,'CAPACITY_CONFLICT');}
- for(const v of proposed)if(invalid.has(v.link.id)){addReason(v.link.sourceId,'dependency_conflict');addReason(v.link.targetId,'dependency_conflict');}
+ // A transformed portion must be named explicitly, rather than borrowing the original root meaning.
+ for(const v of proposed)if(!invalid.has(v.link.id)&&(effects.get(v.target.id)??[]).some(other=>other.link.id!==v.link.id&&!invalid.has(other.link.id)))invalid.set(v.link.id,'AMBIGUOUS_ENDPOINT');
+ // A rejected ancestor makes every dependent interpretation unusable, while preserving decisions.
+ for(const v of proposed)if(!invalid.has(v.link.id)&&allocationParents(v.link).some(id=>invalid.has(id)))invalid.set(v.link.id,'DEPENDENCY_CONFLICT');
  for(const link of graph.links)if(invalid.has(link.id)){addReason(link.sourceId,'dependency_conflict');addReason(link.targetId,'dependency_conflict');}
- const active=proposed.filter(v=>!invalid.has(v.link.id)),result:Projection[]=[];
+ const activeEffects=new Map<string,Node[]>();
+ for(const v of proposed)if(!invalid.has(v.link.id))for(const n of [v.source,...(transformsTarget(v.link)?[v.target]:[])]){
+  const list=activeEffects.get(n.id)??[];list.push(generated.get(v.link.id)!.get(n.operation.id)!);activeEffects.set(n.id,list);
+ }
+ const result:Projection[]=[];
  for(const op of graph.operations){
   const fact=effective(op),output:Part[]=[];
-  for(const node of nodes.get(op.id)!){
-   const allocations=active.filter(v=>v.source===node||v.target===node&&['own_transfer','debt_repayment'].includes(v.link.kind));
-   let used=0n;
-   for(const v of allocations){
-    const source=v.source===node,neutral=['own_transfer','debt_repayment','credit_card_repayment'].includes(v.link.kind),role:Role=neutral?'neutral':v.target.role.value;
-    const amount=node.amount<0n?-v.amount:v.amount;used+=amount;
-    output.push({id:v.link.id+':'+node.id,componentId:node.componentId,amountMinor:amount.toString(),role,categoryId:node.category.userVerified?node.category.value:neutral?node.category.value:v.target.category.value,subcategoryId:node.subcategory.userVerified?node.subcategory.value:neutral?node.subcategory.value:node.category.userVerified&&node.category.value!==v.target.category.value?null:v.target.subcategory.value,basis:[v.link.id,...(source&&!neutral?[v.target.operation.id]:[])],included:true});
-   }
-   const remaining=node.amount-used;
-   if(remaining!==0n||allocations.length===0){const role=node.role.value;output.push({id:node.id+':remainder',componentId:node.componentId,amountMinor:remaining.toString(),role,categoryId:node.category.value,subcategoryId:node.subcategory.value,basis:[],included:true});}
+  const stack=[...nodes.get(op.id)!].reverse();
+  while(stack.length){
+   const node=stack.pop()!,children=(activeEffects.get(node.id)??[]).sort((a,b)=>a.id.localeCompare(b.id)),remaining=node.amount-sumMinor(children.map(n=>n.amount));
+   // Only terminal portions participate; ancestors and parent transactions are never added again.
+   if(remaining!==0n||children.length===0)output.push({id:node.allocationId&&children.length===0?node.id:node.id+':remainder',componentId:node.componentId,allocationId:node.allocationId??null,amountMinor:remaining.toString(),role:node.role.value,categoryId:node.category.value,subcategoryId:node.subcategory.value,basis:node.basis??[],included:true});
+   for(let i=children.length-1;i>=0;i--)stack.push(children[i]!);
   }
   let unresolved=0n,neutral=0n,excluded=0n;
   for(const p of output){

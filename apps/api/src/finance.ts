@@ -5,6 +5,7 @@ import * as tables from '../../../packages/database/src/finance.ts';
 import {object,choice,uuid,dateFact,correction,initialSemantics,defaultRole,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
+import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {reconcile,aggregate} from '../../../packages/finance-core/src/graph.ts';
 import type {Filter} from '../../../packages/finance-core/src/graph.ts';
 import {starterCategories} from '../../../packages/finance-core/src/starter.ts';
@@ -99,8 +100,10 @@ export function parseIntent(value:unknown):Intent {
   intent.parts=r.parts.map(v=>{const p=object(v,['id','type','amountMinor','role','categoryId','subcategoryId']);parsePersistedMinor(p.amountMinor);return {id:p.id===undefined?randomUUID():uuid(p.id),transactionId:intent.id,type:choice(p.type,['principal','interest','fee','insurance','other']),amountMinor:p.amountMinor as string,role:p.role===undefined?facet('unresolved'):facet(choice(p.role,['expense','income','neutral','unresolved']),'user',true),category:p.categoryId===undefined?facet(null):facet(ref(p.categoryId),'user',true),subcategory:p.subcategoryId===undefined?facet(null):facet(ref(p.subcategoryId),'user',true)};});
   if(new Set(intent.parts.map(p=>p.id)).size!==intent.parts.length)throw new TypeError('DUPLICATE_COMPONENT');
  }else if(kind==='link'){
-  const p=object(r.link,['sourceId','targetId','sourceComponentId','targetComponentId','kind','amountMinor','status']);if(parsePersistedMinor(p.amountMinor)<=0n)throw new TypeError('INVALID_ALLOCATION');
-  intent.link={id:intent.id,sourceId:uuid(p.sourceId),targetId:uuid(p.targetId),sourceComponentId:p.sourceComponentId===undefined?null:ref(p.sourceComponentId),targetComponentId:p.targetComponentId===undefined?null:ref(p.targetComponentId),kind:choice(p.kind,linkKinds),amountMinor:p.amountMinor as string,status:choice(p.status,['candidate','confirmed','rejected']),confidence:100,createdBy:'user'};
+  const p=object(r.link,['sourceId','targetId','sourceComponentId','targetComponentId','sourceAllocationId','targetAllocationId','kind','amountMinor','status']);if(parsePersistedMinor(p.amountMinor)<=0n)throw new TypeError('INVALID_ALLOCATION');
+  intent.link={id:intent.id,sourceId:uuid(p.sourceId),targetId:uuid(p.targetId),sourceComponentId:p.sourceComponentId===undefined?null:ref(p.sourceComponentId),targetComponentId:p.targetComponentId===undefined?null:ref(p.targetComponentId),sourceAllocationId:p.sourceAllocationId===undefined?null:ref(p.sourceAllocationId),targetAllocationId:p.targetAllocationId===undefined?null:ref(p.targetAllocationId),kind:choice(p.kind,linkKinds),amountMinor:p.amountMinor as string,status:choice(p.status,['candidate','confirmed','rejected']),confidence:100,createdBy:'user'};
+  if(intent.link.sourceComponentId&&intent.link.sourceAllocationId||intent.link.targetComponentId&&intent.link.targetAllocationId)throw new TypeError('AMBIGUOUS_ENDPOINT_SELECTOR');
+  if(allocationParents(intent.link).includes(intent.id))throw new TypeError('SELF_ALLOCATION_REFERENCE');
  }else if(kind==='account'){
   const p=object(r.patch,['name','type','analyticsEnabled','defaultVisible','loanMode']),out:Record<string,unknown>={};if('name'in p)out.name=safeText(p.name,160);
   if('type'in p)out.type=choice(p.type,['debit_card','credit_card','bank_account','loan','savings','deposit','other']);for(const k of ['analyticsEnabled','defaultVisible']as const)if(k in p)out[k]=bool(p[k]);
@@ -115,7 +118,7 @@ export function parseIntent(value:unknown):Intent {
  if(intent.patch&&'name'in intent.patch&&!intent.patch.name)throw new TypeError('EMPTY_NAME');
  if(['category','counterparty','rule'].includes(kind)&&!intent.create&&r.id===undefined)throw new TypeError('MISSING_ID');return intent;
 }
-const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self'],rule:['name','enabled','priority','conditions','assignments','dependency_status'],link:['source_id','target_id','source_component_id','target_component_id','kind','amount_minor','status','confidence','created_by']}as const;
+const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self'],rule:['name','enabled','priority','conditions','assignments','dependency_status'],link:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by']}as const;
 type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:Record<string,unknown>|Record<string,unknown>[]|null}|StructuralUndo|EntityUndo|BatchUndo|HistoryUndo;
 const jsonColumns=new Set(['corrections','semantics','review_reasons','conditions','assignments','role','category','subcategory']);
 async function update(db:PoolClient,userId:string,table:keyof typeof columns,id:string,values:Record<string,unknown>){
@@ -171,9 +174,14 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
  }
  if(intent.kind==='link'){
   const l=intent.link!;if(!graph.operations.some(o=>o.id===l.sourceId)||!graph.operations.some(o=>o.id===l.targetId))throw new HttpError(404,'NOT_FOUND');
+  const links=[...graph.links.filter(x=>x.id!==id),l],byId=new Map(links.map(x=>[x.id,x]));
+  const correct=(opId:string,parentId:string)=>{const parent=byId.get(parentId);return !!parent&&(parent.sourceId===opId||parent.targetId===opId&&['own_transfer','debt_repayment'].includes(parent.kind));};
+  for(const [opId,parent]of [[l.sourceId,l.sourceAllocationId],[l.targetId,l.targetAllocationId]])if(parent&&!correct(opId!,parent))throw new HttpError(404,'NOT_FOUND');
+  if(allocationOrder(links).cyclic.includes(id))throw new HttpError(409,'CYCLIC_DEPENDENCY');
+  for(const child of links)if(child.id!==id&&(child.sourceAllocationId===id&&!correct(child.sourceId,id)||child.targetAllocationId===id&&!correct(child.targetId,id)))throw new HttpError(409,'ALLOCATION_REFERENCE_CONFLICT');
   const before=(await db.query('SELECT * FROM finance.link WHERE user_id=$1 AND id=$2',[userId,id])).rows[0]??null;
-  const values={source_id:l.sourceId,target_id:l.targetId,source_component_id:l.sourceComponentId,target_component_id:l.targetComponentId,kind:l.kind,amount_minor:l.amountMinor,status:l.status,confidence:l.confidence,created_by:l.createdBy};
-  if(before)await update(db,userId,'link',id,values);else await db.query(`INSERT INTO finance.link(user_id,id,source_id,target_id,source_component_id,target_component_id,kind,amount_minor,status,confidence,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,[userId,id,...Object.values(values)]);
+  const values={source_id:l.sourceId,target_id:l.targetId,source_component_id:l.sourceComponentId,target_component_id:l.targetComponentId,source_allocation_id:l.sourceAllocationId??null,target_allocation_id:l.targetAllocationId??null,kind:l.kind,amount_minor:l.amountMinor,status:l.status,confidence:l.confidence,created_by:l.createdBy};
+  if(before)await update(db,userId,'link',id,values);else await db.query(`INSERT INTO finance.link(user_id,id,source_id,target_id,source_component_id,target_component_id,source_allocation_id,target_allocation_id,kind,amount_minor,status,confidence,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,[userId,id,...Object.values(values)]);
   const outcome=reconcile((await loadFinance(db,userId)).graph).links.find(x=>x.id===id);if(l.status==='confirmed'&&!outcome?.active)throw new HttpError(409,outcome?.reason??'LINK_CONFLICT');
   return {table:'link',id,before};
  }

@@ -1,3 +1,4 @@
+import {dependentLinks} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,choice,uuid,dateFact,effective,operationDay} from '../../../packages/finance-core/src/model.ts';
@@ -66,7 +67,7 @@ export async function applyStructural(db:PoolClient,userId:string,intent:Structu
   await db.query("UPDATE finance.transaction SET corrections=jsonb_set(corrections,'{accountId}',to_jsonb($3::text)),revision=revision+1 WHERE user_id=$1 AND corrected_account_id=ANY($2::uuid[])",[userId,intent.sourceIds,intent.id]);
   for(const r of before.rules)await db.query('UPDATE finance.rule SET conditions=$3,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,r.id,JSON.stringify({...r.conditions,accountId:intent.id})]);
   await db.query('UPDATE finance.account SET merged_into_id=$3,revision=revision+1 WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,sourceAccounts,intent.id]);
-  const operationDependencies=[...new Set([...bound.map(b=>b.transaction_id),...changedOperations])].sort(),linkDependencies=graph.links.filter(l=>operationDependencies.includes(l.sourceId)||operationDependencies.includes(l.targetId)).map(l=>l.id).sort();
+  const operationDependencies=[...new Set([...bound.map(b=>b.transaction_id),...changedOperations])].sort(),linkDependencies=dependentLinks(graph.links,graph.links.filter(l=>operationDependencies.includes(l.sourceId)||operationDependencies.includes(l.targetId)).map(l=>l.id));
   return {table:'structure',id:intent.id,before,details:{kind:intent.kind,targetAccountId:intent.id,sourceAccountIds:sourceAccounts,canonicalSettings:original,operationDependencies,linkDependencies,observationsMoved:bound.length,aliasesMoved:aliased.length,rulesMoved:changedRules,correctionsMoved:changedOperations,sourceFactsPreserved:true}};
  }
  const destinations=new Set([intent.id,...intent.newAccounts.map(a=>a.id)]);
@@ -87,7 +88,7 @@ export async function applyStructural(db:PoolClient,userId:string,intent:Structu
   await db.query('UPDATE finance.transaction SET corrections=$3,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,r.id,JSON.stringify(corrections)]);
  }
  for(const id of changedRules)await db.query("UPDATE finance.rule SET enabled=false,dependency_status='needs_setup',revision=revision+1 WHERE user_id=$1 AND id=$2",[userId,id]);
- const linkDependencies=graph.links.filter(l=>affected.includes(l.sourceId)||affected.includes(l.targetId)).map(l=>l.id).sort();
+ const linkDependencies=dependentLinks(graph.links,graph.links.filter(l=>affected.includes(l.sourceId)||affected.includes(l.targetId)).map(l=>l.id));
  return {table:'structure',id:intent.id,before,details:{kind:intent.kind,newAccounts:intent.newAccounts,observations:intent.observations,operations:intent.operations,aliases:intent.aliases,linkDependencies,rulesNeedSetup:changedRules,sourceFactsPreserved:true}};
 }
 async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<StructuralIntent,{kind:'delete_financial'}>,graph:Graph,bindings:Binding[],aliasRows:Alias[],rules:RuleRow[],actionId:string):Promise<StructuralUndo>{
@@ -108,7 +109,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
   }
  }
  if(!selected.length&&!accountIds.length&&!counterpartyIds.length)throw new HttpError(409,'EMPTY_SCOPE');if(selected.length>1000)throw new HttpError(409,'DELETE_SCOPE_LIMIT');
- const chosen=new Set(selected),survivingLinks=graph.links.filter(l=>chosen.has(l.sourceId)!==chosen.has(l.targetId)),survivingRelated=[...new Set(survivingLinks.map(l=>chosen.has(l.sourceId)?l.targetId:l.sourceId))].sort();
+ const chosen=new Set(selected),removedLinkIds=dependentLinks(graph.links,graph.links.filter(l=>chosen.has(l.sourceId)||chosen.has(l.targetId)).map(l=>l.id)),removedLinks=new Set(removedLinkIds),survivingRelated=[...new Set(graph.links.filter(l=>removedLinks.has(l.id)).flatMap(l=>[l.sourceId,l.targetId]).filter(id=>!chosen.has(id)))].sort();
  const counts=(await db.query(`SELECT
  (SELECT count(*)::int FROM finance.source_observation WHERE user_id=$1 AND transaction_id=ANY($2::uuid[])) AS observations,
  (SELECT count(*)::int FROM finance.component WHERE user_id=$1 AND transaction_id=ANY($2::uuid[])) AS components,
@@ -117,7 +118,9 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  const removedAliases=aliasRows.filter(a=>accountIds.includes(a.account_id)),changedRules=rules.filter(r=>accountIds.includes(r.conditions.accountId as string));
  const cpAliases=counterpartyIds.length?(await db.query('SELECT count(*)::int AS n FROM finance.counterparty_alias WHERE user_id=$1 AND counterparty_id=ANY($2::uuid[])',[userId,counterpartyIds])).rows[0].n:0;
  const cpRules=rules.filter(r=>counterpartyIds.includes(r.conditions.counterpartyId as string)||counterpartyIds.includes(r.assignments.counterpartyId as string));
- const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:counts.links,history:counts.history},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
+ const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:removedLinkIds.length,history:counts.history},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
+ // Delete the closed link set in one statement before transaction FK cascades, including deep descendants.
+ await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,removedLinkIds]);
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,selected]);
  if(accountIds.length){
   await db.query('DELETE FROM finance.account_alias WHERE user_id=$1 AND account_id=ANY($2::uuid[])',[userId,accountIds]);

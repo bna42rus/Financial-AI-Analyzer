@@ -9,7 +9,7 @@ const definitions={
  category:{table:'category',id:'id',keys:['name','parent_id','role','hidden'],readonly:[]},
  counterparty:{table:'counterparty',id:'id',keys:['name','state','is_self','merged_into_id'],readonly:[]},
  rule:{table:'rule',id:'id',keys:['name','enabled','priority','conditions','assignments','dependency_status'],readonly:[]},
- link:{table:'link',id:'id',keys:['source_id','target_id','source_component_id','target_component_id','kind','amount_minor','status','confidence','created_by'],readonly:[]},
+ link:{table:'link',id:'id',keys:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by'],readonly:[]},
  component:{table:'component',id:'id',keys:['transaction_id','type','amount_minor','role','category','subcategory','active'],readonly:['transaction_id']},
  account_source:{table:'observation_account',id:'observation_id',keys:['account_id','transaction_id'],readonly:['transaction_id']},
  account_alias:{table:'account_alias',id:'id',keys:['account_id','alias_type','alias_hmac'],readonly:['alias_type','alias_hmac']},
@@ -34,7 +34,7 @@ export async function captureHistory(db:PoolClient,userId:string):Promise<Snapsh
  for(const kind of Object.keys(definitions)as ObjectKind[]){const d=definitions[kind];let rows:Record<string,unknown>[];
   if(kind==='account_source'||kind==='counterparty_source')rows=(await db.query(`SELECT b.*,o.transaction_id FROM finance.${d.table} b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
   else rows=(await db.query(`SELECT ${d.id},${kind==='analytics'?'config_revision AS revision':'revision'},${d.keys.join(',')} FROM finance.${d.table} WHERE user_id=$1 ORDER BY ${d.id}`,[userId])).rows;
-  for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.map(k=>[k,row[k]]))}});}
+  for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.filter(k=>!['source_allocation_id','target_allocation_id'].includes(k)||row[k]!==null).map(k=>[k,row[k]]))}});}
  }
  return result;
 }
@@ -55,6 +55,8 @@ function plan(rows:HistoryRow[],actionIds:string[],current:SnapshotMap,generatio
    targets.set(k,{...c,after:current.get(k)?.snapshot??null});if(c.before)virtual.set(k,{kind:c.kind,id:c.id,snapshot:c.before});else virtual.delete(k);
   }
  }
+ const alreadyInvalid=new Set(referenceConflicts(current).map(c=>key(c.kind!,c.id!)));
+ for(const c of referenceConflicts(virtual))if(!alreadyInvalid.has(key(c.kind!,c.id!))||stableJSON(current.get(key(c.kind!,c.id!))?.snapshot.values)!==stableJSON(virtual.get(key(c.kind!,c.id!))?.snapshot.values))conflicts.push(c);
  if(objects.size>5000)throw new HttpError(409,'ROLLBACK_SCOPE_LIMIT');
  return {actions,targets:[...targets.values()],objects:[...objects.values()],conflicts};
 }
@@ -72,6 +74,13 @@ function referenceConflicts(map:SnapshotMap):Conflict[]{
  for(const row of map.values()){const v=row.snapshot.values;let invalid=false;
   if(row.kind==='category'&&v.parent_id!==null){const parent=get('category',v.parent_id);invalid=!parent||parent.parent_id!==null||parent.role!=='both'&&parent.role!==v.role;}
   if(row.kind==='operation'){const sem=v.semantics as {role:{value:string};category:{value:string|null};subcategory:{value:string|null};counterparty:{value:string|null}};invalid=!compatible(sem.role.value,sem.category.value,sem.subcategory.value)||sem.counterparty.value!==null&&!get('counterparty',sem.counterparty.value)||!!get('counterparty',sem.counterparty.value)?.merged_into_id||!!v.corrections&&typeof v.corrections==='object'&&'accountId'in v.corrections&&!get('account',(v.corrections as Record<string,unknown>).accountId);}
+  if(row.kind==='link'){
+   invalid=!get('operation',v.source_id)||!get('operation',v.target_id);
+   for(const [opId,component,allocation]of [[v.source_id,v.source_component_id,v.source_allocation_id],[v.target_id,v.target_component_id,v.target_allocation_id]]){
+    if(component){const part=get('component',component);if(!part||part.transaction_id!==opId||allocation)invalid=true;}
+    if(allocation){const parent=get('link',allocation);if(!parent||parent.source_id!==opId&&!(parent.target_id===opId&&['own_transfer','debt_repayment'].includes(parent.kind as string)))invalid=true;}
+   }
+  }
   if(row.kind==='component')invalid=!compatible((v.role as {value:string}).value,(v.category as {value:string|null}).value,(v.subcategory as {value:string|null}).value);
   if(row.kind==='rule'){const a=v.assignments as Record<string,unknown>,f=v.conditions as Record<string,unknown>;invalid=!compatible(a.role,a.categoryId??null,a.subcategoryId??null)||[f.counterpartyId,a.counterpartyId].some(id=>id!==undefined&&id!==null&&(!get('counterparty',id)||get('counterparty',id)?.merged_into_id))||f.accountId!==undefined&&(!get('account',f.accountId)||!!get('account',f.accountId)?.merged_into_id);}
   if(invalid)out.push({kind:row.kind,id:row.id,reason:'DEPENDENCY_CONFLICT'});

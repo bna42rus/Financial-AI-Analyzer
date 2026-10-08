@@ -1,3 +1,4 @@
+import {dependentLinks} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,choice,uuid,facet} from '../../../packages/finance-core/src/model.ts';
@@ -116,7 +117,7 @@ async function applyCategory(db:PoolClient,userId:string,intent:Extract<EntityIn
  // Move children before dropping their old parent; all transaction/component references already moved.
  for(const c of retained)if(!same(c,old.find(o=>o.id===c.id)))await db.query('UPDATE finance.category SET parent_id=$3,role=$4,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,c.id,c.parentId,c.role]);
  for(const id of [...removed].sort((a,b)=>Number(category(b).parentId!==null)-Number(category(a).parentId!==null)))await db.query('DELETE FROM finance.category WHERE user_id=$1 AND id=$2',[userId,id]);
- const affected=[...new Set([...changedOperations,...graph.components.filter(c=>changedComponents.includes(c.id)).map(c=>c.transactionId)])].sort(),linkDependencies=graph.links.filter(l=>affected.includes(l.sourceId)||affected.includes(l.targetId)).map(l=>l.id).sort();
+ const affected=[...new Set([...changedOperations,...graph.components.filter(c=>changedComponents.includes(c.id)).map(c=>c.transactionId)])].sort(),linkDependencies=dependentLinks(graph.links,graph.links.filter(l=>affected.includes(l.sourceId)||affected.includes(l.targetId)).map(l=>l.id));
  return {table:'entities',id:intent.id,before:before as unknown as Record<string,unknown>,details:{kind:intent.kind,categoriesRemoved:[...removed].sort(),categoriesChanged:retained.filter(c=>touched.has(c.id)),operationDependencies:affected,componentDependencies:changedComponents,linkDependencies,rulesMoved,rulesNeedSetup,roleDecisions:intent.roleDecisions,financialOperationsDeleted:0}};
 }
 function coverage(actual:string[],assigned:PartyAssignment[]){if(actual.length!==assigned.length||assigned.some(a=>!actual.includes(a.id)))throw new HttpError(409,'EXPLICIT_DISTRIBUTION_REQUIRED');}
