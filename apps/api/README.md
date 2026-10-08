@@ -21,7 +21,7 @@ No real tariff is seeded. Synthetic tariff fixtures exist only in tests. No paid
 ## Checks
 
 - `pnpm check`: original sources, existing model/projection/interface checks, strict API types and two cryptography checks.
-- `pnpm test:security`: 45 integration scenarios, requires `SECURITY_TEST_DATABASE_URL` for a **fresh dedicated** PostgreSQL 18 cluster on loopback. Creates/disposes a random test database and scoped roles. Refuses a cluster with existing runtime roles; do not point it at Development/Staging/Production with data.
+- `pnpm test:security`: integration scenarios, requires `SECURITY_TEST_DATABASE_URL` for a **fresh dedicated** PostgreSQL 18 cluster on loopback. Creates/disposes a random test database and scoped roles. Refuses a cluster with existing runtime roles; do not point it at Development/Staging/Production with data.
 - GitHub CI supplies official `postgres:18.4`. Real connections, GRANT/RLS and concurrent requests are tested; no in-memory SQL substitute.
 
 Production startup is blocked: the Development environment KEK adapter is not an audited KMS provider. Email delivery, real owner onboarding, complete security screens, retention/cleanup, observability and release acceptance remain required.

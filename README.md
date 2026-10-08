@@ -1,45 +1,34 @@
 # Персональный финансовый анализатор
 
-Начальная подготовка репозитория. Продуктовая база: полный Master Specification + approved A/B + admin recovery E-04, версия 1.3. Структура, основной стек и базовый выбор сервисов согласованы. Текущие решения, домен/бюджет и ещё открытые условия записаны в baseline, часть E.
+Продуктовая база 1.3: полный Master Specification PDF, контекст Word и согласованные A/B/E. Источники неизменны; требования и их покрытие находятся в [реестре](docs/product/implementation-registry.json). Полная готовность продукта не заявляется.
 
-Все четыре первых экрана, окна загрузки/профиля и переходы к истории приняты и сохранены в main через PR №2–6. В `feature/access-admin-requests` начинается этап 3: модель первого доступа, тестовый путь заявки и отдельное приложение админки для просмотра очереди, ручной сверки оплат и подготовки приглашений. В продолжении `feature/server-access-security` реализована Development серверная основа: API/база, verified-email application sessions, reset/invalidation, mandatory admin TOTP и recovery-only восстановление. UI пока остаётся самостоятельным примером; доставка писем, invitation registration и настоящие сервисы предстоят. [Серверный блок и проверки](docs/architecture/server-access-security.md). [Пользовательские экраны](apps/web/README.md); [админка](apps/admin/README.md); [границы нового блока](docs/architecture/access-admin-requests.md).
+## Текущий статус
 
-## Проверка без платных сервисов
+В main принята первая версия четырёх экранов через PR №2–6. Следующая разработка находится в открытой последовательной цепочке PR №7–20. Продолжать текущую работу от `feature/import-ingestion` ([PR №20](https://github.com/bna42rus/Financial-AI-Analyzer/pull/20)); его основа — `feature/import-preparation`, PR №19, `f2ca98b13f4666a80dcb0c970a31e4734edd4538`. Не начинать дальнейшую финансовую разработку от раннего main.
 
-Требуются Node.js 24 LTS и pnpm 11.25.0. Выполнить `pnpm install --frozen-lockfile --ignore-scripts`, затем `pnpm run check`. Для просмотра первого экрана — `pnpm run dev:web`.
-Проверки включают исходные документы, 10 денежных и 16 тестов модели доступа, strict TypeScript обоих приложений, 20 тестов искусственных проекций и обе сборки. Для браузерных проверок установить Chromium по [инструкции](apps/web/README.md) и выполнить `pnpm run test:e2e`: 62 сценария пользовательского интерфейса и 16 сценариев админки. API keys и реальные банковские данные не нужны. API strict TypeScript и две crypto проверки входят в check; `pnpm test:security` запускает 24 integration scenarios на отдельном PostgreSQL 18 (GitHub CI предоставляет базу). Полная security/release acceptance ещё предстоит.
+| Блок | Реализовано | Что впереди |
+| --- | --- | --- |
+| Доступ | Серверная заявка/оплаты/приглашения/регистрация, продления/ручной доступ, email outbox, admin TOTP/recovery | Реальные провайдеры, owner onboarding, эксплуатация и полная security acceptance |
+| Финансовая основа | Accounts/categories/counterparties/rules, observations/corrections, components/links/allocations, preview/commit, история, исключения, Merge/Split, удаления и reset | Подключение рабочих финансовых экранов и будущих module dependencies |
+| Импорт | Локальный text-free HMAC contract, server validation/acceptance, durable provenance, account aliases, консервативный source dedupe, checkpoints/queue и privacy cascade | Реальные bank adapters/safe texts, strict fingerprints, cancellation/dedupe decisions, final classification/link pass и UI |
+| Анализатор и выпуск | Приняты базовые макеты; Registry/AI полностью не реализованы | AI/provider checks, бюджеты/виджеты/views, Staging acceptance и Production |
 
-## Где источники
+Актуальный следующий блок — проверенные локальные bank adapters и безопасный source-text profile с sanitized merchant/description. Text-free profile не закрывает полноценную source restoration или strict cross-file fingerprint. [Границы второго блока импорта](docs/architecture/import-ingestion.md). [Общий план](docs/product/implementation-plan.md). Исторический [bootstrap-status](docs/architecture/bootstrap-status.md) описывает ранние этапы, не текущую готовность.
 
-- docs/product/master_spec_v1.pdf — исходный PDF без изменений.
-- docs/product/context_handoff.docx — исходный Word без изменений.
-- docs/product/baseline.md — approved amendments, architecture и бюджетный план.
-- docs/product/source-manifest.json — hashes и порядок применения.
+## Проверки и Development
 
-## Среды
+Нужны Node.js 24 и pnpm 11.25.0. Установить зависимости: `pnpm install --frozen-lockfile --ignore-scripts`. `pnpm run check` проверяет исходники, денежное/финансовое ядро, access/import models, TypeScript и сборки web/admin/API.
 
-Infrastructure содержит отдельные templates Development/Staging для PostgreSQL. Docker в текущем исполнении не установлен; запуск контейнеров здесь не проверялся. Пароли генерируются отдельно, не добавляются в Git. Production configuration отсутствует, поскольку providers/retention/RPO/RTO/security acceptance ещё не закрыты.
+`pnpm test:security` запускает PostgreSQL/HTTP integration suite на свежем изолированном PostgreSQL 18 cluster; `pnpm test:access-browser` — сквозные HTTP/browser journeys; `pnpm test:e2e` — desktop/mobile интерфейсы. GitHub CI предоставляет PostgreSQL 18.4 и Chromium. Полные результаты конкретного коммита фиксируются в PR; synthetic tests не являются real-bank/device acceptance.
 
-Репозиторий владельца: https://github.com/bna42rus/Financial-AI-Analyzer — private. Чтение и запись проверены; история и база 1.3 доступны. Согласованные план и оформление объединены в main через [PR #1](https://github.com/bna42rus/Financial-AI-Analyzer/pull/1), commit 4bb5d77287d675f32fb9e65d6827e03908225e64. Предшествующий bootstrap CI прошёл. Первые версии экранов сохраняются отдельными feature branches с расширенными проверками. Подписка Pro и защита main пока не подтверждены. Product data и credentials в Git не добавляются.
+Для пользовательского интерфейса — `pnpm dev:web`, для отдельной админки — `pnpm dev:admin`. Для API/worker и операторских миграций см. [API README](apps/api/README.md). Приложения используют отдельные scoped credentials; новые import tables устанавливаются миграцией 0012, отдельный Development Finance worker запускается `pnpm --filter @finance/api dev:imports`. Real statements/identifiers/passwords/credentials не помещаются в Git, logs, AI или Staging.
 
-## План и готовность сайта
+## Источники и выпуск
 
-- [План разработки простыми словами](docs/product/implementation-plan.md).
-- [Список реализации и проверок](docs/product/implementation-checklist.md).
-- [Реестр всех разделов и подпунктов](docs/product/implementation-registry.json).
+- [Исходный PDF](docs/product/master_spec_v1.pdf) и [контекст Word](docs/product/context_handoff.docx).
+- [Согласованные поправки/технические решения](docs/product/baseline.md) и [порядок применения/hash manifest](docs/product/source-manifest.json).
+- [План разработки](docs/product/implementation-plan.md), [checklist](docs/product/implementation-checklist.md), [реестр требований](docs/product/implementation-registry.json).
 
-Готовность отслеживается по требованиям, коду и результатам проверок. Список задач и успешные начальные тесты не означают готовность сайта.
+Денежные суммы — integer minor units; bank facts/user corrections/effective fields раздельны. AI использует только будущий closed versioned Registry. Подписка Pro/защита main и реальные сервисы не подтверждаются одним наличием репозитория. Услуги не приобретались, main не объединялся с новой цепочкой и Production не публиковался.
 
-## Первая интерфейсная версия
-
-Окна загрузки/профиля и переходы к истории объединены с main через PR №6. [Описание, проверка и ограничения](docs/architecture/web-shell-completion.md). Выбор файлов не запускает обработку; регистрация, серверные права и постоянное хранение относятся к следующим частям.
-
-## Заявка и админка
-
-Пользовательский пример: http://127.0.0.1:5173/#access. Отдельная админка запускается через `pnpm run dev:admin` на http://127.0.0.1:5174. Примеры включаются явно и независимы: данные между origins не передаются и не сохраняются. Оплаты и письма не выполняются. [Описание реализации и следующий шаг](docs/architecture/access-admin-requests.md).
-
-
-Третий Development блок: [оплата, приглашения, регистрация и UI/API](docs/architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
-
-
-Четвёртый Development блок: [продление доступа](docs/architecture/access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.
+Для Production нужны полные проверки, отдельные credentials/среды/KMS/retention, принятие владельцем конкретного Staging artifact, миграции и rollback/forward-fix план. Админка не деплоит приложение.
