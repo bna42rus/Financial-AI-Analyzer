@@ -2961,10 +2961,20 @@
       "title": "Импорт банковских выписок",
       "source_text": "Local-first pipeline Схема: файл → определение формата → local extraction/OCR → sanitization/HMAC → parser или safe AI structuring → strict validation → account matching → dedupe → personal rules → global merchant logic → AI classification → optional web merchant lookup → link matching → Review.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-18.3",
@@ -2987,10 +2997,20 @@
       "title": "Импорт банковских выписок",
       "source_text": "Unknown Format и AI fallback Неизвестный документ не отправляется в AI целиком. Сначала локально извлекается safe text/table, удаляются чувствительные identifiers, затем AI возвращает normalized JSON. Backend обязательно валидирует dates, amounts, signs, row consistency, required fields и отсутствие утечки raw identifiers.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-18.5",
@@ -3013,10 +3033,20 @@
       "title": "Импорт банковских выписок",
       "source_text": "Partial Success Если из 500 строк надёжно разобраны 490, они импортируются, а 10 получают review status. Один проблемный файл не должен автоматически отменять весь multi-file batch.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-18.7",
@@ -3125,12 +3155,19 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "docs/architecture/import-preparation.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
       ],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-19",
@@ -3192,10 +3229,20 @@
       "title": "Дедупликация",
       "source_text": "Одинаковые реальные покупки Две покупки на одинаковую сумму в одном магазине в одну минуту могут быть реальными. Поэтому идентичность текста и суммы сама по себе не даёт права удалить строку. Source row ordinal/instance сохраняет различие.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-19.5",
@@ -5442,10 +5489,20 @@
       "title": "Данные и конфиденциальность",
       "source_text": "Raw Statement Исходная банковская выписка по умолчанию не сохраняется на сервере. Файл выбирается и первично обрабатывается на устройстве пользователя.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-35.2",
@@ -5455,10 +5512,20 @@
       "title": "Данные и конфиденциальность",
       "source_text": "Local sanitization До сетевой передачи удаляются или псевдонимизируются account/card/contract numbers, phone, recipient identifiers, bank transaction/document/auth codes и иные устойчивые чувствительные значения.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-35.3",
@@ -5468,10 +5535,20 @@
       "title": "Данные и конфиденциальность",
       "source_text": "Почему HMAC, а не обычный hash Обычный SHA одного банковского номера может позволить сравнивать одинаковые значения между пользователями. HMAC с per-user secret делает псевдоним стабильным только внутри конкретного пользователя и не раскрывает исходное значение.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-35.4",
@@ -5579,12 +5656,19 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "docs/architecture/import-preparation.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-36",
@@ -8769,10 +8853,20 @@
       "title": "Открытые решения технического этапа",
       "source_text": "Authentication & Security Implementation Sessions/cookies, password hashing parameters, reset/invite token storage, TOTP library, SMS provider, CSRF/CSP/CORS, rate limiting, brute-force protection, encryption at rest, KMS/secrets, HMAC key lifecycle, admin break-glass.",
       "group": "open-technical",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фиксация выбранных реализаций и остающихся параметров; legal, retention, RPO/RTO, расходы и реальные провайдерные проверки до запуска."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "verification_plan": "Фиксация выбранных реализаций и остающихся параметров; legal, retention, RPO/RTO, расходы и реальные провайдерные проверки до запуска. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "PDF-54.3",
@@ -9161,13 +9255,20 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "docs/architecture/import-preparation.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия.",
-      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "A-03",
@@ -9256,14 +9357,22 @@
         "docs/architecture/finance-foundation.md",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0007_account_structure_deletion.sql",
-        "docs/architecture/account-structure-deletion.md"
+        "docs/architecture/account-structure-deletion.md",
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/finance-structure.test.ts"
+        "apps/api/test/finance-structure.test.ts",
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "A-06",
@@ -9499,16 +9608,23 @@
         "apps/api/src/pseudonym-context.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0010_financial_reset.sql",
-        "docs/architecture/financial-reset.md"
+        "docs/architecture/financial-reset.md",
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "docs/architecture/import-preparation.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/finance-structure.test.ts",
-        "apps/api/test/finance-reset.test.ts"
+        "apps/api/test/finance-reset.test.ts",
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR.",
-      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди."
+      "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "B-04",
@@ -9681,10 +9797,20 @@
         "18.6",
         "18.10"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/contract.ts",
+        "packages/imports/src/local.ts",
+        "apps/api/src/import-validation.ts",
+        "apps/api/src/server.ts",
+        "docs/architecture/import-preparation.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/preparation.test.ts",
+        "apps/api/test/import-validation.test.ts",
+        "apps/web/e2e/import-preparation.spec.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
     },
     {
       "id": "B-09",
