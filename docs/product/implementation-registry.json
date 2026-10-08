@@ -861,14 +861,18 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
       "verification_plan": "Signed суммы, source/effective, нейтральные и спорные части, возвраты и компенсации, capacities и отсутствие двойного учёта.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-6.2",
@@ -1694,17 +1698,21 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "apps/web/e2e/settings.spec.ts",
         "docs/architecture/web-settings.md",
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
       "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
       "implementation_note": "Настройки: только локальная UI-версия на вымышленном примере; десять разделов, поиск, тема/плотность/текст/движение, сброс с сохранением операций/диалогов/фильтров, точные переходы по account/exclusion IDs. Финансовые разделы для чтения; сохранение/синхронизация, editing, server authorization, полный Reset/layout/start screen/History/deletion не реализованы. Пункт полностью не закрыт.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-11.2",
@@ -1738,10 +1746,19 @@
       "title": "Счета (Accounts)",
       "source_text": "Account Aliases и HMAC Банк может по-разному обозначать один и тот же счёт в нескольких выписках. Чтобы распознать его повторно и при этом не хранить исходный номер, используется таблица aliases: `alias_id`, `account_id`, `alias_type`, `alias_hmac`, `first_seen`, `last_seen`. Чувствительный идентификатор локально преобразуется через HMAC-SHA-256 с per-user secret и namespace. Пример: полный номер счёта не нужен ни пользователю, ни AI. Однако системе важно понять, что выписка в ноябре относится к той же карте, что и выписка в октябре. Поэтому исходный номер не сохраняется, но его HMAC- псевдоним остаётся стабильным для конкретного пользователя.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-11.4",
@@ -1799,10 +1816,19 @@
       "title": "Счета (Accounts)",
       "source_text": "Merge и Split Если один реальный счёт ошибочно определён как два, пользователь может выполнить Merge. Перед подтверждением показываются зависимости: transactions, imports, rules, budgets, views, links. Split используется в обратной ситуации — когда один account ошибочно объединил данные двух реальных источников.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-11.7",
@@ -1812,10 +1838,19 @@
       "title": "Счета (Accounts)",
       "source_text": "Пустой счёт после отмены импорта Если отмена импорта удаляет все операции account, сам account автоматически не исчезает. Система сообщает «У счёта больше нет операций» и предлагает оставить его либо удалить вручную.",
       "group": "accounts",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "Обнаружение и исправление счетов; alias/merge/split; principal/interest/fee; карточные покупки не учитываются повторно при погашении.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-11.8",
@@ -5016,14 +5051,18 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-34.5",
@@ -5272,10 +5311,19 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Physical Delete Delete физически удаляет соответствующие финансовые данные. Перед выполнением всегда показывается scope, count, links/components и reimport warning.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-36.3",
@@ -5285,10 +5333,19 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Dependency Check Перед delete/merge Account, Category, Counterparty, Rule, Budget, View или Transaction система проверяет связанные сущности. Broken saved view не должен молча превращаться в пустой экран: он автоматически корректируется там, где это безопасно, либо получает статус «Требуется обновление».",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-36.4",
@@ -5298,10 +5355,19 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Chat/Cache Cascade Если удалённая operation ранее была сохранена в structured AI result, cache или financial fragment, связанные данные удаляются/обезличиваются. Иначе «удаление» было бы формальным, а не фактическим.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-36.5",
@@ -5337,10 +5403,19 @@
       "title": "Исключение и физическое удаление",
       "source_text": "Selective deletio n Data & Privacy должен позволять физически удалить выбранные operations, данные за период, данные конкретного account либо все financial data. Во всех вариантах показывается точное количество удаляемых объектов и связанных сущностей. Удаление financial data может по выбору сохранить categories, rules и interface settings, чтобы пользователь мог начать заново без повторной настройки продукта.",
       "group": "history",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs.",
+      "note": " Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-37",
@@ -8060,14 +8135,18 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
       "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "PDF-53",
@@ -8677,13 +8756,17 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "A-06",
@@ -8706,13 +8789,17 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "A-07",
@@ -8785,10 +8872,18 @@
         "26.8",
         "30.5"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "A-11",
@@ -8871,13 +8966,17 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "apps/api/src/finance-structure.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/finance-structure.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "B-04",
@@ -8892,10 +8991,18 @@
         "36.4",
         "52.5"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "B-05",
@@ -8982,10 +9089,18 @@
         "19.6",
         "34.4"
       ],
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/finance-structure.ts",
+        "apps/api/src/finance.ts",
+        "packages/database/migrations/0007_account_structure_deletion.sql",
+        "docs/architecture/account-structure-deletion.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/finance-structure.test.ts",
+        "packages/finance-core/test/graph.test.ts"
+      ],
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR."
     },
     {
       "id": "B-08",

@@ -7,6 +7,16 @@ import {applyRules,validateRule} from '../src/rules.ts';
 import type {Rule} from '../src/rules.ts';
 import {sanitizeText,safeText} from '../../privacy/src/text.ts';
 const graph=():Graph=>({accounts:[{id:'bank',bankId:'synthetic',name:'Synthetic',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null}],categories:[{id:'food',name:'Food',parentId:null,role:'expense',hidden:false},{id:'clothes',name:'Clothes',parentId:null,role:'expense',hidden:false},{id:'salary',name:'Salary',parentId:null,role:'income',hidden:false}],operations:[],components:[],links:[],loanMode:'cashflow'});
+test('account matching assignments preserve bank facts and independent correction priority',()=>{
+ const g=graph(),a=op('assigned','-1000');g.accounts.push({...g.accounts[0]!,id:'destination',analyticsEnabled:false});a.accountAssignmentId='destination';g.operations=[a];
+ assert.equal(reconcile(g).operations[0]!.accountId,'destination');assert.equal(aggregate(reconcile(g).operations).netExpensesMinor,'0');assert.equal(a.source.accountId,'bank');
+ a.corrections.accountId='bank';assert.equal(reconcile(g).operations[0]!.accountId,'bank');assert.equal(aggregate(reconcile(g).operations).netExpensesMinor,'1000');assert.equal(a.accountAssignmentId,'destination');
+});
+test('future rule matching uses assigned account while the original source remains unchanged',()=>{
+ const a=op('assigned','-1000');a.accountAssignmentId='destination';const account={...graph().accounts[0]!,id:'destination'};
+ const rule:Rule={id:'scope',name:'Scoped',enabled:true,priority:0,conditions:{accountId:'destination'},assignments:{role:'neutral'}};
+ const classified=applyRules(a,account,[rule]);assert.equal(classified.semantics.role.value,'neutral');assert.equal(classified.source.accountId,'bank');assert.equal(classified.accountAssignmentId,'destination');
+});
 function op(id:string,amount:string,kind:Kind='purchase',category:string|null='food',day='2026-09-01'):Operation{const semantics=initialSemantics(kind,'Synthetic shop');semantics.category=facet(category);return {id,source:{accountId:'bank',operationDate:{precision:'day',date:day},postedDate:null,amountMinor:amount,currency:'RUB',merchantText:'Synthetic shop',description:'Safe example',bankCategory:'',bankRefHmac:null,versions:{parser:'test',normalizer:'test',sanitizer:'test'}},corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]};}
 function link(id:string,sourceId:string,targetId:string,amount:string,kind:Link['kind']='refund'):Link{return {id,sourceId,targetId,amountMinor:amount,kind,sourceComponentId:null,targetComponentId:null,status:'confirmed',confidence:100,createdBy:'user'};}
 function part(id:string,parent:string,amount:string,role:Role,type:Component['type']='other'):Component{return {id,transactionId:parent,type,amountMinor:amount,role:facet(role),category:facet('food'),subcategory:facet(null)};}

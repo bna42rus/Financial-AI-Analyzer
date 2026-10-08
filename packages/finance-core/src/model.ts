@@ -6,12 +6,12 @@ export type Role='expense'|'income'|'neutral'|'unresolved';
 export type Source='user'|'personal_rule'|'deterministic_system_rule'|'global_rule'|'ai'|'bank';
 export type Facet<T>={value:T;source:Source;confidence:number;userVerified:boolean;ruleId?:string};
 export type BankDate={precision:'day';date:string}|{precision:'instant';instant:string};
-export type Account={id:string;bankId:string;name:string;type:'debit_card'|'credit_card'|'bank_account'|'loan'|'savings'|'deposit'|'other';analyticsEnabled:boolean;defaultVisible:boolean;loanMode:'cashflow'|'economic'|null};
+export type Account={id:string;bankId:string;name:string;type:'debit_card'|'credit_card'|'bank_account'|'loan'|'savings'|'deposit'|'other';analyticsEnabled:boolean;defaultVisible:boolean;loanMode:'cashflow'|'economic'|null;mergedIntoId?:string|null};
 export type Category={id:string;name:string;parentId:string|null;role:'expense'|'income'|'both';hidden:boolean};
 export type Semantics={kind:Facet<Kind>;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;merchant:Facet<string>;counterparty:Facet<string|null>};
 export type BankFact={accountId:string;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:'RUB';sourceKind?:Kind;operationAmountMinor?:string|null;operationCurrency?:string|null;merchantText:string;description:string;bankCategory:string;bankRefHmac:string|null;versions:Record<string,string>};
 export type Corrections={accountId?:string;operationDate?:BankDate;postedDate?:BankDate|null;amountMinor?:string};
-export type Operation={id:string;source:BankFact;corrections:Corrections;semantics:Semantics;comment:string;analyticsOverride:'default'|'include'|'exclude';decomposition:boolean;reviewReasons:string[]};
+export type Operation={id:string;source:BankFact;accountAssignmentId?:string;corrections:Corrections;semantics:Semantics;comment:string;analyticsOverride:'default'|'include'|'exclude';decomposition:boolean;reviewReasons:string[]};
 export type Component={id:string;transactionId:string;type:'principal'|'interest'|'fee'|'insurance'|'other';amountMinor:string;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>};
 export const linkKinds=['own_transfer','credit_card_repayment','refund','reversal','expense_reimbursement','debt_repayment'] as const;
 export type Link={id:string;sourceId:string;targetId:string;sourceComponentId:string|null;targetComponentId:string|null;kind:typeof linkKinds[number];amountMinor:string;status:'candidate'|'confirmed'|'rejected';confidence:number;createdBy:Source};
@@ -44,4 +44,4 @@ export function correction(value:unknown):Corrections {
  if('amountMinor'in r){parsePersistedMinor(r.amountMinor);out.amountMinor=r.amountMinor as string;}
  return out;
 }
-export function effective(op:Operation){return {...op.source,...op.corrections};}
+export function effective(op:Operation){return {...op.source,...(op.accountAssignmentId?{accountId:op.accountAssignmentId}:{}),...op.corrections};}

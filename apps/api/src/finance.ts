@@ -12,6 +12,8 @@ import {applyRules,validateRule} from '../../../packages/finance-core/src/rules.
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
 import {HttpError} from './types.ts';
+import {isStructural,parseStructuralIntent,applyStructural,restoreStructure,canonicalAccount,activeAccount} from './finance-structure.ts';
+import type {StructuralIntent,StructuralUndo} from './finance-structure.ts';
 
 const bool=(v:unknown)=>{if(typeof v!=='boolean')throw new TypeError('INVALID_BOOLEAN');return v;};
 const ref=(v:unknown)=>v===null?null:uuid(v);
@@ -36,17 +38,19 @@ export async function prepareFinance(db:PoolClient,userId:string){
 export async function loadFinance(db:PoolClient,userId:string){
  const count=(await db.query('SELECT count(*) AS n FROM finance.transaction WHERE user_id=$1',[userId])).rows[0].n;
  if(BigInt(count)>10000n)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
- const orm=drizzle(db),a=await orm.select().from(tables.accounts).where(eq(tables.accounts.userId,userId)),c=await orm.select().from(tables.categories).where(eq(tables.categories.userId,userId)),t=await orm.select().from(tables.transactions).where(eq(tables.transactions.userId,userId)),o=await orm.select().from(tables.observations).where(eq(tables.observations.userId,userId)),p=await orm.select().from(tables.components).where(eq(tables.components.userId,userId)),l=await orm.select().from(tables.links).where(eq(tables.links.userId,userId));
- const observations=new Map(o.map(r=>[r.id,r])),state=(await db.query('SELECT generation,revision,loan_mode FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
+ const orm=drizzle(db),a=await orm.select().from(tables.accounts).where(eq(tables.accounts.userId,userId)).orderBy(tables.accounts.id),c=await orm.select().from(tables.categories).where(eq(tables.categories.userId,userId)).orderBy(tables.categories.id),t=await orm.select().from(tables.transactions).where(eq(tables.transactions.userId,userId)).orderBy(tables.transactions.id),o=await orm.select().from(tables.observations).where(eq(tables.observations.userId,userId)).orderBy(tables.observations.id),p=await orm.select().from(tables.components).where(eq(tables.components.userId,userId)).orderBy(tables.components.id),l=await orm.select().from(tables.links).where(eq(tables.links.userId,userId)).orderBy(tables.links.id);
+ const sourceMap=(await db.query<{observationId:string;transactionId:string;originalAccountId:string;assignedAccountId:string}>(`SELECT b.observation_id AS "observationId",o.transaction_id AS "transactionId",o.account_id AS "originalAccountId",b.account_id AS "assignedAccountId" FROM finance.observation_account b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
+ const assignments=new Map(sourceMap.map(r=>[r.observationId,r.assignedAccountId])),observations=new Map(o.map(r=>[r.id,r])),state=(await db.query('SELECT generation,revision,loan_mode FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
  const graph:Graph={accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.map(r=>{
   const source=observations.get(r.sourceObservationId);if(!source)throw new TypeError('SOURCE_MISSING');
-  const {userId,id,transactionId,...fact}=source;return {id:r.id,source:{...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},corrections:r.corrections,semantics:r.semantics,comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
+  const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
+  const {userId,id,transactionId,...fact}=source;return {id:r.id,source:{...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},accountAssignmentId:assignment,corrections:r.corrections,semantics:r.semantics,comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
  }),components:p.filter(r=>r.active).map(({userId,active,...r})=>({...r,amountMinor:r.amountMinor.toString()})),links:l.map(({userId,revision,...r})=>({...r,amountMinor:r.amountMinor.toString()})),loanMode:state.loan_mode};
- return {graph,state,parties:(await orm.select().from(tables.counterparties).where(eq(tables.counterparties.userId,userId))).map(({userId,revision,...r})=>({...r,revision:revision.toString()})),rules:(await db.query('SELECT id,name,enabled,priority,conditions,assignments,revision FROM finance.rule WHERE user_id=$1 ORDER BY id',[userId])).rows as (Rule&{revision:string})[]};
+ return {graph,state,sourceMap,aliases:(await db.query('SELECT id,account_id AS "accountId",alias_type AS type FROM finance.account_alias WHERE user_id=$1 ORDER BY id',[userId])).rows as {id:string;accountId:string;type:string}[],parties:(await orm.select().from(tables.counterparties).where(eq(tables.counterparties.userId,userId)).orderBy(tables.counterparties.id)).map(({userId,revision,...r})=>({...r,revision:revision.toString()})),rules:(await db.query('SELECT id,name,enabled,priority,conditions,assignments,revision,dependency_status AS "dependencyStatus" FROM finance.rule WHERE user_id=$1 ORDER BY id',[userId])).rows as (Rule&{revision:string;dependencyStatus:string})[]};
 }
 export async function financeView(db:PoolClient,userId:string,filter:Filter={}){
- const {graph,state,parties,rules}=await loadFinance(db,userId),projection=reconcile(graph);
- return {generation:state.generation,revision:state.revision,accounts:graph.accounts,categories:graph.categories,counterparties:parties,rules,operations:projection.operations.map(p=>{const o=graph.operations.find(o=>o.id===p.id)!;return {...p,classification:o.semantics,comment:o.comment};}),links:projection.links,summary:aggregate(projection.operations,filter)};
+ const {graph,state,parties,rules,sourceMap,aliases}=await loadFinance(db,userId),projection=reconcile(graph);
+ return {generation:state.generation,revision:state.revision,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:sourceMap,accountAliases:aliases,categories:graph.categories,counterparties:parties,rules,operations:projection.operations.map(p=>{const o=graph.operations.find(o=>o.id===p.id)!;return {...p,classification:o.semantics,comment:o.comment};}),links:projection.links,summary:aggregate(projection.operations,filter)};
 }
 export function parseFilter(value:unknown):Filter{
  const r=object(value,['from','through','accountIds','categoryIds','includeExcluded']),f:Filter={};
@@ -59,9 +63,11 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {graph}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===uuid(id));if(!op)throw new HttpError(404,'NOT_FOUND');
  const {bankRefHmac,...source}=op.source;return {...op,source,projection:reconcile(graph).operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links:graph.links.filter(l=>l.sourceId===op.id||l.targetId===op.id)};
 }
-type Intent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
+type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
+type Intent=BaseIntent|StructuralIntent;
 export function parseIntent(value:unknown):Intent {
- const r=object(value,['kind','id','patch','parts','link','create','value']),kind=choice(r.kind,['operation','components','link','account','category','counterparty','rule','analytics','undo']as const),intent:Intent={kind,id:r.id===undefined?randomUUID():uuid(r.id)};
+ if(value&&typeof value==='object'&&!Array.isArray(value)&&isStructural((value as Record<string,unknown>).kind as string))return parseStructuralIntent(value);
+ const r=object(value,['kind','id','patch','parts','link','create','value']),kind=choice(r.kind,['operation','components','link','account','category','counterparty','rule','analytics','undo']as const),intent:BaseIntent={kind,id:r.id===undefined?randomUUID():uuid(r.id)};
  const required=kind==='components'?['parts']:kind==='link'?['link']:['analytics','undo'].includes(kind)?['value']:['patch'];
  if(Object.keys(r).some(k=>!['kind','id',...required,...(['category','counterparty','rule'].includes(kind)?['create']:[])].includes(k))||required.some(k=>!(k in r)))throw new TypeError('INVALID_INTENT');
  if(['operation','components','account','undo'].includes(kind)&&r.id===undefined)throw new TypeError('MISSING_ID');
@@ -93,8 +99,8 @@ export function parseIntent(value:unknown):Intent {
  if(intent.patch&&'name'in intent.patch&&!intent.patch.name)throw new TypeError('EMPTY_NAME');
  if(['category','counterparty','rule'].includes(kind)&&!intent.create&&r.id===undefined)throw new TypeError('MISSING_ID');return intent;
 }
-const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self'],rule:['name','enabled','priority','conditions','assignments'],link:['source_id','target_id','source_component_id','target_component_id','kind','amount_minor','status','confidence','created_by']}as const;
-type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:Record<string,unknown>|Record<string,unknown>[]|null};
+const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self'],rule:['name','enabled','priority','conditions','assignments','dependency_status'],link:['source_id','target_id','source_component_id','target_component_id','kind','amount_minor','status','confidence','created_by']}as const;
+type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:Record<string,unknown>|Record<string,unknown>[]|null}|StructuralUndo;
 const jsonColumns=new Set(['corrections','semantics','review_reasons','conditions','assignments','role','category','subcategory']);
 async function update(db:PoolClient,userId:string,table:keyof typeof columns,id:string,values:Record<string,unknown>){
  const keys=Object.keys(values);if(!keys.length||keys.some(k=>!(columns[table]as readonly string[]).includes(k)))throw new TypeError('INVALID_INTERNAL_PATCH');
@@ -102,13 +108,18 @@ async function update(db:PoolClient,userId:string,table:keyof typeof columns,id:
 }
 async function row(db:PoolClient,userId:string,table:keyof typeof columns,id:string){const r=(await db.query(`SELECT * FROM finance.${table} WHERE user_id=$1 AND id=$2`,[userId,id])).rows[0];if(!r)throw new HttpError(404,'NOT_FOUND');return r;}
 function ownRefs(graph:Graph,parties:{id:string}[],p:Record<string,unknown>){
+ if(p.accountId!==undefined&&p.accountId!==null)activeAccount(graph,p.accountId as string);
  for(const [key,items]of [['accountId',graph.accounts],['categoryId',graph.categories],['subcategoryId',graph.categories],['counterpartyId',parties]]as const)if(p[key]!==undefined&&p[key]!==null&&!items.some(i=>i.id===p[key]))throw new HttpError(404,'NOT_FOUND');
 }
 function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subcategoryId:string|null){
  const category=graph.categories.find(c=>c.id===categoryId),sub=graph.categories.find(c=>c.id===subcategoryId),allows=(r:string)=>!['expense','income'].includes(role)||r==='both'||r===role;
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
-async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string):Promise<Undo> {
+async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(isStructural(intent.kind))return applyStructural(db,userId,intent as StructuralIntent,(await loadFinance(db,userId)).graph,actionId);
+ return applyBase(db,userId,intent as BaseIntent,currentRevision);
+}
+async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRevision:string):Promise<Undo> {
  const {graph,parties}=await loadFinance(db,userId),p=intent.patch??{},id=intent.id;
  if(intent.kind==='operation'){
   const before=await row(db,userId,'transaction',id),semantics:Semantics=structuredClone(before.semantics),values:Record<string,unknown>={};ownRefs(graph,parties,p);
@@ -145,11 +156,11 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  if(intent.kind==='analytics'){const before={loan_mode:graph.loanMode};await db.query('UPDATE finance.workspace SET loan_mode=$2 WHERE user_id=$1',[userId,intent.value]);return {table:'workspace',id:userId,before};}
  if(intent.kind==='undo'){
   const original=(await db.query("SELECT *,committed_at>clock_timestamp()-interval '30 days' AS recent FROM finance.action WHERE user_id=$1 AND id=$2",[userId,intent.value])).rows[0];
-  if(!original||original.status!=='committed'||original.undone||!original.recent||original.intent.canonical.kind==='undo'||original.committed_revision!==currentRevision)throw new HttpError(409,'UNDO_CONFLICT');
+  if(!original||original.status!=='committed'||original.undone||!original.recent||!original.undo_patch||original.intent.canonical.kind==='undo'||original.intent.canonical.kind==='delete_financial'||original.committed_revision!==currentRevision)throw new HttpError(409,'UNDO_CONFLICT');
   await restore(db,userId,original.undo_patch);await db.query('UPDATE finance.action SET undone=true WHERE user_id=$1 AND id=$2',[userId,intent.value]);return {table:'workspace',id:userId,before:null};
  }
  const table=intent.kind,before=intent.create?null:await row(db,userId,table,id),values:Record<string,unknown>={};
- if(table==='account'){for(const [input,key]of Object.entries({name:'display_name',type:'account_type',analyticsEnabled:'analytics_enabled',defaultVisible:'default_visible',loanMode:'loan_mode'}))if(input in p)values[key]=p[input];}
+ if(table==='account'){activeAccount(graph,id);for(const [input,key]of Object.entries({name:'display_name',type:'account_type',analyticsEnabled:'analytics_enabled',defaultVisible:'default_visible',loanMode:'loan_mode'}))if(input in p)values[key]=p[input];}
  if(table==='category'){
   if(p.parentId&&graph.categories.some(c=>c.parentId===id))throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');
   if(!intent.create&&(('role'in p&&p.role!==before.role)||('parentId'in p&&p.parentId!==before.parent_id))&&(graph.operations.some(o=>o.semantics.category.value===id||o.semantics.subcategory.value===id)||graph.components.some(c=>c.category.value===id||c.subcategory.value===id)))throw new HttpError(409,'DEPENDENCY_MIGRATION_REQUIRED');
@@ -162,13 +173,15 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  if(table==='counterparty'){for(const [input,key]of Object.entries({name:'name',state:'state',isSelf:'is_self'}))if(input in p)values[key]=p[input];if(intent.create){if(!p.name)throw new TypeError('MISSING_NAME');await db.query('INSERT INTO finance.counterparty(user_id,id,name,state,is_self) VALUES($1,$2,$3,$4,$5)',[userId,id,p.name,p.state??'registered',p.isSelf??false]);}}
  if(table==='rule'){
   const rule=p as unknown as Omit<Rule,'id'>;ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);
-  if(rule.assignments.role)categoryCompatible(graph,rule.assignments.role,rule.assignments.categoryId??null,rule.assignments.subcategoryId??null);Object.assign(values,p);
+  if(rule.assignments.role)categoryCompatible(graph,rule.assignments.role,rule.assignments.categoryId??null,rule.assignments.subcategoryId??null);Object.assign(values,p,{dependency_status:'ready'});
   if(intent.create)await db.query('INSERT INTO finance.rule(user_id,id,name,enabled,priority,conditions,assignments) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,p.name,p.enabled,p.priority,JSON.stringify(p.conditions),JSON.stringify(p.assignments)]);
  }
  if(!intent.create)await update(db,userId,table,id,values);
  return {table,id,before:before?Object.fromEntries(columns[table].map(k=>[k,before[k]])):null};
 }
 async function restore(db:PoolClient,userId:string,undo:Undo){
+ if(undo.table==='structure'){await restoreStructure(db,userId,undo.before!);return;}
+ if(undo.table==='delete')throw new HttpError(409,'UNDO_CONFLICT');
  if(undo.table==='workspace'){if(undo.before)await db.query('UPDATE finance.workspace SET loan_mode=$2 WHERE user_id=$1',[userId,(undo.before as Record<string,unknown>).loan_mode]);return;}
  if(undo.table==='components'){
   const parts=undo.before as Record<string,unknown>[],settings=parts.at(-1)!;
@@ -179,28 +192,33 @@ async function restore(db:PoolClient,userId:string,undo:Undo){
  if(!(undo.table in columns))throw new TypeError('INVALID_UNDO');
  if(undo.before)await update(db,userId,undo.table,undo.id,undo.before as Record<string,unknown>);else await db.query(`DELETE FROM finance.${undo.table} WHERE user_id=$1 AND id=$2`,[userId,undo.id]);
 }
-function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>){
- return {before:before.summary,after:after.summary,affectedOperationIds:after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id),dependencyConflicts:after.links.filter(l=>l.reason!==null),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id)};
+function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo){
+ const removedOperationIds=before.operations.filter(o=>!after.operations.some(p=>p.id===o.id)).map(o=>o.id);
+ return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),...((undo?.table==='structure'||undo?.table==='delete')?{details:undo.details}:{})};
 }
 export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId','generation','revision','intent']),id=uuid(r.actionId),generation=uuid(r.generation),expected=revision(r.revision),state=await prepareFinance(db,userId);
  if(generation!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
  const existing=(await db.query('SELECT * FROM finance.action WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
- if(existing){if(stable(existing.intent.request)!==stable(r.intent))throw new HttpError(409,'ACTION_REUSED');if(existing.status==='committed')return existing.result;}
+ if(existing){if(existing.intent.canonical.receipt)return existing.result;if(stable(existing.intent.request)!==stable(r.intent))throw new HttpError(409,'ACTION_REUSED');if(existing.status==='committed')return existing.result;}
  if(expected!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');
  if(existing)return {status:'previewed',actionId:id,intent:existing.intent.canonical,impact:existing.preview};
  const intent=parseIntent(r.intent),before=await financeView(db,userId);let changes:ReturnType<typeof impact>;
- await db.query('SAVEPOINT finance_preview');try{await apply(db,userId,intent,state.revision);changes=impact(before,await financeView(db,userId));}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
+ await db.query('SAVEPOINT finance_preview');try{const undo=await apply(db,userId,intent,state.revision,id);changes=impact(before,await financeView(db,userId),undo);}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
  await db.query('INSERT INTO finance.action(user_id,id,generation,expected_revision,intent,preview) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,generation,expected,JSON.stringify({request:r.intent,canonical:intent}),JSON.stringify(changes)]);
  return {status:'previewed',actionId:id,intent,impact:changes};
 }
 export async function commitFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId']),id=uuid(r.actionId),state=await prepareFinance(db,userId),action=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
- if(!action)throw new HttpError(404,'NOT_FOUND');if(action.generation!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');if(action.status==='committed')return action.result;
+ if(!action)throw new HttpError(404,'NOT_FOUND');if(action.status==='committed'&&action.intent.canonical.receipt)return action.result;if(action.generation!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');if(action.status==='committed')return action.result;
  if(action.expected_revision!==state.revision||!action.fresh)throw new HttpError(409,'FINANCE_CHANGED');
- const undo=await apply(db,userId,action.intent.canonical,state.revision),next=(await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1 RETURNING revision',[userId])).rows[0].revision;
- const result={status:'committed',actionId:id,generation:state.generation,revision:next,impact:action.preview};
- await db.query("UPDATE finance.action SET status='committed',result=$3,undo_patch=$4,committed_at=clock_timestamp(),committed_revision=$5 WHERE user_id=$1 AND id=$2",[userId,id,JSON.stringify(result),JSON.stringify(undo),next]);
+ const before=isStructural(action.intent.canonical.kind)?await financeView(db,userId):null,undo=await apply(db,userId,action.intent.canonical,state.revision,id);
+ if(before&&stable(impact(before,await financeView(db,userId),undo))!==stable(action.preview))throw new HttpError(409,'DEPENDENCIES_CHANGED');
+ const next=(await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1 RETURNING generation,revision',[userId])).rows[0];
+ const cleanup=undo.table==='delete'?{destructive:true,undoable:false,counts:undo.details.counts,accounts:((undo.details.accountsDeleted as string[])??[]).length,aliases:undo.details.aliasesDeleted}:null;
+ const result={status:'committed',actionId:id,generation:next.generation,revision:next.revision,...(cleanup?{cleanup}:{impact:action.preview})};
+ if(cleanup)await db.query("UPDATE finance.action SET status='committed',generation=$3,intent=$4,preview=$5,result=$6,undo_patch=NULL,committed_at=clock_timestamp(),committed_revision=$7 WHERE user_id=$1 AND id=$2",[userId,id,next.generation,JSON.stringify({canonical:{kind:'delete_financial',receipt:true}}),JSON.stringify(cleanup),JSON.stringify(result),next.revision]);
+ else await db.query("UPDATE finance.action SET status='committed',result=$3,undo_patch=$4,committed_at=clock_timestamp(),committed_revision=$5 WHERE user_id=$1 AND id=$2",[userId,id,JSON.stringify(result),JSON.stringify(undo),next.revision]);
  // Retire old history during writes. Scheduled cleanup/deletion cascade is a later block.
  await db.query("DELETE FROM finance.action WHERE user_id=$1 AND created_at<clock_timestamp()-interval '30 days'",[userId]);return result;
 }
@@ -233,17 +251,26 @@ export async function acceptObservation(db:PoolClient,userId:string,generation:s
   if(stable(prior)!==stable(fact)||transactionId!==null&&transactionId!==existing.transaction_id)throw new HttpError(409,'OBSERVATION_REUSED');
   return {transactionId:existing.transaction_id as string,observationId,projection:reconcile((await loadFinance(db,userId)).graph).operations.find(o=>o.id===existing.transaction_id)};
  }
- const {graph,rules}=await loadFinance(db,userId),account=graph.accounts.find(a=>a.id===fact.accountId);if(!account)throw new HttpError(404,'NOT_FOUND');
+ const {graph,rules}=await loadFinance(db,userId),account=canonicalAccount(graph,fact.accountId);
  const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialSemantics(kind,fact.merchantText);
  if(transactionId!==null){
   const previous=await row(db,userId,'transaction',id);semantics=structuredClone(previous.semantics);
   if(!semantics.kind.userVerified&&semantics.kind.source==='bank'){semantics.kind=facet(kind,'bank');if(!semantics.role.userVerified&&semantics.role.source==='deterministic_system_rule')semantics.role=facet(defaultRole(kind));}
   if(!semantics.merchant.userVerified&&semantics.merchant.source==='bank')semantics.merchant=facet(fact.merchantText,'bank');
  }else{
-  const op:Operation={id,source:fact,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyRules(op,account,rules);
+  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyRules(op,account,rules);
   semantics=classified.semantics;await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,observationId,JSON.stringify(semantics),classified.analyticsOverride,JSON.stringify(classified.reviewReasons)]);
  }
  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,merchant_text,description,bank_category,bank_ref_hmac,versions,source_kind,operation_amount_minor,operation_currency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[userId,observationId,id,fact.accountId,JSON.stringify(fact.operationDate),fact.postedDate===null?null:JSON.stringify(fact.postedDate),fact.amountMinor,fact.currency,fact.merchantText,fact.description,fact.bankCategory,fact.bankRefHmac,JSON.stringify(fact.versions),kind,fact.operationAmountMinor,fact.operationCurrency]);
+ await db.query('INSERT INTO finance.observation_account(user_id,observation_id,account_id) VALUES($1,$2,$3)',[userId,observationId,account.id]);
  if(transactionId!==null)await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,id,observationId,JSON.stringify(semantics)]);
  await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {transactionId:id,observationId,projection:reconcile((await loadFinance(db,userId)).graph).operations.find(o=>o.id===id)};
+}
+/** Internal sanitized alias hook. HMAC generation/key custody and full Import matching remain separate. */
+export async function acceptAccountAlias(db:PoolClient,userId:string,generation:string,input:unknown){
+ const state=await prepareFinance(db,userId);if(uuid(generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
+ const r=object(input,['id','accountId','type','hmac']),id=uuid(r.id),type=choice(r.type,['bank_account','card','loan_contract','bank_label']);if(typeof r.hmac!=='string'||!/^([0-9a-f]{64})$/.test(r.hmac))throw new TypeError('INVALID_PSEUDONYM');
+ const account=canonicalAccount((await loadFinance(db,userId)).graph,uuid(r.accountId)),old=(await db.query('SELECT id,account_id,alias_type,alias_hmac FROM finance.account_alias WHERE user_id=$1 AND (id=$2 OR (alias_type=$3 AND alias_hmac=$4))',[userId,id,type,r.hmac])).rows;
+ if(old.length){if(old.length!==1||old[0].account_id!==account.id||old[0].alias_type!==type||old[0].alias_hmac!==r.hmac)throw new HttpError(409,'ALIAS_CONFLICT');return {id:old[0].id as string,accountId:account.id};}
+ await db.query('INSERT INTO finance.account_alias(user_id,id,account_id,alias_type,alias_hmac) VALUES($1,$2,$3,$4,$5)',[userId,id,account.id,type,r.hmac]);await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {id,accountId:account.id};
 }
