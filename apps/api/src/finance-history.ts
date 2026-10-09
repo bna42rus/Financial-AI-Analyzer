@@ -4,14 +4,14 @@ import {object,uuid,dateFact} from '../../../packages/finance-core/src/model.ts'
 import {HttpError} from './types.ts';
 
 const definitions={
- duplicate_pair:{table:'duplicate_candidate',id:'id',keys:['left_id','right_id','status'],readonly:['left_id','right_id']},
- operation:{table:'transaction',id:'id',keys:['corrections','semantics','comment','analytics_override','decomposition','review_reasons','source_observation_id'],readonly:['source_observation_id']},
+ duplicate_pair:{table:'duplicate_candidate',id:'id',keys:['left_id','right_id','status'],readonly:[]},
+ operation:{table:'transaction',id:'id',keys:['corrections','semantics','comment','analytics_override','decomposition','review_reasons','source_observation_id','merged_into_id'],readonly:[]},
  account:{table:'account',id:'id',keys:['bank_id','system_name','display_name','account_type','currency','analytics_enabled','default_visible','loan_mode','merged_into_id'],readonly:['bank_id','system_name','currency']},
  category:{table:'category',id:'id',keys:['name','parent_id','role','hidden'],readonly:[]},
  counterparty:{table:'counterparty',id:'id',keys:['name','state','is_self','merged_into_id'],readonly:[]},
  rule:{table:'rule',id:'id',keys:['name','enabled','priority','conditions','assignments','dependency_status'],readonly:[]},
  link:{table:'link',id:'id',keys:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by'],readonly:[]},
- component:{table:'component',id:'id',keys:['transaction_id','type','amount_minor','role','category','subcategory','active'],readonly:['transaction_id']},
+ component:{table:'component',id:'id',keys:['transaction_id','type','amount_minor','role','category','subcategory','active'],readonly:[]},
  account_source:{table:'observation_account',id:'observation_id',keys:['account_id','transaction_id'],readonly:['transaction_id']},
  account_alias:{table:'account_alias',id:'id',keys:['account_id','alias_type','alias_hmac'],readonly:['alias_type','alias_hmac']},
  counterparty_source:{table:'observation_counterparty',id:'observation_id',keys:['counterparty_id','alias_id','transaction_id'],readonly:['alias_id','transaction_id']},
@@ -33,7 +33,7 @@ export function parseRestoreIntent(value:unknown):RestoreIntent {const r=object(
 export async function captureHistory(db:PoolClient,userId:string):Promise<SnapshotMap>{
  const result:SnapshotMap=new Map();
  for(const kind of Object.keys(definitions)as ObjectKind[]){const d=definitions[kind];let rows:Record<string,unknown>[];
-  if(kind==='account_source'||kind==='counterparty_source')rows=(await db.query(`SELECT b.*,o.transaction_id FROM finance.${d.table} b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
+  if(kind==='account_source'||kind==='counterparty_source')rows=(await db.query(`SELECT b.*,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.${d.table} b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
   else rows=(await db.query(`SELECT ${d.id},${kind==='analytics'?'config_revision AS revision':'revision'},${d.keys.join(',')} FROM finance.${d.table} WHERE user_id=$1 ORDER BY ${d.id}`,[userId])).rows;
   for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.filter(k=>!['source_allocation_id','target_allocation_id'].includes(k)||row[k]!==null).map(k=>[k,row[k]]))}});}
  }
@@ -93,9 +93,12 @@ export async function restoreHistory(db:PoolClient,userId:string,intent:RestoreI
  if(p.conflicts.length)return {table:'history',id:intent.id,before:null,details};
  await db.query('SAVEPOINT history_replay');
  try{
+  // Pair endpoints can exchange a unique key during merge/Undo. Recreate the
+  // checked target set atomically, before inserts, rather than overwriting it.
+  for(const c of p.targets.filter(c=>c.kind==='duplicate_pair'))await db.query('DELETE FROM finance.duplicate_candidate WHERE user_id=$1 AND id=$2',[userId,c.id]);
   // Remove new links first, then recreate/update referenced objects, then remove newly created cards/components.
   for(const c of p.targets.filter(c=>!c.before&&c.kind==='link'))await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=$2',[userId,c.id]);
-  for(const c of p.targets.filter(c=>c.before).sort((a,b)=>order(a)-order(b)))await put(db,userId,c);
+  for(const c of p.targets.filter(c=>c.before).sort((a,b)=>order(a)-order(b)))await put(db,userId,c.kind==='duplicate_pair'?{...c,after:null}:c);
   for(const c of p.targets.filter(c=>!c.before&&c.kind!=='link').sort((a,b)=>order(b)-order(a))){const d=definitions[c.kind];if(c.kind==='operation'||c.kind==='analytics')throw new HttpError(409,'OBJECT_MISSING');await db.query(`DELETE FROM finance.${d.table} WHERE user_id=$1 AND ${d.id}=$2`,[userId,c.id]);}
   await db.query('SET CONSTRAINTS ALL IMMEDIATE');await db.query('SET CONSTRAINTS ALL DEFERRED');
   const restored=await captureHistory(db,userId),existingConflicts=new Set(referenceConflicts(current).map(c=>key(c.kind!,c.id!)));
@@ -106,7 +109,7 @@ export async function restoreHistory(db:PoolClient,userId:string,intent:RestoreI
  return {table:'history',id:intent.id,before:null,details};
 }
 type HistoryFilter={from?:string;through?:string;operationIds?:string[];kinds?:string[];beforeRevision?:string;limit:number};
-const actionKinds=['operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different'];
+const actionKinds=['operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different','merge_duplicate'];
 function parseHistoryFilter(value:unknown):HistoryFilter {const r=object(value,['from','through','operationIds','kinds','beforeRevision','limit']),f:HistoryFilter={limit:100};
  for(const k of ['from','through']as const)if(k in r){const d=dateFact({precision:'instant',instant:r[k]});f[k]=(d as {instant:string}).instant;}if(f.from&&f.through&&f.from>f.through)throw new TypeError('INVALID_RANGE');
  if('operationIds'in r)f.operationIds=ids(r.operationIds);if('kinds'in r){if(!Array.isArray(r.kinds)||!r.kinds.length||r.kinds.length>actionKinds.length||r.kinds.some(k=>typeof k!=='string'||!actionKinds.includes(k)))throw new TypeError('INVALID_HISTORY_KINDS');f.kinds=[...new Set(r.kinds as string[])];}

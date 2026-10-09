@@ -42,3 +42,5 @@
 Рабочая загрузка PDF, история и сохранённые операции: [сценарий и текущие границы](docs/architecture/live-import-ui.md).
 
 Сохранённые операции: [редактирование, проверка, corrections и конфликты](docs/architecture/live-operation-review.md).
+
+Следующий Development-блок: [объединение дубликатов и проверяемый Undo](docs/architecture/duplicate-merge.md), `feature/duplicate-merge`, миграция 0015. Фактический полный CI окончательного head фиксируется в PR.

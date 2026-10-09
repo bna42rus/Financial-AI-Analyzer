@@ -3604,17 +3604,23 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-19.6",
@@ -3636,7 +3642,12 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/safe-source.test.ts",
@@ -3644,11 +3655,12 @@
         "apps/web/e2e/import-local.spec.ts",
         "apps/api/test/browser.test.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
       "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-19.7",
@@ -3669,17 +3681,23 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-19.8",
@@ -3700,17 +3718,23 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-19.9",
@@ -6095,16 +6119,25 @@
         "packages/finance-core/src/allocation-graph.ts",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/finance-history.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-34.4",
@@ -6135,7 +6168,12 @@
         "docs/architecture/exclusions-history.md",
         "packages/finance-core/src/allocation-graph.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -6143,10 +6181,14 @@
         "apps/api/test/finance-structure.test.ts",
         "apps/api/test/finance-entities.test.ts",
         "apps/api/test/finance-history.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-34.5",
@@ -6195,18 +6237,27 @@
         "packages/finance-core/src/graph.ts",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "apps/web/e2e/shell.spec.ts",
         "docs/architecture/web-shell-completion.md",
         "apps/api/test/finance-history.test.ts",
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
       "implementation_note": "Первая интерфейсная версия: выбор файлов без чтения/отправки, профиль с честными состояниями подключения, быстрая тема, локальный черновик поддержки и переходы к истории. Полный пункт не закрыт: реальный импорт/парсеры, аккаунты/авторизация/доступ, timezone change, отправка поддержки, история/rollback и persistence предстоят.",
-      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-35",
@@ -9510,7 +9561,12 @@
         "docs/architecture/financial-reset.md",
         "packages/finance-core/src/allocation-graph.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9519,10 +9575,14 @@
         "apps/api/test/finance-entities.test.ts",
         "apps/api/test/finance-history.test.ts",
         "apps/api/test/finance-reset.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "PDF-53",
@@ -10687,7 +10747,12 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/duplicate-merge.md",
+        "apps/api/src/duplicate-merge.ts",
+        "packages/finance-core/src/duplicate-merge.ts",
+        "packages/database/migrations/0015_duplicate_merge.sql",
+        "apps/web/src/DuplicateMerge.tsx"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
@@ -10698,9 +10763,10 @@
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/finance-core/test/duplicate-merge.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
     },
     {
       "id": "B-08",
