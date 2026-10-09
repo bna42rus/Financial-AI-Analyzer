@@ -155,3 +155,9 @@ test('a long reversal dependency chain is iterative and each terminal amount is 
 test('a derived own-transfer portion cannot be reused as the source of a second matching pair',()=>{
  const g=graph();g.operations=[op('out','-1000','transfer_out',null),op('in','1000','transfer_in',null),op('third','1000','transfer_in',null)];g.links=[link('own','out','in','1000','own_transfer'),{...link('reuse','out','third','1000','own_transfer'),sourceAllocationId:'own'}];const r=reconcile(g);assert.equal(r.links[0]!.active,true);assert.equal(r.links[1]!.reason,'SOURCE_ALREADY_PAIRED');assert.equal(r.operations.find(o=>o.id==='third')!.unresolvedMinor,'1000');
 });
+
+test('contradictory inclusion rules preserve default and request review while explicit inclusion is protected',()=>{
+ const g=graph(),o=op('p','-1000'),base={name:'Rule',enabled:true,priority:0,conditions:{merchantContains:'shop'}},rules:Rule[]=[{...base,id:'a',assignments:{analyticsOverride:'include'}},{...base,id:'b',assignments:{analyticsOverride:'exclude'}}];
+ const r=applyRules(o,g.accounts[0]!,rules);assert.equal(r.analyticsOverride,'default');assert.ok(r.reviewReasons.includes('conflicting_rules'));assert.equal(o.reviewReasons.includes('conflicting_rules'),false);
+ o.analyticsOverride='include';assert.equal(applyRules(o,g.accounts[0]!,rules).analyticsOverride,'include');
+});
