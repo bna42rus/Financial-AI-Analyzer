@@ -12,4 +12,5 @@
 .files li{padding:14px 0}.files h3{font-size:15px}.files p{margin-top:9px;font-size:13px;line-height:1.7;overflow-wrap:anywhere}
 .accountList li{display:flex;gap:20px;justify-content:space-between;padding:14px 0}.accountList span{color:var(--color-secondary-text)}
 .review{display:flex;align-items:center;gap:10px;margin:16px 0;font-size:14px}
+.operations li.selectable{display:grid;grid-template-columns:32px minmax(0,1fr);align-items:center}.rowSelect{display:flex;justify-content:center;padding:16px 0}.rowSelect input{width:18px;height:18px}.operations .selectable button{min-width:0}.operations .selectable button>div{min-width:0}.operations .selectable small{line-height:1.6}
 @media(max-width:700px){.importGrid{grid-template-columns:1fr}.operations button{gap:8px;padding:16px 0}.operations button>div{min-width:0}.operations strong{font-size:14px}.counts>div{gap:12px;font-size:14px}.counts dd{max-width:55%}.accountList li{flex-direction:column;gap:6px}}

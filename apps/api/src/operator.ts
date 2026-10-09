@@ -44,6 +44,8 @@ try {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0014_import_cancellation_dedupe.sql',import.meta.url),'utf8'));
   } else if(mode==='migrate-duplicate-merge') {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0015_duplicate_merge.sql',import.meta.url),'utf8'));
+  } else if(mode==='migrate-review-sessions') {
+    await db.query(await readFile(new URL('../../../packages/database/migrations/0016_review_sessions.sql',import.meta.url),'utf8'));
   } else if(mode==='seed-tariff-example') {
     const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
     await db.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);

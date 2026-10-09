@@ -31,6 +31,7 @@ export async function createServer(config: Config) {
   // Finance repositories are never loaded by the control deployment profile.
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
   const finance = config.profile === 'finance' ? await import('./finance.ts') : null;
+  const review = config.profile === 'finance' ? await import('./finance-review.ts') : null;
   const importValidation = config.profile === 'finance' ? await import('./import-validation.ts') : null;
   const importIngestion = config.profile === 'finance' ? await import('./import-ingestion.ts') : null;
   const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
@@ -51,8 +52,8 @@ export async function createServer(config: Config) {
       expires_at=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN EXCLUDED.expires_at ELSE ${schema}.rate_limit.expires_at END RETURNING hits`, [seal.rateKey(purpose+':'+userId)]);
     if (result.rows[0].hits>5) throw new HttpError(429,'RATE_LIMITED');
   }
-  const financeReads=new Set(['/finance/operation','/finance/summary','/finance/history-query','/finance/imports','/finance/import-status']);
-  const financeWrites=new Set(['/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept']);
+  const financeReads=new Set(['/finance/operation','/finance/summary','/finance/history-query','/finance/imports','/finance/import-status','/finance/review-sessions']);
+  const financeWrites=new Set(['/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/review-command']);
   async function rate(request: FastifyRequest) {
     if (request.method !== 'POST') return;
     const route = request.url.split('?')[0]!;
@@ -184,7 +185,7 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports'].includes(path)) {
+      } else if (finance && ['/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/review-sessions','/finance/review-command'].includes(path)) {
         const methodAllowed=path==='/finance/imports'?['GET','POST'].includes(request.method):['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method==='GET':request.method==='POST';
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
@@ -193,6 +194,8 @@ export async function createServer(config: Config) {
         else if(path==='/finance/epoch'){const w=await finance.prepareFinance(db,s.user.id);result={generation:w.generation,revision:w.revision,keyVersion:w.key_version,interfaceEpoch:w.interface_epoch};}
         else if(path==='/finance/summary')result=await finance.financeView(db,s.user.id,finance.parseFilter(request.body));
         else if(path==='/finance/operation')result=await finance.operationView(db,s.user.id,fields(request,['id']).id);
+        else if(path==='/finance/review-sessions')result=await review!.reviewSessions(db,s.user.id,request.body);
+        else if(path==='/finance/review-command')result=await review!.reviewCommand(db,s.user.id,request.body);
         else if(path==='/finance/preview')result=await finance.previewFinance(db,s.user.id,request.body);
         else if(path==='/finance/commit')result=await finance.commitFinance(db,s.user.id,request.body,seal,s.session.id);
         else if(path==='/finance/import-context')result=await finance.prepareImportContext(db,s.user.id,await finance.prepareFinance(db,s.user.id),request.body,seal);
@@ -250,6 +253,7 @@ export async function createServer(config: Config) {
     }
   };
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});
+  if(finance)for(const url of ['/finance/preview','/finance/review-command'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:64*1024,handler:requestHandler});
   // Isolated normalized-contract budget; password/auth routes retain the 8 KiB default.
   if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:512*1024,handler:requestHandler});
   if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:512*1024,handler:requestHandler});

@@ -4,18 +4,18 @@
 
 ## Текущий статус
 
-Актуальная разработка — `feature/operation-relations` поверх [PR №27](https://github.com/bna42rus/Financial-AI-Analyzer/pull/27), `3911ee9bda411b257e38b189c0df4352df5b5ab3`: [редакторы связей и частей операций](docs/architecture/operation-relations.md). Карточка позволяет распределять суммы по категориям, связывать возвраты/компенсации/отмены с конкретными частями и редактировать пары переводов. Все изменения требуют серверного предварительного пересчёта и подтверждения; доступны History/Undo. Новая миграция в этом блоке не требуется; нужны прежние 0001–0015.
+Актуальная разработка — `feature/review-bulk-actions` поверх [PR №28](https://github.com/bna42rus/Financial-AI-Analyzer/pull/28), `fceb99c23f828f62287c39598bdb22d8ae7a45d0`: [массовая правка и последовательный Review](docs/architecture/review-bulk-actions.md). Список операций поддерживает выбор строк/диапазонов и фиксированную выборку для preview/confirmation. В Analyzer можно последовательно разбирать причины проверки, сохранять прогресс и продолжать после паузы. Подтверждаются отдельные facets; duplicate/link reasons остаются независимыми. Изменения имеют History/Undo. Требуются миграции 0001–0016.
 
 `main` содержит раннюю версию интерфейса. Полная актуальная версия находится в последовательной цепочке рабочих PR; продолжать финансовую разработку нужно от её проверенного конца. Результаты CI конкретного коммита указаны в PR. Подключение инфраструктуры и приёмка Staging ведутся отдельно.
 
 | Блок | Реализовано | Что впереди |
 | --- | --- | --- |
 | Доступ | Серверная заявка/оплаты/приглашения/регистрация, продления/ручной доступ, email outbox, admin TOTP/recovery | Реальные провайдеры, owner onboarding, эксплуатация и полная security acceptance |
-| Финансовая основа | Accounts/categories/counterparties/rules, observations/corrections, components/links/allocations, preview/commit, история, исключения, Merge/Split, удаления/reset, одиночные правки карточки, correction preview и Undo, редакторы связей/распределений | Полные финансовые экраны/массовые действия и будущие module dependencies |
-| Импорт | Локальные PDF adapters/HMAC, ограниченные безопасные признаки/магазины, server validation/acceptance, durable provenance, account aliases, консервативный source dedupe, checkpoints/queue, privacy cascade, authenticated загрузка/история и чтение сохранённых операций | CSV/XLSX/OCR, более полный safe text profile, более широкие fingerprints/matching, final classification/link pass и полный review UI |
+| Финансовая основа | Accounts/categories/counterparties/rules, observations/corrections, components/links/allocations, preview/commit, история, исключения, Merge/Split, удаления/reset, одиночные правки карточки, correction preview и Undo, редакторы связей/распределений | Остальные массовые действия, полные структурные редакторы и будущие module dependencies |
+| Импорт | Локальные PDF adapters/HMAC, ограниченные безопасные признаки/магазины, server validation/acceptance, durable provenance, account aliases, консервативный source dedupe, checkpoints/queue, privacy cascade, authenticated загрузка/история и чтение сохранённых операций | CSV/XLSX/OCR, более полный safe text profile, более широкие fingerprints/matching, final classification/link pass и групповые предложения Review и полный AI workflow |
 | Анализатор и выпуск | Приняты базовые макеты; Registry/AI полностью не реализованы | AI/provider checks, бюджеты/виджеты/views, Staging acceptance и Production |
 
-[Одиночные правки карточки](docs/architecture/live-operation-review.md), [отмена импортов и решения по дублям](docs/architecture/import-cancellation-dedupe.md), [объединение дубликатов](docs/architecture/duplicate-merge.md) и [редакторы связей/частей](docs/architecture/operation-relations.md) работают поверх сохранённых финансовых данных. [Загрузка PDF и восстановление результата](docs/architecture/live-import-ui.md) подключены. Полные Review/структурные редакторы правил, массовые правки, остальные форматы, финальная классификация, бюджеты и AI-Анализатор ещё предстоят. [Общий план](docs/product/implementation-plan.md). Исторический bootstrap-status описывает ранние этапы, а реестр покрытия не объявляет весь продукт готовым.
+[Одиночные правки карточки](docs/architecture/live-operation-review.md), [отмена импортов и решения по дублям](docs/architecture/import-cancellation-dedupe.md), [объединение дубликатов](docs/architecture/duplicate-merge.md) и [редакторы связей/частей](docs/architecture/operation-relations.md) работают поверх сохранённых финансовых данных. [Загрузка PDF и восстановление результата](docs/architecture/live-import-ui.md) подключены. [Массовая правка и ручной Review](docs/architecture/review-bulk-actions.md) подключены. Структурные редакторы правил, создание правил/удаления из массовых действий, групповые предложения Review, остальные форматы, финальная классификация, бюджеты и AI-Анализатор ещё предстоят. [Общий план](docs/product/implementation-plan.md). Исторический bootstrap-status описывает ранние этапы, а реестр покрытия не объявляет весь продукт готовым.
 
 ## Проверки и Development
 
@@ -43,4 +43,4 @@
 
 Сохранённые операции: [редактирование, проверка, corrections и конфликты](docs/architecture/live-operation-review.md).
 
-Следующий Development-блок: [объединение дубликатов и проверяемый Undo](docs/architecture/duplicate-merge.md), `feature/duplicate-merge`, миграция 0015. Фактический полный CI окончательного head фиксируется в PR.
+Следующий Development-блок — структурные редакторы Settings и правил. Фактический полный CI окончательного head фиксируется в PR.
