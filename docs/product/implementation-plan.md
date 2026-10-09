@@ -100,3 +100,10 @@
 Прошли 292 локальные проверки, включая полный web UI (82 сценария) и admin UI (16). Владелец явно разрешил сохранение подготовленных исходников, тестов, аудита и synthetic скриншотов в приватный bna42rus/Financial-AI-Analyzer, создание PR и полный CI. Результат PostgreSQL/HTTP CI окончательного коммита фиксируется в PR; этот блок не объединяет ветку с main и не выпускает Production.
 
 Пока владелец занят Timeweb, разработка на synthetic данных продолжается. Следующий основной блок этапа 5 — полная отмена batch/file с source restoration/provenance/privacy cascade и строгая cross-file дедупликация/запоминание решений. В связке с этим нужны рабочие links/components/rules/structural editors и полный Review; далее budgets, полный Operations/Overview и Analyzer Registry/quota/provenance. Внешние подключения остаются в согласованном порядке E; финальный Staging deployment/rollback/restore и owner acceptance ещё требуются.
+
+
+## Следующий блок импорта — отмена и finite strict fingerprint
+
+В `feature/import-cancellation-dedupe` от PR №25 добавлены preview/commit отмены batch/file, unique/shared restoration и direct source evidence, private metadata receipt без Undo, сохранение remaining jobs/пустых accounts, History filters и переходы к surviving operations. Exact-instant finite-profile fingerprint и persistent «разные операции» используют source facts; полная дедупликация произвольных descriptions и duplicate Merge с B-07 ID/Undo ещё открыты. [Границы и проверка](../architecture/import-cancellation-dedupe.md). Фактический полный CI окончательного коммита — в PR; main/Production не меняются.
+
+Следующий финансовый блок: duplicate merge/review и рабочие links/components/rules/structural editors, расширенный безопасный source profile и corpus; затем budgets и полный Operations/Overview/Analyzer. Shared cancellation legacy imports без записанного собственного evidence блокируется до проверки происхождения. Инфраструктура настраивается отдельно; новый runtime требует operator migration 0014.

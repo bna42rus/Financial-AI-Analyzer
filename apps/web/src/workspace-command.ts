@@ -1,6 +1,6 @@
 import {ApiError} from './server-client';
 import type {FinancePreview,FinanceReceipt,FinanceState} from './finance-client';
-export type WorkspaceIntent={kind:'account'|'category'|'counterparty';id:string;patch:Record<string,unknown>;create?:boolean}|{kind:'analytics';value:'cashflow'|'economic'}|{kind:'undo';id:string;value:string}|{kind:'restore_history';actionIds:string[]};
+export type WorkspaceIntent={kind:'account'|'category'|'counterparty';id:string;patch:Record<string,unknown>;create?:boolean}|{kind:'analytics';value:'cashflow'|'economic'}|{kind:'undo';id:string;value:string}|{kind:'restore_history';actionIds:string[]}|{kind:'cancel_import';batchId:string;fileId?:string}|{kind:'duplicate_different';id:string};
 export type CommandState={phase:'idle'|'sending'|'preview'|'retry'|'stale'|'unavailable';title:string;error:string;message:string;preview:FinancePreview|null;undoActionId:string|null};
 export const emptyCommand:CommandState={phase:'idle',title:'',error:'',message:'',preview:null,undoActionId:null};
 type Pending={path:string;body:Record<string,unknown>;confirmation:boolean;generation:string;undo:boolean};
@@ -17,7 +17,7 @@ export class WorkspaceCommand{
   if(this.disposed)return;this.pending=pending;this.publish({phase:'sending',error:''});
   try{const result=await this.deps.request(pending.path,pending.body);if(this.disposed)return;
    if(result.status==='previewed'){const commit={...pending,path:'/finance/commit',body:{actionId:result.actionId}};this.pending=commit;if(!pending.confirmation){await this.send(commit);return;}this.publish({phase:'preview',preview:result});return;}
-   this.pending=null;this.publish({preview:null,undoActionId:pending.undo?null:result.actionId,message:pending.undo?'Изменение отменено.':'Изменение сохранено.'});
+   this.pending=null;this.publish({preview:null,undoActionId:pending.undo||result.cleanup?null:result.actionId,message:result.cleanup?'Загрузка отменена. Для восстановления выберите исходные файлы заново.':pending.undo?'Изменение отменено.':'Изменение сохранено.'});
    try{const view=await this.deps.load();if(this.disposed)return;if(view.generation!==result.generation){this.publish({phase:'unavailable',error:'Финансовые данные сброшены. Откройте приложение заново.'});this.unavailable();return;}this.saved(view);this.publish({phase:'idle'});}
    catch(error){if(this.disposed)return;if(this.accessError(error))return;this.publish({phase:'stale',error:'Изменение сохранено, но данные не удалось обновить. Обновите их перед следующей правкой.'});}
   }catch(error){if(this.disposed)return;if(this.accessError(error))return;

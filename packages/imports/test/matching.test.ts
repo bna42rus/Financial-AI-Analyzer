@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {matchSource,sameSource} from '../src/matching.ts';
+import {matchSource,sameSource,strictSourceDescriptor} from '../src/matching.ts';
 import type {SourceCandidate} from '../src/matching.ts';
 import type {PreparedRow} from '../src/contract.ts';
 const row:PreparedRow={ordinal:1,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',direction:'debit',account:{kind:'bank_account',hmac:'a'.repeat(64)},bankRefHmac:null};
@@ -17,3 +17,16 @@ test('no remaining observation means physical deletion permits reimport',()=>ass
 test('source precision is preserved, never inferred from equal calendar dates',()=>assert.deepEqual(matchSource(row,'new',[source({operationDate:{precision:'instant',instant:'2026-09-01T00:00:00.000Z'}})],new Set()),{transactionId:null,possibleIds:[]}));
 test('posting date and direction are source facts, not mutable effective corrections',()=>{assert.equal(sameSource(row,source({postedDate:{precision:'day',date:'2026-09-02'}})),false);assert.equal(sameSource(row,source({direction:'unknown'})),false);});
 test('JSONB key ordering does not change source-date identity',()=>assert.equal(sameSource(row,source({operationDate:{date:'2026-09-01',precision:'day'}})),true));
+test('strict source requires an exact bank instant and explicit merchant evidence',()=>{
+ const exact={...row,operationDate:{precision:'instant' as const,instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase' as const,merchant:'ozon' as const}};
+ assert.equal(strictSourceDescriptor(row),null);assert.equal(strictSourceDescriptor({...exact,operationDate:row.operationDate}),null);assert.equal(strictSourceDescriptor({...exact,safeSource:{event:'purchase',merchant:null}}),null);
+ assert.notEqual(strictSourceDescriptor(exact),strictSourceDescriptor({...exact,account:{...row.account,hmac:'b'.repeat(64)}}));
+ assert.notEqual(strictSourceDescriptor(exact),strictSourceDescriptor({...exact,safeSource:{event:'purchase',merchant:'magnit'}}));
+});
+test('strict cross-file match is one-to-one and never chooses an ambiguous instance',()=>{
+ const exact={...row,operationDate:{precision:'instant' as const,instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase' as const,merchant:'ozon' as const}},c=source({operationDate:exact.operationDate,strictFingerprint:'key'});
+ assert.equal(matchSource(exact,'new',[c],new Set(),'key').transactionId,'one');
+ assert.equal(matchSource(exact,'new',[c],new Set(['one']),'key').transactionId,null);
+ assert.equal(matchSource(exact,'new',[c,{...c,transactionId:'two'}],new Set(),'key').transactionId,null);
+ assert.equal(matchSource(exact,'new',[{...c,bankRefHmac:'different-stable-id'}],new Set(),'key').transactionId,null);
+});
