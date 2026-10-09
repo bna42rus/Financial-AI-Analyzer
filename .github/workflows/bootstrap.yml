@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:
@@ -15,7 +15,9 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:18.4
+        # Docker Official Images mirror avoids Docker Hub shared-runner pull limits.
+        # https://www.docker.com/blog/news-from-aws-reinvent-docker-official-images-on-amazon-ecr-public/
+        image: public.ecr.aws/docker/library/postgres:18.4
         env:
           POSTGRES_PASSWORD: synthetic-ci-password
         ports: ['5432:5432']

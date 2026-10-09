@@ -17,12 +17,15 @@ export function validateRule(value:unknown):Omit<Rule,'id'> {
  if('merchant'in a)assignments.merchant=safeText(a.merchant,160);if('analyticsOverride'in a)assignments.analyticsOverride=choice(a.analyticsOverride,['default','include','exclude']);
  return {name:safeText(r.name,160),enabled:r.enabled,priority:r.priority,conditions,assignments};
 }
-/** Future classification only. Updating a rule does not call this on old transactions. */
+/** The same closed predicate is used for future imports and explicit historical selection. */
+export function ruleMatches(operation:Operation,account:Account,rule:Rule):boolean {
+ const f=effective(operation),amount=BigInt(f.amountMinor),text=(s:string)=>s.toLocaleLowerCase('ru-RU'),c=rule.conditions;
+ return (!c.merchantEquals||text(operation.semantics.merchant.value)===text(c.merchantEquals))&&(!c.merchantContains||text(operation.semantics.merchant.value).includes(text(c.merchantContains)))&&(!c.descriptionContains||text(f.description).includes(text(c.descriptionContains)))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.kind||c.kind===operation.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
+}
+/** Updating a rule never calls this on old operations; history needs a separate preview command. */
 export function applyRules(operation:Operation,account:Account,rules:Rule[]):Operation {
- const op=structuredClone(operation),f=effective(op),amount=BigInt(f.amountMinor),text=(s:string)=>s.toLocaleLowerCase('ru-RU');
- const matching=rules.filter(r=>{
-  const c=r.conditions;return r.enabled&&(!c.merchantEquals||text(op.semantics.merchant.value)===text(c.merchantEquals))&&(!c.merchantContains||text(op.semantics.merchant.value).includes(text(c.merchantContains)))&&(!c.descriptionContains||text(f.description).includes(text(c.descriptionContains)))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===op.semantics.counterparty.value)&&(!c.kind||c.kind===op.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor));
- }).sort((a,b)=>Object.keys(b.conditions).length-Object.keys(a.conditions).length||b.priority-a.priority);
+ const op=structuredClone(operation);
+ const matching=rules.filter(r=>r.enabled&&ruleMatches(op,account,r)).sort((a,b)=>Object.keys(b.conditions).length-Object.keys(a.conditions).length||b.priority-a.priority);
  const mapping={role:'role',kind:'kind',categoryId:'category',subcategoryId:'subcategory',merchant:'merchant',counterpartyId:'counterparty'}as const;
  for(const [assignment,key]of Object.entries(mapping)as [keyof typeof mapping,typeof mapping[keyof typeof mapping]][]){
   const current=op.semantics[key];if(current.userVerified||key==='kind'&&current.source==='bank'&&current.confidence>=90)continue;
@@ -32,6 +35,11 @@ export function applyRules(operation:Operation,account:Account,rules:Rule[]):Ope
   const value=first.assignments[assignment];(op.semantics as Record<string,unknown>)[key]={...facet(value,'personal_rule'),ruleId:first.id};
  }
  // Explicit transaction inclusion is a manual decision and is never overwritten.
- if(op.analyticsOverride==='default'){const r=matching.find(r=>'analyticsOverride'in r.assignments);if(r)op.analyticsOverride=r.assignments.analyticsOverride!;}
+ if(op.analyticsOverride==='default'){
+  const offered=matching.filter(r=>'analyticsOverride'in r.assignments),first=offered[0];
+  if(first){const ties=offered.filter(r=>Object.keys(r.conditions).length===Object.keys(first.conditions).length&&r.priority===first.priority);
+   if(new Set(ties.map(r=>r.assignments.analyticsOverride)).size>1)op.reviewReasons=[...new Set([...op.reviewReasons,'conflicting_rules'])];else op.analyticsOverride=first.assignments.analyticsOverride!;
+  }
+ }
  return op;
 }

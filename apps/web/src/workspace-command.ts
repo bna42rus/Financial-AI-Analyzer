@@ -1,7 +1,8 @@
 import type {MergeChoices,MergeSide} from '../../../packages/finance-core/src/duplicate-merge';
 import {ApiError} from './server-client';
 import type {FinancePreview,FinanceReceipt,FinanceState,OperationPatch,BulkIntent,BulkDetails} from './finance-client';
-export type WorkspaceIntent=BulkIntent|{kind:'operation';id:string;patch:OperationPatch}|{kind:'account'|'category'|'counterparty';id:string;patch:Record<string,unknown>;create?:boolean}|{kind:'analytics';value:'cashflow'|'economic'}|{kind:'undo';id:string;value:string}|{kind:'restore_history';actionIds:string[]}|{kind:'cancel_import';batchId:string;fileId?:string}|{kind:'duplicate_different';id:string}|{kind:'merge_duplicate';id:string;canonicalId:string;sourceSide:MergeSide;choices:MergeChoices;components?:MergeSide|'none';dropLinkIds:string[]};
+import type {SettingsIntent} from './settings-intents';
+export type WorkspaceIntent=SettingsIntent|BulkIntent|{kind:'operation';id:string;patch:OperationPatch}|{kind:'account'|'category'|'counterparty';id:string;patch:Record<string,unknown>;create?:boolean}|{kind:'analytics';value:'cashflow'|'economic'}|{kind:'undo';id:string;value:string}|{kind:'restore_history';actionIds:string[]}|{kind:'cancel_import';batchId:string;fileId?:string}|{kind:'duplicate_different';id:string}|{kind:'merge_duplicate';id:string;canonicalId:string;sourceSide:MergeSide;choices:MergeChoices;components?:MergeSide|'none';dropLinkIds:string[]};
 export type CommandState={phase:'idle'|'sending'|'preview'|'retry'|'stale'|'unavailable';title:string;error:string;message:string;preview:FinancePreview|null;undoActionId:string|null;bulkResult?:BulkDetails|null};
 export const emptyCommand:CommandState={phase:'idle',title:'',error:'',message:'',preview:null,undoActionId:null,bulkResult:null};
 type Pending={path:string;body:Record<string,unknown>;confirmation:boolean;generation:string;undo:boolean};
