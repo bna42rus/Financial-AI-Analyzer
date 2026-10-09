@@ -355,13 +355,16 @@ export async function acceptCounterpartyAlias(db:PoolClient,userId:string,epoch:
 export async function acceptCounterpartyObservation(db:PoolClient,userId:string,epoch:ImportEpoch,input:unknown){
  const state=await prepareFinance(db,userId);assertImportEpoch(epoch,state);
  const r=object(input,['observationId','counterpartyId','aliasId']),observationId=uuid(r.observationId),aliasId=ref(r.aliasId),party=canonicalParty(await partyRows(db,userId),uuid(r.counterpartyId));
- const observation=(await db.query('SELECT transaction_id FROM finance.source_observation WHERE user_id=$1 AND id=$2',[userId,observationId])).rows[0];if(!observation)throw new HttpError(404,'NOT_FOUND');
+ const observation=(await db.query('SELECT finance.canonical_operation(user_id,transaction_id) AS transaction_id FROM finance.source_observation WHERE user_id=$1 AND id=$2',[userId,observationId])).rows[0];if(!observation)throw new HttpError(404,'NOT_FOUND');
  if(aliasId!==null&&!(await db.query('SELECT 1 FROM finance.counterparty_alias WHERE user_id=$1 AND id=$2 AND counterparty_id=$3',[userId,aliasId,party.id])).rowCount)throw new HttpError(404,'NOT_FOUND');
  const old=(await db.query('SELECT counterparty_id,alias_id FROM finance.observation_counterparty WHERE user_id=$1 AND observation_id=$2',[userId,observationId])).rows[0];
  if(old){if(old.counterparty_id!==party.id||old.alias_id!==aliasId)throw new HttpError(409,'COUNTERPARTY_BINDING_REUSED');return {observationId,counterpartyId:party.id,aliasId};}
  await db.query('INSERT INTO finance.observation_counterparty(user_id,observation_id,counterparty_id,alias_id) VALUES($1,$2,$3,$4)',[userId,observationId,party.id,aliasId]);
  const operation=await row(db,userId,'transaction',observation.transaction_id),semantics:Semantics=structuredClone(operation.semantics),cp=semantics.counterparty;
  if(operation.source_observation_id===observationId&&!cp.userVerified&&(cp.source==='bank'||cp.value===null&&cp.source==='deterministic_system_rule')){semantics.counterparty=facet(party.id,'bank');await update(db,userId,'transaction',operation.id,{semantics});}
+ // A new source assignment after merge is a dependency even when it is not
+ // the currently selected observation; Undo must not redistribute it silently.
+ await db.query('UPDATE finance.transaction t SET revision=revision+1 WHERE t.user_id=$1 AND t.id=$2 AND EXISTS(SELECT 1 FROM finance.transaction a WHERE a.user_id=t.user_id AND a.merged_into_id=t.id)',[userId,operation.id]);
  await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);return {observationId,counterpartyId:party.id,aliasId};
 }
 /** Future sanitized Import/worker entry point. Caller owns one DB transaction; no raw upload route. */

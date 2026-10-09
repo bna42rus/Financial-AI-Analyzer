@@ -5,7 +5,7 @@ import type {PoolClient} from 'pg';
 import {postgresFixture} from './postgres.ts';
 import {createServer} from '../src/server.ts';
 import {hashPassword,token,envelope} from '../src/crypto.ts';
-import {prepareFinance,prepareImportContext} from '../src/finance.ts';
+import {acceptCounterpartyObservation,prepareFinance,prepareImportContext} from '../src/finance.ts';
 import {processImport,importStatus,runImportStage,IMPORT_CHUNK} from '../src/import-ingestion.ts';
 import {createLocalPreparation} from '../../../packages/imports/src/local.ts';
 import type {ExtractedRow,LocalContext} from '../../../packages/imports/src/local.ts';
@@ -318,4 +318,10 @@ test('server refuses missing access, raw smuggling, expired/foreign context and 
 test('ownership/RLS isolate all financial ingestion tables from other users and control/mail roles',async()=>{
  const a=await batch();await accept(a);await drain(a.batchId);await within('second',async db=>{for(const table of ['ingestion_batch','ingestion_file','ingestion_row','ingestion_account','duplicate_candidate'])assert.equal((await db.query(`SELECT 1 FROM finance.${table}`)).rowCount,0);});assert.equal((await within('second',db=>importStatus(db,'second',{batchId:a.batchId})).catch((e:any)=>e.code)),'NOT_FOUND');
  for(const role of ['control_api','mail_finance','mail_control'])for(const table of ['ingestion_batch','ingestion_file','ingestion_row','ingestion_account','duplicate_candidate','ingestion_dispatch'])assert.equal((await pg.owner.query('SELECT has_table_privilege($1,$2,\'SELECT\') AS allowed',[role,'finance.'+table])).rows[0].allowed,false);
+});
+
+test('a new counterparty binding on an original merged source targets its canonical operation and blocks earlier Undo',async()=>{
+ const {pair}=await weakPair(),saved=await command(mergeIntent(pair,{sourceSide:'left'})),partyId=randomUUID(),observationId=(await pg.owner.query('SELECT id FROM finance.source_observation WHERE transaction_id=$1',[pair.rightId])).rows[0].id;
+ await command({kind:'counterparty',id:partyId,create:true,patch:{name:'Synthetic source party'}});const e=await context();await within('first',db=>acceptCounterpartyObservation(db,'first',{generation:e.generation,keyVersion:e.keyVersion},{observationId,counterpartyId:partyId,aliasId:null}));
+ assert.equal((await request('/finance/state')).json().counterpartySources[0].transactionId,pair.leftId);assert.equal((await previewCommand({kind:'undo',id:randomUUID(),value:saved.result.actionId})).statusCode,409);
 });
