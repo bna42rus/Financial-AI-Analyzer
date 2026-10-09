@@ -15,7 +15,9 @@ jobs:
     timeout-minutes: 20
     services:
       postgres:
-        image: postgres:18.4
+        # Docker Official Images mirror avoids Docker Hub shared-runner pull limits.
+        # https://www.docker.com/blog/news-from-aws-reinvent-docker-official-images-on-amazon-ecr-public/
+        image: public.ecr.aws/docker/library/postgres:18.4
         env:
           POSTGRES_PASSWORD: synthetic-ci-password
         ports: ['5432:5432']
