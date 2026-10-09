@@ -23,7 +23,7 @@ export function ServerSettings({state,section,navigate,command,disabled,appearan
   const values:Record<string,string>={debit_card:'Дебетовая карта',credit_card:'Кредитная карта',bank_account:'Текущий счёт',loan:'Кредит',savings:'Накопительный счёт',deposit:'Вклад',other:'Другой',cashflow:'Весь платёж как расход',economic:'Проценты и сопутствующие расходы',expense:'Расходы',income:'Доходы',both:'Расходы и доходы',registered:'Зарегистрирован',ignored:'Игнорируется'};
   const entity='id'in intent?state.accounts.find(a=>a.id===intent.id)??state.categories.find(c=>c.id===intent.id)??state.counterparties.find(p=>p.id===intent.id):null;
   const describe=(v:unknown,k:string)=>k==='name'?String(v):typeof v==='boolean'?(v?'Да':'Нет'):v===null?(k==='parentId'?'Корневая категория':'По умолчанию'):state.categories.find(c=>c.id===v)?.name??values[String(v)]??String(v);
-  const changes='patch'in intent?Object.entries(intent.patch).map(([k,v])=>(labels[k]??'Настройка')+': '+describe(v,k)).join('; '):'';
+  const changes='patch'in intent?Object.entries(intent.patch??{}).map(([k,v])=>(labels[k]??'Настройка')+': '+describe(v,k)).join('; '):'';
   void command?.begin(intent,title+(entity?' «'+entity.name+'»':'')+(changes?'. '+changes:''),confirm);
  }
  const filtered=sections.filter(s=>(s.title+' '+s.keywords).toLocaleLowerCase('ru-RU').replaceAll('ё','е').includes(query.toLocaleLowerCase('ru-RU').replaceAll('ё','е').trim()));

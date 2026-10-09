@@ -35,6 +35,7 @@ export async function postgresFixture() {
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0013_bank_contract_alias.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0014_import_cancellation_dedupe.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0015_duplicate_merge.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0016_review_sessions.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

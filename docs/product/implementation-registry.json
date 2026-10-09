@@ -2,7 +2,7 @@
   "schema_version": 1,
   "baseline_version": "1.3",
   "as_of": "2026-10-09",
-  "base_commit": "3911ee9bda411b257e38b189c0df4352df5b5ab3",
+  "base_commit": "fceb99c23f828f62287c39598bdb22d8ae7a45d0",
   "source_manifest": "docs/product/source-manifest.json",
   "scope_note": "Карта покрытия разделов и подпунктов, не процент готовности. Внутри подпункта может быть несколько обязательных сценариев; перед закрытием его нужно проверить полностью, при необходимости добавить дочерние требования. Extracted source_text вспомогателен: PDF/согласованные overrides остаются авторитетными, схемы сверяются визуально при реализации. Исторические C/D не отменяют последующую E. Текущие источники не редактируются.",
   "status_meaning": {
@@ -1695,14 +1695,28 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-10.1",
@@ -1747,18 +1761,31 @@
         "docs/architecture/live-operation-review.md",
         "apps/web/src/ServerOperation.tsx",
         "apps/web/src/operation-flow.ts",
-        "apps/web/src/finance-client.ts"
+        "apps/web/src/finance-client.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/web/src/finance-client.test.ts",
         "apps/web/src/operation-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
       "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
-      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-10.3",
@@ -1792,10 +1819,27 @@
       "title": "Review Reasons: почему операции могут требовать внимания",
       "source_text": "review_status и review_reasons — разные вещ и `review_reasons` объясняют, почему требуется внимание, а `review_status` показывает состояние процесса проверки. Минимальные значения: `none` — проверка не нужна; `recommended` — проверить желательно; `required` — без решения операция остаётся неполной для заданной логики; `verified` — соответствующие спорные facets подтверждены пользователем. Наличие нескольких review_reasons не заменяется одним статусом.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-10.5",
@@ -1816,18 +1860,31 @@
         "docs/architecture/live-operation-review.md",
         "apps/web/src/ServerOperation.tsx",
         "apps/web/src/operation-flow.ts",
-        "apps/web/src/finance-client.ts"
+        "apps/web/src/finance-client.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/web/src/finance-client.test.ts",
         "apps/web/src/operation-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
       "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
-      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-11",
@@ -4683,15 +4740,29 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-23.5",
@@ -4708,13 +4779,28 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
+      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-23.6",
@@ -4724,10 +4810,27 @@
       "title": "Экран «Операции»",
       "source_text": "Массовые действия Category, role, status, include/exclude, create rule, kind, counterparty, comment, history, delete. Mass actions вне Review требуют confirmation и показывают точное количество затрагиваемых операций.",
       "group": "operations",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-23.7",
@@ -4741,15 +4844,29 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-23.8",
@@ -4770,18 +4887,31 @@
         "docs/architecture/live-operation-review.md",
         "apps/web/src/ServerOperation.tsx",
         "apps/web/src/operation-flow.ts",
-        "apps/web/src/finance-client.ts"
+        "apps/web/src/finance-client.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "apps/api/test/finance-history.test.ts",
         "apps/web/src/finance-client.test.ts",
         "apps/web/src/operation-flow.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
       "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR.",
-      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-23.9",
@@ -4817,15 +4947,29 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-23.11",
@@ -4865,15 +5009,29 @@
       "implementation_refs": [
         "apps/web/src/Operations.tsx",
         "apps/web/src/OperationCard.tsx",
-        "apps/web/src/demo/operations.ts"
+        "apps/web/src/demo/operations.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "apps/web/src/demo/operations.test.ts",
         "apps/web/e2e/operations.spec.ts",
-        "docs/architecture/web-operations.md"
+        "docs/architecture/web-operations.md",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Фильтры, колонки, массовые действия с preview, части и связи; причины сомнений, источник, включение и независимые ручные исправления.",
-      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт."
+      "implementation_note": "Первая версия для чтения искусственных данных: список, фильтры, поиск, сортировка, выбор и карточка. Нет реального импорта/provenance, исправлений/Undo, links/components, facets, History, массовых подтверждений, saved views и серверных прав/сохранения. Полный пункт не закрыт. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-24",
@@ -5167,10 +5325,27 @@
       "title": "Review Flow",
       "source_text": "Review — быстрый последовательный разбор неопределённых и сомнительных операций. Он реализуется внутри Analyzer, потому что естественный язык особенно удобен для вопросов типа «что это за перевод?».",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-25.1",
@@ -5180,10 +5355,27 @@
       "title": "Review Flow",
       "source_text": "Fixed Set При старте фиксируется список transaction IDs. Новые операции не должны самопроизвольно попадать в текущую сессию.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-25.2",
@@ -5193,10 +5385,27 @@
       "title": "Review Flow",
       "source_text": "Интерфейс Показывается progress «4 из 17», контекст одной операции и короткий вопрос. Доступны Back, Skip, Не знаю, Undo. Изменения внутри Review применяются сразу, потому что пользователь уже явно находится в режиме разбора.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-25.3",
@@ -5219,10 +5428,27 @@
       "title": "Review Flow",
       "source_text": "Persisted progress Review можно закрыть и продолжить позже. Если transaction тем временем была решена в другом месте, она автоматически пропускается.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-26",
@@ -6222,7 +6448,16 @@
         "apps/web/src/ServerRelations.tsx",
         "apps/web/src/operation-relations.ts",
         "apps/web/src/operation-flow.ts",
-        "docs/architecture/operation-relations.md"
+        "docs/architecture/operation-relations.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -6234,10 +6469,14 @@
         "apps/api/test/browser.test.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/operation-relations.test.ts",
-        "apps/web/src/operation-flow.test.ts"
+        "apps/web/src/operation-flow.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR. Operation-relations increment adds authenticated preview/confirmation editors, exact component/derived-allocation references, rejected/candidate decisions, decomposition retirement, preserved component facets and stale-decision refusal. Evidence is recorded on the exact PR head. Automatic matching, complete Review/structural editing and full acceptance remain open."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR. Operation-relations increment adds authenticated preview/confirmation editors, exact component/derived-allocation references, rejected/candidate decisions, decomposition retirement, preserved component facets and stale-decision refusal. Evidence is recorded on the exact PR head. Automatic matching, complete Review/structural editing and full acceptance remain open.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-34.4",
@@ -6277,7 +6516,16 @@
         "apps/web/src/ServerRelations.tsx",
         "apps/web/src/operation-relations.ts",
         "apps/web/src/operation-flow.ts",
-        "docs/architecture/operation-relations.md"
+        "docs/architecture/operation-relations.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -6291,10 +6539,14 @@
         "apps/api/test/browser.test.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/operation-relations.test.ts",
-        "apps/web/src/operation-flow.test.ts"
+        "apps/web/src/operation-flow.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR. Operation-relations increment adds authenticated preview/confirmation editors, exact component/derived-allocation references, rejected/candidate decisions, decomposition retirement, preserved component facets and stale-decision refusal. Evidence is recorded on the exact PR head. Automatic matching, complete Review/structural editing and full acceptance remain open."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR. Operation-relations increment adds authenticated preview/confirmation editors, exact component/derived-allocation references, rejected/candidate decisions, decomposition retirement, preserved component facets and stale-decision refusal. Evidence is recorded on the exact PR head. Automatic matching, complete Review/structural editing and full acceptance remain open.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-34.5",
@@ -9285,10 +9537,27 @@
       "title": "Error States и Graceful Degradation",
       "source_text": "Partial Completion Если команда затронула 500 операций и 13 не обработаны, ответ: «487 изменено, 13 не изменено» с доступом к проблемным записям. Нельзя сообщить просто «Готово».",
       "group": "ux-support",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-49.4",
@@ -9314,7 +9583,16 @@
         "apps/web/src/ServerRelations.tsx",
         "apps/web/src/operation-relations.ts",
         "apps/web/src/operation-flow.ts",
-        "docs/architecture/operation-relations.md"
+        "docs/architecture/operation-relations.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9323,10 +9601,14 @@
         "apps/web/src/operation-relations.test.ts",
         "apps/web/src/operation-flow.test.ts",
         "apps/web/e2e/server-workspace.spec.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Operation-relations increment adds authenticated preview/confirmation editors, exact component/derived-allocation references, rejected/candidate decisions, decomposition retirement, preserved component facets and stale-decision refusal. Evidence is recorded on the exact PR head. Automatic matching, complete Review/structural editing and full acceptance remain open."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Operation-relations increment adds authenticated preview/confirmation editors, exact component/derived-allocation references, rejected/candidate decisions, decomposition retirement, preserved component facets and stale-decision refusal. Evidence is recorded on the exact PR head. Automatic matching, complete Review/structural editing and full acceptance remain open.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-49.5",
@@ -9479,14 +9761,28 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-51.2",
@@ -9503,14 +9799,28 @@
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/rules.ts",
         "packages/database/migrations/0006_finance_foundation.sql",
-        "docs/architecture/finance-foundation.md"
+        "docs/architecture/finance-foundation.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
-        "apps/api/test/finance.test.ts"
+        "apps/api/test/finance.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
-      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR."
+      "note": " Finance foundation first server block: a narrow source/correction, graph math and versioned scoped persistence implementation; the full clause is not closed. See finance-foundation.md for pending scenarios. Exact-head evidence in PR.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-51.3",
@@ -9815,10 +10125,27 @@
       "title": "Основные State Machines",
       "source_text": "Review Sessio n created → in progress → paused / completed / abandoned. Список transaction IDs фиксируется при создании; повторное открытие продолжает progress, а уже решённые в другом месте операции пропускаются.",
       "group": "matrices",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
+      ],
+      "verification_refs": [
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Подтверждения и зависимости каждого действия, исчерпывающие states/enums с A-09, единые privacy/AI/release ограничения.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "PDF-53.8",
@@ -10471,7 +10798,16 @@
         "apps/api/src/import-source.ts",
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -10486,11 +10822,14 @@
         "apps/api/test/browser.test.ts",
         "apps/web/src/finance-client.test.ts",
         "apps/web/src/operation-flow.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "A-07",
@@ -10535,17 +10874,30 @@
         "docs/architecture/live-operation-review.md",
         "apps/web/src/ServerOperation.tsx",
         "apps/web/src/operation-flow.ts",
-        "apps/web/src/finance-client.ts"
+        "apps/web/src/finance-client.ts",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/web/src/finance-client.test.ts",
         "apps/web/src/operation-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks.",
-      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
+      "implementation_note": " Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "A-09",
@@ -10617,14 +10969,28 @@
         "apps/api/src/finance-history.ts",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "B-02",
@@ -10705,7 +11071,16 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "docs/architecture/review-bulk-actions.md",
+        "apps/api/src/finance-bulk.ts",
+        "apps/api/src/finance-review.ts",
+        "apps/web/src/ServerOperations.tsx",
+        "apps/web/src/ServerReview.tsx",
+        "apps/web/src/OperationChoice.tsx",
+        "apps/web/src/workspace-command.ts",
+        "packages/finance-core/src/review.ts",
+        "packages/database/migrations/0016_review_sessions.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -10716,11 +11091,15 @@
         "apps/api/test/import-validation.test.ts",
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/web/src/bulk-edit.test.ts",
+        "apps/web/src/workspace-command.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
     {
       "id": "B-04",
