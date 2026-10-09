@@ -15,7 +15,7 @@ function advance(s:SessionRow,operations:Awaited<ReturnType<typeof financeView>>
  return changed;
 }
 export async function reviewSessions(db:PoolClient,userId:string,input:unknown){
- object(input,[]);const state=await prepareFinance(db,userId),view=await financeView(db,userId),rows=(await db.query<SessionRow>('SELECT * FROM finance.review_session WHERE user_id=$1 AND generation=$2 ORDER BY updated_at DESC LIMIT 20 FOR UPDATE',[userId,state.generation])).rows;
+ object(input,[]);const state=await prepareFinance(db,userId),view=await financeView(db,userId),rows=(await db.query<SessionRow>("SELECT * FROM finance.review_session WHERE user_id=$1 AND generation=$2 ORDER BY (status IN ('created','in_progress','paused')) DESC,updated_at DESC,id LIMIT 20 FOR UPDATE",[userId,state.generation])).rows;
  const sessions=[];for(let s of rows){if(['created','in_progress','paused'].includes(s.status)&&advance(s,view.operations))s=await save(db,userId,s);sessions.push(publicSession(s));}return {generation:state.generation,sessions};
 }
 export async function reviewCommand(db:PoolClient,userId:string,input:unknown){
