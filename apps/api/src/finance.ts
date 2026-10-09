@@ -113,7 +113,7 @@ export function parseIntent(value:unknown):Intent {
   for(const k of ['merchant','comment']as const)if(k in p)out[k]=safeText(p[k],k==='comment'?1000:160);
   if('analyticsOverride'in p)out.analyticsOverride=choice(p.analyticsOverride,['default','include','exclude']);intent.patch=out;
  }else if(kind==='components'){
-  if(!Array.isArray(r.parts)||r.parts.length<1||r.parts.length>50)throw new TypeError('INVALID_COMPONENTS');
+  if(!Array.isArray(r.parts)||r.parts.length>50)throw new TypeError('INVALID_COMPONENTS');
   intent.parts=r.parts.map(v=>{const p=object(v,['id','type','amountMinor','role','categoryId','subcategoryId']);parsePersistedMinor(p.amountMinor);return {id:p.id===undefined?randomUUID():uuid(p.id),transactionId:intent.id,type:choice(p.type,['principal','interest','fee','insurance','other']),amountMinor:p.amountMinor as string,role:p.role===undefined?facet('unresolved'):facet(choice(p.role,['expense','income','neutral','unresolved']),'user',true),category:p.categoryId===undefined?facet(null):facet(ref(p.categoryId),'user',true),subcategory:p.subcategoryId===undefined?facet(null):facet(ref(p.subcategoryId),'user',true)};});
   if(new Set(intent.parts.map(p=>p.id)).size!==intent.parts.length)throw new TypeError('DUPLICATE_COMPONENT');
  }else if(kind==='link'){
@@ -186,16 +186,18 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
  if(intent.kind==='components'){
   await row(db,userId,'transaction',id);const before=(await db.query('SELECT * FROM finance.component WHERE user_id=$1 AND transaction_id=$2 ORDER BY id',[userId,id])).rows;
   for(const part of intent.parts!){
+   const previous=graph.components.find(c=>c.id===part.id&&c.transactionId===id);
+   if(previous){for(const key of ['role','category','subcategory']as const)if(part[key].source!=='user')(part as unknown as Record<string,unknown>)[key]=previous[key];}
    ownRefs(graph,parties,{categoryId:part.category.value,subcategoryId:part.subcategory.value});
    categoryCompatible(graph,part.role.value,part.category.value,part.subcategory.value);
    const existing=(await db.query('SELECT transaction_id FROM finance.component WHERE user_id=$1 AND id=$2',[userId,part.id])).rows[0];if(existing&&existing.transaction_id!==id)throw new HttpError(404,'NOT_FOUND');
   }
   const sum=intent.parts!.reduce((s,p)=>s+BigInt(p.amountMinor),0n),op=graph.operations.find(o=>o.id===id)!;
-  if(sum!==BigInt(op.corrections.amountMinor??op.source.amountMinor))throw new HttpError(409,'COMPONENT_SUM_CONFLICT');
+  if(intent.parts!.length&&sum!==BigInt(op.corrections.amountMinor??op.source.amountMinor))throw new HttpError(409,'COMPONENT_SUM_CONFLICT');
   await db.query('UPDATE finance.component SET active=false WHERE user_id=$1 AND transaction_id=$2',[userId,id]);
   for(const part of intent.parts!)await db.query(`INSERT INTO finance.component(user_id,id,transaction_id,type,amount_minor,role,category,subcategory) VALUES($1,$2,$3,$4,$5,$6,$7,$8)
    ON CONFLICT(user_id,id) DO UPDATE SET type=EXCLUDED.type,amount_minor=EXCLUDED.amount_minor,role=EXCLUDED.role,category=EXCLUDED.category,subcategory=EXCLUDED.subcategory,active=true`,[userId,part.id,id,part.type,part.amountMinor,JSON.stringify(part.role),JSON.stringify(part.category),JSON.stringify(part.subcategory)]);
-  await update(db,userId,'transaction',id,{decomposition:true});return {table:'components',id,before:[...before,{decomposition:op.decomposition}]};
+  await update(db,userId,'transaction',id,{decomposition:intent.parts!.length>0});return {table:'components',id,before:[...before,{decomposition:op.decomposition}]};
  }
  if(intent.kind==='link'){
   const l=intent.link!;if(!graph.operations.some(o=>o.id===l.sourceId)||!graph.operations.some(o=>o.id===l.targetId))throw new HttpError(404,'NOT_FOUND');
