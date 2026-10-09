@@ -3437,10 +3437,25 @@
       "title": "Дедупликация",
       "source_text": "Deduplication нужна потому, что пользователь будет регулярно загружать пересекающиеся периоды. Например, август–сентябрь, а затем сентябрь–октябрь. Без dedupe сентябрьские расходы удвоятся.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.1",
@@ -3455,14 +3470,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.2",
@@ -3477,14 +3501,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.3",
@@ -3531,17 +3564,26 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.5",
@@ -3556,14 +3598,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.6",
@@ -3573,20 +3624,31 @@
       "title": "Дедупликация",
       "source_text": "Решение пользователя запоминается Если пользователь подтвердил «это разные операции», система сохраняет dedupe rejection A ≠ B и не должна задавать тот же вопрос после следующего импорта без нового основания. Если подтверждено «это одна операция», перед merge показываются конфликты пользовательских edits, если они существуют.",
       "group": "imports",
-      "status": "not_verified",
+      "status": "partial",
       "implementation_refs": [
         "docs/architecture/safe-bank-source.md",
         "packages/imports/src/safe-source.ts",
         "packages/imports/src/contract.ts",
-        "apps/api/src/import-ingestion.ts"
+        "apps/api/src/import-ingestion.ts",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/safe-source.test.ts",
         "apps/api/test/import-ingestion.test.ts",
-        "apps/web/e2e/import-local.spec.ts"
+        "apps/web/e2e/import-local.spec.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
+      "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.7",
@@ -3601,14 +3663,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.8",
@@ -3623,14 +3694,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-19.9",
@@ -3645,14 +3725,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20",
@@ -3662,10 +3751,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Пользователь должен иметь возможность отменить ошибочную загрузку так, будто конкретного source file или batch не было, не повреждая данные, подтверждённые другими источниками.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.1",
@@ -3675,10 +3779,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Где находится Настройки → Импорты. Вверху показывается последняя загрузка: дата, количество файлов, строки, new/existing/updated/review, банки. Ниже — полная история с фильтрами «Все», «Завершённые», «Ошибки», «Отменённые».",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.2",
@@ -3688,10 +3807,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Почему простой Delete недостаточен Одна transaction может быть найдена в трёх разных выписках. Отмена четвёртой не должна удалить её, если остальные sources продолжают подтверждать существование операции. Поэтому система хранит provenance и `import_effects`.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.3",
@@ -3706,14 +3840,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.4",
@@ -3723,10 +3866,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Unique и Shared Transactions Transaction, существующая только благодаря отменяемому import, физически удаляется. Transaction, подтверждённая другими imports, остаётся; удаляется только provenance отменяемого источника.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.5",
@@ -3736,10 +3894,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Source Restoration Если отменяемый import обновил банковское описание, система выбирает последнюю оставшуюся валидную source observation, а не хранит один хрупкий «предыдущий текст».",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.6",
@@ -3749,10 +3922,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Manual Edits Если уникальная для import transaction была вручную отредактирована пользователем, preview явно предупреждает, что она исчезнет вместе с отменой source. Пользователь принимает это решение осознанно.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.7",
@@ -3762,10 +3950,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Пересчёт После отмены пересчитываются только затронутые links, duplicates, review reasons, budgets, Overview aggregates и related states. Пустой account автоматически не удаляется. Незарегистрированный discovered counterparty может исчезнуть, если больше ни с чем не связан.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.8",
@@ -3775,10 +3978,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Отмена необратима через Undo Отмена import может физически удалить financial data, поэтому обычного Undo нет. Восстановление выполняется повторной загрузкой source file. Сам import остаётся в истории со статусом Cancelled, но удалённое финансовое содержимое не должно сохраняться внутри history.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.9",
@@ -3788,10 +4006,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Отмена отдельного файла и всего batc h Batch — одно действие загрузки, которое может содержать несколько файлов. В карточке batch пользователь может открыть каждый файл отдельно, перейти к связанным operations и выбрать «Отменить этот импорт»; отдельно доступно «Отменить всю загрузку». Перед выполнением preview показывает точные counts: что будет физически удалено, что останется благодаря другим imports, какие source values восстановятся, какие links будут пересчитаны и сколько удаляемых transactions имеют ручные edits.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.10",
@@ -3806,14 +4039,23 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.11",
@@ -3823,10 +4065,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Быстрая отмена последней загрузк и Сразу после успешного batch интерфейс может показывать действие «Отменить последнюю загрузку». Оно не является упрощённым delete: открывается тот же impact preview, что и в Settings → Imports, с теми же правилами provenance и manual edits. Analyzer- команда «Отмени последнюю загрузку» вызывает тот же backend flow.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-20.12",
@@ -3836,10 +4093,25 @@
       "title": "История импортов и отмена импорта",
       "source_text": "Privacy cascade при cancellatio n Отмена import считается источниковым удалением и запускает тот же privacy cleanup для затронутых financial fragments, что и physical deletion: structured Analyzer results, detailed cached fragments и derived caches, которые содержали только удалённые операции, удаляются или обезличиваются. Cancelled import остаётся в history как техническая запись со status и cancellation timestamp, но не сохраняет raw statement или копию удалённых financial rows. Discovered counterparty с нулём оставшихся operations можно убрать автоматически только если пользователь его не регистрировал, не переименовывал и не связывал с personal rule. В противном случае объект считается пользовательской конфигурацией и сохраняется. ЧАСТЬ III. АНАЛИТИКА И AI- АНАЛИЗАТОР Обзор, бюджеты, операции, Review и контролируемые AI- действия",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
+      ],
+      "verification_refs": [
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "PDF-21",
@@ -9813,7 +10085,13 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
@@ -9821,9 +10099,11 @@
         "apps/api/test/import-validation.test.ts",
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
@@ -9923,7 +10203,13 @@
         "apps/api/src/import-ingestion.ts",
         "packages/imports/src/matching.ts",
         "packages/database/migrations/0012_import_ingestion.sql",
-        "docs/architecture/import-ingestion.md"
+        "docs/architecture/import-ingestion.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -9933,9 +10219,11 @@
         "apps/api/test/import-validation.test.ts",
         "apps/web/e2e/import-preparation.spec.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/api/test/import-ingestion.test.ts"
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
@@ -9986,7 +10274,12 @@
         "docs/architecture/live-operation-review.md",
         "apps/web/src/ServerOperation.tsx",
         "apps/web/src/operation-flow.ts",
-        "apps/web/src/finance-client.ts"
+        "apps/web/src/finance-client.ts",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -10000,9 +10293,10 @@
         "apps/web/src/import-flow.test.ts",
         "apps/api/test/browser.test.ts",
         "apps/web/src/finance-client.test.ts",
-        "apps/web/src/operation-flow.test.ts"
+        "apps/web/src/operation-flow.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
@@ -10164,14 +10458,26 @@
         "apps/api/src/finance-history.ts",
         "apps/api/src/finance-structure.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "B-03",
@@ -10373,16 +10679,28 @@
         "packages/finance-core/src/allocation-graph.ts",
         "packages/finance-core/src/graph.ts",
         "packages/database/migrations/0011_derived_allocations.sql",
-        "docs/architecture/derived-allocations.md"
+        "docs/architecture/derived-allocations.md",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "apps/api/src/import-ingestion.ts",
+        "packages/imports/src/matching.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/ServerFinance.tsx",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-structure.test.ts",
         "packages/finance-core/test/graph.test.ts",
         "apps/api/test/finance-entities.test.ts",
         "apps/api/test/finance-history.test.ts",
-        "apps/api/test/finance-chains.test.ts"
+        "apps/api/test/finance-chains.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/browser.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial."
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Category/counterparty third server block: source-preserving category hierarchy migrations, explicit role conflicts, CP alias/source Merge/Split, card deletion distinct from destructive financial scope, scoped dependency/rule checks and conservative Undo. UI, budgets/widgets/views, discovery/import cancellation, full reset/HMAC rotation and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
     },
     {
       "id": "B-08",
@@ -10409,7 +10727,12 @@
         "docs/architecture/live-import-ui.md",
         "apps/web/src/ServerImport.tsx",
         "apps/web/src/import-flow.ts",
-        "apps/web/src/ServerFinance.tsx"
+        "apps/web/src/ServerFinance.tsx",
+        "apps/api/src/import-cancellation.ts",
+        "apps/api/src/import-source.ts",
+        "packages/database/migrations/0014_import_cancellation_dedupe.sql",
+        "apps/web/src/WorkspaceCommandPanel.tsx",
+        "docs/architecture/import-cancellation-dedupe.md"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -10418,9 +10741,10 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/web/src/import-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR."
     },
     {

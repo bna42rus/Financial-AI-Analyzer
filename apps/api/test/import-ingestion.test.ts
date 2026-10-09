@@ -35,7 +35,89 @@ async function safeBatch(rows=[row({safeSource:{event:'purchase',merchant:'ozon'
  try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}
 }
 
+async function actionEpoch(){const e=(await request('/finance/epoch')).json();return {generation:e.generation,revision:e.revision};}
 async function importedOperation(){const id=(await pg.owner.query('SELECT id FROM finance.transaction')).rows[0].id;const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
+
+test('cancel preview warns about unique manual edits, commit purges sources, retains empty accounts and has no Undo',async()=>{
+ const b=await safeBatch([row({amountMinor:'-73107',safeSource:{event:'purchase',merchant:'ozon'}})]);await accept(b);await drain(b.batchId);
+ const op=await importedOperation(),key=(await context()).keyVersion;await command({kind:'operation',id:op.id,patch:{comment:'My decision',merchant:'My merchant',role:'expense'}});await command({kind:'components',id:op.id,parts:[{type:'other',amountMinor:'-30000',role:'expense'},{type:'other',amountMinor:'-43107',role:'expense'}]});
+ const {preview,result}=await command({kind:'cancel_import',batchId:b.batchId});
+ assert.equal(preview.impact.details.counts.operations,1);assert.equal(preview.impact.details.counts.manualEdits,1);assert.equal(preview.impact.details.counts.components,2);assert.equal(result.cleanup.undoable,false);
+ assert.equal((await status(b.batchId)).status,'cancelled');assert.equal((await status(b.batchId)).counts.removed,1);
+ const c=await counts();assert.equal(c.transaction,0);assert.equal(c.source_observation,0);assert.equal(c.ingestion_row,0);assert.equal(c.ingestion_dispatch,0);assert.equal(c.account,1);assert.equal((await context()).keyVersion,key);
+ assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.component')).rows[0].n,0);
+ assert.equal((await pg.owner.query('SELECT file_hmac FROM finance.ingestion_file')).rows[0].file_hmac,null);
+ const receipt=(await request('/finance/commit',{actionId:result.actionId}));assert.equal(receipt.statusCode,200,receipt.body);assert.deepEqual(receipt.json(),result);
+ const persisted=JSON.stringify((await pg.owner.query('SELECT * FROM finance.action')).rows);for(const fragment of ['-73107','My decision','My merchant',b.files[0]!.fileHmac])assert.equal(persisted.includes(fragment),false);
+ const undo=await request('/finance/preview',{actionId:randomUUID(),...await actionEpoch(),intent:{kind:'undo',id:randomUUID(),value:result.actionId}});assert.equal(undo.statusCode,409);
+ const again=await safeBatch([row({amountMinor:'-73107',safeSource:{event:'purchase',merchant:'ozon'}})]);await accept(again);await drain(again.batchId);assert.notEqual((await importedOperation()).id,op.id);
+});
+test('shared cancellation restores the latest remaining source and keeps verified decisions and corrections',async()=>{
+ const a=await batch([row({amountMinor:'-100'})],'source A');await accept(a);await drain(a.batchId);const original=await importedOperation();
+ await command({kind:'operation',id:original.id,patch:{corrections:{amountMinor:'-777'},comment:'Keep this',merchant:'Verified merchant',role:'expense'}});
+ const b=await batch([row({amountMinor:'-200'})],'source B');await accept(b);await drain(b.batchId);const c=await batch([row({amountMinor:'-300'})],'source C');await accept(c);await drain(c.batchId);
+ await command({kind:'cancel_import',batchId:b.batchId});assert.equal((await importedOperation()).source.amountMinor,'-300');
+ const {preview}=await command({kind:'cancel_import',batchId:c.batchId});assert.equal(preview.impact.details.counts.sharedOperations,1);assert.equal(preview.impact.details.counts.operations,0);
+ const kept=await importedOperation();assert.equal(kept.id,original.id);assert.equal(kept.source.amountMinor,'-100');assert.equal(kept.projection.amountMinor,'-777');assert.equal(kept.comment,'Keep this');assert.equal(kept.semantics.merchant.value,'Verified merchant');assert.equal(kept.semantics.merchant.userVerified,true);
+ assert.equal((await counts()).source_observation,1);
+});
+test('cancelling the only merchant evidence cannot leave its inherited text in a remaining observation or classification',async()=>{
+ const a=await safeBatch();await accept(a);await drain(a.batchId);const b=await batch([row({amountMinor:'-200'})],'text-free remaining source');await accept(b);await drain(b.batchId);
+ assert.equal((await importedOperation()).source.merchantText,'Ozon');await command({kind:'cancel_import',batchId:a.batchId});
+ const op=await importedOperation();assert.equal(op.source.amountMinor,'-200');assert.equal(op.source.merchantText,'');assert.equal(op.source.description,'');assert.equal(op.semantics.merchant.value,'');assert.equal(op.semantics.kind.value,'other');
+ assert.equal((await pg.owner.query("SELECT 1 FROM finance.source_observation WHERE merchant_text='Ozon' OR description='Покупка'")).rowCount,0);
+ const c=await batch([row({amountMinor:'-250'})],'new text-free source');await accept(c);await drain(c.batchId);assert.equal((await importedOperation()).semantics.merchant.value,'');
+});
+test('cancelling one file after a checkpoint stops its pending rows and lets the other accepted file finish',async()=>{
+ const contextValue=await context(),a=await batch(Array.from({length:IMPORT_CHUNK+1},(_,i)=>row({bankReference:'Cancelled-'+i})),'file A',contextValue),b=await batch([row({bankReference:'Surviving-1'}),row({bankReference:'Surviving-2'})],'file B',contextValue);a.files.push(...b.files);
+ await accept(a);await within('first',db=>processImport(db,'first',a.batchId));assert.equal((await counts()).transaction,IMPORT_CHUNK);
+ const {preview}=await command({kind:'cancel_import',batchId:a.batchId,fileId:a.files[0]!.fileId});assert.equal(preview.impact.details.counts.pendingRows,1);assert.equal(preview.impact.details.counts.operations,IMPORT_CHUNK);
+ const complete=await drain(a.batchId);assert.equal(complete.status,'completed');assert.equal(complete.counts.created,2);assert.equal(complete.counts.removed,IMPORT_CHUNK+1);assert.equal(complete.counts.pending,0);assert.equal((await counts()).transaction,2);assert.equal((await counts()).ingestion_dispatch,0);
+ assert.ok(complete.files[0]!.cancelledAt);assert.equal(complete.files[1]!.cancelledAt,null);
+});
+test('strict exact-source fingerprint reuses a no-ID operation across files despite effective edits, but consumes it only once',async()=>{
+ const exact=row({bankReference:undefined,operationDate:{precision:'instant',instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase',merchant:'ozon'}}),a=await safeBatch([exact],'strict A');await accept(a);await drain(a.batchId);const original=await importedOperation();
+ await command({kind:'operation',id:original.id,patch:{corrections:{amountMinor:'-999',operationDate:{precision:'day',date:'2026-10-01'}},merchant:'User label'}});
+ const b=await safeBatch([exact,{...exact}],'strict B');await accept(b);const report=await drain(b.batchId);assert.equal(report.counts.existing,1);assert.equal(report.counts.created,1);assert.equal((await counts()).transaction,2);
+ const fingerprint=(await pg.owner.query('SELECT strict_fingerprint FROM finance.ingestion_row')).rows;assert.equal(fingerprint.every(r=>/^[a-f0-9]{64}$/.test(r.strict_fingerprint)),true);
+ await command({kind:'cancel_import',batchId:b.batchId});assert.equal((await counts()).transaction,1);assert.equal((await importedOperation()).id,original.id);
+ const c=await safeBatch([exact],'strict C');await accept(c);assert.equal((await drain(c.batchId)).counts.existing,1);
+});
+test('different-operation decision is persisted across reimport and can be restored through checked History',async()=>{
+ const a=await batch([row({bankReference:undefined})],'different A');await accept(a);await drain(a.batchId);const b=await batch([row({bankReference:undefined})],'different B');await accept(b);await drain(b.batchId);
+ const pair=(await request('/finance/state')).json().duplicateCandidates[0];const saved=await command({kind:'duplicate_different',id:pair.id});
+ assert.equal((await request('/finance/state')).json().duplicateCandidates.length,0);assert.equal((await pg.owner.query('SELECT status FROM finance.duplicate_candidate')).rows[0].status,'different');
+ const again=await batch([row({bankReference:undefined})],'different B');await accept(again);await drain(again.batchId);assert.equal((await counts()).transaction,2);assert.equal((await request('/finance/state')).json().duplicateCandidates.length,0);
+ const history=(await request('/finance/history-query',{operationIds:[pair.leftId]})).json();assert.equal(history.actions.some((a:any)=>a.id===saved.result.actionId),true);
+ await command({kind:'restore_history',actionIds:[saved.result.actionId]});assert.equal((await request('/finance/state')).json().duplicateCandidates.length,1);
+ assert.equal((await request('/finance/state')).json().operations.every((o:any)=>o.reviewReasons.includes('possible_duplicate')),true);
+});
+test('cancellation checks ownership, access and fresh dependencies before commit',async()=>{
+ const a=await batch();await accept(a);await drain(a.batchId);const epoch=await actionEpoch();
+ for(const intent of [{kind:'cancel_import',batchId:randomUUID()},{kind:'cancel_import',batchId:a.batchId,fileId:randomUUID()},{kind:'duplicate_different',id:randomUUID()}]){const result=await request('/finance/preview',{actionId:randomUUID(),...epoch,intent});assert.equal(result.statusCode,404,result.body);}
+ const actionId=randomUUID(),preview=await request('/finance/preview',{actionId,...epoch,intent:{kind:'cancel_import',batchId:a.batchId}});assert.equal(preview.statusCode,200,preview.body);
+ const b=await batch([row({bankReference:'Another'})],'new dependency');await accept(b);assert.equal((await request('/finance/commit',{actionId})).statusCode,409);assert.equal((await status(a.batchId)).status,'completed');
+ await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId})).statusCode,403);
+});
+test('legacy shared source without recorded evidence fails closed instead of restoring invented text',async()=>{
+ const a=await safeBatch();await accept(a);await drain(a.batchId);const b=await batch([row({amountMinor:'-200'})],'legacy shared source');await accept(b);await drain(b.batchId);
+ await pg.owner.query("UPDATE finance.ingestion_row SET evidence_recorded=false WHERE file_id=$1",[b.files[0]!.fileId]);
+ const preview=await request('/finance/preview',{actionId:randomUUID(),...await actionEpoch(),intent:{kind:'cancel_import',batchId:a.batchId}});assert.equal(preview.statusCode,409,preview.body);assert.equal(preview.json().code,'IMPORT_SOURCE_UPGRADE_REQUIRED');assert.equal((await counts()).source_observation,2);assert.equal((await status(a.batchId)).status,'completed');
+});
+test('history filters and per-file canonical IDs follow cancellation without exposing source fragments',async()=>{
+ const c=await context(),a=await batch([row()],'scope A',c),b=await batch([row({bankReference:'Other-operation'})],'scope B',c);a.files.push(...b.files);await accept(a);const complete=await drain(a.batchId);
+ assert.equal(complete.operationIds.length,2);assert.equal(complete.files[0]!.operationIds.length,1);assert.notDeepEqual(complete.files[0]!.operationIds,complete.files[1]!.operationIds);
+ await command({kind:'cancel_import',batchId:a.batchId,fileId:a.files[0]!.fileId});const report=await status(a.batchId);assert.equal(report.operationIds.length,1);assert.deepEqual(report.files[0]!.operationIds,[]);assert.deepEqual(report.operationIds,report.files[1]!.operationIds);
+ assert.equal((await request('/finance/imports',{status:'cancelled'})).json().batches.length,1);assert.equal((await request('/finance/imports',{status:'errors'})).json().batches.length,0);assert.equal((await request('/finance/imports',{status:'made-up'})).statusCode,400);
+});
+test('source restoration invalidates over-capacity allocations without deleting the surviving refund or user link',async()=>{
+ const a=await safeBatch([row({safeSource:{event:'purchase',merchant:'ozon'}}),row({bankReference:'Refund',amountMinor:'200',direction:'credit',safeSource:{event:'refund',merchant:'ozon'}})],'allocation A');await accept(a);await drain(a.batchId);
+ const ops=(await pg.owner.query('SELECT t.id,o.source_kind FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id)')).rows,purchase=ops.find(o=>o.source_kind==='purchase')!.id,refund=ops.find(o=>o.source_kind==='refund')!.id;
+ const b=await safeBatch([row({amountMinor:'-200',safeSource:{event:'purchase',merchant:'ozon'}})],'allocation B');await accept(b);await drain(b.batchId);
+ const linkId=randomUUID();await command({kind:'link',id:linkId,link:{sourceId:refund,targetId:purchase,kind:'refund',amountMinor:'200',status:'confirmed'}});
+ const {preview}=await command({kind:'cancel_import',batchId:b.batchId});assert.equal(preview.impact.details.counts.linksRecalculated,1);assert.equal(preview.impact.details.counts.linksDeleted,0);
+ const state=(await request('/finance/state')).json(),link=state.links.find((l:any)=>l.id===linkId);assert.equal(link.active,false);assert.ok(link.reason);assert.equal(state.operations.length,2);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.link')).rows[0].n,1);
+});
 
 test('import history restores accepted and completed batches without keys, payloads or filenames',async()=>{
  const b=await batch();await accept(b);const pending=await request('/finance/imports');assert.equal(pending.statusCode,200);assert.equal(pending.json().batches[0].batchId,b.batchId);assert.equal(pending.json().batches[0].status,'accepted');

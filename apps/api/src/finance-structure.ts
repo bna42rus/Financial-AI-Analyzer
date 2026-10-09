@@ -129,7 +129,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,removedLinkIds]);
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,selected]);
  await invalidatePendingImports(db,userId);
- await db.query(`UPDATE finance.transaction t SET review_reasons=review_reasons-'possible_duplicate',revision=revision+1 WHERE t.user_id=$1 AND t.id=ANY($2::uuid[]) AND review_reasons @> '["possible_duplicate"]'::jsonb AND NOT EXISTS(SELECT 1 FROM finance.duplicate_candidate d WHERE d.user_id=t.user_id AND (d.left_id=t.id OR d.right_id=t.id))`,[userId,duplicateSurvivors]);
+ await db.query(`UPDATE finance.transaction t SET review_reasons=review_reasons-'possible_duplicate',revision=revision+1 WHERE t.user_id=$1 AND t.id=ANY($2::uuid[]) AND review_reasons @> '["possible_duplicate"]'::jsonb AND NOT EXISTS(SELECT 1 FROM finance.duplicate_candidate d WHERE d.user_id=t.user_id AND d.status='candidate' AND (d.left_id=t.id OR d.right_id=t.id))`,[userId,duplicateSurvivors]);
  if(accountIds.length){
   await db.query('DELETE FROM finance.account_alias WHERE user_id=$1 AND account_id=ANY($2::uuid[])',[userId,accountIds]);
   for(const r of changedRules){const conditions={...r.conditions};delete conditions.accountId;await db.query("UPDATE finance.rule SET conditions=$3,enabled=false,dependency_status='needs_setup',revision=revision+1 WHERE user_id=$1 AND id=$2",[userId,r.id,JSON.stringify(conditions)]);}

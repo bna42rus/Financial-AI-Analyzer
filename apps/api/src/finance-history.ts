@@ -4,6 +4,7 @@ import {object,uuid,dateFact} from '../../../packages/finance-core/src/model.ts'
 import {HttpError} from './types.ts';
 
 const definitions={
+ duplicate_pair:{table:'duplicate_candidate',id:'id',keys:['left_id','right_id','status'],readonly:['left_id','right_id']},
  operation:{table:'transaction',id:'id',keys:['corrections','semantics','comment','analytics_override','decomposition','review_reasons','source_observation_id'],readonly:['source_observation_id']},
  account:{table:'account',id:'id',keys:['bank_id','system_name','display_name','account_type','currency','analytics_enabled','default_visible','loan_mode','merged_into_id'],readonly:['bank_id','system_name','currency']},
  category:{table:'category',id:'id',keys:['name','parent_id','role','hidden'],readonly:[]},
@@ -42,12 +43,12 @@ export function historyDelta(before:SnapshotMap,after:SnapshotMap):Change[]{
  return [...new Set([...before.keys(),...after.keys()])].sort().flatMap(k=>{const b=before.get(k),a=after.get(k);return stableJSON(b?.snapshot??null)===stableJSON(a?.snapshot??null)?[]:[{kind:(a??b)!.kind,id:(a??b)!.id,before:b?.snapshot??null,after:a?.snapshot??null}];});
 }
 export function publicChanges(changes:Change[]){const safe=(s:Snapshot|null)=>s===null?null:{revision:s.revision,values:Object.fromEntries(Object.entries(s.values).filter(([k])=>k!=='alias_hmac'))};return changes.map(c=>({...c,before:safe(c.before),after:safe(c.after)}));}
-export function associatedOperations(changes:Change[],projected:string[]){const ids=new Set(projected);for(const c of changes){if(c.kind==='operation')ids.add(c.id);for(const s of [c.before,c.after])if(s){if(c.kind==='link'){ids.add(s.values.source_id as string);ids.add(s.values.target_id as string);}if(['component','account_source','counterparty_source'].includes(c.kind))ids.add(s.values.transaction_id as string);}}return [...ids].sort();}
+export function associatedOperations(changes:Change[],projected:string[]){const ids=new Set(projected);for(const c of changes){if(c.kind==='operation')ids.add(c.id);for(const s of [c.before,c.after])if(s){if(c.kind==='duplicate_pair'){ids.add(s.values.left_id as string);ids.add(s.values.right_id as string);}if(c.kind==='link'){ids.add(s.values.source_id as string);ids.add(s.values.target_id as string);}if(['component','account_source','counterparty_source'].includes(c.kind))ids.add(s.values.transaction_id as string);}}return [...ids].sort();}
 async function historyRows(db:PoolClient,userId:string){const rows=(await db.query<HistoryRow>("SELECT *,committed_at>clock_timestamp()-interval '30 days' AS recent FROM finance.action WHERE user_id=$1 AND status='committed' AND (committed_at>clock_timestamp()-interval '30 days' OR undone=false) ORDER BY committed_revision DESC LIMIT 10001",[userId])).rows;if(rows.length>10000)throw new HttpError(409,'HISTORY_SIZE_LIMIT');return rows;}
 function plan(rows:HistoryRow[],actionIds:string[],current:SnapshotMap,generation:string){
  const selected=new Set(actionIds),actions=actionIds.map(id=>{const row=rows.find(r=>r.id===id);if(!row)throw new HttpError(404,'NOT_FOUND');return row;}).sort((a,b)=>BigInt(a.committed_revision)>BigInt(b.committed_revision)?-1:1),virtual=new Map(current),targets=new Map<string,Change>(),conflicts:Conflict[]=[],objects=new Map<string,{kind:ObjectKind;id:string}>();
  for(const row of actions){let reason:string|undefined;
-  if(!row.recent)reason='HISTORY_EXPIRED';else if(row.generation!==generation)reason='GENERATION_CHANGED';else if(row.undone)reason='ALREADY_ROLLED_BACK';else if(['delete_financial','undo','restore_history'].includes(row.intent.canonical.kind)||!row.undo_patch)reason='ACTION_NOT_REVERSIBLE';else if(!row.change_set)reason='LEGACY_HISTORY';
+  if(!row.recent)reason='HISTORY_EXPIRED';else if(row.generation!==generation)reason='GENERATION_CHANGED';else if(row.undone)reason='ALREADY_ROLLED_BACK';else if(['delete_financial','cancel_import','undo','restore_history'].includes(row.intent.canonical.kind)||!row.undo_patch)reason='ACTION_NOT_REVERSIBLE';else if(!row.change_set)reason='LEGACY_HISTORY';
   if(reason){conflicts.push({actionId:row.id,reason});continue;}
   for(const c of row.change_set!){const k=key(c.kind,c.id);objects.set(k,{kind:c.kind,id:c.id});
    const later=rows.some(r=>!selected.has(r.id)&&BigInt(r.committed_revision)>BigInt(row.committed_revision)&&r.change_set?.some(l=>key(l.kind,l.id)===k));
@@ -105,7 +106,7 @@ export async function restoreHistory(db:PoolClient,userId:string,intent:RestoreI
  return {table:'history',id:intent.id,before:null,details};
 }
 type HistoryFilter={from?:string;through?:string;operationIds?:string[];kinds?:string[];beforeRevision?:string;limit:number};
-const actionKinds=['operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial'];
+const actionKinds=['operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different'];
 function parseHistoryFilter(value:unknown):HistoryFilter {const r=object(value,['from','through','operationIds','kinds','beforeRevision','limit']),f:HistoryFilter={limit:100};
  for(const k of ['from','through']as const)if(k in r){const d=dateFact({precision:'instant',instant:r[k]});f[k]=(d as {instant:string}).instant;}if(f.from&&f.through&&f.from>f.through)throw new TypeError('INVALID_RANGE');
  if('operationIds'in r)f.operationIds=ids(r.operationIds);if('kinds'in r){if(!Array.isArray(r.kinds)||!r.kinds.length||r.kinds.length>actionKinds.length||r.kinds.some(k=>typeof k!=='string'||!actionKinds.includes(k)))throw new TypeError('INVALID_HISTORY_KINDS');f.kinds=[...new Set(r.kinds as string[])];}
@@ -116,7 +117,7 @@ export async function queryHistory(db:PoolClient,userId:string,generation:string
  const f=parseHistoryFilter(input),current=await captureHistory(db,userId),all=await historyRows(db,userId);
  if(f.operationIds)for(const id of f.operationIds)if(!current.has(key('operation',id)))throw new HttpError(404,'NOT_FOUND');
  const filtered=all.filter(r=>r.recent&&(!f.from||r.committed_at>=new Date(f.from))&&(!f.through||r.committed_at<=new Date(f.through))&&(!f.operationIds||r.affected_operation_ids.some(id=>f.operationIds!.includes(id)))&&(!f.kinds||f.kinds.includes(r.intent.canonical.kind))&&(!f.beforeRevision||BigInt(r.committed_revision)<BigInt(f.beforeRevision))),page=filtered.slice(0,f.limit),actions=page.map(r=>{
-  const p=plan(all,[r.id],current,generation),available=!p.conflicts.length,structural=!r.change_set&&!['delete_financial','undo','restore_history'].includes(r.intent.canonical.kind)&&r.undo_patch&&!r.undone;
+  const p=plan(all,[r.id],current,generation),available=!p.conflicts.length,structural=!r.change_set&&!['delete_financial','cancel_import','undo','restore_history'].includes(r.intent.canonical.kind)&&r.undo_patch&&!r.undone;
   return {id:r.id,committed_at:r.committed_at,revision:r.committed_revision,intent:r.intent.canonical,undone:r.undone,undoable:available,requiresPreview:true,dependenciesChecked:false,rollbackStatus:available?'available':structural?'legacy':p.conflicts.some(c=>['OBJECT_CHANGED','OBJECT_MISSING','DEPENDENCY_CONFLICT'].includes(c.reason))?'conflict':'not_available',conflicts:p.conflicts,operationIds:r.affected_operation_ids,changes:publicChanges(r.change_set??[])};
  });
  return {actions,nextBeforeRevision:filtered.length>f.limit?page.at(-1)?.committed_revision??null:null};

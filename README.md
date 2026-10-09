@@ -4,6 +4,8 @@
 
 ## Текущий статус
 
+Последующий блок от проверенного PR №25 находится в `feature/import-cancellation-dedupe`: [отмена batch/file, direct source evidence, finite strict matching и persistent different decisions](docs/architecture/import-cancellation-dedupe.md). `main` по-прежнему ранний; infra/deployment ведутся отдельно. Для этой версии нужна migration 0014, actual exact-head CI указан в PR. Остальные абзацы ниже описывают предшествующие блоки.
+
 В main принята первая версия четырёх экранов через PR №2–6. Следующая разработка находится в открытой последовательной цепочке PR №7–23; следующий блок находится в `feature/live-operation-review`. Его основа — `feature/live-import-ui` ([PR №23](https://github.com/bna42rus/Financial-AI-Analyzer/pull/23)), `1bc5247335a081776061831d2e3c27eae027ff7b`. Не начинать дальнейшую финансовую разработку от раннего main.
 
 | Блок | Реализовано | Что впереди |
