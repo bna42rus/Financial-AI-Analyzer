@@ -90,7 +90,7 @@ test('profile shows real connection states, changes the theme, keeps support pri
   await dialog.getByRole('button', { name: 'Конфиденциальность', exact: true }).click();
   await expect(page).toHaveURL(/#settings\/privacy$/); await expect(dialog).toBeHidden();
   await expect(page.getByRole('heading', { name: 'Конфиденциальность', exact: true })).toBeVisible();
-  expect(requests).toEqual([]); expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
+  expect(requests).toEqual([]); expect(await page.evaluate(() => ({keys:Object.keys(localStorage),session:sessionStorage.length,value:JSON.parse(localStorage.getItem('finance-appearance-v1')!)}))).toEqual({keys:['finance-appearance-v1'],session:0,value:{theme:'dark',density:'comfortable',textSize:'standard',motion:'system'}});
 });
 
 test('history links preserve financial filters, select the operation explicitly and do not create history', async ({ page }) => {

@@ -12,7 +12,7 @@ export interface Appearance {
   motion: 'system' | 'reduced' | 'full';
 }
 export const defaultAppearance: Appearance = { theme: 'system', density: 'comfortable', textSize: 'standard', motion: 'system' };
-const sections = [
+export const sections = [
   { id: 'accounts', title: 'Счета', description: 'Банки и названия счетов', keywords: 'карта тип видимость переименовать', icon: CreditCard },
   { id: 'imports', title: 'Загрузки', description: 'Выписки и результаты обработки', keywords: 'импорт файлы дубликаты отмена', icon: Upload },
   { id: 'categories', title: 'Категории', description: 'Расходы, доходы и подкатегории', keywords: 'справочник дерево объединить', icon: FolderTree },
@@ -124,13 +124,8 @@ export function Settings({ operations, appearance, loading, onAppearanceChange, 
       case 'budgets': return <>{empty('Бюджетов пока нет', 'Здесь можно будет задавать планы расходов и сравнивать их с фактическими тратами за выбранный период.')}<p className={styles.note}>Создание и изменение бюджетов пока недоступны. Плановые суммы не подставляются из примера.</p></>;
       case 'analytics': return <><dl className={styles.info}>{info('Валюта общей аналитики', 'Российский рубль (₽)')}{info('Обычные кредиты', 'Весь платёж учитывается как расход', 'Для отдельного кредита можно будет выбрать другую модель.')}{info('Свои переводы', 'Не входят в расходы и доходы')}{info('Погашение кредитной карты', 'Не учитывается повторно как расход')}{info('Возвраты', 'Уменьшают расходы своей категории')}{info('Неопределённый смысл операции', 'Не входит в расходы и доходы')}</dl><div className={styles.exclusions}><div><h3>Исключения</h3><p>Исключённые операции остаются в списке, но не входят в обычные итоги.</p></div><span className={styles.count}>{excluded.length}</span></div>{excluded.length > 0 ? <button className={common.button} onClick={() => onOpenOperations('Исключённые операции', excluded)}>Показать исключённые операции <ArrowRight size={16} aria-hidden="true" /></button> : <p className={styles.note}>Исключённых операций нет.</p>}<p className={styles.note}>Изменение финансовых параметров и создание исключений подключим позже.</p></>;
       case 'interface': return <>
-        <p className={styles.description}>Выберите удобное оформление. Сейчас оно действует на этой странице до перезагрузки.</p>
-        <div className={styles.appearance}>
-          <label>Тема<select aria-label="Тема" value={appearance.theme} onChange={e => onAppearanceChange({ ...appearance, theme: e.target.value as Appearance['theme'] })}><option value="system">Как на устройстве</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select><small>Цвета всех экранов и окон.</small></label>
-          <label>Плотность<select aria-label="Плотность" value={appearance.density} onChange={e => onAppearanceChange({ ...appearance, density: e.target.value as Appearance['density'] })}><option value="comfortable">Комфортная</option><option value="compact">Компактная</option></select><small>Расстояния между записями и блоками.</small></label>
-          <label>Размер текста<select aria-label="Размер текста" value={appearance.textSize} onChange={e => onAppearanceChange({ ...appearance, textSize: e.target.value as Appearance['textSize'] })}><option value="standard">Обычный</option><option value="large">Крупный</option></select><small>Размер подписей и основного текста.</small></label>
-          <label>Анимация<select aria-label="Анимация" value={appearance.motion} onChange={e => onAppearanceChange({ ...appearance, motion: e.target.value as Appearance['motion'] })}><option value="system">Как на устройстве</option><option value="reduced">Уменьшить движение</option><option value="full">Обычная</option></select><small>Системное уменьшение движения учитывается по умолчанию.</small></label>
-        </div><div className={styles.reset}><div><h3>Сбросить оформление</h3><p>Вернуть тему устройства, комфортную плотность и обычный текст. Операции, диалоги и фильтры сохранятся.</p></div><button className={common.button} onClick={() => { onAppearanceChange({ ...defaultAppearance }); setNotice('Оформление сброшено. Данные и фильтры сохранены.'); }}>Сбросить оформление</button></div>
+        <p className={styles.description}>Выберите удобное оформление. Оформление сохраняется на этом устройстве; финансовые данные в настройки оформления не входят.</p>
+        <AppearanceControls appearance={appearance} onAppearanceChange={onAppearanceChange}/><div className={styles.reset}><div><h3>Сбросить оформление</h3><p>Вернуть тему устройства, комфортную плотность и обычный текст. Операции, диалоги и фильтры сохранятся.</p></div><button className={common.button} onClick={() => { onAppearanceChange({ ...defaultAppearance }); setNotice('Оформление сброшено. Данные и фильтры сохранены.'); }}>Сбросить оформление</button></div>
         <p className={styles.notice} role="status">{notice}</p>
         <details className={styles.category}><summary>Стартовый экран и сохранённые представления</summary><p>Сейчас сайт начинает с Обзора или экрана из ссылки. Выбор стартового экрана и управление сохранёнными представлениями подключим позже.</p></details>
       </>;
@@ -152,3 +147,10 @@ export function Settings({ operations, appearance, loading, onAppearanceChange, 
     </div>
   </section>;
 }
+
+export function AppearanceControls({appearance,onAppearanceChange}:{appearance:Appearance;onAppearanceChange:(v:Appearance)=>void}){return <div className={styles.appearance}>
+          <label>Тема<select aria-label="Тема" value={appearance.theme} onChange={e => onAppearanceChange({ ...appearance, theme: e.target.value as Appearance['theme'] })}><option value="system">Как на устройстве</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select><small>Цвета всех экранов и окон.</small></label>
+          <label>Плотность<select aria-label="Плотность" value={appearance.density} onChange={e => onAppearanceChange({ ...appearance, density: e.target.value as Appearance['density'] })}><option value="comfortable">Комфортная</option><option value="compact">Компактная</option></select><small>Расстояния между записями и блоками.</small></label>
+          <label>Размер текста<select aria-label="Размер текста" value={appearance.textSize} onChange={e => onAppearanceChange({ ...appearance, textSize: e.target.value as Appearance['textSize'] })}><option value="standard">Обычный</option><option value="large">Крупный</option></select><small>Размер подписей и основного текста.</small></label>
+          <label>Анимация<select aria-label="Анимация" value={appearance.motion} onChange={e => onAppearanceChange({ ...appearance, motion: e.target.value as Appearance['motion'] })}><option value="system">Как на устройстве</option><option value="reduced">Уменьшить движение</option><option value="full">Обычная</option></select><small>Системное уменьшение движения учитывается по умолчанию.</small></label>
+        </div>;}

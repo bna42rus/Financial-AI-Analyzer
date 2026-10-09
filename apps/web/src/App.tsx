@@ -12,8 +12,9 @@ import type { OperationsView, OperationScope } from './demo/operations';
 import { Analyzer } from './Analyzer';
 import { newChatBook } from './demo/analyzer';
 import type { ChatBook } from './demo/analyzer';
-import { Settings, defaultAppearance } from './Settings';
+import { Settings } from './Settings';
 import type { Appearance } from './Settings';
+import {applyAppearance,readAppearance} from './workspace';
 import { ProfileDialog, UploadDialog } from './ShellDialogs';
 
 type Detail = { title: string; description: string; rows: readonly DemoOperation[]; calculation?: boolean };
@@ -36,12 +37,8 @@ export function App() {
   const [screen,setScreen] = useState<Screen>(currentScreen);
   const [modal,setModal] = useState<'upload'|'profile'|null>(null);
   const [historyOperation,setHistoryOperation] = useState<DemoOperation|null>(null);
-  const [appearance,setAppearance] = useState<Appearance>(()=>({...defaultAppearance}));
-  useEffect(()=>{
-    const root=document.documentElement;
-    root.dataset.theme=appearance.theme;root.dataset.density=appearance.density;
-    root.dataset.textSize=appearance.textSize;root.dataset.motion=appearance.motion;
-  },[appearance]);
+  const [appearance,setAppearance] = useState<Appearance>(readAppearance);
+  useEffect(()=>applyAppearance(appearance),[appearance]);
   const [chatBook,setChatBook] = useState<ChatBook>(newChatBook);
   const [operationsView,setOperationsView] = useState<OperationsView>(defaultOperationsView);
   const [scope,setScope] = useState<OperationScope|null>(null);
