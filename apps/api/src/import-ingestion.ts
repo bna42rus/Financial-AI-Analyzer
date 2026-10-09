@@ -69,7 +69,7 @@ async function importReport(db:PoolClient,userId:string,batchId:string){
  const batch=(await db.query('SELECT status,created_at,finished_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,batchId])).rows[0];
  if(!batch)throw new HttpError(404,'NOT_FOUND');
  const files=(await db.query('SELECT id,bank,rows_found,blocked,error,cancelled_at FROM finance.ingestion_file WHERE user_id=$1 AND batch_id=$2 ORDER BY position',[userId,batchId])).rows;
- const rows=(await db.query(`SELECT r.file_id,r.ordinal,r.status,r.issue,r.outcome,o.transaction_id FROM finance.ingestion_row r JOIN finance.ingestion_file f ON (f.user_id,f.id)=(r.user_id,r.file_id)
+ const rows=(await db.query(`SELECT r.file_id,r.ordinal,r.status,r.issue,r.outcome,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.ingestion_row r JOIN finance.ingestion_file f ON (f.user_id,f.id)=(r.user_id,r.file_id)
  LEFT JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE f.user_id=$1 AND f.batch_id=$2 ORDER BY f.position,r.ordinal`,[userId,batchId])).rows;
  const loaded=await loadFinance(db,userId),involved=new Set(rows.map(r=>r.transaction_id).filter(Boolean)),projection=reconcile(loaded.graph);
  const review=new Set(projection.operations.filter(o=>involved.has(o.id)&&o.reviewReasons.length).map(o=>o.id));
@@ -111,10 +111,10 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
    graph.accounts.push({id:accountId,bankId:bank,name,type,analyticsEnabled:true,defaultVisible:true,loanMode:null});
   }
   // Immutable observations + original source aliases survive effective edits and explicit account splits.
-  const candidates=(await db.query<SourceCandidate>(`SELECT o.transaction_id AS "transactionId",f.file_hmac AS "fileHmac",r.ordinal,o.bank_ref_hmac AS "bankRefHmac",o.operation_date AS "operationDate",o.posted_date AS "postedDate",o.amount_minor::text AS "amountMinor",o.currency,r.direction,r.strict_fingerprint AS "strictFingerprint"
+  const candidates=(await db.query<SourceCandidate>(`SELECT finance.canonical_operation(o.user_id,o.transaction_id) AS "transactionId",f.file_hmac AS "fileHmac",r.ordinal,o.bank_ref_hmac AS "bankRefHmac",o.operation_date AS "operationDate",o.posted_date AS "postedDate",o.amount_minor::text AS "amountMinor",o.currency,r.direction,r.strict_fingerprint AS "strictFingerprint",EXISTS(SELECT 1 FROM finance.transaction a WHERE a.user_id=o.user_id AND a.merged_into_id=finance.canonical_operation(o.user_id,o.transaction_id)) AS "mergedInstance"
   FROM finance.ingestion_row r JOIN finance.ingestion_file f ON (f.user_id,f.id)=(r.user_id,r.file_id) JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id)
   WHERE r.user_id=$1 AND r.alias_kind=$2 AND r.alias_hmac=$3 AND f.bank=$4 AND r.status='imported'`,[userId,row.account.kind,row.account.hmac,bank])).rows;
-  const used=new Set<string>((await db.query('SELECT o.transaction_id FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE r.user_id=$1 AND r.file_id=$2',[userId,entry.file_id])).rows.map(r=>r.transaction_id));
+  const used=new Set<string>((await db.query('SELECT finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE r.user_id=$1 AND r.file_id=$2',[userId,entry.file_id])).rows.map(r=>r.transaction_id));
   const descriptor=strictSourceDescriptor(row),fingerprint=descriptor===null?null:createHash('sha256').update(descriptor).digest('hex');
   const match=matchSource(row,entry.file_hmac,candidates,used,fingerprint),transactionId=match.transactionId??randomUUID(),observationId=randomUUID();
   const prior=match.transactionId?(await db.query(`SELECT t.semantics,t.source_observation_id,o.*,r.direction FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.ingestion_row r ON (r.user_id,r.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.id=$2`,[userId,transactionId])).rows[0]:null;
@@ -150,6 +150,8 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
    graph.operations[graph.operations.indexOf(current)]=classified;
    await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
   }
+  // An added source after an explicit merge is a new dependency for its Undo.
+  if(prior&&unchanged)await db.query('UPDATE finance.transaction t SET revision=revision+1 WHERE t.user_id=$1 AND t.id=$2 AND EXISTS(SELECT 1 FROM finance.transaction a WHERE a.user_id=t.user_id AND a.merged_into_id=t.id)',[userId,transactionId]);
   await db.query("UPDATE finance.ingestion_row SET status='imported',payload=NULL,outcome=$3,observation_id=$4,alias_kind=$5,alias_hmac=$6,direction=$7,source_evidence=$8,evidence_recorded=true,strict_fingerprint=$9 WHERE user_id=$1 AND id=$2",[userId,entry.id,prior?(unchanged?'existing':'updated'):'created',observationId,row.account.kind,row.account.hmac,row.direction,row.safeSource?JSON.stringify(row.safeSource):null,fingerprint]);
   for(const candidateId of match.possibleIds){
    if(candidateId===transactionId)continue;const pair=[transactionId,candidateId].sort();

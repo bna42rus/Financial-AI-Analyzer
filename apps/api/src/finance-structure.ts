@@ -46,7 +46,7 @@ type AccountRow={id:string;display_name:string;account_type:string;analytics_ena
 type TransactionRow={id:string;corrections:Record<string,unknown>};
 type RuleRow={id:string;conditions:Record<string,unknown>;assignments:Record<string,unknown>;enabled:boolean;dependency_status:string};
 const accountColumns=['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'] as const;
-async function sourceMap(db:PoolClient,userId:string){return (await db.query<Binding>('SELECT b.observation_id,b.account_id,o.transaction_id FROM finance.observation_account b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id',[userId])).rows;}
+async function sourceMap(db:PoolClient,userId:string){return (await db.query<Binding>('SELECT b.observation_id,b.account_id,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.observation_account b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id',[userId])).rows;}
 async function aliases(db:PoolClient,userId:string){return (await db.query<Alias>('SELECT id,account_id,alias_type FROM finance.account_alias WHERE user_id=$1 ORDER BY id',[userId])).rows;}
 function coverage(actual:string[],supplied:Assignment[]){if(actual.length!==supplied.length||supplied.some(r=>!actual.includes(r.id)))throw new HttpError(409,'EXPLICIT_DISTRIBUTION_REQUIRED');}
 async function capture(db:PoolClient,userId:string,accountIds:string[],bindingRows:Binding[],aliasRows:Alias[],operationIds:string[],ruleIds:string[]){
@@ -106,14 +106,14 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
   activeAccount(graph,scope.accountId);const ids=new Set(bindings.filter(b=>b.account_id===scope.accountId).map(b=>b.transaction_id));selected=graph.operations.filter(o=>effective(o).accountId===scope.accountId||ids.has(o.id)).map(o=>o.id);
   if(scope.deleteAccount){accountIds=graph.accounts.filter(a=>a.id===scope.accountId||a.mergedIntoId===scope.accountId).map(a=>a.id);
    // Split destinations retain their own source provenance; never delete them to remove an old card.
-   const used=(await db.query('SELECT 1 FROM finance.source_observation WHERE user_id=$1 AND account_id=ANY($2::uuid[]) AND NOT(transaction_id=ANY($3::uuid[])) LIMIT 1',[userId,accountIds,selected])).rowCount;if(used)throw new HttpError(409,'SOURCE_ACCOUNT_STILL_REFERENCED');
+   const used=(await db.query('SELECT 1 FROM finance.source_observation WHERE user_id=$1 AND account_id=ANY($2::uuid[]) AND NOT(finance.canonical_operation(user_id,transaction_id)=ANY($3::uuid[])) LIMIT 1',[userId,accountIds,selected])).rowCount;if(used)throw new HttpError(409,'SOURCE_ACCOUNT_STILL_REFERENCED');
   }
  }
  if(!selected.length&&!accountIds.length&&!counterpartyIds.length)throw new HttpError(409,'EMPTY_SCOPE');if(selected.length>1000)throw new HttpError(409,'DELETE_SCOPE_LIMIT');
  const chosen=new Set(selected),removedLinkIds=dependentLinks(graph.links,graph.links.filter(l=>chosen.has(l.sourceId)||chosen.has(l.targetId)).map(l=>l.id)),removedLinks=new Set(removedLinkIds),survivingRelated=[...new Set(graph.links.filter(l=>removedLinks.has(l.id)).flatMap(l=>[l.sourceId,l.targetId]).filter(id=>!chosen.has(id)))].sort();
  const counts=(await db.query(`SELECT
- (SELECT count(*)::int FROM finance.source_observation WHERE user_id=$1 AND transaction_id=ANY($2::uuid[])) AS observations,
- (SELECT count(*)::int FROM finance.component WHERE user_id=$1 AND transaction_id=ANY($2::uuid[])) AS components,
+ (SELECT count(*)::int FROM finance.source_observation WHERE user_id=$1 AND finance.canonical_operation(user_id,transaction_id)=ANY($2::uuid[])) AS observations,
+ (SELECT count(*)::int FROM finance.component WHERE user_id=$1 AND finance.canonical_operation(user_id,transaction_id)=ANY($2::uuid[])) AS components,
  (SELECT count(*)::int FROM finance.link WHERE user_id=$1 AND (source_id=ANY($2::uuid[]) OR target_id=ANY($2::uuid[]))) AS links,
  (SELECT count(*)::int FROM finance.action WHERE user_id=$1 AND id<>$3 AND NOT(status='committed' AND COALESCE(intent->'canonical'->>'receipt','false')='true')) AS history`,[userId,selected,actionId])).rows[0];
  const removedAliases=aliasRows.filter(a=>accountIds.includes(a.account_id)),changedRules=rules.filter(r=>accountIds.includes(r.conditions.accountId as string));
@@ -121,7 +121,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  const cpRules=rules.filter(r=>counterpartyIds.includes(r.conditions.counterpartyId as string)||counterpartyIds.includes(r.assignments.counterpartyId as string));
  const duplicateSurvivors=[...new Set((await db.query('SELECT left_id,right_id FROM finance.duplicate_candidate WHERE user_id=$1 AND (left_id=ANY($2::uuid[]) OR right_id=ANY($2::uuid[]))',[userId,selected])).rows.flatMap(r=>[r.left_id,r.right_id]).filter(id=>!chosen.has(id)))];
  const ingestion=(await db.query(`SELECT
- (SELECT count(*)::int FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE o.user_id=$1 AND o.transaction_id=ANY($2::uuid[])) AS sources,
+ (SELECT count(*)::int FROM finance.ingestion_row r JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE o.user_id=$1 AND finance.canonical_operation(o.user_id,o.transaction_id)=ANY($2::uuid[])) AS sources,
  (SELECT count(*)::int FROM finance.ingestion_row WHERE user_id=$1 AND status='pending') AS pending,
  (SELECT count(*)::int FROM finance.duplicate_candidate WHERE user_id=$1 AND (left_id=ANY($2::uuid[]) OR right_id=ANY($2::uuid[]))) AS candidates`,[userId,selected])).rows[0];
  const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,observations:counts.observations,components:counts.components,links:removedLinkIds.length,history:counts.history,importSources:ingestion.sources,pendingImportRowsInvalidated:ingestion.pending,duplicateCandidates:ingestion.candidates},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};

@@ -30,3 +30,9 @@ test('strict cross-file match is one-to-one and never chooses an ambiguous insta
  assert.equal(matchSource(exact,'new',[c,{...c,transactionId:'two'}],new Set(),'key').transactionId,null);
  assert.equal(matchSource(exact,'new',[{...c,bankRefHmac:'different-stable-id'}],new Set(),'key').transactionId,null);
 });
+
+test('explicitly merged known file ordinals reuse their canonical operation, but unseen instances remain one-to-one',()=>{
+ const c=source({mergedInstance:true});assert.equal(matchSource(row,'file',[c],new Set(['one'])).transactionId,'one');
+ assert.equal(matchSource({...row,ordinal:2},'file',[c],new Set(['one'])).transactionId,null);
+ assert.equal(matchSource(row,'other-file',[c],new Set(['one'])).transactionId,null);
+});

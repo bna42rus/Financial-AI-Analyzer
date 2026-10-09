@@ -1,7 +1,7 @@
 import type {PreparedRow} from './contract.ts';
 import type {BankDate} from '../../finance-core/src/model.ts';
 
-export type SourceCandidate={transactionId:string;fileHmac:string;ordinal:number;bankRefHmac:string|null;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:string;direction:string;strictFingerprint?:string|null};
+export type SourceCandidate={transactionId:string;fileHmac:string;ordinal:number;bankRefHmac:string|null;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:string;direction:string;strictFingerprint?:string|null;mergedInstance?:boolean};
 /** The finite source profile is strict only with an exact instant and an explicit
  * known merchant/event. Date-only or absent text evidence stays ambiguous.
  * The caller hashes this descriptor, which contains the per-user keyed alias. */
@@ -15,7 +15,9 @@ export function sameSource(a:PreparedRow,b:SourceCandidate){return sameDate(a.op
  * One transaction may be consumed at most once per file, including across durable checkpoints. */
 export function matchSource(row:PreparedRow,fileHmac:string,candidates:SourceCandidate[],used:Set<string>,strictFingerprint:string|null=null){
  const unique=(items:SourceCandidate[])=>[...new Set(items.map(c=>c.transactionId))];
- const instance=unique(candidates.filter(c=>!used.has(c.transactionId)&&c.fileHmac===fileHmac&&c.ordinal===row.ordinal&&sameSource(row,c)));
+ // A user's explicit merge may join two known ordinals. Only those identical
+ // source-file instances may reuse it; unseen rows still obey one-to-one matching.
+ const instance=unique(candidates.filter(c=>(!used.has(c.transactionId)||c.mergedInstance)&&c.fileHmac===fileHmac&&c.ordinal===row.ordinal&&sameSource(row,c)));
  if(instance.length===1)return {transactionId:instance[0]!,possibleIds:[] as string[]};
  const strong=row.bankRefHmac===null?[]:unique(candidates.filter(c=>!used.has(c.transactionId)&&c.bankRefHmac===row.bankRefHmac));
  if(strong.length===1)return {transactionId:strong[0]!,possibleIds:[] as string[]};

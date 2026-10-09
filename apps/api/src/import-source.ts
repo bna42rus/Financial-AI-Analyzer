@@ -6,7 +6,7 @@ import type {SafeSource} from '../../../packages/imports/src/safe-source.ts';
 /** Rebuild inherited text only from observations that still exist. A materialized
  * snapshot must never preserve merchant evidence from a cancelled source. */
 export async function sourceEvidence(db:PoolClient,userId:string){
- return (await db.query<{id:string;transaction_id:string;evidence_recorded:boolean;source_evidence:SafeSource|null;source_kind:NonNullable<BankFact['sourceKind']>;merchant_text:string;description:string}>(`SELECT o.id,o.transaction_id,r.evidence_recorded,r.source_evidence,o.source_kind,o.merchant_text,o.description
+ return (await db.query<{id:string;transaction_id:string;evidence_recorded:boolean;source_evidence:SafeSource|null;source_kind:NonNullable<BankFact['sourceKind']>;merchant_text:string;description:string}>(`SELECT o.id,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id,r.evidence_recorded,r.source_evidence,o.source_kind,o.merchant_text,o.description
  FROM finance.source_observation o LEFT JOIN finance.ingestion_row r ON (r.user_id,r.id)=(o.user_id,o.import_row_id)
  WHERE o.user_id=$1 ORDER BY o.observed_at,o.id`,[userId])).rows;
 }
