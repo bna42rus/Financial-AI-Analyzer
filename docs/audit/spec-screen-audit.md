@@ -15,6 +15,7 @@
 - Потеря financial access немедленно удаляет финансовое содержимое с экрана; ограниченный аккаунт остаётся доступен.
 - Theme/density/textSize/motion сохраняются после reload только как 4 визуальных значения; raw files, passwords, key, операции, диалоги, filenames и drafts не записываются в browser store. Reset оформления не удаляет финансы.
 - Network uncertainty повторяет тот же action, ошибки загрузки после commit блокируют следующую правку до refresh; поздний ответ закрытого workspace игнорируется.
+- Переход между разделами во время первой загрузки сохраняет ответ текущего запроса: navigation больше не выполняет cleanup рабочего workspace. Отдельный тест удерживает первый response и меняет экран до его доставки; до исправления он воспроизводил зависание на desktop/mobile, после — проходит без ожидания polling timer.
 
 ## Что остаётся разработать и проверить
 
@@ -39,7 +40,9 @@ Timeweb/account setup не мешает synthetic разработке. Внеш
 
 ## Результаты проверки
 
-Локально прошли: неизменность исходников; 133 core/access/import теста; 53 web unit/flow теста; 8 crypto/mail tests; TypeScript web/admin/API; обе сборки; полный прогон 82 web UI сценариев (desktop/mobile, без повторов, 55,3 с), включая 10 новых connected UI сценариев; 16 admin UI. Итого 292 успешные локальные проверки. Обновлённые assertions проверяют ровно 4 визуальных значения и отсутствие финансовых данных/drafts. Финальный код проверен в локальном коммите cb64e2e; последующее изменение затрагивает только документацию результатов.
+До первого CI локально прошли: неизменность исходников; 133 core/access/import теста; 53 web unit/flow теста; 8 crypto/mail tests; TypeScript web/admin/API; обе сборки; полный прогон 82 web UI сценариев (desktop/mobile, без повторов, 55,3 с), включая 10 новых connected UI сценариев; 16 admin UI. Итого 292 успешные локальные проверки. Обновлённые assertions проверяют ровно 4 визуальных значения и отсутствие финансовых данных/drafts.
+
+Первый полный CI дополнительно прошёл 251 PostgreSQL/security тест, но два HTTP/browser сценария обнаружили отмену первого чтения при быстрой навигации; это не успешный полный прогон. После исправления локально повторно прошли TypeScript/web unit (53 теста) и все 12 connected UI сценариев без повторов, включая два новых регрессионных сценария. Фактический результат полного CI окончательного кода фиксируется в PR, а не выводится из прежнего локального коммита или суммы частичных прогонов.
 
 Полная проверка окончательного коммита, включая PostgreSQL и 6 real HTTP/browser journeys, запускается в PR ветки feature/spec-screen-audit к feature/live-operation-review. Её фактический результат, run URL и commit SHA фиксируются в описании PR после завершения; локальные проверки и ссылки на тесты в матрице не заменяют этот результат. Connected interface tests с synthetic HTTP adapter отдельно от real PostgreSQL/HTTP browser journeys. Mobile viewport Chromium не объявляется настоящим Safari. Скриншоты [Overview desktop](screenshots/connected-overview-desktop.png), [Overview mobile](screenshots/connected-overview-mobile.png), [Settings desktop](screenshots/connected-settings-desktop.png), [Settings mobile](screenshots/connected-settings-mobile.png) синтетические, просмотрены визуально.
 
