@@ -145,3 +145,28 @@ test('interactive finance reads and edits have separate durable limits without c
  for(let i=0;i<4;i++)assert.equal((await request('/auth/sign-in/email',{email:'first@example.test',password:'Synthetic wrong password'})).statusCode,401);
  assert.equal((await request('/auth/sign-in/email',{email:'first@example.test',password:'Synthetic wrong password'})).statusCode,429);
 });
+
+test('editing component amounts preserves automatic and verified facets, with coherent preview and Undo',async()=>{
+ const p=await append('-25000','loan_payment');await command({kind:'analytics',value:'economic'});
+ await command({kind:'components',id:p.transactionId,parts:[{type:'principal',amountMinor:'-20000'},{type:'interest',amountMinor:'-5000',role:'expense',categoryId:null}]});
+ const detail=(await request('/finance/operation',{id:p.transactionId})).json(),principal=detail.components.find((c:any)=>c.type==='principal'),interest=detail.components.find((c:any)=>c.type==='interest');assert.equal(principal.role.userVerified,false);assert.equal(interest.role.userVerified,true);
+ const changed=await command({kind:'components',id:p.transactionId,parts:[{id:principal.id,type:'principal',amountMinor:'-19000'},{id:interest.id,type:'interest',amountMinor:'-6000'}]});
+ assert.equal(changed.preview.impact.after.netExpensesMinor,'6000');const after=(await request('/finance/operation',{id:p.transactionId})).json();assert.deepEqual(after.components.find((c:any)=>c.id===principal.id).role,principal.role);assert.deepEqual(after.components.find((c:any)=>c.id===interest.id).role,interest.role);assert.equal(after.source.amountMinor,'-25000');
+ await command({kind:'undo',id:randomUUID(),value:changed.actionId});assert.equal((await view()).summary.netExpensesMinor,'5000');
+});
+
+test('returning to the whole operation previews invalidated component links, preserves decisions and can be undone',async()=>{
+ const p=await append('-10000'),refund=await append('5000','refund'),partId=randomUUID();
+ await command({kind:'components',id:p.transactionId,parts:[{id:partId,type:'other',amountMinor:'-10000',role:'expense'}]});
+ const linked=await command({kind:'link',link:{sourceId:refund.transactionId,targetId:p.transactionId,targetComponentId:partId,kind:'refund',amountMinor:'5000',status:'confirmed'}});assert.equal((await view()).summary.netExpensesMinor,'5000');
+ const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent:{kind:'components',id:p.transactionId,parts:[]}});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().impact.after.netExpensesMinor,'10000');assert.ok(preview.json().impact.dependencyConflicts.length);assert.equal((await view()).summary.netExpensesMinor,'5000');
+ const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);const d=(await request('/finance/operation',{id:p.transactionId})).json();assert.equal(d.decomposition,false);assert.equal(d.components.length,0);assert.equal(d.links[0].status,'confirmed');assert.equal(d.linkStates[0].active,false);
+ await command({kind:'undo',id:randomUUID(),value:actionId});assert.equal((await view()).summary.netExpensesMinor,'5000');assert.equal((await request('/finance/operation',{id:p.transactionId})).json().links[0].id,linked.preview.intent.id);
+});
+
+test('component removal and updates cannot cross tenants or silently disregard effective amount corrections',async()=>{
+ const p=await append('-10000');await command({kind:'operation',id:p.transactionId,patch:{corrections:{amountMinor:'-8000'}}});const w=await view();
+ for(const intent of [{kind:'components',id:randomUUID(),parts:[]},{kind:'components',id:p.transactionId,parts:[{type:'other',amountMinor:'-10000'}]}]){const r=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent});assert.equal(r.statusCode,intent.parts.length?409:404,r.body);}
+ const second=await within('second',async db=>{const state=await financeView(db,'second');const a=await acceptAccount(db,'second',importEpoch(state),{id:randomUUID(),bankId:'synthetic-bank',systemName:'Other tenant',type:'bank_account'});return acceptObservation(db,'second',importEpoch(await financeView(db,'second')),randomUUID(),null,{accountId:a.id,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-1000',currency:'RUB',merchantText:'Other synthetic shop',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'synthetic-1',normalizer:'1',sanitizer:'1'}},'purchase');});
+ const denied=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'components',id:second.transactionId,parts:[]}});assert.equal(denied.statusCode,404);assert.equal((await view()).summary.netExpensesMinor,'8000');
+});

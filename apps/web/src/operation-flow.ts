@@ -1,8 +1,9 @@
 import {ApiError} from './server-client';
 import {rebasePatch,safeOperationPatch} from './finance-client';
 import type {FinanceDetail,FinancePreview,FinanceReceipt,OperationPatch} from './finance-client';
-type Intent={kind:'operation';id:string;patch:OperationPatch}|{kind:'undo';id:string;value:string};
-type Attempt={mode:'edit'|'correction'|'undo';baseline:FinanceDetail;intent:Intent};
+import type {RelationIntent} from './operation-relations';
+type Intent={kind:'operation';id:string;patch:OperationPatch}|{kind:'undo';id:string;value:string}|RelationIntent;
+type Attempt={mode:'edit'|'correction'|'undo'|'relation';baseline:FinanceDetail;intent:Intent};
 type Pending={path:string;body:Record<string,unknown>;attempt:Attempt};
 export type OperationFlowState={detail:FinanceDetail;phase:'idle'|'sending'|'retry'|'preview'|'conflict'|'stale'|'unavailable';error:string;message:string;preview:FinancePreview|null;conflict:{current:FinanceDetail;attempt:Attempt}|null;undoActionId:string|null};
 export type OperationDependencies={request:(path:string,body:Record<string,unknown>)=>Promise<FinancePreview|FinanceReceipt>;load:(id:string)=>Promise<FinanceDetail>};
@@ -13,6 +14,7 @@ export class OperationFlow{
  private begin(attempt:Attempt){const d=attempt.baseline,body={actionId:crypto.randomUUID(),generation:d.generation,revision:d.revision,intent:attempt.intent};return this.send({path:attempt.mode==='edit'?'/finance/edit':'/finance/preview',body,attempt});}
  edit(patch:OperationPatch){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'edit',baseline:this.state.detail,intent:{kind:'operation',id:this.state.detail.id,patch:safeOperationPatch(patch)}});}
  correct(patch:OperationPatch){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'correction',baseline:this.state.detail,intent:{kind:'operation',id:this.state.detail.id,patch:safeOperationPatch(patch)}});}
+ relation(intent:RelationIntent){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'relation',baseline:this.state.detail,intent:structuredClone(intent)});}
  undo(){if(this.state.phase!=='idle'||!this.state.undoActionId||this.disposed)return;return this.begin({mode:'undo',baseline:this.state.detail,intent:{kind:'undo',id:crypto.randomUUID(),value:this.state.undoActionId}});}
  retry(){if(this.state.phase==='retry'&&this.pending&&!this.disposed)return this.send(this.pending);}
  confirm(){if(this.state.phase==='preview'&&this.pending&&!this.disposed)return this.send(this.pending);}
@@ -40,7 +42,7 @@ export class OperationFlow{
   }
  }
  useCurrent(){const conflict=this.state.conflict;if(!conflict||this.disposed)return;this.pending=null;this.publish({detail:conflict.current,phase:'idle',conflict:null,error:'',preview:null,message:'Открыта текущая версия. Ваша правка не применена.'});this.saved(conflict.current);}
- applyOwn(){const conflict=this.state.conflict;if(!conflict||this.disposed)return;const {attempt,current}=conflict,intent=attempt.intent.kind==='operation'?{...attempt.intent,patch:rebasePatch(attempt.baseline,current,attempt.intent.patch)}:attempt.intent;return this.begin({...attempt,baseline:current,intent});}
+ applyOwn(){const conflict=this.state.conflict;if(!conflict||this.disposed||conflict.attempt.mode==='relation')return;const {attempt,current}=conflict,intent=attempt.intent.kind==='operation'?{...attempt.intent,patch:rebasePatch(attempt.baseline,current,attempt.intent.patch)}:attempt.intent;return this.begin({...attempt,baseline:current,intent});}
  async reload(){if(this.disposed||['sending','retry','preview'].includes(this.state.phase))return;this.publish({phase:'sending',error:''});try{const detail=await this.dependencies.load(this.state.detail.id);if(this.disposed)return;if(detail.generation!==this.state.detail.generation){this.publish({phase:'unavailable',error:'Финансовые данные были сброшены. Откройте список заново.'});return;}this.pending=null;this.publish({detail,phase:'idle',conflict:null,preview:null,message:''});this.saved(detail);}catch(e){this.publish({phase:'unavailable',error:e instanceof Error?e.message:'Операция больше недоступна.'});}}
  dispose(){this.disposed=true;this.pending=null;}
 }
