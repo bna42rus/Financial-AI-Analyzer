@@ -28,7 +28,8 @@ export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleInt
   const op=graph.operations.find(o=>o.id===id);if(!op)throw new HttpError(404,'NOT_FOUND');
   const account=graph.accounts.find(a=>a.id===effective(op).accountId)!;
   if(!ruleMatches(op,account,rule))throw new HttpError(409,'RULE_SCOPE_CHANGED');
-  const next=applyRules(op,account,active);compatible(next.semantics.role.value,next.semantics.category.value,next.semantics.subcategory.value);
+  const reconsidered=structuredClone(op);reconsidered.reviewReasons=reconsidered.reviewReasons.filter(r=>r!=='conflicting_rules');
+  const next=applyRules(reconsidered,account,active);compatible(next.semantics.role.value,next.semantics.category.value,next.semantics.subcategory.value);
   if(Object.values(op.semantics).some(f=>f.userVerified)||op.analyticsOverride!=='default')protectedOperationIds.push(id);
   if(next.reviewReasons.includes('conflicting_rules'))conflictingOperationIds.push(id);
   if(JSON.stringify([op.semantics,op.analyticsOverride,op.reviewReasons])!==JSON.stringify([next.semantics,next.analyticsOverride,next.reviewReasons])){
