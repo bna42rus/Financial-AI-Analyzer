@@ -28,17 +28,20 @@ export function readLocalXlsx(fileId:string,bytes:Uint8Array):ExtractedFile{
   const cellXfs=styles&&descendants(styles,'cellXfs')[0],xf=cellXfs?descendants(cellXfs,'xf').map(n=>Number(n.getAttribute('numFmtId'))):[];
   const date1904=['1','true'].includes(descendants(workbook,'workbookPr')[0]?.getAttribute('date1904')??'');
   function value(c:Element){
-   if(descendants(c,'f').length)return '!INVALID_FORMULA';
+   // Neither a cached formula result nor an invented error marker is a bank
+   // fact. Empty required cells become row issues; absent text cannot create
+   // description HMAC/strict-dedupe evidence.
+   if(descendants(c,'f').length)return '';
    const t=c.getAttribute('t'),v=descendants(c,'v')[0]?.textContent??'';
    if(t==='inlineStr')return descendants(c,'t').map(n=>n.textContent??'').join('');
    if(t==='s'){if(!/^\d+$/.test(v)||!Object.hasOwn(strings,Number(v)))throw new BankPdfError('UNSUPPORTED_LAYOUT');return strings[Number(v)]!;}
-   if(t==='e'||t==='b')return '!INVALID_CELL';
+   if(t==='e'||t==='b')return '';
    const format=xf[Number(c.getAttribute('s')??0)]??0,custom=formats.get(format)??'';
    if([14,15,16,17,22].includes(format)||/y.*d|d.*y/i.test(custom.replace(/"[^"]*"/g,''))){
     // Date serials with times are not rounded or assigned an invented timezone.
-    if(!/^\d{1,6}(?:\.0+)?$/.test(v))return '!INVALID_DATE';
+    if(!/^\d{1,6}(?:\.0+)?$/.test(v))return '';
     const n=Number(v),epoch=date1904?Date.UTC(1904,0,1):Date.UTC(1899,11,31);
-    if(!date1904&&n===60)return '!INVALID_DATE';
+    if(!date1904&&n===60)return '';
     return new Date(epoch+(n-(date1904||n<60?0:1))*86400000).toISOString().slice(0,10);
    }
    return v;
