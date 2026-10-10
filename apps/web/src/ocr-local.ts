@@ -5,14 +5,15 @@ import type {TextItem} from '../../../packages/imports/src/bank-pdf.ts';
 
 /** OCR words are ephemeral local data. No logging, cache, URL input or external model hosts. */
 export function ocrLayout(blocks:Block[]|null,width:number,height:number,scale:number):TextItem[]{
- const words=(blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines.flatMap(l=>l.words)));
+ const words=(blocks??[]).flatMap(b=>b.paragraphs.flatMap(p=>p.lines.flatMap(l=>l.words.map(w=>({word:w,baseline:l.bbox.y1})))));
  if(words.length>10000)throw new BankPdfError('LOCAL_LIMIT');
  const out:TextItem[]=[];
- for(const w of words){
+ for(const {word:w,baseline} of words){
   if(!w.text.trim())continue;
   if(!Number.isFinite(w.confidence)||w.confidence<85)throw new BankPdfError('OCR_UNCERTAIN');
   const b=w.bbox;if(![b.x0,b.x1,b.y0,b.y1].every(Number.isFinite)||b.x0<0||b.x1>width||b.y0<0||b.y1>height||b.x1<=b.x0||b.y1<=b.y0)throw new BankPdfError('OCR_UNCERTAIN');
-  out.push({text:w.text,x:b.x0/scale,y:(height-(b.y0+b.y1)/2)/scale,width:(b.x1-b.x0)/scale});
+  if(!Number.isFinite(baseline))throw new BankPdfError('OCR_UNCERTAIN');
+  out.push({text:w.text,x:b.x0/scale,y:(height-baseline)/scale,width:(b.x1-b.x0)/scale});
  }
  // Join nearby glyph words into original cell phrases, while retaining wide column gaps.
  const merged:TextItem[]=[];

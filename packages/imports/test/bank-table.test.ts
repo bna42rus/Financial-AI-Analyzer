@@ -16,6 +16,12 @@ test('CSV retains exact amounts, dates, issuer account, safe source and parser w
  const b=await prepare(),rows=b.files[0]!.rows;assert.deepEqual(rows.map(r=>r.amountMinor),['-1001','2050']);assert.equal(rows[0]!.parser,'tbank-table/1');assert.deepEqual(rows[0]!.safeSource,{event:'purchase',merchant:'ozon'});assert.equal(rows[0]!.postedDate?.precision,'day');
  assert.equal(validatePreparedBatch(b).report.counts.validRows,2);for(const secret of ['Private','00000000000000000001','Номер счета'])assert.equal(JSON.stringify(b).includes(secret),false);
 });
+test('four-column CSV accepts explicit bank and account metadata above the required header',async()=>{
+ for(const delimiter of [';',',','\t']){
+  const s=['Банк;Т-Банк','Номер счета;00000000000000000001','Дата операции;Сумма операции;Валюта;Описание','2026-09-01;-10.01;RUB;Снятие наличных Private ATM'].join('\n').replaceAll(';',delimiter);
+  const b=await prepare(parse(s));assert.equal(b.files[0]!.rows.length,1);assert.equal(b.files[0]!.rows[0]!.amountMinor,'-1001');assert.deepEqual(b.files[0]!.rows[0]!.safeSource,{event:'cash_withdrawal',merchant:null});
+ }
+});
 test('quoted CSV delimiters, escaped quotes and multiline descriptions never split operations',async()=>{
  const s=text.replace('Покупка OZON Private-Terminal','"Покупка OZON; terminal ""private""\nline"');assert.equal((await prepare(parse(s))).files[0]!.rowsFound,2);
  for(const malformed of [text.replace('Покупка OZON Private-Terminal','"unterminated'),text.replace('Покупка OZON Private-Terminal','"purchase"extra')])assert.throws(()=>parse(malformed),/UNSUPPORTED_LAYOUT/);

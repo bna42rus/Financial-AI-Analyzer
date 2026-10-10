@@ -27,7 +27,7 @@ export function csvTable(text:string):string[][]{
   if(quoted)throw new BankPdfError('UNSUPPORTED_LAYOUT');if(cell||row.length||closed){push();rows.push(row);}return rows;
  };
  const candidates:string[][][]=[];
- for(const delimiter of [';',',','\t'])try{const table=parse(delimiter);if(table.some(r=>r.map(norm).includes('дата операции')&&r.length>=5))candidates.push(table);}catch(error){if(error instanceof BankPdfError&&error.code==='LOCAL_LIMIT')throw error;}
+ for(const delimiter of [';',',','\t'])try{const table=parse(delimiter);if(table.some(r=>r.map(norm).includes('дата операции')&&r.length>=4))candidates.push(table);}catch(error){if(error instanceof BankPdfError&&error.code==='LOCAL_LIMIT')throw error;}
  if(candidates.length!==1)throw new BankPdfError(candidates.length?'AMBIGUOUS_FORMAT':'UNSUPPORTED_LAYOUT');return candidates[0]!;
 }
 /** Only explicit textual calendar facts and timezone-marked instants. */
