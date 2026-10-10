@@ -28,13 +28,13 @@ Desktop показывает настраиваемые колонки в таб
 
 Ctrl/Cmd+A выбирает все server-filtered IDs; Shift+click/↑/↓/Space используют anchor среди загруженных строк. Разрозненный выбор сохраняется при загрузке следующей страницы. Bulk editor сначала получает все выбранные строки с сервера, фиксирует epoch и не добавляет новые matching imports в команду. Другой revision требует сравнения/обновления, а не молчаливой перезаписи. Обновление прежнего набора страниц сохраняет глубину загрузки и scroll.
 
-Inline semantic edits вызывают те же действия, что Operation Card. Date/amount/source corrections остаются в карточке. Контекстное меню доступно правой кнопкой/Shift+F10 и кнопкой выбранной операции на mobile. Возможны open, semantic fields, verify, similar merchant, history, delete и Copy ID. Review использует фиксированный список; AI Analyzer по-прежнему не подключён.
+Inline semantic edits вызывают те же действия, что Operation Card. Date/amount/source corrections остаются в карточке. Из строки или фиксированной массовой выборки можно открыть существующий редактор personal rule с предложенными общими conditions/assignments; сохранение действует на будущие imports, прошлое не переписывается автоматически. Контекстное меню доступно правой кнопкой/Shift+F10 и кнопкой выбранной операции на mobile. Возможны open, semantic fields, verify, similar merchant, history, delete и Copy ID. Review использует фиксированный список; AI Analyzer по-прежнему не подключён.
 
 ## Граница готовности
 
 Отказ `FINANCE_SIZE_LIMIT` при >10,000 удалён. Это **серверная pagination над полным reconciliation**, а не SQL pagination/materialized projection. Убраны повторные линейные поиски transactions/components на каждую операцию и повторный credit-card scan. Сложные links требуют общего графа; его предельные память/время, многопользовательская нагрузка и длительность массовых command previews требуют отдельного профилирования. 30 секунд в synthetic CI — защитный test timeout, не Production SLA.
 
-Финансовые bulk edit/delete/Review остаются ограничены 1000 IDs одной команды; Ctrl/Cmd+A выбирает больше и явно блокирует слишком широкую команду. Cross-page range anchor, продвинутый drag-resize колонок, стартовый last state/Overview Views, row creation of recurring rule, AI analysis selected snapshot и реальные Safari/Android проверки не объявлены завершёнными. Полное соответствие всем §§23/33 и полный readiness release этим блоком не заявляется.
+Финансовые bulk edit/delete/Review остаются ограничены 1000 IDs одной команды; Ctrl/Cmd+A выбирает больше и явно блокирует слишком широкую команду. продвинутый drag-resize колонок, стартовый last state/Overview Views, автоматические предложения recurring rules, AI analysis selected snapshot и реальные Safari/Android проверки не объявлены завершёнными. Полное соответствие всем §§23/33 и полный readiness release этим блоком не заявляется.
 
 ## Проверки
 
