@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui, feature/import-review-expansion]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:
@@ -56,5 +56,12 @@ jobs:
         with:
           name: financial-reset-previews
           path: apps/web/test-results/**/financial-reset-preview.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Save similar-purchase Review desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-group-previews
+          path: apps/web/test-results/**/review-group-preview.png
           if-no-files-found: error
           retention-days: 7

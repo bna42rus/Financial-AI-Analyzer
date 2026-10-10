@@ -3256,10 +3256,27 @@
       "title": "Импорт банковских выписок",
       "source_text": "Импорт — один из центральных процессов продукта. Пользователь должен выбирать файл и получать готовый результат без ручного mapping wizard, но при этом чувствительные данные не должны бесконтрольно уходить наружу.",
       "group": "imports",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
+      ],
+      "verification_refs": [
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-18.1",
@@ -3326,7 +3343,12 @@
         "docs/architecture/live-import-ui.md",
         "apps/web/src/ServerImport.tsx",
         "apps/web/src/import-flow.ts",
-        "apps/web/src/ServerFinance.tsx"
+        "apps/web/src/ServerFinance.tsx",
+        "docs/architecture/import-review-expansion.md",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -3338,10 +3360,15 @@
         "apps/web/e2e/import-local.spec.ts",
         "packages/imports/test/safe-source.test.ts",
         "apps/web/src/import-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-18.3",
@@ -3360,16 +3387,28 @@
         "docs/architecture/safe-bank-source.md",
         "packages/imports/src/safe-source.ts",
         "packages/imports/src/contract.ts",
-        "apps/api/src/import-ingestion.ts"
+        "apps/api/src/import-ingestion.ts",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
         "apps/api/test/import-ingestion.test.ts",
-        "packages/imports/test/safe-source.test.ts"
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
+      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-18.4",
@@ -3665,7 +3704,12 @@
         "docs/architecture/live-import-ui.md",
         "apps/web/src/ServerImport.tsx",
         "apps/web/src/import-flow.ts",
-        "apps/web/src/ServerFinance.tsx"
+        "apps/web/src/ServerFinance.tsx",
+        "docs/architecture/import-review-expansion.md",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "apps/api/test/finance-reset.test.ts",
@@ -3678,10 +3722,15 @@
         "apps/web/e2e/import-local.spec.ts",
         "packages/imports/test/safe-source.test.ts",
         "apps/web/src/import-flow.test.ts",
-        "apps/api/test/browser.test.ts"
+        "apps/api/test/browser.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md."
+      "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md. Live UI block: authenticated automatic PDF preparation, memory-only passwords and same-batch safe retry, tenant-bound metadata history with pagination, accepted/background restoration, canonical operation counts separate from technical issues, persisted operations and server-calculated totals. Full editing/review, other formats/OCR, accepted-batch cancellation and final classification/link pass remain pending. Exact-head CI evidence is recorded in the PR; see live-import-ui.md.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-19",
@@ -3700,16 +3749,26 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
         "packages/imports/test/matching.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-19.1",
@@ -3761,17 +3820,27 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-19.3",
@@ -3824,7 +3893,13 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -3833,11 +3908,15 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-19.5",
@@ -3901,7 +3980,12 @@
         "apps/api/src/duplicate-merge.ts",
         "packages/finance-core/src/duplicate-merge.ts",
         "packages/database/migrations/0015_duplicate_merge.sql",
-        "apps/web/src/DuplicateMerge.tsx"
+        "apps/web/src/DuplicateMerge.tsx",
+        "docs/architecture/import-review-expansion.md",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/safe-source.test.ts",
@@ -3910,11 +3994,14 @@
         "apps/api/test/browser.test.ts",
         "packages/imports/test/matching.test.ts",
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/duplicate-merge.test.ts"
+        "packages/finance-core/test/duplicate-merge.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
       "verification_plan": "Local-first и privacy до передачи; сканы/пароли; partial success; реальные одинаковые покупки; пересекающиеся источники; безопасная отмена и гонки.",
       "implementation_note": " Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md.",
-      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR."
+      "note": " Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Duplicate merge Development increment: explicit canonical/source choice, manual conflicts, immutable original sources with tenant ID aliases, checked History/Undo, component/link dependency guards and canonical-aware import/cancellation/deletion. Full clause remains partial; exact-head CI in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-19.7",
@@ -5452,17 +5539,28 @@
         "apps/web/src/OperationChoice.tsx",
         "apps/web/src/workspace-command.ts",
         "packages/finance-core/src/review.ts",
-        "packages/database/migrations/0016_review_sessions.sql"
+        "packages/database/migrations/0016_review_sessions.sql",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "apps/web/src/bulk-edit.test.ts",
         "apps/web/src/workspace-command.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/review-browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-25.1",
@@ -5482,17 +5580,28 @@
         "apps/web/src/OperationChoice.tsx",
         "apps/web/src/workspace-command.ts",
         "packages/finance-core/src/review.ts",
-        "packages/database/migrations/0016_review_sessions.sql"
+        "packages/database/migrations/0016_review_sessions.sql",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "apps/web/src/bulk-edit.test.ts",
         "apps/web/src/workspace-command.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/review-browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-25.2",
@@ -5532,10 +5641,27 @@
       "title": "Review Flow",
       "source_text": "Похожие операции Если система видит группу действительно похожих операций, она может предложить применить решение к группе. Но scope должен быть показан до выполнения.",
       "group": "review",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы."
+      "status": "partial",
+      "implementation_refs": [
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
+      ],
+      "verification_refs": [
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
+      ],
+      "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-25.4",
@@ -5555,17 +5681,28 @@
         "apps/web/src/OperationChoice.tsx",
         "apps/web/src/workspace-command.ts",
         "packages/finance-core/src/review.ts",
-        "packages/database/migrations/0016_review_sessions.sql"
+        "packages/database/migrations/0016_review_sessions.sql",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "apps/web/src/bulk-edit.test.ts",
         "apps/web/src/workspace-command.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/review-browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/import-ingestion.test.ts"
       ],
       "verification_plan": "Независимые facets и их confidence; ручные решения сохраняются; счётчик считает parent transactions; разбор продолжается после паузы.",
-      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
+      "implementation_note": " Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-26",
@@ -6840,7 +6977,13 @@
         "docs/architecture/local-bank-parsers.md",
         "docs/architecture/safe-bank-source.md",
         "packages/imports/src/safe-source.ts",
-        "apps/api/src/import-ingestion.ts"
+        "apps/api/src/import-ingestion.ts",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
@@ -6849,10 +6992,16 @@
         "packages/imports/test/bank-pdf.test.ts",
         "apps/web/e2e/import-local.spec.ts",
         "apps/api/test/import-ingestion.test.ts",
-        "packages/imports/test/safe-source.test.ts"
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
       "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
-      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md."
+      "implementation_note": " Local bank PDF block: observed T-Bank/Ozon/Sber templates, memory-only PDF/password extraction, text-free HMAC payload, bank-specific parser metadata and synthetic checks. Safe rich text, other formats/OCR/live UI remain incomplete. See local-bank-parsers.md. Finite bank-source/1 codes and canonical labels are implemented with independent validation; arbitrary source text and broad merchant coverage remain pending. Evidence: docs/architecture/safe-bank-source.md.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-35.3",
@@ -6868,14 +7017,29 @@
         "packages/imports/src/local.ts",
         "apps/api/src/import-validation.ts",
         "apps/api/src/server.ts",
-        "docs/architecture/import-preparation.md"
+        "docs/architecture/import-preparation.md",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/imports/test/preparation.test.ts",
         "apps/api/test/import-validation.test.ts",
-        "apps/web/e2e/import-preparation.spec.ts"
+        "apps/web/e2e/import-preparation.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/import-ingestion.test.ts",
+        "apps/api/test/finance.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial."
+      "verification_plan": "History 30 дней, конфликтующие поздние изменения; irreversible delete/cancel import; cascade диалогов и кешей; full wipe, key/generation и остановка jobs. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
+      "note": " Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md."
     },
     {
       "id": "PDF-35.4",
@@ -11025,7 +11189,13 @@
         "packages/database/migrations/0014_import_cancellation_dedupe.sql",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/WorkspaceCommandPanel.tsx",
-        "docs/architecture/import-cancellation-dedupe.md"
+        "docs/architecture/import-cancellation-dedupe.md",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -11037,9 +11207,12 @@
         "packages/imports/test/matching.test.ts",
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/review-browser.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR."
     },
     {
@@ -11104,7 +11277,12 @@
         "apps/web/src/OperationChoice.tsx",
         "apps/web/src/workspace-command.ts",
         "packages/finance-core/src/review.ts",
-        "packages/database/migrations/0016_review_sessions.sql"
+        "packages/database/migrations/0016_review_sessions.sql",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -11122,9 +11300,11 @@
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/bulk-edit.test.ts",
         "apps/web/src/workspace-command.test.ts",
-        "apps/api/test/review-browser.test.ts"
+        "apps/api/test/review-browser.test.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/finance-core/test/review-group.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR. Derived-allocation sixth server block: stable source/target allocation references, iterative nested reversal/portion reconciliation, capacities, source/loan/category propagation, reference/cycle constraints, dependent Undo and transitive link deletion. 17 new pure scenarios and 20 PostgreSQL/HTTP scenarios; exact-head evidence in PR. UI/automatic matching/actual Import/queue/cancellation/Analyzer/future cascades and full acceptance remain pending; full clause partial. Cancellation/dedupe Development increment: own batch/file preview/commit, direct evidence/shared restoration, private irreversible receipt, finite exact-instant fingerprint and persistent different-pair History. Legacy shared evidence, full sanitized descriptions, duplicate merge/ID mapping, future module/privacy/release coverage remain open; exact-head CI evidence in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Вложенные reversal/refund allocations; no double counting; dependent single/bulk rollback; cascade с сохранением surviving operations.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
@@ -11377,7 +11557,12 @@
         "apps/web/src/OperationChoice.tsx",
         "apps/web/src/workspace-command.ts",
         "packages/finance-core/src/review.ts",
-        "packages/database/migrations/0016_review_sessions.sql"
+        "packages/database/migrations/0016_review_sessions.sql",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -11392,9 +11577,11 @@
         "apps/web/src/bulk-edit.test.ts",
         "apps/web/src/workspace-command.test.ts",
         "apps/api/test/review-browser.test.ts",
-        "apps/web/e2e/server-workspace.spec.ts"
+        "apps/web/e2e/server-workspace.spec.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/finance-core/test/review-group.test.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Account structure/deletion second server block: explicit source/operation/alias distribution, source-preserving bindings, scoped rules and conservative Undo; selective atomic deletion clears current financial History copies and invalidates old payloads. UI, full wipe/HMAC rotation, imports and future-module cascades remain pending. Full clause remains partial; exact-head evidence in PR. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md.",
       "verification_plan": " Development reset/key context проверяются 27 PG/HTTP сценариями; UI/actual Import/jobs/canonicalization/KMS/backups/deletion replay и общая acceptance ещё впереди. Первый блок Import: text-free local WebCrypto/HMAC preparation и независимая server validation с technical row issues/context guards. 23 pure, 13 PG/HTTP и Chromium desktop/mobile scenarios; exact-head evidence в PR. Не создаёт финансовые записи. Actual bank adapters/OCR/safe source texts, accepted batches/provenance/dedupe/queue/cancellation/UI и real-device/Production acceptance ещё не завершены; full clause partial.",
       "implementation_note": " Second Import block: durable normalized batch acceptance/provenance, source-only conservative matching, checkpoints/one-active constraint and deletion cascade. Text-free profile only; real adapters/safe texts, cancellation, remembered dedupe decisions, final classification/link pass/UI remain incomplete. See import-ingestion.md; CI evidence at exact commit in PR. Fixed-scope bulk/manual Review increment: preview/confirmation outside Review, immediate reversible classification inside Review, independent facet verification/reasons, one-action atomic History/Undo, captured-epoch conflicts, exact retries, server-persisted fixed-ID progress with deletion/reset cleanup. Full clause remains partial: remaining mass actions, structural/rule editors, grouped/AI Review, pagination/load qualification and Staging acceptance are open. See review-bulk-actions.md and exact-head CI in PR."
     },
@@ -11650,7 +11837,14 @@
         "docs/architecture/live-operation-review.md",
         "apps/web/src/ServerOperation.tsx",
         "apps/web/src/operation-flow.ts",
-        "apps/web/src/finance-client.ts"
+        "apps/web/src/finance-client.ts",
+        "docs/architecture/import-review-expansion.md",
+        "packages/imports/src/safe-source.ts",
+        "packages/imports/src/matching.ts",
+        "packages/finance-core/src/review-group.ts",
+        "apps/api/src/finance-review-group.ts",
+        "apps/web/src/ServerReview.tsx",
+        "packages/database/migrations/0017_import_description_identity.sql"
       ],
       "verification_refs": [
         "packages/finance-core/test/graph.test.ts",
@@ -11659,9 +11853,14 @@
         "apps/api/test/import-ingestion.test.ts",
         "apps/api/test/browser.test.ts",
         "apps/web/src/finance-client.test.ts",
-        "apps/web/src/operation-flow.test.ts"
+        "apps/web/src/operation-flow.test.ts",
+        "packages/imports/test/safe-source.test.ts",
+        "packages/imports/test/matching.test.ts",
+        "packages/finance-core/test/review-group.test.ts",
+        "apps/api/test/review-browser.test.ts",
+        "apps/web/e2e/server-workspace.spec.ts"
       ],
-      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks.",
+      "note": "Читать полностью; ссылка перечисляет указанные подпункты, но не ограничивает область действия. C применяется с техническим приоритетом E; E-08 содержит открытые условия. Finance foundation has a narrow server/core implementation and tests; full amendment is not closed. See finance-foundation.md for limits and next blocks. Development import/Review expansion: versioned 20-merchant finite profile, device-only per-user full-description HMAC, one-to-one strict/date-only matching and exact fixed-session group scope with server session-version validation and one Undo. No raw description/identifiers or digest enter UI/AI/report. Whole clause remains partial; exact-head CI/visual evidence in PR and limitations in import-review-expansion.md.",
       "implementation_note": " Authenticated live import UI: device-only password/file handling, same sanitized batch retries and recovery, one-active durable background work, distinct canonical review and technical row counts, tenant-bound metadata history. Full amendment remains partial; see live-import-ui.md and exact-head CI evidence in PR. Saved-operation UI increment: actual editable facets and individual verification, pre-request text sanitization, reversible server edits/Undo, source-preserving exact corrections with preview/commit, coherent epoch/current-attempted conflicts and safe idempotent retries. Related links/components can be inspected; editing them, full History/Review and other clause requirements remain pending. See live-operation-review.md and exact-head CI evidence in PR."
     },
     {

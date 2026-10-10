@@ -30,6 +30,24 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  return {state,detail,calls,block:()=>{blocked=true;},loseCommit:()=>{lostCommit=true;}};
 }
 async function section(page:Page,title:string){await page.getByRole('link',{name:'Настройки',exact:true}).click();await page.getByRole('navigation',{name:'Подразделы настроек'}).getByRole('button',{name:new RegExp('^'+title)}).click();await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();}
+test('similar Review group shows exact scope, cancels without writes and requires reopening after new financial data',async({page},info)=>{
+ const h=await setup(page),second={...structuredClone(h.state.operations[0]!),id:crypto.randomUUID(),date:{precision:'day' as const,date:'2026-09-02'}};
+ h.state.operations.push(second);h.state.categories.push({id:crypto.randomUUID(),name:'Продукты',parentId:null,role:'expense',hidden:false});
+ let session:{id:string;generation:string;operationIds:string[];cursor:number;decisions:Record<string,string>;status:string;revision:string}|null=null;
+ await page.route('http://127.0.0.1:3000/finance/review-*',async route=>{
+  const req=route.request();if(req.method()==='OPTIONS')return route.fallback();const b=req.postDataJSON()??{},headers={'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true'};
+  if(req.url().endsWith('review-sessions'))return route.fulfill({headers,json:{generation:h.state.generation,sessions:session?[session]:[]}});
+  if(b.kind==='create')session={id:b.sessionId,generation:b.generation,operationIds:[...b.operationIds],cursor:0,decisions:{},status:'in_progress',revision:'1'};
+  await route.fulfill({headers,json:session});
+ });
+ await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Анализатор',exact:true}).click();await page.getByRole('button',{name:'Начать проверку всех требующих внимания: 2',exact:true}).click();
+ await page.getByRole('button',{name:'Показать похожие покупки: 2',exact:true}).click();const group=page.getByRole('region',{name:'Группа похожих покупок',exact:true});await expect(group.getByRole('listitem')).toHaveCount(2);await group.screenshot({path:info.outputPath('review-group-preview.png')});
+ await group.getByRole('button',{name:'Обновить значения',exact:true}).click();await expect(group).toHaveCount(0);expect(h.calls.filter(c=>['/finance/preview','/finance/commit'].includes(c.path))).toHaveLength(0);
+ await page.getByRole('button',{name:'Показать похожие покупки: 2',exact:true}).click();h.state.operations.push({...structuredClone(second),id:crypto.randomUUID()});h.state.revision='2';await page.getByRole('button',{name:'Обновить данные',exact:true}).click();
+ await expect(group.getByRole('alert')).toContainText('Данные изменились');await expect(group.getByRole('button',{name:'Применить решение к группе: 2',exact:true})).toBeDisabled();await expect(group.getByRole('button',{name:'Использовать моё решение с текущими данными'})).toHaveCount(0);
+ await group.getByRole('button',{name:'Обновить значения',exact:true}).click();await page.getByRole('button',{name:'Показать похожие покупки: 2',exact:true}).click();await expect(group.getByRole('listitem')).toHaveCount(2);
+ expect(h.calls.filter(c=>['/finance/preview','/finance/commit'].includes(c.path))).toHaveLength(0);expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});
 test('bulk preview works on the first finance response without another navigation or polling refresh',async({page})=>{
  const h=await setup(page,false,async()=>{await page.getByRole('link',{name:'Операции',exact:true}).click();});await page.getByLabel('Выбрать операцию 1',{exact:true}).check();await page.getByRole('button',{name:'Изменить выбранные',exact:true}).click();await page.getByLabel('Действие с операциями',{exact:true}).selectOption('comment');await page.getByLabel('Новый комментарий',{exact:true}).fill('Synthetic first-load decision');await page.getByRole('button',{name:'Показать последствия массовой правки'}).click();await expect(page.getByRole('region',{name:'Состояние изменения'}).getByRole('button',{name:'Применить изменение',exact:true})).toBeVisible({timeout:2000});expect(h.calls.filter(c=>c.path==='/finance/preview')).toHaveLength(1);expect(h.calls.filter(c=>c.path==='/finance/preview')[0]!.body.intent).toMatchObject({operationIds:[h.detail.id],patch:{comment:'Synthetic first-load decision'}});
 });

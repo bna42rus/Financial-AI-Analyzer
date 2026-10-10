@@ -31,13 +31,29 @@ async function drain(id:string){for(let n=0;n<30;n++){const s=await status(id);i
 async function command(intent:unknown){const e=(await request('/finance/epoch')).json(),actionId=randomUUID(),p=await request('/finance/preview',{actionId,generation:e.generation,revision:e.revision,intent});assert.equal(p.statusCode,200,p.body);const c=await request('/finance/commit',{actionId,...((intent as {kind:string}).kind==='reset_financial'?{confirmReset:true}:{})});assert.equal(c.statusCode,200,c.body);return {preview:p.json(),result:c.json()};}
 async function counts(){const result:Record<string,number>={};for(const table of ['transaction','source_observation','account','account_alias','ingestion_batch','ingestion_file','ingestion_row','ingestion_account','duplicate_candidate','ingestion_dispatch'])result[table]=Number((await pg.owner.query(`SELECT count(*) AS n FROM finance.${table} WHERE user_id='first'`)).rows[0].n);return result;}
 async function safeBatch(rows=[row({safeSource:{event:'purchase',merchant:'ozon'}})],bytes='Synthetic safe source'){
- const local=await createLocalPreparation(await context(),undefined,'bank-pdf/1',sourceSanitizer);
- try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}
+ const local=await createLocalPreparation(await context(),undefined,'bank-pdf/2',sourceSanitizer);
+ try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows:rows.map(r=>({...r,localDescription:r.localDescription??JSON.stringify(r.safeSource??null)}))}]);}finally{local.dispose();}
 }
 
 async function actionEpoch(){const e=(await request('/finance/epoch')).json();return {generation:e.generation,revision:e.revision};}
 async function importedOperation(){const id=(await pg.owner.query('SELECT id FROM finance.transaction')).rows[0].id;const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
 async function detail(id:string){const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
+test('expanded source corpus and private full-description fingerprints distinguish equal-brand purchases and reuse exact unknown descriptions',async()=>{
+ const exact=row({bankReference:undefined,operationDate:{precision:'instant',instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase',merchant:'vkusvill'},localDescription:'Покупка ВкусВилл Synthetic-Terminal-A auth Synthetic-Private-1'});
+ const first=await safeBatch([exact],'Expanded first');await accept(first);await drain(first.batchId);let current=await importedOperation();assert.equal(current.source.merchantText,'ВкусВилл');assert.equal(current.source.versions.sanitizer,'bank-source/2');assert.equal(current.source.versions.dedupe,'strict-bank-description/2');
+ const other=await safeBatch([{...exact,localDescription:'Покупка ВкусВилл Synthetic-Terminal-B auth Synthetic-Private-2'}],'Expanded other');await accept(other);const different=await drain(other.batchId);assert.equal(different.counts.created,1);assert.equal((await request('/finance/state')).json().duplicateCandidates.length,0);
+ const repeat=await safeBatch([exact],'Expanded repeat');await accept(repeat);assert.equal((await drain(repeat.batchId)).counts.existing,1);assert.equal((await counts()).transaction,2);
+ const unknown={...exact,safeSource:{event:'purchase' as const,merchant:null},localDescription:'Покупка Synthetic Unknown Store authorization Synthetic-Private-3'};
+ const u=await safeBatch([unknown],'Unknown first');await accept(u);await drain(u.batchId);const again=await safeBatch([unknown],'Unknown repeat');await accept(again);assert.equal((await drain(again.batchId)).counts.existing,1);assert.equal((await counts()).transaction,3);
+ const stored=(await pg.owner.query("SELECT description_hmac,source_evidence,payload FROM finance.ingestion_row WHERE user_id='first'")).rows;assert.equal(stored.every(r=>/^[a-f0-9]{64}$/.test(r.description_hmac)&&r.payload===null),true);assert.equal(JSON.stringify(stored).includes('Synthetic'),false);
+ const report=await status(u.batchId);assert.equal(JSON.stringify(report).includes('descriptionHmac'),false);assert.equal(JSON.stringify((await request('/finance/state')).json()).includes('descriptionHmac'),false);
+ await command({kind:'cancel_import',batchId:u.batchId});assert.equal((await counts()).transaction,3);await command({kind:'delete_financial',scope:{kind:'operations',operationIds:report.files[0]!.operationIds!}});assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_row WHERE description_hmac=$1",[again.files[0]!.rows[0]!.descriptionHmac])).rows[0].n,'0');
+});
+test('date-only private descriptions remain separate possible duplicates and preserve explicit different decisions on exact-file reimport',async()=>{
+ const dated=row({bankReference:undefined,safeSource:{event:'purchase',merchant:'dns'},localDescription:'Оплата по карте DNS Synthetic-Private-1'}),a=await safeBatch([dated],'Date-only A');await accept(a);await drain(a.batchId);const b=await safeBatch([dated],'Date-only B');await accept(b);await drain(b.batchId);
+ assert.equal((await counts()).transaction,2);const pair=(await request('/finance/state')).json().duplicateCandidates[0];assert.ok(pair);await command({kind:'duplicate_different',id:pair.id});
+ const repeated=await safeBatch([dated],'Date-only B');await accept(repeated);assert.equal((await drain(repeated.batchId)).counts.existing,1);assert.equal((await request('/finance/state')).json().duplicateCandidates.length,0);
+});
 async function weakPair(){const rows=[row({bankReference:undefined,safeSource:{event:'purchase',merchant:'ozon'}})],a=await safeBatch(rows,'merge source A');await accept(a);const ar=await drain(a.batchId),b=await safeBatch(rows,'merge source B');await accept(b);await drain(b.batchId);const pair=(await request('/finance/state')).json().duplicateCandidates[0];return {pair,leftBatch:ar.operationIds[0]===pair.leftId?a:b,rightBatch:ar.operationIds[0]===pair.leftId?b:a};}
 const mergeIntent=(pair:any,extra:Record<string,unknown>={})=>({kind:'merge_duplicate',id:pair.id,canonicalId:pair.leftId,sourceSide:'left',choices:{},...extra});
 async function previewCommand(intent:unknown){return request('/finance/preview',{actionId:randomUUID(),...await actionEpoch(),intent});}
@@ -236,7 +252,7 @@ test('acceptance is durable, count-only and does not yet write financial observa
  assert.equal((await request('/finance/import-status',{batchId:b.batchId})).statusCode,200);
 });
 test('all three local bank adapters persist their actual parser version and Ozon contracts stay non-loan',async()=>{
- const session=await createLocalPreparation(await context(),undefined,'bank-pdf/1');
+ const session=await createLocalPreparation(await context(),undefined,'bank-pdf/2');
  try{
   const b=await session.prepare(randomUUID(),(['tbank','ozon','sber'] as const).map(bank=>parseBankPdf(randomUUID(),new TextEncoder().encode('Synthetic '+bank),syntheticLayout(bank))));
   await accept(b);const s=await drain(b.batchId);assert.equal(s.counts.created,6);assert.equal(s.counts.notImported,0);

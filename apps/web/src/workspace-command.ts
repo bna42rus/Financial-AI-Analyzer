@@ -24,7 +24,7 @@ export class WorkspaceCommand{
    catch(error){if(this.disposed)return;if(this.accessError(error))return;this.publish({phase:'stale',error:'Изменение сохранено, но данные не удалось обновить. Обновите их перед следующей правкой.'});}
   }catch(error){if(this.disposed)return;if(this.accessError(error))return;
    if(error instanceof ApiError&&error.code==='NETWORK_ERROR'){this.publish({phase:'retry',error:'Сервер не подтвердил результат. Повторите то же действие; второй записи не будет.'});return;}
-   this.pending=null;const conflict=error instanceof ApiError&&['FINANCE_CHANGED','DEPENDENCIES_CHANGED','GENERATION_CHANGED'].includes(error.code);this.publish({phase:conflict?'stale':'idle',preview:null,error:error instanceof Error?error.message:'Изменение не применено. Обновите данные и повторите.'});
+   this.pending=null;const conflict=error instanceof ApiError&&['FINANCE_CHANGED','DEPENDENCIES_CHANGED','GENERATION_CHANGED','REVIEW_CHANGED','REVIEW_GROUP_CHANGED'].includes(error.code);this.publish({phase:conflict?'stale':'idle',preview:null,error:error instanceof Error?error.message:'Изменение не применено. Обновите данные и повторите.'});
   }
  }
  private accessError(error:unknown){if(error instanceof ApiError&&['AUTH_REQUIRED','FINANCE_ACCESS_REQUIRED','ACCESS_EXPIRED','SUSPENDED','GENERATION_CHANGED'].includes(error.code)){this.pending=null;this.publish({phase:'unavailable',preview:null,error:'Доступ к финансовым данным ограничен.'});this.unavailable();return true;}return false;}
