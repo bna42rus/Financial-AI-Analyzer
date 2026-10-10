@@ -5,6 +5,7 @@ import type {Page} from '@playwright/test';
 import {createServer} from 'vite';
 import type {ViteDevServer} from 'vite';
 import {fileURLToPath} from 'node:url';
+import {queryOperations,parseOperationsQuery} from '../../../packages/finance-core/src/operations';
 import {aggregate} from '../../../packages/finance-core/src/graph';
 import type {Filter} from '../../../packages/finance-core/src/graph';
 import {syntheticDetail,syntheticPreview} from '../test/synthetic-finance';
@@ -18,6 +19,9 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  else if(path==='/access/tariffs')result={tariffs:[]};else if(path.startsWith('/access/')){result={code:'NOT_FOUND'};status=404;}
  else if(blocked&&path.startsWith('/finance/')){result={code:'FINANCE_ACCESS_REQUIRED'};status=403;}
  else if(path==='/finance/summary'){if(duringInitialLoad){summaryWaiting=true;await summaryGate;}result={...state,summary:aggregate(state.operations,body as Filter)};}
+ else if(path==='/finance/operations-views')result={views:[]};
+ else if(path==='/finance/operations-page'){const q=parseOperationsQuery(body.query??{}),r=queryOperations(state.operations,state,q),offset=Number(body.cursor?.offset??0),limit=Number(body.limit??50);result={...r,operations:r.operations.slice(offset,offset+limit),generation:state.generation,revision:state.revision,workspaceTotal:state.operations.length,offset,nextCursor:offset+limit<r.total?{generation:state.generation,revision:state.revision,queryHash:'synthetic',offset:offset+limit}:null};}
+ else if(path==='/finance/operations-selection'){const r=queryOperations(state.operations,state,parseOperationsQuery(body.query??{}));result={operationIds:r.operations.map(o=>o.id),reviewIds:r.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),operations:state.operations.filter(o=>body.ids?.includes(o.id)),generation:state.generation,revision:state.revision};}
  else if(path==='/finance/state')result=state;
  else if(path==='/finance/imports')result={batches:[],nextCursor:null};
  else if(path==='/finance/operation')result={...detail,revision:state.revision};

@@ -165,7 +165,7 @@ test('full reset leaves another user data, protected key and login/access unchan
 test('ciphertext transplanted from another user fails closed without exposing a key',async()=>{
  await context();await within('second',async db=>prepareImportContext(db,'second',await prepareFinance(db,'second'),{contextId:randomUUID()},envelope(fc.wrappingKey)));const other=(await pg.owner.query("SELECT sealed_key FROM protected_keys.pseudonym_key WHERE user_id='second'")).rows[0].sealed_key;await pg.owner.query("UPDATE protected_keys.pseudonym_key SET sealed_key=$1 WHERE user_id='first'",[other]);const r=await request('/finance/import-context',{contextId:randomUUID()});assert.equal(r.statusCode,503);assert.equal(r.json().code,'PSEUDONYM_KEY_UNAVAILABLE');assert.equal('key'in r.json(),false);
 });
-test('reset works above the ordinary graph limit using the epoch endpoint and count-only preview',async()=>{
+test('reset remains count-only and works above 10,000 operations alongside ordinary graph reads',async()=>{
  const db=await pg.owner.connect();try{
   await db.query('BEGIN');
   await db.query(`INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics) SELECT 'first',gen_random_uuid(),gen_random_uuid(),$1::jsonb FROM generate_series(1,10001)`,[JSON.stringify({kind:{value:'purchase',source:'bank',confidence:100,userVerified:false},role:{value:'expense',source:'bank',confidence:100,userVerified:false},category:{value:null,source:'bank',confidence:0,userVerified:false},subcategory:{value:null,source:'bank',confidence:0,userVerified:false},merchant:{value:'Synthetic',source:'bank',confidence:100,userVerified:false},counterparty:{value:null,source:'bank',confidence:0,userVerified:false}})]);
@@ -173,7 +173,7 @@ test('reset works above the ordinary graph limit using the epoch endpoint and co
   await db.query("INSERT INTO finance.observation_account(user_id,observation_id,account_id) SELECT user_id,id,account_id FROM finance.source_observation WHERE user_id='first'");
   await db.query('COMMIT');
  }catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}
- assert.equal((await request('/finance/state')).statusCode,409);const done=await reset();assert.equal(done.result.cleanup.counts.operations,10001);assert.equal(done.result.cleanup.counts.observations,10001);assert.equal((await counts()).transaction,0);assert.equal((await view()).operations.length,0);
+ assert.equal((await request('/finance/state')).statusCode,200);const done=await reset();assert.equal(done.result.cleanup.counts.operations,10001);assert.equal(done.result.cleanup.counts.observations,10001);assert.equal((await counts()).transaction,0);assert.equal((await view()).operations.length,0);
 });
 test('an executing acceptance cannot race an older reset preview or resurrect data after a new reset',async()=>{
  const c=await context(),r=await resetPreview(),id=randomUUID();let entered!:()=>void,release!:()=>void;const started=new Promise<void>(resolve=>{entered=resolve;}),gate=new Promise<void>(resolve=>{release=resolve;});
