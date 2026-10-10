@@ -8,8 +8,9 @@ import type {ExtractedRow,ExtractedFile} from './local.ts';
 /** Raw layout is device-only. Do not serialize it into diagnostics or server requests. */
 export type TextItem={text:string;x:number;y:number;width:number};
 export type PdfLayout=TextItem[][];
-export const bankPdfAdapter='bank-pdf/1' as const;
-export const pdfParserVersions={tbank:'tbank-movement-pdf/1',ozon:'ozon-movement-pdf/1',sber:'sber-card-pdf/1'} as const;
+export const bankPdfAdapter='bank-pdf/2' as const;
+export const legacyPdfParserVersions={tbank:'tbank-movement-pdf/1',ozon:'ozon-movement-pdf/1',sber:'sber-card-pdf/1'} as const;
+export const pdfParserVersions={tbank:'tbank-movement-pdf/2',ozon:'ozon-movement-pdf/2',sber:'sber-card-pdf/2'} as const;
 export type PdfFailure='UNKNOWN_FORMAT'|'AMBIGUOUS_FORMAT'|'UNSUPPORTED_LAYOUT'|'LOCAL_LIMIT'|'LOCAL_READ_FAILED'|'PASSWORD_REQUIRED'|'WRONG_PASSWORD'|'OCR_REQUIRED'|'PREPARATION_CLOSED';
 export class BankPdfError extends Error {readonly code:PdfFailure;constructor(code:PdfFailure){super(code);this.code=code;}}
 export const MAX_PDF_BYTES=20*1024*1024,MAX_PDF_PAGES=100,MAX_PDF_ITEMS=100000,MAX_PDF_TEXT=2000000;
@@ -123,7 +124,8 @@ export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):Ex
    try{const amount=cell(start,c.amount,c.end);Object.assign(row,pdfMoney(amount,bank==='sber'));
     if(bank==='tbank'?!/(?:₽|руб\.?|р\.?|RUB)\s*$/iu.test(amount):bank==='ozon'?!declaredRub:!declaredRub&&!page.some(l=>/сумма в рублях/.test(norm(l.text))))row.currency='UNSUPPORTED';
    }catch{/* Preparation records INVALID_AMOUNT without raw fragments. */}
-   row.safeSource=extractSafeSource(active.map(l=>cell(l,c!.description,c!.descriptionEnd??c!.amount)).join(' '),row.amountMinor);
+   row.localDescription=active.map(l=>cell(l,c!.description,c!.descriptionEnd??c!.amount)).join(' ');
+   row.safeSource=extractSafeSource(row.localDescription,row.amountMinor);
    rows.push(row);if(rows.length>1000)throw new BankPdfError('LOCAL_LIMIT');active=[];
   }
   for(let i=0;i<page.length;i++){

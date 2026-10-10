@@ -36,3 +36,14 @@ test('explicitly merged known file ordinals reuse their canonical operation, but
  assert.equal(matchSource({...row,ordinal:2},'file',[c],new Set(['one'])).transactionId,null);
  assert.equal(matchSource(row,'other-file',[c],new Set(['one'])).transactionId,null);
 });
+test('new strict identity includes full description evidence for unknown merchants; unsafe or date-only rows stay ambiguous',()=>{
+ const exact={...row,descriptionHmac:'a'.repeat(64),operationDate:{precision:'instant' as const,instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase' as const,merchant:null}};
+ assert.ok(strictSourceDescriptor(exact));assert.notEqual(strictSourceDescriptor(exact),strictSourceDescriptor({...exact,descriptionHmac:'b'.repeat(64)}));
+ assert.equal(strictSourceDescriptor({...exact,descriptionHmac:null}),null);assert.equal(strictSourceDescriptor({...exact,operationDate:row.operationDate}),null);
+});
+test('different full descriptions do not become false duplicate candidates solely through equal day, amount and brand',()=>{
+ const identified={...row,descriptionHmac:'a'.repeat(64)},c=source({descriptionHmac:'b'.repeat(64)});
+ assert.deepEqual(matchSource(identified,'new',[c],new Set()),{transactionId:null,possibleIds:[]});
+ assert.deepEqual(matchSource(identified,'new',[{...c,descriptionHmac:identified.descriptionHmac}],new Set()),{transactionId:null,possibleIds:['one']});
+ assert.equal(matchSource({...identified,bankRefHmac:'stable'},'new',[{...c,bankRefHmac:'stable'}],new Set()).transactionId,'one');
+});

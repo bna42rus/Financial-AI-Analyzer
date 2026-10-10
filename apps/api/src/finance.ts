@@ -9,6 +9,7 @@ import type {MergeDuplicateIntent} from './duplicate-merge.ts';
 import {parseBulkIntent,parseOperationPatch,bulkPatches} from './finance-bulk.ts';
 import type {BulkIntent} from './finance-bulk.ts';
 import {reviewStatus} from '../../../packages/finance-core/src/review.ts';
+import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
@@ -155,6 +156,7 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
  if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
  if(intent.kind==='bulk_operations'){
+  if(intent.reviewScope)await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations);
   const loaded=await loadFinance(db,userId),patches=bulkPatches(intent,loaded.graph);let warnings:unknown[]=[];
   if('analyticsOverride'in intent.patch){const result=await applyExclusion(db,userId,{kind:'set_exclusion',id:intent.id,scope:{kind:'operations',operationIds:intent.operationIds},value:intent.patch.analyticsOverride as 'default'|'include'|'exclude',includeRelated:false},loaded.graph);warnings=result.details.warnings as unknown[];}
   for(const item of patches){delete item.patch.analyticsOverride;if(Object.keys(item.patch).length)await applyBase(db,userId,{kind:'operation',id:item.id,patch:item.patch},currentRevision,loaded);}

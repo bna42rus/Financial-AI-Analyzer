@@ -27,6 +27,32 @@ async function append(amount:string,kind:Kind='purchase',transactionId:string|nu
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
+test('Review group applies only the displayed session subset, preserves bank facts, retries once and has one Undo',async()=>{
+ const ids=[(await append('-1000')).transactionId,(await append('-2000')).transactionId],w=await view(),sessionId=randomUUID();
+ const created=await request('/finance/review-command',{commandId:randomUUID(),sessionId,generation:w.generation,kind:'create',operationIds:ids,financeRevision:w.revision});assert.equal(created.statusCode,200,created.body);const s=created.json();
+ const newer=(await append('-3000')).transactionId,facts=(await pg.owner.query("SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows;
+ const fresh=await view(),food=fresh.categories.find((c:any)=>c.name==='Продукты'&&c.parentId===null).id;
+ const saved=await command({kind:'bulk_operations',operationIds:ids,patch:{categoryId:food},reviewScope:{sessionId,revision:s.revision,anchorId:ids[0]!}});
+ assert.equal(saved.preview.impact.details.selectedCount,2);assert.equal((await request('/finance/commit',{actionId:saved.actionId})).json().actionId,saved.actionId);
+ const after=await view();assert.equal(after.operations.filter((o:any)=>ids.includes(o.id)).every((o:any)=>o.classification.category.value===food),true);assert.equal(after.operations.find((o:any)=>o.id===newer).classification.category.value,null);
+ assert.deepEqual((await pg.owner.query("SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,facts);
+ const sessions=(await request('/finance/review-sessions',{})).json().sessions;assert.equal(sessions[0].cursor,2);assert.equal(sessions[0].status,'completed');assert.deepEqual(sessions[0].operationIds,ids);
+ await command({kind:'undo',id:randomUUID(),value:saved.actionId});assert.equal((await view()).operations.filter((o:any)=>ids.includes(o.id)).every((o:any)=>o.classification.category.value===null),true);
+});
+test('Review group rejects widened or partial selections, foreign sessions and nonclassification conflicts atomically',async()=>{
+ const ids=[(await append('-1000')).transactionId,(await append('-2000')).transactionId],w=await view(),sessionId=randomUUID();const s=(await request('/finance/review-command',{commandId:randomUUID(),sessionId,generation:w.generation,kind:'create',operationIds:ids,financeRevision:w.revision})).json();
+ const newer=(await append('-3000')).transactionId;
+ async function attempt(operationIds:string[],scope={sessionId,revision:s.revision,anchorId:ids[0]!}){const e=await view();return request('/finance/preview',{actionId:randomUUID(),generation:e.generation,revision:e.revision,intent:{kind:'bulk_operations',operationIds,patch:{comment:'Synthetic group decision'},reviewScope:scope}});}
+ for(const chosen of [[ids[0]!],[...ids,newer],ids.toReversed()]){const r=await attempt(chosen);assert.equal(r.statusCode,409,r.body);assert.equal(r.json().code,'REVIEW_GROUP_CHANGED');}
+ const foreign=randomUUID();await within('second',async db=>{const e=await financeView(db,'second');await db.query("INSERT INTO finance.review_session(user_id,id,generation,operation_ids,status) VALUES('second',$1,$2,$3,'in_progress')",[foreign,e.generation,[randomUUID()]]);});assert.equal((await attempt(ids,{sessionId:foreign,revision:'0',anchorId:ids[0]!})).statusCode,404);
+ await pg.owner.query("UPDATE finance.transaction SET review_reasons='[\"possible_duplicate\"]'::jsonb WHERE user_id='first' AND id=$1",[ids[1]!]);assert.equal((await attempt(ids)).json().code,'REVIEW_GROUP_CHANGED');assert.equal((await view()).operations.every((o:any)=>o.comment===''),true);
+});
+test('Review progress changes between group preview and commit invalidate the pending group without financial writes',async()=>{
+ const ids=[(await append('-1000')).transactionId,(await append('-2000')).transactionId],w=await view(),sessionId=randomUUID(),s=(await request('/finance/review-command',{commandId:randomUUID(),sessionId,generation:w.generation,kind:'create',operationIds:ids,financeRevision:w.revision})).json(),actionId=randomUUID();
+ const p=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent:{kind:'bulk_operations',operationIds:ids,patch:{comment:'Synthetic stale group'},reviewScope:{sessionId,revision:s.revision,anchorId:ids[0]!}}});assert.equal(p.statusCode,200,p.body);
+ const moved=await request('/finance/review-command',{commandId:randomUUID(),sessionId,generation:w.generation,revision:s.revision,kind:'skip'});assert.equal(moved.statusCode,200,moved.body);
+ const c=await request('/finance/commit',{actionId});assert.equal(c.statusCode,409,c.body);assert.equal(c.json().code,'REVIEW_CHANGED');assert.equal((await view()).operations.every((o:any)=>o.comment===''),true);
+});
 
 test('bulk category assignment is read-only until confirmed, preserves independent facets, groups history and atomically undoes',async()=>{
  const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId,w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,sub=w.categories.find((c:{parentId:string|null})=>c.parentId===food).id;

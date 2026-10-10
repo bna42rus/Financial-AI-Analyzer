@@ -24,7 +24,7 @@ test('real PDF worker prepares three bank formats locally without uploading file
   return {result,local:localStorage.length,session:sessionStorage.length};
  },fixtures);
  expect(output.result.localIssues).toEqual([]);expect(output.result.batch.files.map((f:{bank:string})=>f.bank)).toEqual(['tbank','ozon','sber','ozon']);
- expect(output.result.batch.versions.sanitizer).toBe('bank-source/1');
+ expect(output.result.batch.versions.sanitizer).toBe('bank-source/2');
  expect(output.result.batch.files.slice(0,3).every((f:any)=>f.rows[0].safeSource?.event==='purchase'&&f.rows[0].safeSource?.merchant==='ozon')).toBe(true);
  expect(output.result.batch.files[3].rows[0].safeSource).toBeNull();expect(output.result.batch.files[3].rows[0].amountMinor).toBe('-1001');
  expect(output.result.batch.files.every((f:{rows:unknown[]})=>f.rows.length===2)).toBe(true);
