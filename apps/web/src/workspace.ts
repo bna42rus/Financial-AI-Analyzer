@@ -17,6 +17,8 @@ export function financeRoute(hash:string):FinanceRoute{
  return {screen:screen==='operations'||screen==='analyzer'?screen:'overview',section:null};
 }
 const appearanceKey='finance-appearance-v1';
+// Only an opaque interface epoch is persisted, never financial records or import context.
+export function acceptInterfaceEpoch(epoch:string){try{const previous=localStorage.getItem('finance-interface-epoch-v1');localStorage.setItem('finance-interface-epoch-v1',epoch);return previous!==null&&previous!==epoch;}catch{return false;}}
 export function readAppearance():Appearance{
  try{const value=JSON.parse(localStorage.getItem(appearanceKey)??'null') as Partial<Appearance>|null;
   if(value&&['system','light','dark'].includes(value.theme??'')&&['comfortable','compact'].includes(value.density??'')&&['standard','large'].includes(value.textSize??'')&&['system','reduced','full'].includes(value.motion??''))return {theme:value.theme!,density:value.density!,textSize:value.textSize!,motion:value.motion!};

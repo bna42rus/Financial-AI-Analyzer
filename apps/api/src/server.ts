@@ -191,7 +191,7 @@ export async function createServer(config: Config) {
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
         if(path==='/finance/state')result=await finance.financeView(db,s.user.id);
-        else if(path==='/finance/epoch'){const w=await finance.prepareFinance(db,s.user.id);result={generation:w.generation,revision:w.revision,keyVersion:w.key_version,interfaceEpoch:w.interface_epoch};}
+        else if(path==='/finance/epoch'){const w=await finance.prepareFinance(db,s.user.id);result={generation:w.generation,revision:w.revision,keyVersion:w.key_version,interfaceEpoch:w.interface_epoch,recentAuthenticationRequired:!(await db.query("SELECT created_at>clock_timestamp()-interval '5 minutes' AS fresh FROM identity.auth_session WHERE user_id=$1 AND id=$2",[s.user.id,s.session.id])).rows[0]?.fresh};}
         else if(path==='/finance/summary')result=await finance.financeView(db,s.user.id,finance.parseFilter(request.body));
         else if(path==='/finance/operation')result=await finance.operationView(db,s.user.id,fields(request,['id']).id);
         else if(path==='/finance/review-sessions')result=await review!.reviewSessions(db,s.user.id,request.body);
