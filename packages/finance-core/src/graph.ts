@@ -14,6 +14,8 @@ const family=(l:Link)=>['refund','expense_reimbursement','reversal'].includes(l.
  * but never used as a calculation basis. No DB/network/AI or silent allocation clipping. */
 export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcome[]} {
  const accounts=new Map(graph.accounts.map(a=>[a.id,a])),cats=new Map(graph.categories.map(c=>[c.id,c]));
+ const components=new Map<string,typeof graph.components>();for(const part of graph.components){const own=components.get(part.transactionId)??[];own.push(part);components.set(part.transactionId,own);}
+ const hasCreditPurchase=graph.operations.some(o=>accounts.get(effective(o).accountId)?.type==='credit_card'&&o.semantics.kind.value==='purchase');
  const nodes=new Map<string,Node[]>(),reasons=new Map<string,Set<string>>(),invalid=new Map<string,string>();
  const addReason=(id:string,reason:string)=>reasons.get(id)?.add(reason);
  const compatible=(role:Role,catId:string|null,subId:string|null)=>{
@@ -22,7 +24,7 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
   return (!catId||!!cat&&cat.parentId===null&&(role!=='expense'&&role!=='income'||cat.role==='both'||cat.role===role))&&(!subId||!!sub&&sub.parentId===catId&&(role!=='expense'&&role!=='income'||sub.role==='both'||sub.role===role));
  };
  for(const op of graph.operations){
-  const fact=effective(op),amount=parsePersistedMinor(fact.amountMinor),parts=graph.components.filter(c=>c.transactionId===op.id);
+  const fact=effective(op),amount=parsePersistedMinor(fact.amountMinor),parts=components.get(op.id)??[];
   reasons.set(op.id,new Set(op.reviewReasons));
   if(!accounts.has(fact.accountId))throw new TypeError('MISSING_ACCOUNT');
   let base:Node[];
@@ -129,7 +131,7 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
    if(!p.included)excluded+=abs(amount);
   }
   if(op.semantics.kind.value==='refund'&&output.some(p=>p.role==='unresolved'))addReason(op.id,'unlinked_refund');
-  if(op.semantics.kind.value==='credit_card_repayment'&&!graph.operations.some(p=>accounts.get(effective(p).accountId)?.type==='credit_card'&&p.semantics.kind.value==='purchase'))addReason(op.id,'incomplete_credit_data');
+  if(op.semantics.kind.value==='credit_card_repayment'&&!hasCreditPurchase)addReason(op.id,'incomplete_credit_data');
   if(['transfer_in','transfer_out'].includes(op.semantics.kind.value)&&output.some(p=>p.role==='unresolved'))addReason(op.id,'unresolved_transfer');
   assertComponentSum(parsePersistedMinor(fact.amountMinor),output.map(p=>parsePersistedMinor(p.amountMinor)));
   const roles=[...new Set(output.map(p=>p.role))];

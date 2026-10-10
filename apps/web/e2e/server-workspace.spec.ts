@@ -5,6 +5,7 @@ import type {Page} from '@playwright/test';
 import {createServer} from 'vite';
 import type {ViteDevServer} from 'vite';
 import {fileURLToPath} from 'node:url';
+import {queryOperations,parseOperationsQuery} from '../../../packages/finance-core/src/operations';
 import {aggregate} from '../../../packages/finance-core/src/graph';
 import type {Filter} from '../../../packages/finance-core/src/graph';
 import {syntheticDetail,syntheticPreview} from '../test/synthetic-finance';
@@ -18,6 +19,9 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  else if(path==='/access/tariffs')result={tariffs:[]};else if(path.startsWith('/access/')){result={code:'NOT_FOUND'};status=404;}
  else if(blocked&&path.startsWith('/finance/')){result={code:'FINANCE_ACCESS_REQUIRED'};status=403;}
  else if(path==='/finance/summary'){if(duringInitialLoad){summaryWaiting=true;await summaryGate;}result={...state,summary:aggregate(state.operations,body as Filter)};}
+ else if(path==='/finance/operations-views')result={views:[]};
+ else if(path==='/finance/operations-page'){const q=parseOperationsQuery(body.query??{}),r=queryOperations(state.operations,state,q),offset=Number(body.cursor?.offset??0),limit=Number(body.limit??50);result={...r,operations:r.operations.slice(offset,offset+limit),generation:state.generation,revision:state.revision,workspaceTotal:state.operations.length,offset,nextCursor:offset+limit<r.total?{generation:state.generation,revision:state.revision,queryHash:'synthetic',offset:offset+limit}:null};}
+ else if(path==='/finance/operations-selection'){const r=queryOperations(state.operations,state,parseOperationsQuery(body.query??{}));result={operationIds:r.operations.map(o=>o.id),reviewIds:r.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),operations:state.operations.filter(o=>body.ids?.includes(o.id)),generation:state.generation,revision:state.revision};}
  else if(path==='/finance/state')result=state;
  else if(path==='/finance/imports')result={batches:[],nextCursor:null};
  else if(path==='/finance/operation')result={...detail,revision:state.revision};
@@ -108,7 +112,7 @@ test('duplicate merge requires manual choices, permits declining, and retries th
 test('a late duplicate comparison response cannot restore data after access is lost',async({page})=>{
  const h=await setup(page),pair={id:crypto.randomUUID(),leftId:h.detail.id,rightId:crypto.randomUUID()};h.state.duplicateCandidates=[pair];let release!:()=>void,started!:()=>void;const gate=new Promise<void>(r=>{release=r;}),seen=new Promise<void>(r=>{started=r;});
  await page.route('http://127.0.0.1:3000/finance/operation',async route=>{if(route.request().method()==='OPTIONS'){await route.fallback();return;}started();await gate;try{await route.fulfill({headers:{'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true'},contentType:'application/json',body:JSON.stringify(h.detail)});}catch{}});
- await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await page.getByRole('button',{name:'Это одна операция',exact:true}).click();await seen;h.block();await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await expect(page.getByText('Доступ ограничен. Аккаунт, безопасность и поддержка остаются доступны.')).toBeVisible();release();await expect(page.getByRole('region',{name:'Выбор данных для объединения'})).toHaveCount(0);await expect(page.getByRole('navigation',{name:'Разделы сайта'})).toHaveCount(0);
+ await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await page.getByRole('button',{name:'Это одна операция',exact:true}).click();await seen;const delivered=Promise.all([pair.leftId,pair.rightId].map(id=>page.waitForResponse(r=>r.url().endsWith('/finance/operation')&&r.request().method()==='POST'&&r.request().postDataJSON().id===id)));h.block();try{await expect(page.getByText('Доступ ограничен. Аккаунт, безопасность и поддержка остаются доступны.')).toBeVisible({timeout:10000});}finally{release();}await delivered;await page.evaluate(()=>new Promise<void>(resolve=>requestAnimationFrame(()=>requestAnimationFrame(()=>resolve()))));await expect(page.getByRole('region',{name:'Выбор данных для объединения'})).toHaveCount(0);await expect(page.getByRole('navigation',{name:'Разделы сайта'})).toHaveCount(0);
 });
 
 test('component editor keeps signed cents, validates the sum and waits for explicit preview confirmation',async({page})=>{
@@ -180,4 +184,25 @@ test('an interface epoch changed on another device resets stored appearance on t
 
 test('local CSV XLSX OCR upload dialog remains readable on desktop and mobile',async({page},testInfo)=>{
  await setup(page);await page.getByRole('button',{name:'Загрузить файлы',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Загрузка выписок'});await expect(dialog.getByLabel('Файлы выписок')).toHaveAttribute('accept','.pdf,.csv,.xlsx');await expect(dialog).toContainText('PDF, CSV или XLSX');await expect(dialog).toContainText('Файл и пароль остаются на устройстве');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);await dialog.screenshot({path:testInfo.outputPath('local-import-preview.png')});
+});
+
+
+test('changing shared dates preserves Operations settings, hides stale totals, and manual all-history overrides a dynamic period',async({page})=>{
+ await setup(page);await page.getByRole('link',{name:'Операции',exact:true}).click();
+ const region=page.getByRole('region',{name:'Проверка и выбор операций'}),list=page.getByRole('list',{name:'Сохранённые операции'});
+ await expect(list.getByRole('listitem')).toHaveCount(1);await page.getByLabel('Поиск сохранённых операций').fill('Synthetic shop');await page.getByLabel('Плотность операций').selectOption('compact');
+ let release!:()=>void,started!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;}),begin=new Promise<void>(resolve=>{started=resolve;});
+ await page.route('http://127.0.0.1:3000/finance/operations-page',async route=>{if(route.request().method()==='POST'&&route.request().postDataJSON().query.filter.from==='2099-01-01'){started();await gate;}await route.fallback();});
+ await page.getByLabel('С даты',{exact:true}).fill('2099-01-01');await begin;
+ try{await expect(page.getByLabel('Поиск сохранённых операций')).toHaveValue('Synthetic shop');await expect(page.getByLabel('Плотность операций')).toHaveValue('compact');await expect(region.getByText(/^Расходы:/)).toHaveCount(0);await expect(list).toHaveCount(0);await expect(page.getByRole('button',{name:'Выбрать все найденные',exact:true})).toBeDisabled();}finally{release();}
+ await expect(page.getByRole('heading',{name:'Нет операций по выбранным фильтрам'})).toBeVisible();await page.getByRole('button',{name:'За всю историю',exact:true}).click();await expect(list.getByRole('listitem')).toHaveCount(1);
+ await page.clock.setFixedTime(new Date('2026-10-10T12:00:00Z'));await page.getByLabel('Период представления').selectOption('last_30_days');await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('2026-09-11');await expect(page.getByRole('heading',{name:'Нет операций по выбранным фильтрам'})).toBeVisible();await page.getByRole('button',{name:'За всю историю',exact:true}).click();await expect(page.getByLabel('Период представления')).toHaveValue('all');await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('');await expect(list.getByRole('listitem')).toHaveCount(1);await expect(page.getByLabel('Поиск сохранённых операций')).toHaveValue('Synthetic shop');
+});
+
+
+test('a delayed default view cannot overwrite a search already entered in Operations',async({page})=>{
+ await setup(page);let release!:()=>void,started!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;}),begin=new Promise<void>(resolve=>{started=resolve;});
+ await page.route('http://127.0.0.1:3000/finance/operations-views',async route=>{if(route.request().method()==='OPTIONS')return route.fallback();started();await gate;await route.fulfill({headers:{'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true'},json:{views:[{id:crypto.randomUUID(),name:'Synthetic delayed default',isDefault:true,dependencyStatus:'ready',revision:'1',position:0,modifiedAt:'2026-10-10T12:00:00Z',definition:{filter:{search:'Never matching synthetic'},period:'all',columns:['merchant','amount'],widths:{},sort:'date',direction:'desc',group:'none',density:'compact'}}]}});});
+ await page.getByRole('link',{name:'Операции',exact:true}).click();await begin;await page.getByLabel('Поиск сохранённых операций').fill('Synthetic shop');await expect(page.getByRole('list',{name:'Сохранённые операции'}).getByRole('listitem')).toHaveCount(1);
+ const response=page.waitForResponse(r=>r.url().endsWith('/finance/operations-views')&&r.request().method()==='POST');release();await response;await expect(page.getByLabel('Представление операций')).toContainText('Synthetic delayed default');await expect(page.getByLabel('Поиск сохранённых операций')).toHaveValue('Synthetic shop');await expect(page.getByLabel('Представление операций')).toHaveValue('');await expect(page.getByRole('list',{name:'Сохранённые операции'}).getByRole('listitem')).toHaveCount(1);
 });

@@ -1,3 +1,5 @@
+import {parseViewIntent,applyViewIntent,repairOperationsViews} from './operations.ts';
+import type {ViewIntent} from './operations.ts';
 import {parseRuleIntent,applyRuleIntent} from './finance-rules.ts';
 import type {RuleIntent} from './finance-rules.ts';
 import {randomUUID} from 'node:crypto';
@@ -60,33 +62,35 @@ export async function prepareFinance(db:PoolClient,userId:string){
  return (await db.query('SELECT * FROM finance.workspace WHERE user_id=$1 FOR UPDATE',[userId])).rows[0] as {generation:string;revision:string;loan_mode:'cashflow'|'economic';key_version:string;interface_epoch:string;config_revision:string};
 }
 export async function loadFinance(db:PoolClient,userId:string){
- const count=(await db.query('SELECT count(*) AS n FROM finance.transaction WHERE user_id=$1',[userId])).rows[0].n;
- if(BigInt(count)>10000n)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
  const orm=drizzle(db),a=await orm.select().from(tables.accounts).where(eq(tables.accounts.userId,userId)).orderBy(tables.accounts.id),c=await orm.select().from(tables.categories).where(eq(tables.categories.userId,userId)).orderBy(tables.categories.id),t=await orm.select().from(tables.transactions).where(eq(tables.transactions.userId,userId)).orderBy(tables.transactions.id),o=await orm.select().from(tables.observations).where(eq(tables.observations.userId,userId)).orderBy(tables.observations.id),p=await orm.select().from(tables.components).where(eq(tables.components.userId,userId)).orderBy(tables.components.id),l=await orm.select().from(tables.links).where(eq(tables.links.userId,userId)).orderBy(tables.links.id);
  const sourceMap=(await db.query<{observationId:string;transactionId:string;originalAccountId:string;assignedAccountId:string}>(`SELECT b.observation_id AS "observationId",finance.canonical_operation(o.user_id,o.transaction_id) AS "transactionId",o.account_id AS "originalAccountId",b.account_id AS "assignedAccountId" FROM finance.observation_account b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
  const assignments=new Map(sourceMap.map(r=>[r.observationId,r.assignedAccountId])),observations=new Map(o.map(r=>[r.id,r])),state=(await db.query('SELECT generation,revision,loan_mode,key_version,interface_epoch FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
  const evidence=await sourceEvidence(db,userId),evidenceByOperation=new Map<string,typeof evidence>();
  for(const row of evidence){const own=evidenceByOperation.get(row.transaction_id)??[];own.push(row);evidenceByOperation.set(row.transaction_id,own);}
+ const transactionById=new Map(t.map(r=>[r.id,r]));
  const graph:Graph={accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
   const source=observations.get(r.sourceObservationId!);if(!source)throw new TypeError('SOURCE_MISSING');
   const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
   const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,corrections:r.corrections,semantics:r.semantics,comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
- }),components:p.filter(r=>r.active&&t.some(o=>o.id===r.transactionId&&!o.mergedIntoId)).map(({userId,active,...r})=>({...r,amountMinor:r.amountMinor.toString()})),links:l.map(({userId,revision,...r})=>({...r,amountMinor:r.amountMinor.toString()})),loanMode:state.loan_mode};
- return {graph,state,sourceMap,categoryOperations:t.map(r=>({id:r.id,role:r.semantics.role.value,categoryId:r.semantics.category.value,subcategoryId:r.semantics.subcategory.value,merchant:r.semantics.merchant.value,retired:!!r.mergedIntoId})),categoryComponents:p.map(c=>({id:c.id,transactionId:c.transactionId,role:c.role.value,categoryId:c.category.value,subcategoryId:c.subcategory.value,retired:!c.active||!!t.find(o=>o.id===c.transactionId)?.mergedIntoId})),aliases:(await db.query('SELECT id,account_id AS "accountId",alias_type AS type FROM finance.account_alias WHERE user_id=$1 ORDER BY id',[userId])).rows as {id:string;accountId:string;type:string}[],parties:(await orm.select().from(tables.counterparties).where(eq(tables.counterparties.userId,userId)).orderBy(tables.counterparties.id)).map(({userId,revision,...r})=>({...r,revision:revision.toString()})),rules:(await db.query('SELECT id,name,enabled,priority,conditions,assignments,revision,dependency_status AS "dependencyStatus" FROM finance.rule WHERE user_id=$1 ORDER BY id',[userId])).rows as (Rule&{revision:string;dependencyStatus:string})[]};
+ }),components:p.filter(r=>r.active&&!!transactionById.get(r.transactionId)&&!transactionById.get(r.transactionId)!.mergedIntoId).map(({userId,active,...r})=>({...r,amountMinor:r.amountMinor.toString()})),links:l.map(({userId,revision,...r})=>({...r,amountMinor:r.amountMinor.toString()})),loanMode:state.loan_mode};
+ return {graph,state,sourceMap,categoryOperations:t.map(r=>({id:r.id,role:r.semantics.role.value,categoryId:r.semantics.category.value,subcategoryId:r.semantics.subcategory.value,merchant:r.semantics.merchant.value,retired:!!r.mergedIntoId})),categoryComponents:p.map(c=>({id:c.id,transactionId:c.transactionId,role:c.role.value,categoryId:c.category.value,subcategoryId:c.subcategory.value,retired:!c.active||!!transactionById.get(c.transactionId)?.mergedIntoId})),aliases:(await db.query('SELECT id,account_id AS "accountId",alias_type AS type FROM finance.account_alias WHERE user_id=$1 ORDER BY id',[userId])).rows as {id:string;accountId:string;type:string}[],parties:(await orm.select().from(tables.counterparties).where(eq(tables.counterparties.userId,userId)).orderBy(tables.counterparties.id)).map(({userId,revision,...r})=>({...r,revision:revision.toString()})),rules:(await db.query('SELECT id,name,enabled,priority,conditions,assignments,revision,dependency_status AS "dependencyStatus" FROM finance.rule WHERE user_id=$1 ORDER BY id',[userId])).rows as (Rule&{revision:string;dependencyStatus:string})[]};
 }
-export async function financeView(db:PoolClient,userId:string,filter:Filter={}){
+export async function financeView(db:PoolClient,userId:string,filter:Filter={},compact=false){
  const {graph,state,parties,rules,sourceMap,aliases,categoryOperations,categoryComponents}=await loadFinance(db,userId),projection=reconcile(graph);
+ const operationsById=new Map(graph.operations.map(o=>[o.id,o]));
  const counterpartySources=(await db.query('SELECT b.observation_id AS "observationId",finance.canonical_operation(o.user_id,o.transaction_id) AS "transactionId",b.counterparty_id AS "counterpartyId",b.alias_id AS "aliasId" FROM finance.observation_counterparty b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id',[userId])).rows;
  const counterpartyAliases=(await db.query('SELECT id,counterparty_id AS "counterpartyId",alias_type AS type FROM finance.counterparty_alias WHERE user_id=$1 ORDER BY id',[userId])).rows;
  const tombstones=(await db.query('SELECT id,merged_into_id AS "canonicalId" FROM finance.transaction WHERE user_id=$1 AND merged_into_id IS NOT NULL ORDER BY id',[userId])).rows;
+ const summary=aggregate(projection.operations,filter);
  const duplicateCandidates=(await db.query("SELECT id,left_id AS \"leftId\",right_id AS \"rightId\" FROM finance.duplicate_candidate WHERE user_id=$1 AND status='candidate' ORDER BY id",[userId])).rows;
- return {operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:sourceMap,accountAliases:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources,counterpartyAliases,categoryOperations,categoryComponents,rules,operations:projection.operations.map(p=>{const o=graph.operations.find(o=>o.id===p.id)!;return {...p,classification:o.semantics,comment:o.comment,description:o.source.description,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:aggregate(projection.operations,filter)};
+ return {operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:o.corrections.postedDate??o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
 }
 export function parseFilter(value:unknown):Filter{
- const r=object(value,['from','through','accountIds','categoryIds','includeExcluded']),f:Filter={};
+ const r=object(value,['from','through','accountIds','categoryIds','includeExcluded','compact']),f:Filter={};
  for(const k of ['from','through']as const)if(k in r){const date=dateFact({precision:'day',date:r[k]});f[k]=(date as {date:string}).date;}
  if(f.from&&f.through&&f.from>f.through)throw new TypeError('INVALID_RANGE');
  for(const k of ['accountIds','categoryIds']as const)if(k in r){if(!Array.isArray(r[k])||r[k].length>100)throw new TypeError('INVALID_FILTER');f[k]=(r[k]as unknown[]).map(uuid);}
+ if('compact'in r)bool(r.compact);
  if('includeExcluded'in r)f.includeExcluded=bool(r.includeExcluded);return f;
 }
 export async function operationView(db:PoolClient,userId:string,id:unknown){
@@ -97,10 +101,10 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {bankRefHmac,...source}=op.source;return {...op,source,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type Intent=RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type Intent=ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&!Array.isArray(value)){
-  const k=(value as Record<string,unknown>).kind;if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
+  const k=(value as Record<string,unknown>).kind;if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
   if(k==='merge_duplicate')return parseMergeDuplicate(value);
   if(k==='duplicate_different'){const r=object(value,['kind','id']);return {kind:k,id:uuid(r.id)};}
  }
@@ -154,6 +158,7 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
  if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
  if(intent.kind==='bulk_operations'){
   if(intent.reviewScope)await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations);
@@ -279,7 +284,7 @@ export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  if(r.intent&&typeof r.intent==='object'&&(r.intent as {kind?:unknown}).kind==='reset_financial')return previewReset(db,userId,id,r.intent,state,existing);
  if(existing)return {status:'previewed',actionId:id,intent:existing.intent.canonical,impact:existing.preview};
  const intent=parseIntent(r.intent),before=await financeView(db,userId),historyBefore=await captureHistory(db,userId);let changes:ReturnType<typeof impact>,journal:Change[];
- await db.query('SAVEPOINT finance_preview');try{const undo=await apply(db,userId,intent,state.revision,id);journal=historyDelta(historyBefore,await captureHistory(db,userId));changes=impact(before,await financeView(db,userId),undo,journal);}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
+ await db.query('SAVEPOINT finance_preview');try{const undo=await apply(db,userId,intent,state.revision,id);await repairOperationsViews(db,userId,intent);journal=historyDelta(historyBefore,await captureHistory(db,userId));changes=impact(before,await financeView(db,userId),undo,journal);}finally{await db.query('ROLLBACK TO SAVEPOINT finance_preview');await db.query('RELEASE SAVEPOINT finance_preview');}
  await db.query('INSERT INTO finance.action(user_id,id,generation,expected_revision,intent,preview,change_set) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,generation,expected,JSON.stringify({request:r.intent,canonical:intent}),JSON.stringify(changes),JSON.stringify(journal)]);
  return {status:'previewed',actionId:id,intent,impact:changes};
 }
@@ -291,6 +296,7 @@ export async function commitFinance(db:PoolClient,userId:string,input:unknown,se
  const before=await financeView(db,userId),historyBefore=await captureHistory(db,userId),undo=await apply(db,userId,action.intent.canonical,state.revision,id);
  if(undo.table==='history'&&(undo.details.conflicts as unknown[]).length)throw new HttpError(409,'ROLLBACK_CONFLICT');
  if(undo.table==='batch'&&undo.details.kind==='merge_duplicate'&&(undo.details.conflicts as unknown[]).length)throw new HttpError(409,'MERGE_CONFLICT');
+ await repairOperationsViews(db,userId,action.intent.canonical);
  const journal=historyDelta(historyBefore,await captureHistory(db,userId)),actual=impact(before,await financeView(db,userId),undo,journal);
  if(stable(actual)!==stable(action.preview)||stable(journal)!==stable(action.change_set))throw new HttpError(409,'DEPENDENCIES_CHANGED');
  const next=(await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1 RETURNING generation,revision',[userId])).rows[0];
