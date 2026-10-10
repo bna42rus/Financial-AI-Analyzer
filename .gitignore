@@ -13,3 +13,4 @@ coverage/
 artifacts/
 playwright-report/
 test-results/
+apps/web/public/ocr-v1/

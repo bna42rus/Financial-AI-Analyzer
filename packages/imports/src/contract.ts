@@ -1,4 +1,5 @@
-import {parseSafeSource,sourceSanitizer,sourceProfiles} from './safe-source.ts';
+import {localBankAdapter,localParserVersions} from './bank-table.ts';
+import {parseSafeSource,sourceSanitizer,localSourceSanitizer,sourceProfiles} from './safe-source.ts';
 import type {SafeSource} from './safe-source.ts';
 import {dateFact,object,uuid} from '../../finance-core/src/model.ts';
 import type {BankDate} from '../../finance-core/src/model.ts';
@@ -6,7 +7,7 @@ import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 
 /** A deliberately text-free first preparation profile, not a bank parser. */
 export const versions=Object.freeze({pipeline:'local-prepare/1',normalizer:'strict-source/1',sanitizer:'text-free/1',hmac:'namespaced-hmac/1',adapter:'source-adapter/1'} as const);
-export const adapterVersions=['source-adapter/1','bank-pdf/1','bank-pdf/2'] as const;
+export const adapterVersions=['source-adapter/1','bank-pdf/1','bank-pdf/2',localBankAdapter] as const;
 export type ProcessingVersions=Omit<typeof versions,'adapter'|'sanitizer'>&{adapter:typeof adapterVersions[number];sanitizer:typeof versions.sanitizer|typeof sourceProfiles[number]};
 export const banks=['tbank','ozon','sber','other'] as const;
 export type Bank=typeof banks[number];
@@ -16,7 +17,7 @@ export const issueCodes=['INVALID_DATE','INVALID_AMOUNT','INVALID_CURRENCY','INV
 export type IssueCode=typeof issueCodes[number];
 export type RowIssue={ordinal:number;code:IssueCode};
 export type Context={contextId:string;generation:string;keyVersion:string};
-export type PreparedRow={ordinal:number;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:'RUB';direction:'debit'|'credit'|'unknown';account:{kind:AliasKind;hmac:string};bankRefHmac:string|null;safeSource?:SafeSource|null;descriptionHmac?:string|null};
+export type PreparedRow={ordinal:number;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:'RUB';direction:'debit'|'credit'|'unknown';account:{kind:AliasKind;hmac:string};bankRefHmac:string|null;safeSource?:SafeSource|null;descriptionHmac?:string|null;parser?:typeof localParserVersions[number]};
 export type PreparedFile={fileId:string;fileHmac:string;bank:Bank;rowsFound:number;status:'prepared'|'blocked';error:'LOCAL_READ_FAILED'|null;rows:PreparedRow[];issues:RowIssue[]};
 export type PreparedBatch={schemaVersion:1;versions:ProcessingVersions;context:Context;batchId:string;files:PreparedFile[]};
 // Development contract guards; these do not promise supported bank file/device limits.
@@ -31,9 +32,9 @@ export function parseContext(value:unknown):Context{const r=closed(value,['conte
 class InvalidRow extends Error {readonly code:IssueCode;constructor(code:IssueCode){super(code);this.code=code;}}
 function rowDate(value:unknown){try{return dateFact(value);}catch{throw new InvalidRow('INVALID_DATE');}}
 function rowAmount(value:unknown):string{try{if(typeof value!=='string'||value.length>20)throw new Error();parsePersistedMinor(value);return value;}catch{throw new InvalidRow('INVALID_AMOUNT');}}
-function parseRow(value:unknown,profile:ProcessingVersions['sanitizer']):PreparedRow{
- const structured=profile!=='text-free/1',identity=profile===sourceSanitizer;
- const r=allowed(value,['ordinal','operationDate','postedDate','amountMinor','currency','direction','account','bankRefHmac',...(structured?['safeSource']:[]),...(identity?['descriptionHmac']:[])]);
+function parseRow(value:unknown,profile:ProcessingVersions['sanitizer'],local=false):PreparedRow{
+ const structured=profile!=='text-free/1',identity=profile===sourceSanitizer||profile===localSourceSanitizer;
+ const r=allowed(value,['ordinal','operationDate','postedDate','amountMinor','currency','direction','account','bankRefHmac',...(structured?['safeSource']:[]),...(identity?['descriptionHmac']:[]),...(local?['parser']:[])]);
  const ordinal=count(r.ordinal,1),operationDate=rowDate(r.operationDate),postedDate=r.postedDate===null||r.postedDate===undefined?null:rowDate(r.postedDate),amountMinor=rowAmount(r.amountMinor);
  if(!r.account||typeof r.account!=='object'||Array.isArray(r.account))throw new InvalidRow('INVALID_ACCOUNT');
  const account=allowed(r.account,['kind','hmac']);
@@ -42,14 +43,16 @@ function parseRow(value:unknown,profile:ProcessingVersions['sanitizer']):Prepare
  if(!hmacValue(account.hmac)||r.bankRefHmac!==null&&r.bankRefHmac!==undefined&&!hmacValue(r.bankRefHmac))throw new InvalidRow('INVALID_PSEUDONYM');
  if(!['debit','credit','unknown'].includes(r.direction as string)||r.direction==='debit'&&BigInt(amountMinor)>=0n||r.direction==='credit'&&BigInt(amountMinor)<=0n)throw new InvalidRow('INVALID_DIRECTION');
  let safeSource:SafeSource|null=null;if(structured){try{safeSource=parseSafeSource(r.safeSource,amountMinor,profile as typeof sourceProfiles[number]);}catch{throw new ImportContractError();}}
- return {ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:r.direction as PreparedRow['direction'],account:{kind:account.kind as AliasKind,hmac:account.hmac},bankRefHmac:(r.bankRefHmac??null) as string|null,...(structured?{safeSource}:{}),...(identity?{descriptionHmac:r.descriptionHmac as string|null}:{})};
+ return {ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:r.direction as PreparedRow['direction'],account:{kind:account.kind as AliasKind,hmac:account.hmac},bankRefHmac:(r.bankRefHmac??null) as string|null,...(structured?{safeSource}:{}),...(identity?{descriptionHmac:r.descriptionHmac as string|null}:{}),...(local?{parser:r.parser as PreparedRow['parser']}:{})};
 }
 
 /** The server independently validates; invalid facts become technical issues, never zero/date guesses. */
 export function validatePreparedBatch(input:unknown){
  const r=closed(input,['schemaVersion','versions','context','batchId','files']),v=closed(r.versions,Object.keys(versions));
  if(r.schemaVersion!==1||Object.entries(versions).some(([k,value])=>k==='adapter'?!adapterVersions.includes(v[k] as ProcessingVersions['adapter']):k==='sanitizer'?![versions.sanitizer,...sourceProfiles].includes(v[k] as ProcessingVersions['sanitizer']):v[k]!==value))throw new ImportContractError();
- const structured=v.sanitizer!=='text-free/1',identity=v.sanitizer===sourceSanitizer;if(structured&&v.adapter!==(identity?'bank-pdf/2':'bank-pdf/1'))throw new ImportContractError();
+ const structured=v.sanitizer!=='text-free/1',identity=v.sanitizer===sourceSanitizer||v.sanitizer===localSourceSanitizer;if(structured&&!(v.sanitizer===localSourceSanitizer?v.adapter===localBankAdapter:identity?v.adapter==='bank-pdf/2':v.adapter==='bank-pdf/1'))throw new ImportContractError();
+ const local=v.adapter===localBankAdapter;
+ if(local&&!identity)throw new ImportContractError();
  const context=parseContext(r.context),batchId=id(r.batchId);
  if(!Array.isArray(r.files)||r.files.length<1||r.files.length>MAX_FILES)throw new ImportContractError();
  const fileIds=new Set<string>();let totalRows=0;
@@ -67,15 +70,16 @@ export function validatePreparedBatch(input:unknown){
   for(const value of f.issues){const i=closed(value,['ordinal','code']);if(!issueCodes.includes(i.code as IssueCode))throw new ImportContractError();issues.push({ordinal:ordinal(i.ordinal),code:i.code as IssueCode});}
   for(const value of f.rows){
    // Inspect field names even on an invalid row: never silently ignore a raw identifier/text field.
-   const item=allowed(value,['ordinal','operationDate','postedDate','amountMinor','currency','direction','account','bankRefHmac',...(structured?['safeSource']:[]),...(identity?['descriptionHmac']:[])]),n=ordinal(item.ordinal);
+   const item=allowed(value,['ordinal','operationDate','postedDate','amountMinor','currency','direction','account','bankRefHmac',...(structured?['safeSource']:[]),...(identity?['descriptionHmac']:[]),...(local?['parser']:[])]),n=ordinal(item.ordinal);
    if(item.account&&typeof item.account==='object'&&!Array.isArray(item.account))allowed(item.account,['kind','hmac']);
    // Nested date fields also have a closed schema, including rows with a different invalid fact.
    for(const d of [item.operationDate,item.postedDate])if(d!==null&&typeof d==='object'&&!Array.isArray(d)){
     const date=d as Record<string,unknown>;if(Object.keys(date).some(k=>!['precision','date','instant'].includes(k)))throw new ImportContractError();
    }
    if(structured){try{parseSafeSource(item.safeSource,undefined,v.sanitizer as typeof sourceProfiles[number]);}catch{throw new ImportContractError();}}
+   if(local&&(!localParserVersions.includes(item.parser as typeof localParserVersions[number])||!(item.parser as string).startsWith(f.bank+'-')||(item.parser as string).includes('-ocr/')&&(item.safeSource!==null||item.descriptionHmac!==null||item.bankRefHmac!==null)))throw new ImportContractError();
    if(identity&&(!Object.hasOwn(item,'descriptionHmac')||item.descriptionHmac!==null&&!hmacValue(item.descriptionHmac)))throw new ImportContractError();
-   try{rows.push(parseRow(item,v.sanitizer as ProcessingVersions['sanitizer']));}catch(error){if(!(error instanceof InvalidRow))throw error;issues.push({ordinal:n,code:error.code});}
+   try{rows.push(parseRow(item,v.sanitizer as ProcessingVersions['sanitizer'],local));}catch(error){if(!(error instanceof InvalidRow))throw error;issues.push({ordinal:n,code:error.code});}
   }
   rows.sort((a,b)=>a.ordinal-b.ordinal);issues.sort((a,b)=>a.ordinal-b.ordinal);
   return {fileId,fileHmac:f.fileHmac,bank:f.bank as Bank,rowsFound,status:'prepared' as const,error:null,rows,issues};

@@ -1,4 +1,5 @@
-import {parseSafeSource,sourceSanitizer,sourceProfiles,normalizeSourceDescription} from './safe-source.ts';
+import {localBankAdapter} from './bank-table.ts';
+import {parseSafeSource,sourceSanitizer,localSourceSanitizer,sourceProfiles,normalizeSourceDescription} from './safe-source.ts';
 import {dateFact,uuid} from '../../finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 import {aliasKinds,banks,MAX_FILES,MAX_ROWS,parseContext,validatePreparedBatch,versions} from './contract.ts';
@@ -30,7 +31,7 @@ function bytesFromKey(input:unknown){
 const encoder=new TextEncoder();
 /** Browser WebCrypto only. No network, storage, telemetry, AI or raw-file upload dependency. */
 export async function createLocalPreparation(input:LocalContext,signal?:AbortSignal,adapter:ProcessingVersions['adapter']='source-adapter/1',sanitizer:ProcessingVersions['sanitizer']='text-free/1'){
- if(!['text-free/1',...sourceProfiles].includes(sanitizer)||sanitizer!=='text-free/1'&&adapter!==(sanitizer===sourceSanitizer?'bank-pdf/2':'bank-pdf/1'))throw new LocalPreparationError('INVALID_SANITIZER');
+ if(!['text-free/1',...sourceProfiles].includes(sanitizer)||sanitizer!=='text-free/1'&&!(sanitizer===localSourceSanitizer?adapter===localBankAdapter:sanitizer===sourceSanitizer?adapter==='bank-pdf/2':adapter==='bank-pdf/1'))throw new LocalPreparationError('INVALID_SANITIZER');
  if(!adapterVersions.includes(adapter))throw new LocalPreparationError('INVALID_ADAPTER');
  if(signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');
  if(!globalThis.crypto?.subtle)throw new LocalPreparationError('LOCAL_CRYPTO_UNAVAILABLE');
@@ -66,9 +67,9 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
      const amountMinor=row.amountMinor as string,direction=row.direction;
      if(!['debit','credit','unknown'].includes(direction as string)||direction==='debit'&&BigInt(amountMinor)>=0n||direction==='credit'&&BigInt(amountMinor)<=0n)throw new RowFailure('INVALID_DIRECTION');
      const account={kind:row.account.kind,hmac:await identifier(file.bank,row.account.kind,row.account.value)},bankRefHmac=row.bankReference===null||row.bankReference===undefined?null:await identifier(file.bank,'bank_reference',row.bankReference);
-     const description=sanitizer===sourceSanitizer?normalizeSourceDescription(row.localDescription):null;
+     const description=(sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer)?normalizeSourceDescription(row.localDescription):null;
      const descriptionHmac=description===null?null:await sign(encoder.encode(JSON.stringify(['source-description/1',file.bank,row.account.kind,account.hmac,description])));
-     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(sanitizer!=='text-free/1'?{safeSource:parseSafeSource(row.safeSource??null,amountMinor,sanitizer)}:{}),...(sanitizer===sourceSanitizer?{descriptionHmac}:{})});
+     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(sanitizer!=='text-free/1'?{safeSource:parseSafeSource(row.safeSource??null,amountMinor,sanitizer)}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer)?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
     }catch(error){if(!(error instanceof RowFailure))throw error;result.issues.push({ordinal,code:error.code});}
    }
    prepared.push(result);

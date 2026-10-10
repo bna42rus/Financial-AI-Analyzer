@@ -11,7 +11,7 @@ export type PdfLayout=TextItem[][];
 export const bankPdfAdapter='bank-pdf/2' as const;
 export const legacyPdfParserVersions={tbank:'tbank-movement-pdf/1',ozon:'ozon-movement-pdf/1',sber:'sber-card-pdf/1'} as const;
 export const pdfParserVersions={tbank:'tbank-movement-pdf/2',ozon:'ozon-movement-pdf/2',sber:'sber-card-pdf/2'} as const;
-export type PdfFailure='UNKNOWN_FORMAT'|'AMBIGUOUS_FORMAT'|'UNSUPPORTED_LAYOUT'|'LOCAL_LIMIT'|'LOCAL_READ_FAILED'|'PASSWORD_REQUIRED'|'WRONG_PASSWORD'|'OCR_REQUIRED'|'PREPARATION_CLOSED';
+export type PdfFailure='UNKNOWN_FORMAT'|'AMBIGUOUS_FORMAT'|'UNSUPPORTED_LAYOUT'|'LOCAL_LIMIT'|'LOCAL_READ_FAILED'|'PASSWORD_REQUIRED'|'WRONG_PASSWORD'|'OCR_REQUIRED'|'OCR_UNCERTAIN'|'PREPARATION_CLOSED';
 export class BankPdfError extends Error {readonly code:PdfFailure;constructor(code:PdfFailure){super(code);this.code=code;}}
 export const MAX_PDF_BYTES=20*1024*1024,MAX_PDF_PAGES=100,MAX_PDF_ITEMS=100000,MAX_PDF_TEXT=2000000;
 const norm=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();

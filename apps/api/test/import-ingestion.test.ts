@@ -11,6 +11,8 @@ import {createLocalPreparation} from '../../../packages/imports/src/local.ts';
 import type {ExtractedRow,LocalContext} from '../../../packages/imports/src/local.ts';
 import type {PreparedBatch} from '../../../packages/imports/src/contract.ts';
 import {sourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
+import {localSourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
+import {localBankAdapter,parseBankTable,csvTable} from '../../../packages/imports/src/bank-table.ts';
 import {parseBankPdf,pdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
 import {syntheticLayout} from '../../../packages/imports/test/synthetic-layout.ts';
 import type {Config} from '../src/types.ts';
@@ -38,6 +40,24 @@ async function safeBatch(rows=[row({safeSource:{event:'purchase',merchant:'ozon'
 async function actionEpoch(){const e=(await request('/finance/epoch')).json();return {generation:e.generation,revision:e.revision};}
 async function importedOperation(){const id=(await pg.owner.query('SELECT id FROM finance.transaction')).rows[0].id;const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
 async function detail(id:string){const r=await request('/finance/operation',{id});assert.equal(r.statusCode,200,r.body);return r.json();}
+test('mixed local table contract persists parser and finite cash/transfer facts, isolates bad rows and cascades cancellation',async()=>{
+ const csv='Банк;Т-Банк\nНомер счета;'+account+'\nДата операции;Сумма операции;Валюта;Описание\n2026-09-01;-10.01;RUB;Снятие наличных Private ATM\n2026-09-02;20.00;RUB;Внесение наличных Private ATM\n2026-09-03;1.00;RUB;Кешбэк Private\n2026-09-04;2.00;RUB;Входящий перевод Private Person\n2026-09-05;-3.00;RUB;Исходящий перевод Private Person\n30.02.2026;-1.00;RUB;Покупка OZON Private';
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,localSourceSanitizer);let batch:PreparedBatch;
+ try{batch=await local.prepare(randomUUID(),[parseBankTable(randomUUID(),new TextEncoder().encode(csv),csvTable(csv))]);}finally{local.dispose();}
+ await accept(batch);const report=await drain(batch.batchId);assert.equal(report.counts.created,5);assert.equal(report.counts.notImported,1);assert.equal(report.status,'partial');
+ const state=(await request('/finance/state')).json(),ops=state.operations;assert.equal(ops.find((o:any)=>o.classification.kind.value==='cash_withdrawal').analyticsRole,'neutral');assert.equal(ops.find((o:any)=>o.classification.kind.value==='cash_deposit').analyticsRole,'neutral');assert.equal(ops.find((o:any)=>o.classification.kind.value==='cashback').analyticsRole,'income');assert.equal(ops.filter((o:any)=>['transfer_in','transfer_out'].includes(o.classification.kind.value)).every((o:any)=>o.analyticsRole==='unresolved'),true);
+ const sources=(await pg.owner.query("SELECT versions,description,merchant_text FROM finance.source_observation WHERE user_id='first'")).rows;assert.equal(sources.every(s=>s.versions.parser==='tbank-table/1'&&s.versions.sanitizer==='bank-source/3'),true);assert.equal(JSON.stringify(sources).includes('Private'),false);
+ const replay=await request('/finance/import-accept',batch);assert.equal(replay.statusCode,200);assert.equal((await counts()).transaction,5);
+ const invalid=structuredClone(batch);invalid.batchId=randomUUID();invalid.files[0]!.fileId=randomUUID();invalid.files[0]!.rows[0]!.parser='sber-table/1';assert.equal((await request('/finance/import-accept',invalid)).statusCode,400);
+ await command({kind:'cancel_import',batchId:batch.batchId});assert.equal((await counts()).transaction,0);assert.equal((await counts()).source_observation,0);assert.equal(JSON.stringify((await request('/finance/state')).json()).includes('Private'),false);
+});
+test('OCR parser metadata cannot promote merchant or strict dedupe evidence over HTTP',async()=>{
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,localSourceSanitizer);let batch:PreparedBatch;
+ try{batch=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic scanned bytes'),rows:[row({parser:'tbank-ocr/1',bankReference:undefined,safeSource:null,localDescription:undefined})]}]);}finally{local.dispose();}
+ const bad=structuredClone(batch);bad.files[0]!.rows[0]!.safeSource={event:'purchase',merchant:'ozon'};assert.equal((await request('/finance/import-accept',bad)).statusCode,400);
+ await accept(batch);await drain(batch.batchId);const op=await importedOperation();assert.equal(op.source.versions.parser,'tbank-ocr/1');assert.equal(op.semantics.kind.confidence,0);assert.equal(op.projection.analyticsRole,'unresolved');assert.equal(op.projection.reviewReasons.length>0,true);
+ const evidence=(await pg.owner.query("SELECT source_evidence,description_hmac,strict_fingerprint FROM finance.ingestion_row WHERE user_id='first'")).rows;assert.deepEqual(evidence,[{source_evidence:null,description_hmac:null,strict_fingerprint:null}]);
+});
 test('expanded source corpus and private full-description fingerprints distinguish equal-brand purchases and reuse exact unknown descriptions',async()=>{
  const exact=row({bankReference:undefined,operationDate:{precision:'instant',instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase',merchant:'vkusvill'},localDescription:'Покупка ВкусВилл Synthetic-Terminal-A auth Synthetic-Private-1'});
  const first=await safeBatch([exact],'Expanded first');await accept(first);await drain(first.batchId);let current=await importedOperation();assert.equal(current.source.merchantText,'ВкусВилл');assert.equal(current.source.versions.sanitizer,'bank-source/2');assert.equal(current.source.versions.dedupe,'strict-bank-description/2');
