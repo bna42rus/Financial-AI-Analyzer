@@ -94,7 +94,11 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
  for(const v of proposed)for(const n of [v.source,...(transformsTarget(v.link)?[v.target]:[])]){const p=effects.get(n.id)??[];p.push(v);effects.set(n.id,p);}
  for(const [id,p]of effects){const node=p[0]!.source.id===id?p[0]!.source:p[0]!.target;if(sumMinor(p.map(v=>v.amount))>abs(node.amount))for(const v of p)invalid.set(v.link.id,'CAPACITY_CONFLICT');}
  // A transformed portion must be named explicitly, rather than borrowing the original root meaning.
- for(const v of proposed)if(!invalid.has(v.link.id)&&(effects.get(v.target.id)??[]).some(other=>other.link.id!==v.link.id&&!invalid.has(other.link.id)))invalid.set(v.link.id,'AMBIGUOUS_ENDPOINT');
+ const ambiguous=new Set<string>();
+ for(const v of proposed)if(!invalid.has(v.link.id)&&(effects.get(v.target.id)??[]).some(other=>other.link.id!==v.link.id&&!invalid.has(other.link.id)))ambiguous.add(v.link.id);
+ // Evaluate against one snapshot: marking the first conflict must not turn the
+ // other conflicting interpretation into an input-order-dependent winner.
+ for(const id of ambiguous)invalid.set(id,'AMBIGUOUS_ENDPOINT');
  // A rejected ancestor makes every dependent interpretation unusable, while preserving decisions.
  for(const v of proposed)if(!invalid.has(v.link.id)&&allocationParents(v.link).some(id=>invalid.has(id)))invalid.set(v.link.id,'DEPENDENCY_CONFLICT');
  for(const link of graph.links)if(invalid.has(link.id)){addReason(link.sourceId,'dependency_conflict');addReason(link.targetId,'dependency_conflict');}

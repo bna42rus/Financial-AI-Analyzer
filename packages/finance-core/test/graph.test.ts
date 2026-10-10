@@ -161,3 +161,35 @@ test('contradictory inclusion rules preserve default and request review while ex
  const r=applyRules(o,g.accounts[0]!,rules);assert.equal(r.analyticsOverride,'default');assert.ok(r.reviewReasons.includes('conflicting_rules'));assert.equal(o.reviewReasons.includes('conflicting_rules'),false);
  o.analyticsOverride='include';assert.equal(applyRules(o,g.accounts[0]!,rules).analyticsOverride,'include');
 });
+
+test('mutually ambiguous transformed roots reject every interpretation independent of link order and period',()=>{
+ const g=graph();g.operations=[op('out','-1000','purchase','food','2026-09-01'),op('in','1000','reversal',null,'2026-10-01')];
+ g.links=[link('own','out','in','500','own_transfer'),link('return','in','out','500','reversal')];
+ const first=reconcile(g);g.links.reverse();const second=reconcile(g);
+ assert.ok(first.links.every(l=>!l.active&&l.reason==='AMBIGUOUS_ENDPOINT'));
+ assert.deepEqual(second.operations,first.operations);
+ assert.deepEqual([...second.links].sort((a,b)=>a.id.localeCompare(b.id)),[...first.links].sort((a,b)=>a.id.localeCompare(b.id)));
+ assert.equal(aggregate(first.operations,{through:'2026-09-30'}).netExpensesMinor,'1000');
+ assert.equal(aggregate(first.operations,{from:'2026-10-01'}).netExpensesMinor,'0');
+ assert.ok(first.operations.every(o=>o.reviewReasons.includes('dependency_conflict')));
+});
+test('generated ambiguous link permutations preserve manual facts and monthly totals',()=>{
+ for(let amount=1;amount<=100;amount++){
+  const g=graph();g.operations=[op('out',String(-amount*3)),op('in',String(amount*2),'reversal',null,'2026-10-01')];
+  g.operations[0]!.semantics.category=facet('clothes','user',true);
+  g.links=[link('a','out','in',String(amount),'own_transfer'),link('b','in','out',String(amount),'reversal')];
+  const before=structuredClone(g.operations),left=reconcile(g);g.links.reverse();const right=reconcile(g);
+  assert.deepEqual(right.operations,left.operations);assert.deepEqual(g.operations,before);
+  assert.deepEqual(aggregate(right.operations,{through:'2026-09-30'}),aggregate(left.operations,{through:'2026-09-30'}));
+  assert.equal(aggregate(left.operations,{through:'2026-09-30'}).netExpensesMinor,String(amount*3));
+ }
+});
+test('more than ten thousand bank facts retain exact totals, exclusions and refund periods in the pure core',()=>{
+ const g=graph();g.operations=Array.from({length:10000},(_,i)=>op('p'+i,'-12345'));
+ g.operations[0]!.analyticsOverride='exclude';
+ g.operations.push(op('refund','12345','refund',null,'2026-10-01'));g.links=[link('return','refund','p1','12345')];
+ const facts=JSON.stringify(g),r=reconcile(g);
+ assert.equal(r.operations.length,10001);assert.equal(aggregate(r.operations,{through:'2026-09-30'}).netExpensesMinor,'123437655');
+ assert.equal(aggregate(r.operations,{from:'2026-10-01'}).netExpensesMinor,'-12345');
+ assert.equal(aggregate(r.operations).netExpensesMinor,'123425310');assert.equal(JSON.stringify(g),facts);
+});

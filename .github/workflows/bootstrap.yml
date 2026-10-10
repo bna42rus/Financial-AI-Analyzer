@@ -37,6 +37,8 @@ jobs:
         run: npm install --global pnpm@11.25.0 --ignore-scripts
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Reject known high and critical dependency advisories
+        run: pnpm audit --audit-level=high
       - name: Verify sources, calculations, types and web build
         run: pnpm run check
       - name: Check auth, TOTP, recovery, ownership and database roles on PostgreSQL 18

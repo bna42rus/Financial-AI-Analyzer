@@ -9,6 +9,7 @@ import {hashPassword,token} from '../src/crypto.ts';
 import {prepareFinance,acceptAccount,acceptObservation,financeView,previewFinance,commitFinance} from '../src/finance.ts';
 import type {Config} from '../src/types.ts';
 import type {Kind} from '../../../packages/finance-core/src/model.ts';
+import {sanitizeText} from '../../../packages/privacy/src/text.ts';
 let pg:Awaited<ReturnType<typeof postgresFixture>>,server:Awaited<ReturnType<typeof createServer>>,control:Awaited<ReturnType<typeof createServer>>,fc:Config;
 const pw='Synthetic finance password 123!';let cookie:string,account:string;
 before(async()=>{pg=await postgresFixture();fc={profile:'finance',pool:pg.finance,baseURL:'https://api.example.test',origin:'https://app.example.test',authSecret:token(),wrappingKey:randomBytes(32),environment:'test'};server=await createServer(fc);control=await createServer({...fc,profile:'control',pool:pg.control,baseURL:'https://control.example.test',origin:'https://admin.example.test',authSecret:token(),wrappingKey:randomBytes(32)});});
@@ -27,6 +28,16 @@ async function append(amount:string,kind:Kind='purchase',transactionId:string|nu
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
+test('HTTP financial text boundary rejects passport, email and invisible-identifier bypasses without writes or reflection',async()=>{
+ const operationId=(await append('-1000')).transactionId;
+ for(const raw of ['Паспорт 4510 123456','Email synthetic.private@example.test','Карта 1234\u200b5678\u20609012\u200e3456','Договор No TEST-123456']){
+  const w=await view(),r=await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'operation',id:operationId,patch:{comment:raw}}});
+  assert.equal(r.statusCode,400);assert.ok(!r.body.includes(raw));assert.equal((await view()).revision,w.revision);
+ }
+ assert.equal((await pg.owner.query('SELECT count(*) FROM finance.action')).rows[0].count,'0');
+ await command({kind:'operation',id:operationId,patch:{comment:sanitizeText('Паспорт 4510 123456; Email synthetic.private@example.test')}});
+ const detail=(await request('/finance/operation',{id:operationId})).json();assert.ok(detail.comment.includes('[реквизиты скрыты]'));assert.ok(!JSON.stringify(detail).includes('4510'));assert.ok(!JSON.stringify(detail).includes('synthetic.private@example.test'));
+});
 test('Review group applies only the displayed session subset, preserves bank facts, retries once and has one Undo',async()=>{
  const ids=[(await append('-1000')).transactionId,(await append('-2000')).transactionId],w=await view(),sessionId=randomUUID();
  const created=await request('/finance/review-command',{commandId:randomUUID(),sessionId,generation:w.generation,kind:'create',operationIds:ids,financeRevision:w.revision});assert.equal(created.statusCode,200,created.body);const s=created.json();

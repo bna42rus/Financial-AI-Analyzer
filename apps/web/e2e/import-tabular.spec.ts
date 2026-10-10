@@ -25,6 +25,16 @@ test('XLSX dates, formulas, external relationships, extra worksheets and malform
  },fixtures);
  expect(result.batch.files[0].rows[0].operationDate).toEqual({precision:'day',date:'2026-09-01'});expect(result.batch.files[1].issues).toEqual([{ordinal:1,code:'INVALID_AMOUNT'}]);expect(result.batch.files[1].rows).toHaveLength(1);expect(result.batch.files.slice(2).every((f:any)=>f.status==='blocked')).toBe(true);expect(JSON.stringify(result)).not.toContain('Private');
 });
+test('an XLSX description formula supplies neither cached text nor invented strict-dedupe evidence',async({page})=>{
+ await page.goto('/');
+ const result=await page.evaluate(async bytes=>{
+  const path='/src/import-local.ts',module=await import(/* @vite-ignore */ path),context={contextId:crypto.randomUUID(),generation:crypto.randomUUID(),keyVersion:crypto.randomUUID(),key:btoa(String.fromCharCode(...new Uint8Array(32).fill(17))).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_'),expiresAt:new Date(Date.now()+60000).toISOString()};
+  return module.prepareLocalBankFiles(context,crypto.randomUUID(),[{fileId:crypto.randomUUID(),file:new File([new Uint8Array(bytes)],'Private.xlsx')}]);
+ },[...syntheticXlsx({descriptionFormula:true})]);
+ expect(result.localIssues).toEqual([]);expect(result.batch.files[0].rows).toHaveLength(2);
+ const row=result.batch.files[0].rows[0];expect(row.amountMinor).toBe('-1001');expect(row.safeSource).toBeNull();expect(row.descriptionHmac).toBeNull();
+ expect(JSON.stringify(result)).not.toMatch(/INVALID_FORMULA|Private|Cached|Identifier/);
+});
 test('real local OCR loads only same-site models and retains no text, image or persistent storage',async({page})=>{
  test.setTimeout(90000);const external:string[]=[],writes:string[]=[];page.on('request',r=>{if(!r.url().startsWith('http://127.0.0.1:5173/')&&!r.url().startsWith('ws://127.0.0.1:5173/'))external.push(r.url());if(r.method()!=='GET')writes.push(r.url());});await page.goto('/');
  const result=await page.evaluate(async()=>{

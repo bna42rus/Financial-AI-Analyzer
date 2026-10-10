@@ -59,9 +59,18 @@ test('server expiry rejects a still locally prepared payload with the recovery m
 test('bounded normalized payloads above the auth route limit validate, while auth keeps 8 KiB',async()=>{
  const payload=await batch(await context(),Array.from({length:1000},()=>row({bankReference:undefined})));assert.ok(JSON.stringify(payload).length>8192);const r=await request('/finance/import-validation',payload);assert.equal(r.statusCode,200,r.body);assert.equal(r.json().counts.validRows,1000);const auth=await request('/auth/sign-in/email',{email:'first@example.test',password:'x'.repeat(9000)});assert.equal(auth.statusCode,413);assert.deepEqual(auth.json(),{code:'INVALID_REQUEST'});
 });
+test('the maximum closed bank profile fits validation and acceptance without expanding the auth allowance',async()=>{
+ const payload=await batch(await context(),Array.from({length:1000},()=>row()));
+ payload.versions.adapter='bank-local/1';payload.versions.sanitizer='bank-source/3';
+ for(const item of payload.files[0]!.rows){item.operationDate={precision:'instant',instant:'2026-09-01T00:00:00.000Z'};item.postedDate={precision:'instant',instant:'2026-09-01T00:00:00.000Z'};item.amountMinor='-9223372036854775808';item.parser='tbank-movement-pdf/2';item.descriptionHmac='a'.repeat(64);item.safeSource={event:'purchase',merchant:'yandexmarket'};}
+ const bytes=Buffer.byteLength(JSON.stringify(payload));assert.ok(bytes>512*1024);assert.ok(bytes<1024*1024);
+ const before=await counts(),validated=await request('/finance/import-validation',payload);assert.equal(validated.statusCode,200,validated.body);assert.equal(validated.json().counts.validRows,1000);assert.deepEqual(await counts(),before);
+ const accepted=await request('/finance/import-accept',payload);assert.equal(accepted.statusCode,202,accepted.body);assert.equal((await counts()).transaction,0);
+ const auth=await request('/auth/sign-in/email',{email:'first@example.test',password:'x'.repeat(9000)});assert.equal(auth.statusCode,413);assert.deepEqual(auth.json(),{code:'INVALID_REQUEST'});
+});
 test('oversize, malformed JSON and unsupported versions never reflect request content',async()=>{
  const c=await context(),payload=await batch(c);(payload.versions as any).pipeline='future/1';const wrong=await request('/finance/import-validation',payload);assert.equal(wrong.statusCode,400);assert.deepEqual(wrong.json(),{code:'INVALID_IMPORT_PAYLOAD'});
- for(const text of ['{"private":"Private sentinel"','{"private":"'+('Private sentinel'.repeat(40_000))+'"}']){const r=await server.fastify.inject({method:'POST',url:'/finance/import-validation',payload:text,headers:{origin:fc.origin,cookie,'content-type':'application/json'}});assert.ok([400,413].includes(r.statusCode));assert.deepEqual(r.json(),{code:'INVALID_REQUEST'});assert.equal(r.body.includes('sentinel'),false);}
+ for(const text of ['{"private":"Private sentinel"','{"private":"'+('Private sentinel'.repeat(80_000))+'"}']){const r=await server.fastify.inject({method:'POST',url:'/finance/import-validation',payload:text,headers:{origin:fc.origin,cookie,'content-type':'application/json'}});assert.ok([400,413].includes(r.statusCode));assert.deepEqual(r.json(),{code:'INVALID_REQUEST'});assert.equal(r.body.includes('sentinel'),false);}
 });
 test('method, origin, query and control deployment do not bypass the finance-only contract',async()=>{
  const payload=await batch();assert.equal((await request('/finance/import-validation')).statusCode,404);assert.equal((await request('/finance/import-validation?raw=Private',payload)).statusCode,404);assert.equal((await request('/finance/import-validation',payload,{origin:'https://other.example.test'})).statusCode,403);const r=await control.fastify.inject({method:'POST',url:'/finance/import-validation',payload,headers:{origin:fc.origin,cookie,'content-type':'application/json'}});assert.equal(r.statusCode,404,r.body);

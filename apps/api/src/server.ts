@@ -255,8 +255,10 @@ export async function createServer(config: Config) {
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});
   if(finance)for(const url of ['/finance/preview','/finance/review-command'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:64*1024,handler:requestHandler});
   // Isolated normalized-contract budget; password/auth routes retain the 8 KiB default.
-  if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:512*1024,handler:requestHandler});
-  if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:512*1024,handler:requestHandler});
+  // A closed 1000-row profile with instants and all HMAC fields exceeds 512 KiB.
+  // Keep this allowance scoped to imports; schema limits still bound every field.
+  if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:1024*1024,handler:requestHandler});
+  if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:1024*1024,handler:requestHandler});
   await app.init();
   fastify.setErrorHandler((error, _request, reply) => {
     // Parser/oversize failures must never reflect raw request fragments or tokens.

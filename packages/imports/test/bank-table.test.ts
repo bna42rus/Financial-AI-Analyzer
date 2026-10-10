@@ -27,6 +27,15 @@ test('quoted CSV delimiters, escaped quotes and multiline descriptions never spl
  for(const malformed of [text.replace('Покупка OZON Private-Terminal','"unterminated'),text.replace('Покупка OZON Private-Terminal','"purchase"extra')])assert.throws(()=>parse(malformed),/UNSUPPORTED_LAYOUT/);
  const comma=text.replaceAll(';',',').replace('20,5','20.50');assert.equal(parse(comma).rows.length,2);
 });
+test('a long valid CSV row is not rejected by an oversized wrong-delimiter candidate',async()=>{
+ for(const delimiter of [';',',','\t']){
+  const extra=Array.from({length:20},(_,i)=>'Дополнительное поле '+i),values=extra.map(()=>'x'.repeat(100));
+  const rows=[['Банк','Т-Банк'],['Номер счета','00000000000000000001'],['Дата операции','Сумма операции','Валюта','Описание',...extra],['2026-09-01','-10.01','RUB','Покупка OZON '+'x'.repeat(3800),...values]];
+  const parsed=await prepare(parse(rows.map(r=>r.join(delimiter)).join('\n')));
+  assert.equal(parsed.files[0]!.rows.length,1);assert.equal(parsed.files[0]!.rows[0]!.amountMinor,'-1001');
+ }
+ assert.throws(()=>csvTable('Дата операции;Сумма операции;Валюта;Описание\n2026-09-01;-1.00;RUB;'+'x'.repeat(4001)),/LOCAL_LIMIT/);
+});
 test('bad bank facts are counted per-row issues while another valid row survives',async()=>{
  for(const [bad,code] of [['30.02.2026','INVALID_DATE'],['=1+1','INVALID_AMOUNT'],['USD','INVALID_CURRENCY']] as const){
   const s=code==='INVALID_DATE'?text.replace('01.09.2026',bad):code==='INVALID_AMOUNT'?text.replace('-10.01',bad):text.replace('RUB',bad),b=await prepare(parse(s));assert.equal(b.files[0]!.rowsFound,2);assert.deepEqual(b.files[0]!.issues,[{ordinal:1,code}]);assert.equal(b.files[0]!.rows.length,1);
