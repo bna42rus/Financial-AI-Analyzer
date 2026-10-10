@@ -1,13 +1,13 @@
 import type {LocalContext} from '../../../packages/imports/src/local';
 import type {PreparedBatch} from '../../../packages/imports/src/contract';
 import type {ImportReport} from '../../../packages/imports/src/report';
-import type {prepareLocalBankPdfs} from './import-local';
+import type {prepareLocalBankFiles} from './import-local';
 import {ApiError} from './server-client';
 
 export type LocalIssue={fileId:string;name:string;code:string};
 export type ImportFlowState={phase:'idle'|'local'|'sending'|'retry';issues:LocalIssue[];locked:{fileId:string;name:string}[];error:string};
 type Input={fileId:string;file:File;password?:string};
-export type ImportDependencies={context:(signal:AbortSignal)=>Promise<LocalContext>;prepare:typeof prepareLocalBankPdfs;accept:(batch:PreparedBatch)=>Promise<ImportReport>};
+export type ImportDependencies={context:(signal:AbortSignal)=>Promise<LocalContext>;prepare:typeof prepareLocalBankFiles;accept:(batch:PreparedBatch)=>Promise<ImportReport>};
 const initial=():ImportFlowState=>({phase:'idle',issues:[],locked:[],error:''});
 /** Raw File/password/key references never enter a network dependency or persistent storage. */
 export class ImportFlow{
@@ -22,7 +22,7 @@ export class ImportFlow{
   if(inputs.length>10){this.publish({error:'Выберите не больше 10 файлов за одну загрузку.'});return;}
   const turn=++this.turn,controller=new AbortController();this.controller=controller;this.locked=[];this.publish({phase:'local',error:'',issues:[],locked:[]});
   const issues:LocalIssue[]=[],valid=inputs.filter(i=>{
-   const code=!/\.pdf$/i.test(i.file.name)?'UNSUPPORTED_FILE':i.file.size===0?'EMPTY_FILE':i.file.size>20*1024*1024?'LOCAL_LIMIT':null;
+   const code=!/\.(pdf|csv|xlsx)$/i.test(i.file.name)?'UNSUPPORTED_FILE':i.file.size===0?'EMPTY_FILE':i.file.size>20*1024*1024?'LOCAL_LIMIT':null;
    if(code)issues.push({fileId:i.fileId,name:i.file.name,code});return code===null;
   });
   try{
