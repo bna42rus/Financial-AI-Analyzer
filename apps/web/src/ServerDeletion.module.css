@@ -1,0 +1,10 @@
+.content { overflow-wrap:anywhere; }
+.content form { display:grid; gap:16px; margin:18px 0; }
+.content label { display:block; }
+.content input:not([type="checkbox"]),.content select { display:block; width:100%; min-width:0; margin-top:6px; padding:10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); }
+.content input[type="checkbox"] { margin-right:8px; }
+.counts { margin:15px 0; }
+.counts>div { display:flex; gap:16px; justify-content:space-between; border-bottom:1px solid var(--color-border); padding:10px 0; }
+.counts dt { flex:1; color:var(--color-secondary-text); }
+.counts dd { margin:0; text-align:right; }
+@media(max-width:700px){.content input:not([type="checkbox"]),.content select {font-size:16px;} .counts>div {display:block;} .counts dd {text-align:left;margin-top:5px;}}

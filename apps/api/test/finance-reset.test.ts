@@ -182,7 +182,7 @@ test('an executing acceptance cannot race an older reset preview or resurrect da
  await reset();await assert.rejects(within('first',db=>withPreparedImport(db,'first',prepared(c),async()=>{})),/IMPORT_CONTEXT_CHANGED/);assert.equal((await counts()).account,0);
 });
 test('old sessions require a fresh password proof, without retaining it in reset history',async()=>{
- await append('-1000');const r=await resetPreview();await pg.owner.query("UPDATE identity.auth_session SET created_at=clock_timestamp()-interval '6 minutes' WHERE user_id='first'");
+ await append('-1000');const r=await resetPreview();await pg.owner.query("UPDATE identity.auth_session SET created_at=clock_timestamp()-interval '6 minutes' WHERE user_id='first'");assert.equal(r.epoch.recentAuthenticationRequired,false);assert.equal((await request('/finance/epoch')).json().recentAuthenticationRequired,true);
  const blocked=await request('/finance/commit',{actionId:r.actionId,confirmReset:true});assert.equal(blocked.statusCode,401);assert.equal(blocked.json().code,'RECENT_AUTHENTICATION_REQUIRED');
  const wrong=await request('/finance/commit',{actionId:r.actionId,confirmReset:true,password:'Wrong password 123!'});assert.equal(wrong.statusCode,401);assert.equal((await counts()).transaction,1);
  const done=await request('/finance/commit',{actionId:r.actionId,confirmReset:true,password:pw});assert.equal(done.statusCode,200,done.body);assert.equal((await counts()).transaction,0);const receipt=(await pg.owner.query('SELECT * FROM finance.action WHERE id=$1',[r.actionId])).rows[0];assert.equal(JSON.stringify(receipt).includes(pw),false);
