@@ -239,7 +239,16 @@ test('safe merchant equality alone never authorizes cross-file dedupe',async()=>
 });
 test('HTTP independently rejects source smuggling, unsupported versions and contradictory signs before staging',async()=>{
  const original=await safeBatch();
- for(const edit of [(b:any)=>b.files[0].rows[0].safeSource.merchant='Private recipient',(b:any)=>b.files[0].rows[0].safeSource.raw='Private auth',(b:any)=>b.files[0].rows[0].safeSource.event='refund',(b:any)=>b.versions.sanitizer='bank-source/2',(b:any)=>{b.files[0].rows[0].amountMinor='bad';b.files[0].rows[0].safeSource.raw='Private auth';}]){const b=structuredClone(original);edit(b);const r=await request('/finance/import-accept',b);assert.equal(r.statusCode,400);assert.deepEqual(r.json(),{code:'INVALID_IMPORT_PAYLOAD'});assert.equal(r.body.includes('Private'),false);}
+ for(const edit of [
+  (b:any)=>b.files[0].rows[0].safeSource.merchant='Private recipient',
+  (b:any)=>b.files[0].rows[0].safeSource.raw='Private auth',
+  (b:any)=>b.files[0].rows[0].safeSource.event='refund',
+  (b:any)=>b.versions.sanitizer='bank-source/3',
+  (b:any)=>b.files[0].rows[0].descriptionHmac='Private raw description',
+  (b:any)=>{delete b.files[0].rows[0].descriptionHmac;},
+  (b:any)=>{b.files[0].rows[0].amountMinor='bad';b.files[0].rows[0].safeSource.raw='Private auth';},
+  (b:any)=>{b.files[0].rows[0].amountMinor='bad';b.files[0].rows[0].descriptionHmac='Private raw description';}
+ ]){const b=structuredClone(original);edit(b);const r=await request('/finance/import-accept',b);assert.equal(r.statusCode,400);assert.deepEqual(r.json(),{code:'INVALID_IMPORT_PAYLOAD'});assert.equal(r.body.includes('Private'),false);}
  assert.equal((await counts()).ingestion_batch,0);
 });
 test('deletion clears safe source observations and pending codes cannot resurrect them',async()=>{
