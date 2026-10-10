@@ -185,3 +185,16 @@ test('an interface epoch changed on another device resets stored appearance on t
 test('local CSV XLSX OCR upload dialog remains readable on desktop and mobile',async({page},testInfo)=>{
  await setup(page);await page.getByRole('button',{name:'Загрузить файлы',exact:true}).click();const dialog=page.getByRole('dialog',{name:'Загрузка выписок'});await expect(dialog.getByLabel('Файлы выписок')).toHaveAttribute('accept','.pdf,.csv,.xlsx');await expect(dialog).toContainText('PDF, CSV или XLSX');await expect(dialog).toContainText('Файл и пароль остаются на устройстве');expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);await dialog.screenshot({path:testInfo.outputPath('local-import-preview.png')});
 });
+
+
+test('changing shared dates preserves Operations settings, hides stale totals, and manual all-history overrides a dynamic period',async({page})=>{
+ await setup(page);await page.getByRole('link',{name:'Операции',exact:true}).click();
+ const region=page.getByRole('region',{name:'Проверка и выбор операций'}),list=page.getByRole('list',{name:'Сохранённые операции'});
+ await expect(list.getByRole('listitem')).toHaveCount(1);await page.getByLabel('Поиск сохранённых операций').fill('Synthetic shop');await page.getByLabel('Плотность операций').selectOption('compact');
+ let release!:()=>void,started!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;}),begin=new Promise<void>(resolve=>{started=resolve;});
+ await page.route('http://127.0.0.1:3000/finance/operations-page',async route=>{if(route.request().method()==='POST'&&route.request().postDataJSON().query.filter.from==='2099-01-01'){started();await gate;}await route.fallback();});
+ await page.getByLabel('С даты',{exact:true}).fill('2099-01-01');await begin;
+ try{await expect(page.getByLabel('Поиск сохранённых операций')).toHaveValue('Synthetic shop');await expect(page.getByLabel('Плотность операций')).toHaveValue('compact');await expect(region.getByText(/^Расходы:/)).toHaveCount(0);await expect(list).toHaveCount(0);await expect(page.getByRole('button',{name:'Выбрать все найденные',exact:true})).toBeDisabled();}finally{release();}
+ await expect(page.getByRole('heading',{name:'Нет операций по выбранным фильтрам'})).toBeVisible();await page.getByRole('button',{name:'За всю историю',exact:true}).click();await expect(list.getByRole('listitem')).toHaveCount(1);
+ await page.clock.setFixedTime(new Date('2026-10-10T12:00:00Z'));await page.getByLabel('Период представления').selectOption('last_30_days');await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('2026-09-11');await expect(page.getByRole('heading',{name:'Нет операций по выбранным фильтрам'})).toBeVisible();await page.getByRole('button',{name:'За всю историю',exact:true}).click();await expect(page.getByLabel('Период представления')).toHaveValue('all');await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('');await expect(list.getByRole('listitem')).toHaveCount(1);await expect(page.getByLabel('Поиск сохранённых операций')).toHaveValue('Synthetic shop');
+});
