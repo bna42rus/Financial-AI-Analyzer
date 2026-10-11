@@ -9,7 +9,7 @@
   },
   "scripts": {
     "check:spec": "node scripts/check-spec.mjs",
-    "test": "node --test packages/finance-core/test/money.test.ts packages/finance-core/test/graph.test.ts packages/finance-core/test/duplicate-merge.test.ts packages/finance-core/test/review-group.test.ts packages/finance-core/test/operations.test.ts packages/access/test/model.test.ts packages/imports/test/preparation.test.ts packages/imports/test/matching.test.ts packages/imports/test/bank-pdf.test.ts packages/imports/test/safe-source.test.ts packages/imports/test/bank-table.test.ts packages/privacy/test/text.test.ts",
+    "test": "node --test packages/finance-core/test/money.test.ts packages/finance-core/test/graph.test.ts packages/finance-core/test/duplicate-merge.test.ts packages/finance-core/test/review-group.test.ts packages/finance-core/test/operations.test.ts packages/access/test/model.test.ts packages/imports/test/preparation.test.ts packages/imports/test/matching.test.ts packages/imports/test/bank-pdf.test.ts packages/imports/test/safe-source.test.ts packages/imports/test/bank-table.test.ts packages/privacy/test/text.test.ts packages/finance-core/test/budgets.test.ts",
     "dev:web": "pnpm --filter @finance/web dev",
     "build:web": "pnpm --filter @finance/web build",
     "check:web": "pnpm --filter @finance/web check",

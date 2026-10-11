@@ -10,14 +10,14 @@ export type Column=typeof operationColumns[number];
 export const defaultColumns:Column[]=['date','merchant','amount','account','kind','role','category','status'];
 export const sortFields=['date','amount','merchant','category','confidence','status'] as const;
 export const groupFields=['none','date','category','subcategory','merchant','counterparty','account','kind'] as const;
-export type OperationsFilter={from?:string;through?:string;accountIds?:string[];bankId?:string;categoryIds?:string[];subcategoryIds?:string[];kind?:string;role?:string;amountFrom?:string;amountThrough?:string;search?:string;merchant?:string;counterpartyIds?:string[];reason?:string;status?:string;facet?:'kind'|'role'|'category'|'subcategory';confidenceFrom?:number;confidenceThrough?:number;source?:string;inclusion?:'any'|'included'|'excluded';refund?:boolean;transfer?:boolean;linked?:boolean;comment?:string;ruleId?:string;postedFrom?:string;postedThrough?:string;batchId?:string;fileId?:string;possibleDuplicate?:boolean;attention?:boolean;uncategorized?:boolean;operationIds?:string[]};
+export type OperationsFilter={from?:string;through?:string;accountIds?:string[];bankId?:string;categoryIds?:string[];subcategoryIds?:string[];kind?:string;role?:string;amountFrom?:string;amountThrough?:string;search?:string;merchant?:string;counterpartyIds?:string[];reason?:string;status?:string;facet?:'kind'|'role'|'category'|'subcategory';confidenceFrom?:number;confidenceThrough?:number;source?:string;inclusion?:'any'|'included'|'excluded';includeExcluded?:boolean;refund?:boolean;transfer?:boolean;linked?:boolean;comment?:string;ruleId?:string;postedFrom?:string;postedThrough?:string;batchId?:string;fileId?:string;possibleDuplicate?:boolean;attention?:boolean;uncategorized?:boolean;operationIds?:string[]};
 export type OperationsQuery={filter:OperationsFilter;sort:typeof sortFields[number];direction:'asc'|'desc';group:typeof groupFields[number]};
 export type OperationsView={filter:OperationsFilter;period:'all'|'fixed'|'current_month'|'previous_month'|'last_30_days';columns:Column[];widths:Partial<Record<Column,number>>;sort:OperationsQuery['sort'];direction:OperationsQuery['direction'];group:OperationsQuery['group'];density:'comfortable'|'compact'};
 export type OperationRow=Projection&{classification:Semantics;comment:string;description?:string;reviewStatus?:ReturnType<typeof reviewStatus>;postedDate?:BankDate|null;bankCategory?:string;imports?:{batchId:string;fileId:string}[];linked?:boolean;groupKey?:string};
 export type OperationsCatalog={accounts:Account[];categories:Category[];counterparties:{id:string;name:string}[]};
 function strings(value:unknown,max=100){if(!Array.isArray(value)||value.length>max)throw new TypeError('INVALID_FILTER');const ids=value.map(uuid);if(new Set(ids).size!==ids.length)throw new TypeError('DUPLICATE_FILTER');return ids;}
 export function parseOperationsFilter(value:unknown):OperationsFilter{
- const r=object(value,['from','through','accountIds','bankId','categoryIds','subcategoryIds','kind','role','amountFrom','amountThrough','search','merchant','counterpartyIds','reason','status','facet','confidenceFrom','confidenceThrough','source','inclusion','refund','transfer','linked','comment','ruleId','postedFrom','postedThrough','batchId','fileId','possibleDuplicate','attention','uncategorized','operationIds']),f:OperationsFilter={};
+ const r=object(value,['from','through','accountIds','bankId','categoryIds','subcategoryIds','kind','role','amountFrom','amountThrough','search','merchant','counterpartyIds','reason','status','facet','confidenceFrom','confidenceThrough','source','inclusion','includeExcluded','refund','transfer','linked','comment','ruleId','postedFrom','postedThrough','batchId','fileId','possibleDuplicate','attention','uncategorized','operationIds']),f:OperationsFilter={};
  for(const k of ['from','through','postedFrom','postedThrough'] as const)if(k in r)f[k]=(dateFact({precision:'day',date:r[k]}) as {date:string}).date;
  if(f.from&&f.through&&f.from>f.through||f.postedFrom&&f.postedThrough&&f.postedFrom>f.postedThrough)throw new TypeError('INVALID_RANGE');
  for(const k of ['accountIds','categoryIds','subcategoryIds','counterpartyIds','operationIds'] as const)if(k in r)f[k]=strings(r[k],k==='operationIds'?1000:100);
@@ -31,7 +31,7 @@ export function parseOperationsFilter(value:unknown):OperationsFilter{
  if('inclusion' in r)f.inclusion=choice(r.inclusion,['any','included','excluded']);
  for(const k of ['confidenceFrom','confidenceThrough'] as const)if(k in r){if(typeof r[k]!=='number'||!Number.isInteger(r[k])||r[k]<0||r[k]>100)throw new TypeError('INVALID_CONFIDENCE');f[k]=r[k];}
  if(f.confidenceFrom!==undefined&&f.confidenceThrough!==undefined&&f.confidenceFrom>f.confidenceThrough)throw new TypeError('INVALID_RANGE');
- for(const k of ['refund','transfer','linked','possibleDuplicate','attention','uncategorized'] as const)if(k in r){if(typeof r[k]!=='boolean')throw new TypeError('INVALID_BOOLEAN');f[k]=r[k];}
+ for(const k of ['includeExcluded','refund','transfer','linked','possibleDuplicate','attention','uncategorized'] as const)if(k in r){if(typeof r[k]!=='boolean')throw new TypeError('INVALID_BOOLEAN');f[k]=r[k];}
  return f;
 }
 export function parseOperationsQuery(value:unknown):OperationsQuery{const r=object(value,['filter','sort','direction','group']);return {filter:parseOperationsFilter(r.filter??{}),sort:choice(r.sort??'date',sortFields),direction:choice(r.direction??'desc',['asc','desc']),group:choice(r.group??'none',groupFields)};}
@@ -61,6 +61,6 @@ export function queryOperations(rows:OperationRow[],catalog:OperationsCatalog,q:
  const ordered=found.map(o=>({...o,groupKey:groupKey(o)})).sort((a,b)=>(q.group!=='none'?a.groupKey.localeCompare(b.groupKey,'ru'):0)||(q.direction==='desc'?-1:1)*compare(a,b)||a.id.localeCompare(b.id));
  // Filter terminal portions, after reconciliation against the entire graph. A mixed
  // operation's unmatched part must not leak into category/role/inclusion totals.
- const summary=aggregate(found.map(o=>({...o,parts:o.parts.filter(partMatches)})));
+ const summary=aggregate(found.map(o=>({...o,parts:o.parts.filter(partMatches)})),{includeExcluded:f.includeExcluded===true});
  return {operations:ordered,summary,total:ordered.length};
 }

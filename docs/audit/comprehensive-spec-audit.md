@@ -43,7 +43,7 @@ P1 означает обязательную работу до завершен�
 | --- | --- | --- | --- |
 | G01 | P1 | AI и Action Registry; PDF 26, 27, 28, 30, 55 | Нет рабочего финансового чата, Financial Relevance Gate, versioned AI Registry, minimum-context tools и защиты document/web prompt injection. Наличие обычного preview/commit API не реализует AI. |
 | G02 | P1 | AI quota и документы; PDF 29, 30, 35, 54 | Нет рабочего учёта AI usage/cost/reserve, сообщений 80/95/100%, stateless provider adapter, local document page permissions и удаления финансовых результатов/чатов. Entitlement anchor реализован отдельно и не доказывает quota. |
-| G03 | P1 | Бюджеты; PDF 22, 31, 32, 52 | Нет серверной модели и рабочего UI бюджетов: periods, recurring/custom periods, account/category scopes, hierarchy, net refunds, alerts, comparison, history и deletion dependencies. |
+| G03 | P1 | Бюджеты; PDF 22, 31, 32, 52 | GUI/storage budgets, periods, net/gross, versions, History/Undo и dependency repair реализованы. Analyzer/Registry, Overview widgets/references и real-environment acceptance остаются открытыми. |
 | G04 | P1 | Обзор; PDF 21, 47 | Базовые KPI и category drilldown работают. Нет полного набора динамики/comparison/top widgets, конструктора, сохранённых layouts/views, независимого порядка mobile и связанных budget widgets. |
 | G05 | P1 | Операции; PDF 23, 24, 47 | Поиск/review/exclusion, snapshot selection, карточка, bulk semantic edits и links/components реализованы. Не завершены desktop configurable table/columns, весь каталог фильтров, grouping/sorting, Saved Views и полный набор inline edits. |
 | G06 | P1 | Импорт; PDF 18, 19, 20 | Известные локальные PDF/CSV/XLSX/OCR профили конечные. Нет unknown-format AI fallback, общего безопасного description profile, полного global/AI classification и final automatic transfer/refund linking. Нельзя считать любой банковский формат поддержанным. |
@@ -89,7 +89,7 @@ P1 означает обязательную работу до завершен�
 | 19 | Дедупликация | Source-only strict/fuzzy candidate matching, repeated same-file rows, one-to-one evidence, different-pair persistence и controlled duplicate merge/undo реализованы. | G06 |
 | 20 | История импортов и отмена импорта | Import history/report/status/file scope и cancellation preview/commit сохраняют shared provenance, очищают unique rows и fencing generation. | G06, G18, G20 |
 | 21 | Обзор (Overview) | Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown. | G04, G22 |
-| 22 | Бюджеты | Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением. | G03 |
+| 22 | Бюджеты | Persistent GUI budgets реализованы; см. [контракт](../architecture/budgets-periods-versions.md). Analyzer/Overview widgets и acceptance остаются открытыми. | G03 |
 | 23 | Экран «Операции» | Connected Operations: поиск, attention/status/excluded, snapshot multi/range selection, bulk semantic edits, карточка, deletion и Review переход. | G05, G10, G22 |
 | 24 | Карточка операции | Operation card: sanitized source/corrections/facets, links/components, duplicate decisions, exclusion/history/delete; user fields проходят shared local/server text guard. | G05 |
 | 25 | Review Flow | Persistent Review sessions фиксируют IDs/progress, skip/back/pause/resume, групповой scope, independent facets; group mutation одна с Undo. |  |
@@ -119,7 +119,7 @@ P1 означает обязательную работу до завершен�
 | 49 | Error States и Graceful Degradation | Import static errors, retry/idempotency/network uncertainty, stale responses, generation/access fencing проверяются; отсутствующие AI/infra failures не приняты. | G16 |
 | 50 | Поддержка | Полноценный support workflow и реальные контакты/доставка не завершены. | G12, G15 |
 | 51 | Матрица подтверждений | Direct reversible edit/Review vs impact confirmation/destructive full reset имеют отдельные server guards и UI paths. |  |
-| 52 | Матрица зависимостей сущностей | Текущие graph/import/rules/review/history dependencies проверяются; будущие budget/widget/view/AI-result зависимости требуют нового cascade. | G03, G18 |
+| 52 | Матрица зависимостей сущностей | Текущие graph/import/rules/review/history dependencies проверяются; budget и Operations view dependencies подключены; будущие widget/AI-result зависимости требуют нового cascade. | G03, G18 |
 | 53 | Основные State Machines | Access/invitation/payment/import/Review state machines реализованы частично; maintenance отсутствует, enum mapping не равен полной acceptance. | G20 |
 | 54 | Открытые решения технического этапа | Node24/TS/React/Fastify/Postgres/pg-boss/Better Auth/OCR выбраны. E уточняет стек/provider/SMS; legal/retention/RPO/RTO и Production security остаются открытыми. | G02, G07, G08, G09, G12, G13, G15, G19, G21 |
 | 55 | Технический справочник и итоговые правила | Core types перечисляют financial kinds/roles/sources/links/components; full privacy/AI/release checklist частичен. | G01, G07, G09, G20 |

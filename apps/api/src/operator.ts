@@ -50,6 +50,8 @@ try {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0017_import_description_identity.sql',import.meta.url),'utf8'));
   } else if(mode==='migrate-local-bank-classification') {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0018_local_bank_classification.sql',import.meta.url),'utf8'));
+  } else if(mode==='migrate-budgets') {
+    await db.query(await readFile(new URL('../../../packages/database/migrations/0020_budgets.sql',import.meta.url),'utf8'));
   } else if(mode==='migrate-operations-views') {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0019_operations_views.sql',import.meta.url),'utf8'));
   } else if(mode==='seed-tariff-example') {
@@ -70,7 +72,7 @@ try {
     await db.query(`INSERT INTO control.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Development example','owner@example.test',true,now(),now())`, [id]);
     await db.query(`INSERT INTO control.auth_account(id,account_id,provider_id,user_id,password,created_at,updated_at) VALUES($1,$2,'credential',$2,$3,now(),now())`, [randomUUID(), id, await hashPassword(chosen)]);
     await db.query('INSERT INTO control.security_state(user_id,bootstrap_pending) VALUES($1,true)', [id]);
-  } else throw new Error('Use migrate, migrate-invitations, migrate-renewal, migrate-manual, migrate-mail, migrate-finance, migrate-account-structure, migrate-entity-structure, migrate-exclusions-history, migrate-financial-reset, migrate-derived-allocations, migrate-import-ingestion, migrate-bank-contract-alias, migrate-import-cancellation-dedupe, migrate-duplicate-merge, migrate-review-sessions, migrate-import-description-identity, migrate-local-bank-classification, migrate-operations-views, seed-tariff-example or seed-admin-example');
+  } else throw new Error('Use migrate, migrate-invitations, migrate-renewal, migrate-manual, migrate-mail, migrate-finance, migrate-account-structure, migrate-entity-structure, migrate-exclusions-history, migrate-financial-reset, migrate-derived-allocations, migrate-import-ingestion, migrate-bank-contract-alias, migrate-import-cancellation-dedupe, migrate-duplicate-merge, migrate-review-sessions, migrate-import-description-identity, migrate-local-bank-classification, migrate-operations-views, migrate-budgets, seed-tariff-example or seed-admin-example');
   await db.query('COMMIT'); process.stdout.write('Development operation completed.\n');
 } catch (error) { await db.query('ROLLBACK'); throw new Error('Development operation failed; no changes committed'); }
 finally { db.release(); await pool.end(); }

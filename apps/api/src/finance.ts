@@ -1,3 +1,5 @@
+import {parseBudgetIntent,applyBudgetIntent} from './budgets.ts';
+import type {BudgetIntent} from './budgets.ts';
 import {parseViewIntent,applyViewIntent,repairOperationsViews} from './operations.ts';
 import type {ViewIntent} from './operations.ts';
 import {parseRuleIntent,applyRuleIntent} from './finance-rules.ts';
@@ -101,10 +103,10 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {bankRefHmac,...source}=op.source;return {...op,source,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type Intent=ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type Intent=BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&!Array.isArray(value)){
-  const k=(value as Record<string,unknown>).kind;if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
+  const k=(value as Record<string,unknown>).kind;if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
   if(k==='merge_duplicate')return parseMergeDuplicate(value);
   if(k==='duplicate_different'){const r=object(value,['kind','id']);return {kind:k,id:uuid(r.id)};}
  }
@@ -158,6 +160,7 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
  if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
  if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
  if(intent.kind==='bulk_operations'){
