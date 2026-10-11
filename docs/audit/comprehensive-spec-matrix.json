@@ -8305,7 +8305,7 @@
       "title": "AI- Анализатор",
       "source_text_sha256": "680fff22e322c137605a560b20bba744174bd004d8baba5541a0630c64c65218",
       "obligation_excerpt": "Financial Relevance Gate До доступа к пользовательским финансам запрос классифицируется как Financial, Financial-adjacent, Ambiguous или Unrelated. Financial получает полный доступ к разрешённым financial tools. Financial-adjacent получает ",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Рабочего AI чата/gate/tools нет. Реализованный explicit Review в Analyzer не является AI.",
       "open_gap_ids": [
@@ -8316,10 +8316,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8345,12 +8354,21 @@
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/analyzer.ts",
         "docs/architecture/web-analyzer.md",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/analyzer.spec.ts",
         "apps/web/src/demo/analyzer.test.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8376,12 +8394,21 @@
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/analyzer.ts",
         "docs/architecture/web-analyzer.md",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/analyzer.spec.ts",
         "apps/web/src/demo/analyzer.test.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8394,7 +8421,7 @@
       "title": "AI- Анализатор",
       "source_text_sha256": "e74c46531ebe6d1290a508d912d74d82193670a7305dec3900f33ce1c20e2ad3",
       "obligation_excerpt": "Добавить на Обзор Chart из ответа может быть сохранён как Overview widget с теми же filters, metric, grouping и period logic.",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Рабочего AI чата/gate/tools нет. Реализованный explicit Review в Analyzer не является AI.",
       "open_gap_ids": [
@@ -8405,10 +8432,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8434,12 +8470,21 @@
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/analyzer.ts",
         "docs/architecture/web-analyzer.md",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/analyzer.spec.ts",
         "apps/web/src/demo/analyzer.test.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8465,12 +8510,21 @@
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/analyzer.ts",
         "docs/architecture/web-analyzer.md",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/analyzer.spec.ts",
         "apps/web/src/demo/analyzer.test.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8483,7 +8537,7 @@
       "title": "AI- Анализатор",
       "source_text_sha256": "d2344cc66ac70175e3b9f56397c4e08d1dcbffde4a53e79d77d025fc8b965b9b",
       "obligation_excerpt": "Unrelated request s Если запрос не относится к финансам, Analyzer не должен использовать financial data или web search. Ответ короткий — обычно 1–2 предложения — с лёгким финансовым юмором/перенаправлением, без превращения продукта в универ",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Рабочего AI чата/gate/tools нет. Реализованный explicit Review в Analyzer не является AI.",
       "open_gap_ids": [
@@ -8494,10 +8548,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8510,7 +8573,7 @@
       "title": "AI- Анализатор",
       "source_text_sha256": "410343164761dfa25571422f5bc06321c9380a4e3d68cff5465f9e6710195ed1",
       "obligation_excerpt": "Хранение диалогов и окончание доступ а Chat хранит сообщения, ответы, structured result references, action IDs и использованный контекст, но не копию всей transaction database. После expiry финансовая часть Analyzer недоступна, однако истор",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Рабочего AI чата/gate/tools нет. Реализованный explicit Review в Analyzer не является AI.",
       "open_gap_ids": [
@@ -8521,10 +8584,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8550,12 +8622,21 @@
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/analyzer.ts",
         "docs/architecture/web-analyzer.md",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/e2e/analyzer.spec.ts",
         "apps/web/src/demo/analyzer.test.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8594,7 +8675,7 @@
       "title": "Action Registry Анализатора",
       "source_text_sha256": "0b75a7825794cc22af82b9ad6f1a43b7ef9d5469cc00140842e73665826b5908",
       "obligation_excerpt": "Почему это важно Даже если модель ошиблась в интерпретации текста, она не должна технически иметь возможность выполнить действие вне списка разрешённых команд. Action Registry превращает AI из «всемогущего агента» в строго контролируемый ин",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
       "observed": "Обычный backend mutation service проверяет permissions/preview/commit; versioned AI Action Registry и relevance/tool orchestration отсутствуют.",
       "open_gap_ids": [
@@ -8604,10 +8685,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8620,7 +8710,7 @@
       "title": "Action Registry Анализатора",
       "source_text_sha256": "eb533e722d979e236ca7157c79246402841fb365ae791726804ba670bbb094ce",
       "obligation_excerpt": "Основные группы действий Read; Accounts; Transactions; Categories; Rules; Counterparties; Budgets; Analytics; Overview; Operations UI; Interface; History; Imports; Financial Documents; Deterministic Calculators; Internet; Review.",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
       "observed": "Обычный backend mutation service проверяет permissions/preview/commit; versioned AI Action Registry и relevance/tool orchestration отсутствуют.",
       "open_gap_ids": [
@@ -8630,10 +8720,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8646,7 +8745,7 @@
       "title": "Action Registry Анализатора",
       "source_text_sha256": "eeab8540e31c4228c308ef374adab360be906751208439bf9cae189d2c44770b",
       "obligation_excerpt": "Пример команды Пользователь: «Все переводы Алексею за последние три месяца — это аренда, и делай так дальше». Analyzer: определяет intent → находит операции → предлагает rule + historical application → показывает scope → при необходимости п",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
       "observed": "Обычный backend mutation service проверяет permissions/preview/commit; versioned AI Action Registry и relevance/tool orchestration отсутствуют.",
       "open_gap_ids": [
@@ -8656,10 +8755,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8688,11 +8796,20 @@
         "apps/web/src/ServerFinance.tsx",
         "docs/architecture/exclusions-history.md",
         "docs/product/implementation-plan.md",
-        "packages/database/migrations/0009_exclusions_history.sql"
+        "packages/database/migrations/0009_exclusions_history.sql",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-history.test.ts",
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8721,11 +8838,20 @@
         "apps/web/src/ServerFinance.tsx",
         "docs/architecture/exclusions-history.md",
         "docs/product/implementation-plan.md",
-        "packages/database/migrations/0009_exclusions_history.sql"
+        "packages/database/migrations/0009_exclusions_history.sql",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/api/test/finance-history.test.ts",
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8738,7 +8864,7 @@
       "title": "Action Registry Анализатора",
       "source_text_sha256": "c0f5217cb098b497f8dbcd2bd56cc6c8ccbe3efaf4148717580802d8c5f7354f",
       "obligation_excerpt": "Результат action и partial failur e После mutation Analyzer сообщает, что конкретно изменено, сколько объектов затронуто и какой `action_id` записан в Change History; для reversible actions показывается Undo. Если действие выполнено частичн",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
       "observed": "Обычный backend mutation service проверяет permissions/preview/commit; versioned AI Action Registry и relevance/tool orchestration отсутствуют.",
       "open_gap_ids": [
@@ -8748,10 +8874,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -8979,7 +9114,7 @@
       "title": "AI- лимиты",
       "source_text_sha256": "a5408b578855e266dbf010f55323cf0df6e682d27f554763fe7a6912a9fe8a81",
       "obligation_excerpt": "Что видит пользователь В Analyzer отображается остаток, например «AI- лимит: осталось 73%». На ориентировочных уровнях 80%, 95% и 100% используются предупреждения.",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Access cycle anchor/date math реализован; AI usage/quota/reserve/cost metering отсутствует.",
       "open_gap_ids": [
@@ -8989,10 +9124,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -9005,7 +9149,7 @@
       "title": "AI- лимиты",
       "source_text_sha256": "45f64678e5e9f7fff0edb33f1189e38b57b1a7d9dc7a1281c6c1268fea5c4d02",
       "obligation_excerpt": "Что расходует лимит Обычные AI- запросы пользователя, web-assisted ответы и анализ финансовых документов. Автоматическая классификация импорта, системные recalculations, базовый Review и короткий ответ на unrelated request не должны съедать",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Access cycle anchor/date math реализован; AI usage/quota/reserve/cost metering отсутствует.",
       "open_gap_ids": [
@@ -9015,10 +9159,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -9031,7 +9184,7 @@
       "title": "AI- лимиты",
       "source_text_sha256": "3b2f384424f39eb10fd2f270888b2231afe3195a3c88bdd20a56f8498b4b20f0",
       "obligation_excerpt": "После исчерпания Overview, Operations, imports, budgets, rules и manual classification продолжают работать. Старые чаты при активном entitlement доступны для чтения. Блокируются новые обычные AI- задачи до reset или дополнительного quota.",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Access cycle anchor/date math реализован; AI usage/quota/reserve/cost metering отсутствует.",
       "open_gap_ids": [
@@ -9041,10 +9194,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -9057,7 +9219,7 @@
       "title": "AI- лимиты",
       "source_text_sha256": "03fe73df3614831d3c8467846b3d8a1736f41113630b17140a38388680d3afbd",
       "obligation_excerpt": "Период quota Для многомесячных тарифов AI quota обновляется ежемесячно по дате начала access cycle, а не первого числа календарного месяца. Досрочное продление не обнуляет текущий usage.",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Access cycle anchor/date math реализован; AI usage/quota/reserve/cost metering отсутствует.",
       "open_gap_ids": [
@@ -9067,10 +9229,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -9083,7 +9254,7 @@
       "title": "AI- лимиты",
       "source_text_sha256": "2fe6525464eac1850e5bec523cb430a0d43d261453c68646ada05719c8c2a47c",
       "obligation_excerpt": "Admin Usage Administrator видит количество/объём использования и примерную себестоимость, может добавить quota или задать individual override, но не получает содержимое финансовых чатов клиента.",
-      "registry_status_preserved": "not_verified",
+      "registry_status_preserved": "partial",
       "assessment": "not_implemented",
       "observed": "Access cycle anchor/date math реализован; AI usage/quota/reserve/cost metering отсутствует.",
       "open_gap_ids": [
@@ -9093,10 +9264,19 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/ServerFinance.tsx",
-        "docs/product/implementation-plan.md"
+        "docs/product/implementation-plan.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/analyzer.spec.ts"
+        "apps/web/e2e/analyzer.spec.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false

@@ -127,3 +127,7 @@
 ## 11 октября: полный блок Обзора
 
 Поверх бюджетов реализованы полные deterministic widgets, constructor, сравнения, точный drill-down, saved views/layouts, budgets references и History/Undo. Контракт: [overview-complete](../architecture/overview-complete.md). Exact-head проверки и статус опубликованного PR фиксируются в его описании; Production/Safari и AI provider не объявлены готовыми. Следующий блок плана — Analyzer foundations/closed Registry/quota/test adapter, затем подготовка deployment и реальное Staging acceptance.
+
+### Development: Analyzer foundations после полного Обзора
+
+В `feature/analyzer-foundation` реализованы [серверные диалоги, конечный Registry, текущие расчёты, quota ledger и synthetic adapter contract](../architecture/analyzer-foundation.md). Рабочий UI использует сохранённые данные, exact scope, общий preview/commit/History/Undo, snapshot/follow-up и privacy cascade. Требуется operator migration 0022 после 0021. Полный natural language и все Registry groups, реальный Yandex/provider acceptance, web/freshness, documents/calculators и admin usage UI остаются открыты. Следующий этап — расширение provider-backed Analyzer в согласованном объёме, затем deployment preparation и реальное Staging acceptance. Exact-head CI фиксируется в PR; Production не выпускается.

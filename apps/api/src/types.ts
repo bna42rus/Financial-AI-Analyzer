@@ -2,7 +2,7 @@ import type { PoolClient, Pool } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import type { envelope } from './crypto.ts';
 export type Profile = 'finance' | 'control';
-export type Config = { profile: Profile; pool: Pool; baseURL: string; origin: string; authSecret: string; wrappingKey: Buffer; environment: 'development' | 'test' };
+export type Config = { profile: Profile; pool: Pool; baseURL: string; origin: string; authSecret: string; wrappingKey: Buffer; environment: 'development' | 'test'; analyzerAdapter?: import('../../../packages/analyzer/src/registry.ts').AnalyzerAdapter };
 export type Sealer = ReturnType<typeof envelope>;
 export type DB = Pick<PoolClient, 'query'>;
 export class HttpError extends Error { constructor(public status: number, public code: string) { super(code); } }

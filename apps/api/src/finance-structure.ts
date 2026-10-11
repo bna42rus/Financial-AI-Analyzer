@@ -125,6 +125,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  (SELECT count(*)::int FROM finance.ingestion_row WHERE user_id=$1 AND status='pending') AS pending,
  (SELECT count(*)::int FROM finance.duplicate_candidate WHERE user_id=$1 AND (left_id=ANY($2::uuid[]) OR right_id=ANY($2::uuid[]))) AS candidates`,[userId,selected])).rows[0];
  const retained=(await db.query('SELECT id FROM finance.transaction WHERE user_id=$1 AND merged_into_id=ANY($2::uuid[]) ORDER BY id',[userId,selected])).rows.map(r=>r.id as string);
+ const analyzerChats=Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_chat WHERE user_id=$1',[userId])).rows[0].n);
  const details={kind:intent.kind,scope,destructive:true,undoable:false,reimportWarning:true,operationIds:[...selected].sort(),retainedOperationIds:retained,survivingRelatedOperationIds:survivingRelated,accountsDeleted:accountIds,aliasesDeleted:removedAliases.length,counterpartiesDeleted:counterpartyIds,counterpartyAliasesDeleted:cpAliases,rulesNeedSetup:[...changedRules,...cpRules].map(r=>r.id),counts:{operations:selected.length,retainedOperations:retained.length,observations:counts.observations,components:counts.components,links:removedLinkIds.length,history:counts.history,importSources:ingestion.sources,pendingImportRowsInvalidated:ingestion.pending,duplicateCandidates:ingestion.candidates},historyPolicy:'clear_financial_history_and_previews',pendingPayloadPolicy:'invalidate_previous_generation'};
  // Delete the closed link set in one statement before transaction FK cascades, including deep descendants.
  await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,removedLinkIds]);
@@ -140,6 +141,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  if(counterpartyIds.length)await removePartyCard(db,userId,counterpartyIds);
  // Old previews/results contain entire-workspace totals. Retain only metadata-only deletion receipts.
  await db.query("DELETE FROM finance.action WHERE user_id=$1 AND id<>$2 AND NOT(status='committed' AND COALESCE(intent->'canonical'->>'receipt','false')='true')",[userId,actionId]);
+ const survivingChats=Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_chat WHERE user_id=$1',[userId])).rows[0].n);Object.assign(details.counts,{analyzerChats:analyzerChats-survivingChats});
  await db.query('UPDATE finance.workspace SET generation=gen_random_uuid() WHERE user_id=$1',[userId]);
  return {table:'delete',id:intent.id,before:null,details};
 }

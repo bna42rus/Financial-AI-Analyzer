@@ -15,6 +15,8 @@ try {
   if (mode === 'migrate') {
     const sql = await readFile(new URL('../../../packages/database/migrations/0001_access_security.sql', import.meta.url), 'utf8');
     await db.query(sql);
+  } else if(mode==='migrate-analyzer') {
+    await db.query(await readFile(new URL('../../../packages/database/migrations/0022_analyzer_foundation.sql',import.meta.url),'utf8'));
   } else if(mode==='migrate-invitations') {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0002_invitation_registration.sql',import.meta.url),'utf8'));
   } else if(mode==='migrate-renewal') {

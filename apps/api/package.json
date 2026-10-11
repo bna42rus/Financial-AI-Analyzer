@@ -6,9 +6,9 @@
   "scripts": {
     "dev": "node --import tsx src/main.ts",
     "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts",
-    "test:integration": "pnpm run test:integration:base && node --import tsx --test --test-concurrency=1 test/overview.test.ts",
+    "test:integration": "pnpm run test:integration:base && node --import tsx --test --test-concurrency=1 test/overview.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer.test.ts",
     "operator": "node --import tsx src/operator.ts",
-    "test:browser": "pnpm run test:browser:base && node --import tsx --test --test-concurrency=1 test/overview-browser.test.ts",
+    "test:browser": "pnpm run test:browser:base && node --import tsx --test --test-concurrency=1 test/overview-browser.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer-browser.test.ts",
     "dev:mail": "node --import tsx src/mail-main.ts",
     "dev:imports": "node --import tsx src/import-main.ts",
     "test:integration:base": "node --import tsx --test --test-concurrency=1 test/security.test.ts test/mail.test.ts test/finance.test.ts test/finance-structure.test.ts test/finance-entities.test.ts test/finance-history.test.ts test/finance-reset.test.ts test/finance-chains.test.ts test/import-validation.test.ts test/import-ingestion.test.ts test/operations.test.ts test/budgets.test.ts",

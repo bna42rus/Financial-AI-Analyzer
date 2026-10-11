@@ -1,1 +1,3 @@
-Financial Relevance Gate, closed Registry, provider gateway and quota accounting. Not implemented yet.
+Versioned finite Registry, deterministic financial intents and strict synthetic provider contract. Authenticated persisted chats, server calculations, permission checks and monthly quota ledger live in `apps/api/src/analyzer.ts`; the frontend uses the same finance preview/commit and Undo services as Operations.
+
+This is the Analyzer foundation, not a production AI provider. Unknown financial language, financial-adjacent classification, documents, web/freshness, calculators and the remaining Registry groups require subsequent implementation and provider acceptance. See [contract and boundaries](../../docs/architecture/analyzer-foundation.md).
