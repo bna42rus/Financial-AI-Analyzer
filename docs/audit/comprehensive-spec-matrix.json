@@ -165,7 +165,7 @@
       "id": "G03",
       "priority": "P1",
       "title": "Бюджеты",
-      "remaining": "Нет серверной модели и рабочего UI бюджетов: periods, recurring/custom periods, account/category scopes, hierarchy, net refunds, alerts, comparison, history и deletion dependencies.",
+      "remaining": "Persistent GUI budgets delivered: filters, calendars, versioned limits, lifecycle and History/Undo. Analyzer NL/Registry and Overview budget widgets/reference lifecycle remain open; real deployment/device/load acceptance still required.",
       "pdf_sections": [
         22,
         31,
@@ -6648,19 +6648,23 @@
       "source_text_sha256": "cf8c34476acb8284c4ce9e20d8dca30994a7ef7962a174087623744ac5112846",
       "obligation_excerpt": "Budget — это не категория и не отдельный кошелёк. Это сохранённый финансовый фильтр плюс лимит и период. Такая модель позволяет создавать как простой бюджет «Рестораны — 20 000 ₽ /мес.», так и сложный «Все переменные расходы по двум счетам ",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6674,19 +6678,23 @@
       "source_text_sha256": "7c2767f67c33c55247061f4cbdb8caf9269080dbc1bc71a51cca1d87cd7d3b64",
       "obligation_excerpt": "Периоды Поддерживаются week, month, quarter, year, fixed one-off period и recurring custom period, например 15-е число одного месяца → 14-е следующего.",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6700,19 +6708,23 @@
       "source_text_sha256": "4fadc09f814ce288464e8038a0f5327b9da0a93b2af066a10369996c6dc5fcf3",
       "obligation_excerpt": "Net и Gross По умолчанию budget считает net expenses, то есть возвраты уменьшают использованный лимит. Пользователь может переключить конкретный budget на gross, если хочет контролировать первоначальные траты независимо от последующих возвр",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6726,19 +6738,23 @@
       "source_text_sha256": "c6d10fb19f8f98ea190a864164664dfc38ed5390c8ada524542fe270f13a077d",
       "obligation_excerpt": "Отрицательный net fact Если в периоде возвратов больше, чем расходов, внутренний net fact может стать отрицательным. UI не должен показывать абсурдное «остаток больше лимита». Вместо этого: «Использовано 0 ₽ » и дополнительная пометка «Возв",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6752,19 +6768,23 @@
       "source_text_sha256": "cb60504604fe9f29f88c4b55972c8a25408ebd9df702794e2c92840a8ff9cfae",
       "obligation_excerpt": "Пересекающиеся бюджеты Одна operation может участвовать в нескольких budget indicators — например «Еда» и «Все переменные расходы». Это допустимо и не означает двойной учёт в основной аналитике.",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6778,19 +6798,23 @@
       "source_text_sha256": "9137f9923e05c2107640ebb771c2567d136e80985623c07927df7a1c740facff",
       "obligation_excerpt": "No Rollover В первой версии неиспользованный лимит не переносится на следующий период. Каждый новый период начинается с установленного лимита.",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6804,19 +6828,23 @@
       "source_text_sha256": "7de794acfe99b78092572cd73235538bb90f8d4be96ecb6f007b2887f3f9ac03",
       "obligation_excerpt": "Версии лимита Изменение лимита не переписывает исторические периоды. При изменении пользователь выбирает: применить с текущего либо со следующего периода. Это позволяет корректно сравнивать историю.",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6830,19 +6858,23 @@
       "source_text_sha256": "966834bb164665c5a94aba7741288827f3b673390e0c49a4c5c805221d308b36",
       "obligation_excerpt": "Управление через Analyzer Примеры: «Создай бюджет 30 000 ₽ на рестораны в месяц», «Покажи превышенные бюджеты», «Сделай лимит на транспорт 20 000 ₽ со следующего месяца». Широкие изменения проходят обычную confirmation policy.",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6856,19 +6888,23 @@
       "source_text_sha256": "2fe87ff9e8f8fac64718a4c5a5e3716fd8587d3f9e7aa22be589bf11573d531e",
       "obligation_excerpt": "Какие операции попадают в budge t По умолчанию budget считает только включённые в аналитику operations с подходящим role и filters. Excluded operations не входят, unresolved не входят до определения смысла, если пользователь явно не создал ",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6882,19 +6918,23 @@
       "source_text_sha256": "f4587615a1fffe1343d434979f7b1e6762c0ef84f457ea78871b99f87bcf305f",
       "obligation_excerpt": "Карточка и жизненный цикл budge t Карточка показывает limit, spent, remaining, percentage, условия фильтра, period, net/gross basis, accounts и переход «Показать операции». Budget можно temporarily disable без удаления. Удаление budget удал",
       "registry_status_preserved": "not_verified",
-      "assessment": "not_implemented",
-      "observed": "Полноценный persistent Budgets отсутствует; демонстрационные/описательные элементы не считаются исполнением.",
+      "assessment": "partial_reviewed",
+      "observed": "Persistent budget filters, calendar periods, net/gross, display clamp, versions, lifecycle, History/Undo and dependency repair implemented. Analyzer NL/Registry, Overview widgets and deployment/device/load acceptance remain open; final-head CI evidence in PR.",
       "open_gap_ids": [
         "G03"
       ],
       "fixed_finding_ids": [],
       "implementation_refs": [
-        "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
-        "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -17479,14 +17519,22 @@
         "packages/database/migrations/0006_finance_foundation.sql",
         "packages/finance-core/src/graph.ts",
         "packages/finance-core/src/model.ts",
-        "packages/finance-core/src/rules.ts"
+        "packages/finance-core/src/rules.ts",
+        "packages/finance-core/src/budgets.ts",
+        "apps/api/src/budgets.ts",
+        "apps/web/src/ServerBudgets.tsx",
+        "packages/database/migrations/0020_budgets.sql",
+        "docs/architecture/budgets-periods-versions.md"
       ],
       "verification_refs": [
         "apps/api/test/browser.test.ts",
         "apps/api/test/finance.test.ts",
         "apps/api/test/security.test.ts",
         "docs/architecture/invitation-registration.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/budgets.test.ts",
+        "apps/api/test/budgets.test.ts",
+        "apps/api/test/budgets-browser.test.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false

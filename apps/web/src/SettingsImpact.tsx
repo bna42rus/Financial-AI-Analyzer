@@ -1,9 +1,11 @@
 import type {FinanceState} from './finance-client';
+import {formatMoney} from './demo/overview';
 import {roleNames} from './finance-client';
 const labels:Record<string,string>={merge_accounts:'Объединение счетов',split_account:'Разделение счёта',merge_categories:'Объединение категорий',delete_category:'Удаление категории',migrate_category:'Перенос категории',merge_counterparties:'Объединение контрагентов',split_counterparty:'Разделение контрагента',delete_counterparty:'Удаление контрагента',delete_rule:'Удаление правила',apply_rules:'Применение правил к прошлым операциям'};
 const array=(v:unknown):unknown[]=>Array.isArray(v)?v:[];
 const rows=(v:unknown)=>array(v).filter((r):r is Record<string,unknown>=>!!r&&typeof r==='object');
 export function SettingsImpact({details:d,finance:s}:{details:{kind:string}&Record<string,unknown>;finance?:FinanceState|null}){
+ if(['save_budget','set_budget_limit','delete_budget'].includes(d.kind))return <section aria-label="Последствия изменения бюджета"><h3>{d.kind==='delete_budget'?'Удаление бюджета':d.kind==='set_budget_limit'?'Новый лимит':'Условия бюджета'}</h3><p>Бюджет «{String(d.name)}».</p>{d.limitMinor!==undefined&&<p>Лимит: {formatMoney(String(d.limitMinor))}. Применяется с {String(d.effectiveFrom)}.</p>}{d.kind==='save_budget'&&<p>{d.enabled?'Бюджет включён.':'Бюджет приостановлен.'} Лимит: {formatMoney(String(rows(d.limits).at(-1)?.limitMinor??'0'))}. Возвраты {((d.definition as {basis?:string})?.basis==='gross')?'не уменьшают лимит.':'уменьшают использованный лимит.'}</p>}<p>Финансовые операции сохранятся. Изменение записывается в историю; Undo доступен 30 дней, пока нет конфликтующих решений.</p></section>;
  if(!(d.kind in labels))return null;
  const names=(ids:unknown)=>array(ids).map(id=>s?.accounts.find(a=>a.id===id)?.name??s?.categories.find(c=>c.id===id)?.name??s?.counterparties.find(p=>p.id===id)?.name??s?.rules.find(r=>r.id===id)?.name??'Карточка');
  const destination=(id:unknown)=>s?.accounts.find(a=>a.id===id)?.name??s?.counterparties.find(p=>p.id===id)?.name??rows(d.newAccounts??d.newParties).find(r=>r.id===id)?.name??(id===null?'Без контрагента':'Выбранная карточка');
