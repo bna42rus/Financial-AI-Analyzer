@@ -46,13 +46,14 @@ jobs:
       - name: Check auth, TOTP, recovery, ownership and database roles on PostgreSQL 18
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
-        run: pnpm run test:security
+        # Overview has its own PostgreSQL/browser job below; run each large suite once.
+        run: pnpm --filter @finance/api run test:integration:base
       - name: Install browser for interface checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
       - name: Check full application, payment review and registration over HTTP with PostgreSQL
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
-        run: pnpm run test:access-browser
+        run: pnpm --filter @finance/api run test:browser:base
       - name: Save real PostgreSQL Operations desktop and mobile previews
         uses: actions/upload-artifact@v4
         with:
