@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui, feature/import-review-expansion, feature/local-tabular-ocr, feature/comprehensive-spec-audit, feature/operations-views-pagination, feature/budgets-periods-versions]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui, feature/import-review-expansion, feature/local-tabular-ocr, feature/comprehensive-spec-audit, feature/operations-views-pagination, feature/budgets-periods-versions, feature/overview-complete]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:
@@ -253,4 +253,60 @@ jobs:
           name: local-import-failure-diagnostics
           path: apps/web/test-results/
           if-no-files-found: ignore
+          retention-days: 7
+
+  analyzer-checks:
+    name: analyzer-checks
+    runs-on: ubuntu-latest
+    # Real PostgreSQL and HTTP suites include saved-chat and confirmed-action browser journeys.
+    # Individual request/test timeouts still detect stalled operations.
+    timeout-minutes: 20
+    services:
+      postgres:
+        # Docker Official Images mirror avoids Docker Hub shared-runner pull limits.
+        # https://www.docker.com/blog/news-from-aws-reinvent-docker-official-images-on-amazon-ecr-public/
+        image: public.ecr.aws/docker/library/postgres:18.4
+        env:
+          POSTGRES_PASSWORD: synthetic-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Reject known high and critical dependency advisories
+        run: pnpm audit --audit-level=high
+      - name: Check API types for analyzer scenarios
+        run: pnpm run check:api
+      - name: Check Analyzer gate, scope, quotas, tenant isolation and deletion on PostgreSQL 18
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer.test.ts
+      - name: Install browser for interface checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check Analyzer saved chats, confirmation, reload and Undo in real browsers
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-browser.test.ts
+      - name: Check analyzer drafts, comparisons, delayed responses and access loss in desktop and mobile browsers
+        run: pnpm --filter @finance/web exec playwright test e2e/analyzer-connected.spec.ts
+      - name: Save real PostgreSQL Analyzer desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-previews
+          path: |
+            apps/api/analyzer-previews/*.png
+            apps/web/test-results/**/analyzer-connected.png
+          if-no-files-found: error
           retention-days: 7

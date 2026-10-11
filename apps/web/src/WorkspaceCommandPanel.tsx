@@ -11,7 +11,7 @@ function CancellationImpact({details}:{details:CancelImportDetails}){
  return <section aria-label="Последствия отмены импорта"><p>Отменяемых файлов: {details.counts.files}. Физически удалится операций: {details.counts.operations}. Останутся благодаря другим источникам: {details.counts.sharedOperations}.</p>
  <p>Источников будет удалено: {details.counts.observations}. Частей операций: {details.counts.components}.</p><p>Связей для пересчёта: {details.counts.linksRecalculated}. Остановится строк выбранных файлов: {details.counts.pendingRows}.</p>
  {details.counts.manualEdits>0&&<p role="alert">Удаляемых операций с ручными правками: {details.counts.manualEdits}. Эти правки исчезнут вместе с операциями.</p>}
- <p>Записей финансовой истории будет очищено: {details.counts.history}. Отмена необратима через Undo; восстановление — повторной загрузкой исходного файла. Пустые счета сохранятся.</p>
+ {details.counts.analyzerChats!==undefined&&<p>Зависимых диалогов будет удалено: {details.counts.analyzerChats}.</p>}<p>Записей финансовой истории будет очищено: {details.counts.history}. Отмена необратима через Undo; восстановление — повторной загрузкой исходного файла. Пустые счета сохранятся.</p>
  {!!details.sourceRestorations.length&&<details><summary>Какие банковские данные восстановятся</summary><ul>{details.sourceRestorations.map((r,i)=><li key={r.operationId}>Операция {i+1}: {displayBankDate(r.before.operationDate,'Europe/Moscow')} · {formatMoney(r.before.amountMinor)} · {r.before.merchantText||r.before.description||'Без описания'} → {displayBankDate(r.after.operationDate,'Europe/Moscow')} · {formatMoney(r.after.amountMinor)} · {r.after.merchantText||r.after.description||'Без описания'}. Ручные правки сохранятся.</li>)}</ul></details>}
  </section>;
 }

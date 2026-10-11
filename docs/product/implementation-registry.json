@@ -5921,10 +5921,22 @@
       "title": "AI- Анализатор",
       "source_text": "Financial Relevance Gate До доступа к пользовательским финансам запрос классифицируется как Financial, Financial-adjacent, Ambiguous или Unrelated. Financial получает полный доступ к разрешённым financial tools. Financial-adjacent получает только финансовую часть. Ambiguous вызывает короткое уточнение. Unrelated не читает финансовую БД и не запускает web search; вместо содержательного ответа даётся короткое финансовое перенаправление.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.2",
@@ -5938,15 +5950,25 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/demo/analyzer.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/analyzer.test.ts",
         "apps/web/e2e/analyzer.spec.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.3",
@@ -5960,15 +5982,25 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/demo/analyzer.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/analyzer.test.ts",
         "apps/web/e2e/analyzer.spec.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.4",
@@ -5978,10 +6010,22 @@
       "title": "AI- Анализатор",
       "source_text": "Добавить на Обзор Chart из ответа может быть сохранён как Overview widget с теми же filters, metric, grouping и period logic.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.5",
@@ -5995,15 +6039,25 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/demo/analyzer.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/analyzer.test.ts",
         "apps/web/e2e/analyzer.spec.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.6",
@@ -6017,15 +6071,25 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/demo/analyzer.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/analyzer.test.ts",
         "apps/web/e2e/analyzer.spec.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.7",
@@ -6035,10 +6099,22 @@
       "title": "AI- Анализатор",
       "source_text": "Unrelated request s Если запрос не относится к финансам, Analyzer не должен использовать financial data или web search. Ответ короткий — обычно 1–2 предложения — с лёгким финансовым юмором/перенаправлением, без превращения продукта в универсальный чат. Повторные unrelated- запросы не снимают это ограничение.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.8",
@@ -6048,10 +6124,22 @@
       "title": "AI- Анализатор",
       "source_text": "Хранение диалогов и окончание доступ а Chat хранит сообщения, ответы, structured result references, action IDs и использованный контекст, но не копию всей transaction database. После expiry финансовая часть Analyzer недоступна, однако история чатов сохраняется и снова становится доступной после восстановления entitlement; в restricted mode новые financial AI- запросы не выполняются.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-26.9",
@@ -6065,15 +6153,25 @@
       "implementation_refs": [
         "apps/web/src/Analyzer.tsx",
         "apps/web/src/demo/analyzer.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/analyzer.test.ts",
         "apps/web/e2e/analyzer.spec.ts",
-        "docs/architecture/web-analyzer.md"
+        "docs/architecture/web-analyzer.md",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт."
+      "implementation_note": "Только локальная UI-демонстрация: отдельные диалоги и черновики, история, четыре конечных вопроса и один follow-up с текущим перерасчётом/историческим snapshot, scope и расчёт, preview+переход. Не подтверждены AI/semantic context/Registry/права/entitlement/quota/persistence/privacy pipeline; mobile Chromium и сокращённая высота не заменяют реальный iOS keyboard/Review. Полный пункт не закрыт.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-27",
@@ -6096,10 +6194,22 @@
       "title": "Action Registry Анализатора",
       "source_text": "Почему это важно Даже если модель ошиблась в интерпретации текста, она не должна технически иметь возможность выполнить действие вне списка разрешённых команд. Action Registry превращает AI из «всемогущего агента» в строго контролируемый интерфейс к бизнес-логике.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-27.2",
@@ -6109,10 +6219,22 @@
       "title": "Action Registry Анализатора",
       "source_text": "Основные группы действий Read; Accounts; Transactions; Categories; Rules; Counterparties; Budgets; Analytics; Overview; Operations UI; Interface; History; Imports; Financial Documents; Deterministic Calculators; Internet; Review.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-27.3",
@@ -6122,10 +6244,22 @@
       "title": "Action Registry Анализатора",
       "source_text": "Пример команды Пользователь: «Все переводы Алексею за последние три месяца — это аренда, и делай так дальше». Analyzer: определяет intent → находит операции → предлагает rule + historical application → показывает scope → при необходимости получает confirmation → backend валидирует → создаёт rule и изменяет выбранные operations → action_id записывается в History.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-27.4",
@@ -6142,13 +6276,23 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
+      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-27.5",
@@ -6165,13 +6309,23 @@
         "apps/api/src/finance.ts",
         "apps/api/src/server.ts",
         "packages/database/migrations/0009_exclusions_history.sql",
-        "docs/architecture/exclusions-history.md"
+        "docs/architecture/exclusions-history.md",
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
       ],
       "verification_refs": [
-        "apps/api/test/finance-history.test.ts"
+        "apps/api/test/finance-history.test.ts",
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
       ],
       "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
-      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR."
+      "note": " Exclusions/history fourth server block: explicit operation/filter/confirmed-chain overrides preserve bank facts; versioned before-after journal, 30-day scoped history/filter/cursor, atomic selected rollback and object/dependency/ABA conflicts. Deep delete clears journals/indexes. UI/Analyzer disclosure, pre-migration after deltas, automatic import grouping, scheduled retention, budgets/views/widgets and full reset/future cascades remain pending. Full clause partial; exact-head evidence in PR.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-27.6",
@@ -6181,10 +6335,22 @@
       "title": "Action Registry Анализатора",
       "source_text": "Результат action и partial failur e После mutation Analyzer сообщает, что конкретно изменено, сколько объектов затронуто и какой `action_id` записан в Change History; для reversible actions показывается Undo. Если действие выполнено частично, результат разделяет succeeded/failed и не выдаёт общий статус «Готово».",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-28",
@@ -6298,10 +6464,22 @@
       "title": "AI- лимиты",
       "source_text": "Что видит пользователь В Analyzer отображается остаток, например «AI- лимит: осталось 73%». На ориентировочных уровнях 80%, 95% и 100% используются предупреждения.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-29.2",
@@ -6311,10 +6489,22 @@
       "title": "AI- лимиты",
       "source_text": "Что расходует лимит Обычные AI- запросы пользователя, web-assisted ответы и анализ финансовых документов. Автоматическая классификация импорта, системные recalculations, базовый Review и короткий ответ на unrelated request не должны съедать пользовательскую quota.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-29.3",
@@ -6324,10 +6514,22 @@
       "title": "AI- лимиты",
       "source_text": "После исчерпания Overview, Operations, imports, budgets, rules и manual classification продолжают работать. Старые чаты при активном entitlement доступны для чтения. Блокируются новые обычные AI- задачи до reset или дополнительного quota.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-29.4",
@@ -6337,10 +6539,22 @@
       "title": "AI- лимиты",
       "source_text": "Период quota Для многомесячных тарифов AI quota обновляется ежемесячно по дате начала access cycle, а не первого числа календарного месяца. Досрочное продление не обнуляет текущий usage.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-29.5",
@@ -6350,10 +6564,22 @@
       "title": "AI- лимиты",
       "source_text": "Admin Usage Administrator видит количество/объём использования и примерную себестоимость, может добавить quota или задать individual override, но не получает содержимое финансовых чатов клиента.",
       "group": "analyzer",
-      "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст."
+      "status": "partial",
+      "implementation_refs": [
+        "packages/analyzer/src/registry.ts",
+        "apps/api/src/analyzer.ts",
+        "apps/web/src/ServerAnalyzer.tsx",
+        "packages/database/migrations/0022_analyzer_foundation.sql",
+        "docs/architecture/analyzer-foundation.md"
+      ],
+      "verification_refs": [
+        "packages/analyzer/test/registry.test.ts",
+        "apps/api/test/analyzer.test.ts",
+        "apps/api/test/analyzer-browser.test.ts",
+        "apps/web/e2e/analyzer-connected.spec.ts"
+      ],
+      "verification_plan": "Financial relevance gate; закрытый Registry; права до preview и commit; текущие данные, quota, freshness и минимальный очищенный внешний контекст.",
+      "verification_notes": "Analyzer foundations: finite commands and synthetic provider contract. Partial; full semantic AI, all Registry groups, live provider/web/documents/admin quota and Staging acceptance remain open. Exact-head results in PR."
     },
     {
       "id": "PDF-30",

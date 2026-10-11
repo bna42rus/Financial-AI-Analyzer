@@ -1,0 +1,9 @@
+.layout {height:min(760px, calc(100dvh - 240px));min-height:480px;width:100%;margin-top:16px;}
+.tableWrap {overflow-x:auto;width:100%;}
+.tableWrap table {border-collapse:collapse;width:100%;font-size:calc(13px * var(--text-scale,1));}
+.tableWrap th,.tableWrap td {padding:8px;border-bottom:1px solid var(--color-border);text-align:left;}
+.tableWrap td:last-child {white-space:nowrap;text-align:right;}
+.tableWrap button {text-align:left;overflow-wrap:anywhere;}
+@media(max-width:700px){.layout{height:calc(100dvh - 180px);min-height:440px;}}
+.total {container-type:inline-size;}
+.total strong {display:block;max-width:100%;white-space:nowrap;overflow-x:auto;font-size:clamp(18px,12cqi,32px);}
