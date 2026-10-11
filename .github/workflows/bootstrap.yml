@@ -105,6 +105,8 @@ jobs:
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/budgets-browser.test.ts
+      - name: Check budget drafts, delayed responses and access loss in desktop and mobile browsers
+        run: pnpm --filter @finance/web exec playwright test e2e/budgets.spec.ts
       - name: Save real PostgreSQL Budget desktop and mobile previews
         uses: actions/upload-artifact@v4
         with:
