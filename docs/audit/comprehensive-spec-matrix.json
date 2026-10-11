@@ -6232,7 +6232,7 @@
       "obligation_excerpt": "Обзор — главный аналитический экран. Его задача не в том, чтобы показать максимально много цифр, а в том, чтобы за несколько секунд ответить на основные вопросы: сколько потрачено, сколько получено, что изменилось, какие категории растут, к",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6240,11 +6240,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6259,7 +6271,7 @@
       "obligation_excerpt": "Основные показатели Стандартные KPI: Расходы, Доходы, Разница и Требуют внимания. «Расходы» показываются в net- логике: gross expenses минус связанные возвраты и компенсации. «Разница» = доходы − net expenses и не является банковским баланс",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6269,14 +6281,26 @@
         "apps/web/src/App.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/overview.spec.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6291,7 +6315,7 @@
       "obligation_excerpt": "Карточка «Требуют внимания» Считает именно transactions с активными `review_reasons`. Системные предупреждения, например «не загружена детализация кредитной карты» или «один файл не распознан», выводятся отдельными banners, чтобы число в ка",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6301,14 +6325,26 @@
         "apps/web/src/App.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/overview.spec.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6323,7 +6359,7 @@
       "obligation_excerpt": "Виджеты Базовые widgets: расходы по категориям, доходы по категориям, динамика, сравнение периодов, крупнейшие категории, крупнейшие операции, budgets и requires attention. Дополнительный каталог может включать refunds, reimbursements, loan",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6333,14 +6369,26 @@
         "apps/web/src/App.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/overview.spec.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6355,7 +6403,7 @@
       "obligation_excerpt": "Custom Widget Пользователь может создать собственный блок и выбрать metric, grouping, period, filters, chart type, comparison, top N и sort. Например: «Расходы на такси по месяцам за год» или «Проценты по кредитам по счетам».",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6363,11 +6411,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6382,7 +6442,7 @@
       "obligation_excerpt": "Почему готовый виджет расходов не смешивает разные сущности Виджет «Расходы по категориям» должен оставаться именно анализом расходов. Собственные переводы, cash movements и нейтральные операции не следует добавлять туда только потому, что ",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6392,14 +6452,26 @@
         "apps/web/src/App.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/overview.spec.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6414,7 +6486,7 @@
       "obligation_excerpt": "Переход в операции Tap/click по сегменту или строке аналитики открывает Operations с уже установленным соответствующим контекстом. Например, нажатие на «Рестораны — 31 200 ₽ » открывает список этих операций за выбранный период.",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6425,7 +6497,15 @@
         "apps/web/src/Operations.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/operations.spec.ts",
@@ -6433,7 +6513,11 @@
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6448,7 +6532,7 @@
       "obligation_excerpt": "«Как рассчитано» Для ключевых показателей пользователь может открыть диагностический breakdown: количество операций, gross, refunds, reimbursements, excluded, neutral, unresolved и активные filters. Это механизм доверия: число не должно быт",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6458,14 +6542,26 @@
         "apps/web/src/App.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/overview.spec.ts",
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6480,7 +6576,7 @@
       "obligation_excerpt": "Saved Views и layout Обзор — настраиваемое рабочее пространство. Widgets можно двигать, скрывать, дублировать и менять размер. Набор filters + widgets + layout сохраняется как named Overview View. Период может быть dynamic («текущий месяц»)",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6488,11 +6584,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6507,7 +6615,7 @@
       "obligation_excerpt": "Схема взаимодействия Глобальные фильтры → Widgets → пользователь выбирает показатель → Operations с контекстом → при необходимости Operation Card или Review. Таким образом аналитика всегда связана с исходными операциями, а не существует отд",
       "registry_status_preserved": "partial",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6518,7 +6626,15 @@
         "apps/web/src/Operations.tsx",
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/demo/overview.ts",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/operations.spec.ts",
@@ -6526,7 +6642,11 @@
         "apps/web/e2e/server-workspace.spec.ts",
         "apps/web/src/demo/overview.test.ts",
         "docs/architecture/web-overview.md",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6541,7 +6661,7 @@
       "obligation_excerpt": "Режимы представления каждого аналитического widge t Для аналитического widget доступны два независимых слоя отображения: graph и text analysis. Пользователь может оставить только график, только текст или оба варианта, но хотя бы один должен",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6549,11 +6669,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6568,7 +6700,7 @@
       "obligation_excerpt": "Сравнения и отсутствие балансо в Сравнение поддерживает previous same period, previous month/year и custom comparison period. В Overview намеренно нет банковских balances: приложение анализирует потоки операций, а не пытается восстановить т",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6576,11 +6708,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6595,7 +6739,7 @@
       "obligation_excerpt": "Параметры Custom Widge t Метрики первой версии могут включать expenses, income, refunds/reimbursements, own transfers, transfers, loan payments/costs, fees, cash, operation count, budget и разрешённые комбинации. Grouping: time, category, s",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6603,11 +6747,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -6622,7 +6778,7 @@
       "obligation_excerpt": "Типы графиков и merchant s Базовые визуализации первой версии: bar, line и pie/donut там, где доли действительно помогают чтению данных. Для сложных выборок система может предпочесть table/text вместо декоративного графика. В Custom Widget ",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected Overview использует server core totals/filter context, exact net/gross/refund explanations и category drilldown.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G22"
@@ -6630,11 +6786,23 @@
       "fixed_finding_ids": [],
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
-        "packages/finance-core/src/graph.ts"
+        "packages/finance-core/src/graph.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "packages/finance-core/test/graph.test.ts"
+        "packages/finance-core/test/graph.test.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -14461,7 +14629,7 @@
       "obligation_excerpt": "Overview KPI могут идти по две карточки в ряд; аналитические widgets обычно на всю ширину. Mobile widget order хранится отдельно от desktop. Tap по графику показывает значение и «Показать операции».",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected routes и desktop/mobile Chromium сценарии покрывают узкие workflows; full mobile layouts/device acceptance не завершены.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G05",
@@ -14472,11 +14640,23 @@
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/ServerOperation.tsx",
-        "apps/web/src/ServerSettings.tsx"
+        "apps/web/src/ServerSettings.tsx",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "apps/web/e2e/shell.spec.ts"
+        "apps/web/e2e/shell.spec.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
@@ -14629,7 +14809,7 @@
       "obligation_excerpt": "Upload, empty states и restricted mode на mobil e Загрузка использует системный file picker и поддерживает multiple selection там, где это позволяет OS. Empty Overview/Operations ведут к понятному CTA загрузки, а не показывают пустые deskto",
       "registry_status_preserved": "not_verified",
       "assessment": "partial_reviewed",
-      "observed": "Connected routes и desktop/mobile Chromium сценарии покрывают узкие workflows; full mobile layouts/device acceptance не завершены.",
+      "observed": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками.",
       "open_gap_ids": [
         "G04",
         "G05",
@@ -14640,11 +14820,23 @@
       "implementation_refs": [
         "apps/web/src/ServerFinance.tsx",
         "apps/web/src/ServerOperation.tsx",
-        "apps/web/src/ServerSettings.tsx"
+        "apps/web/src/ServerSettings.tsx",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/e2e/server-workspace.spec.ts",
-        "apps/web/e2e/shell.spec.ts"
+        "apps/web/e2e/shell.spec.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "evidence_scope": "Ссылки на код/тесты подтверждают только реализованные части. Passing test не означает full-clause acceptance.",
       "full_clause_verified": false
