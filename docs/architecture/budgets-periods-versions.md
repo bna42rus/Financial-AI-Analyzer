@@ -20,7 +20,7 @@ Account/counterparty/category merges переназначают ссылки; am
 
 ## Интерфейс и проверка
 
-Settings → Budgets: создание и редактирование условий, точные карточки/расшифровка, просмотр периода по дате, версии лимита, current/next, временное выключение, подтверждение удаления и переход в Operations с теми же условиями. Общие filters не ограничивают сохранённый budget. Устаревшая форма блокируется при новой revision; поздние ответы не возвращаются после unmount/access loss. Формы не сохраняют финансы в browser storage.
+Settings → Budgets: создание и редактирование условий, точные карточки/расшифровка, просмотр периода по дате, версии лимита, current/next, временное выключение, подтверждение удаления и переход в Operations с теми же условиями. Общие filters не ограничивают сохранённый budget. Устаревшая форма блокируется при новой revision; поздние ответы не возвращаются после unmount/access loss. Отмена preview сохраняет черновик; чужая последующая revision блокирует его, но не закрывает. Форма закрывается после подтверждённого собственного action receipt. Формы не сохраняют финансы в browser storage.
 
 Проверки: core calendar/BigInt/negative net/15 001 rows; PostgreSQL preview/commit/idempotency, refund across periods, components, explicit excluded, versions/Undo, period crossing, anchor invariants, deletion/reset, tenant roles, stale writes, 15 003 rows; реальные HTTP/Chromium journeys desktop/mobile — create/confirm/next/reload/disable/drilldown/delete/Undo. Полные результаты относятся только к final head и записываются в PR после CI. Short budget job повторяет тот же subset и не прибавляется к общему числу уникальных тестов.
 
