@@ -122,3 +122,8 @@
 ### Development: локальные таблицы и OCR после PR №32
 
 В `feature/local-tabular-ocr` добавлены [CSV/XLSX, local OCR и конечные cash/transfer signals](../architecture/local-tabular-ocr.md). Самоописывающиеся таблицы не требуют mapping wizard; неизвестные структуры блокируются до будущего AI fallback. OCR assets строятся из pinned dependencies и загружаются только с того же сайта, cache выключен; OCR не создаёт merchant/strict description evidence. `bank-local/1` / `bank-source/3` сохраняют legacy readers и записывают parser на каждую source observation. Migration 0018 после 0017 обязательна; после первого нового import нужны compatible reader/worker или forward-fix. Exact-head CI и screenshots фиксируются в PR. Реальные bank exports, mobile Safari/device corpus, arbitrary sanitized descriptions, unknown-format AI fallback и final classification/link matching остаются открыты.
+
+
+## 11 октября: полный блок Обзора
+
+Поверх бюджетов реализованы полные deterministic widgets, constructor, сравнения, точный drill-down, saved views/layouts, budgets references и History/Undo. Контракт: [overview-complete](../architecture/overview-complete.md). Exact-head проверки и статус опубликованного PR фиксируются в его описании; Production/Safari и AI provider не объявлены готовыми. Следующий блок плана — Analyzer foundations/closed Registry/quota/test adapter, затем подготовка deployment и реальное Staging acceptance.

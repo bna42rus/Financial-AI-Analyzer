@@ -4487,9 +4487,24 @@
       "source_text": "Обзор — главный аналитический экран. Его задача не в том, чтобы показать максимально много цифр, а в том, чтобы за несколько секунд ответить на основные вопросы: сколько потрачено, сколько получено, что изменилось, какие категории растут, какие бюджеты превышены и где данные требуют внимания.",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.1",
@@ -4502,15 +4517,28 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.2",
@@ -4523,15 +4551,28 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.3",
@@ -4544,15 +4585,28 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.4",
@@ -4563,9 +4617,24 @@
       "source_text": "Custom Widget Пользователь может создать собственный блок и выбрать metric, grouping, period, filters, chart type, comparison, top N и sort. Например: «Расходы на такси по месяцам за год» или «Проценты по кредитам по счетам».",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.5",
@@ -4578,15 +4647,28 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.6",
@@ -4600,16 +4682,29 @@
       "implementation_refs": [
         "apps/web/src/App.tsx",
         "apps/web/src/demo/overview.ts",
-        "apps/web/src/Operations.tsx"
+        "apps/web/src/Operations.tsx",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
         "docs/architecture/web-overview.md",
-        "apps/web/e2e/operations.spec.ts"
+        "apps/web/e2e/operations.spec.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Обзор открывает Операции с выбранными IDs и общими фильтрами; карточка только для чтения искусственных данных. Реальное общее ядро, полные Review/actions/API и серверные права предстоят; полный пункт не закрыт."
+      "implementation_note": "Обзор открывает Операции с выбранными IDs и общими фильтрами; карточка только для чтения искусственных данных. Реальное общее ядро, полные Review/actions/API и серверные права предстоят; полный пункт не закрыт.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.7",
@@ -4622,15 +4717,28 @@
       "status": "partial",
       "implementation_refs": [
         "apps/web/src/App.tsx",
-        "apps/web/src/demo/overview.ts"
+        "apps/web/src/demo/overview.ts",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
-        "docs/architecture/web-overview.md"
+        "docs/architecture/web-overview.md",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations."
+      "implementation_note": "Первая оболочка/Обзор на явно включаемой искусственной UI-проекции; локальные проверки прошли. Полный пункт не закрыт: реальные данные, финансовое ядро, остальные экраны/виджеты, API, сохранение и права предстоят. Drilldown пока открывает окно чтения, а не Operations.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.8",
@@ -4641,9 +4749,24 @@
       "source_text": "Saved Views и layout Обзор — настраиваемое рабочее пространство. Widgets можно двигать, скрывать, дублировать и менять размер. Набор filters + widgets + layout сохраняется как named Overview View. Период может быть dynamic («текущий месяц») или fixed («01.09–30.09»). Desktop и mobile layouts хранятся отдельно.",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.9",
@@ -4657,16 +4780,29 @@
       "implementation_refs": [
         "apps/web/src/App.tsx",
         "apps/web/src/demo/overview.ts",
-        "apps/web/src/Operations.tsx"
+        "apps/web/src/Operations.tsx",
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
       ],
       "verification_refs": [
         "apps/web/src/demo/overview.test.ts",
         "apps/web/e2e/overview.spec.ts",
         "docs/architecture/web-overview.md",
-        "apps/web/e2e/operations.spec.ts"
+        "apps/web/e2e/operations.spec.ts",
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
       ],
       "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
-      "implementation_note": "Обзор открывает Операции с выбранными IDs и общими фильтрами; карточка только для чтения искусственных данных. Реальное общее ядро, полные Review/actions/API и серверные права предстоят; полный пункт не закрыт."
+      "implementation_note": "Обзор открывает Операции с выбранными IDs и общими фильтрами; карточка только для чтения искусственных данных. Реальное общее ядро, полные Review/actions/API и серверные права предстоят; полный пункт не закрыт.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.10",
@@ -4677,9 +4813,24 @@
       "source_text": "Режимы представления каждого аналитического widge t Для аналитического widget доступны два независимых слоя отображения: graph и text analysis. Пользователь может оставить только график, только текст или оба варианта, но хотя бы один должен быть включён. Базовый текст строится deterministic- логикой из рассчитанных значений; AI нужен только для более глубокого объяснения по явному запросу, а не для того, чтобы каждый раз «придумывать» подпись к графику.",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.11",
@@ -4690,9 +4841,24 @@
       "source_text": "Сравнения и отсутствие балансо в Сравнение поддерживает previous same period, previous month/year и custom comparison period. В Overview намеренно нет банковских balances: приложение анализирует потоки операций, а не пытается восстановить точный остаток по счёту из неполных statements. Поэтому KPI «Разница» нельзя подписывать или интерпретировать как баланс.",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.12",
@@ -4703,9 +4869,24 @@
       "source_text": "Параметры Custom Widge t Метрики первой версии могут включать expenses, income, refunds/reimbursements, own transfers, transfers, loan payments/costs, fees, cash, operation count, budget и разрешённые комбинации. Grouping: time, category, subcategory, account, bank, kind, role, counterparty, merchant. Time granularity: auto, day, week, month, quarter, year. Локальные filters widget- а могут переопределять глобальный контекст только явно и должны отображаться в его настройках.",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-21.13",
@@ -4716,9 +4897,24 @@
       "source_text": "Типы графиков и merchant s Базовые визуализации первой версии: bar, line и pie/donut там, где доли действительно помогают чтению данных. Для сложных выборок система может предпочесть table/text вместо декоративного графика. В Custom Widget пользователь может включать/исключать отдельные categories из отображения, управлять labels/legend и top N. Отдельный стандартный блок «Top merchants» показывает крупнейших получателей расходов в выбранном контексте с переходом в Operations.",
       "group": "overview",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Одинаковые расчёты со всеми экранами; объяснение сумм, signed графики, виджеты и saved views; календарные бюджеты и версии лимитов.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-22",
@@ -9725,9 +9921,24 @@
       "source_text": "Overview KPI могут идти по две карточки в ряд; аналитические widgets обычно на всю ширину. Mobile widget order хранится отдельно от desktop. Tap по графику показывает значение и «Показать операции».",
       "group": "ux-support",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-47.3",
@@ -9817,9 +10028,24 @@
       "source_text": "Upload, empty states и restricted mode на mobil e Загрузка использует системный file picker и поддерживает multiple selection там, где это позволяет OS. Empty Overview/Operations ведут к понятному CTA загрузки, а не показывают пустые desktop- таблицы. При expired/suspended access mobile так же переходит в restricted mode: financial navigation скрывается, но Renewal, Security, Support и deletion controls остаются доступны.",
       "group": "ux-support",
       "status": "not_verified",
-      "implementation_refs": [],
-      "verification_refs": [],
-      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs."
+      "implementation_refs": [
+        "packages/finance-core/src/overview.ts",
+        "packages/finance-core/src/metrics.ts",
+        "apps/api/src/overview.ts",
+        "apps/web/src/ServerOverview.tsx",
+        "apps/web/src/OverviewWidgetEditor.tsx",
+        "apps/web/src/OverviewChart.tsx",
+        "packages/database/migrations/0021_overview_views.sql",
+        "docs/architecture/overview-complete.md"
+      ],
+      "verification_refs": [
+        "packages/finance-core/test/overview.test.ts",
+        "apps/api/test/overview.test.ts",
+        "apps/api/test/overview-browser.test.ts",
+        "apps/web/e2e/overview-connected.spec.ts"
+      ],
+      "verification_plan": "Mobile/keyboard/ARIA; понятные ошибки и partial progress; отсутствие утечек в support и технических logs.",
+      "note": "Overview Development: полный deterministic каталог/constructor, comparisons, exact point selectors, saved views и independent desktop/mobile layouts, budget references, History/Undo и privacy/concurrency guards. Exact-head CI в PR; deep AI, real environment/Safari и profile settings остаются отдельными блоками."
     },
     {
       "id": "PDF-48",

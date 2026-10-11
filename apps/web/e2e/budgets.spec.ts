@@ -1,3 +1,4 @@
+import {calculateOverview,defaultOverview} from '../../../packages/finance-core/src/overview';
 import {test,expect} from '@playwright/test';
 import type {Page} from '@playwright/test';
 import {createServer} from 'vite';
@@ -15,6 +16,8 @@ async function setup(page:Page){const detail=syntheticDetail(),op={...detail.pro
  await page.route('http://127.0.0.1:3000/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname,body=req.postDataJSON()??{},headers={'Access-Control-Allow-Origin':req.headers().origin??new URL(base).origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});calls.push({path,body});let result:unknown={},status=200;
  if(path==='/session')result={name:'Synthetic user',scope:blocked?'restricted':'active',capabilities:['finance'],indefinite:true,timezone:'Europe/Moscow'};
  else if(blocked&&path.startsWith('/finance/')){result={code:'FINANCE_ACCESS_REQUIRED'};status=403;}
+ else if(path==='/finance/overview-views')result={views:[]};
+ else if(path==='/finance/overview')result={generation:state.generation,revision:state.revision,timezone:'Europe/Moscow',budgetOptions:budgets.map(b=>({id:b.id,name:b.name})),...calculateOverview(state.operations,{...state,budgets},body.filter??{},body.widgets??defaultOverview().widgets)};
  else if(path==='/finance/summary'||path==='/finance/state')result=state;
  else if(path==='/finance/imports')result={batches:[],nextCursor:null};
  else if(path==='/finance/budgets')result={generation:state.generation,revision:state.revision,budgets:budgets.map(b=>({...b,at:body.at??calendarDay(new Date(),b.definition.timezone),calculation:calculateBudget(b,state.operations,state,body.at??calendarDay(new Date(),b.definition.timezone))}))};
