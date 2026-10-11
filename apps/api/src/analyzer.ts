@@ -19,7 +19,8 @@ export async function analyzerQuota(db:PoolClient,userId:string):Promise<Quota>{
  SELECT anchor_at,quota_policy,((anchor_at AT TIME ZONE timezone)+make_interval(months=>k)) AT TIME ZONE timezone AS start,
  ((anchor_at AT TIME ZONE timezone)+make_interval(months=>k+1)) AT TIME ZONE timezone AS finish FROM slot`,[userId])).rows[0];
  if(!c||!Number.isSafeInteger(c.quota_policy?.limit)||c.quota_policy.limit<0)return {available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null};
- const used=Number((await db.query('SELECT COALESCE(sum(units),0) AS n FROM commerce.analyzer_usage WHERE user_id=$1 AND anchor_at=$2 AND period_start=$3',[userId,c.anchor_at,c.start])).rows[0].n),limit=c.quota_policy.limit;
+ // Preserve the canonical database timestamp: pg Date serialization truncates microseconds.
+ const used=Number((await db.query('SELECT COALESCE(sum(units),0) AS n FROM commerce.analyzer_usage WHERE user_id=$1 AND anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND period_start=$2',[userId,c.start])).rows[0].n),limit=c.quota_policy.limit;
  const warning=used>=limit?100:used*100>=limit*95?95:used*100>=limit*80?80:null;
  return {available:true,limit,used,remaining:Math.max(0,limit-used),periodStart:c.start.toISOString(),resetAt:c.finish.toISOString(),warning};
 }

@@ -20,6 +20,7 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  else if(path==='/access/tariffs')result={tariffs:[]};else if(path.startsWith('/access/')){result={code:'NOT_FOUND'};status=404;}
  else if(blocked&&path.startsWith('/finance/')){result={code:'FINANCE_ACCESS_REQUIRED'};status=403;}
  else if(path==='/finance/summary'){if(duringInitialLoad){summaryWaiting=true;await summaryGate;}result={...state,summary:aggregate(state.operations,body as Filter)};}
+ else if(path==='/finance/analyzer-state')result={chats:[],quota:{available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null},providerAvailable:false,registryVersion:'analyzer/1'};
  else if(path==='/finance/overview-views')result={views:[]};
  else if(path==='/finance/overview')result={generation:state.generation,revision:state.revision,timezone:'Pacific/Honolulu',budgetOptions:[],...calculateOverview(state.operations,state,body.filter??{},body.widgets??defaultOverview().widgets)};
  else if(path==='/finance/operations-views')result={views:[]};
