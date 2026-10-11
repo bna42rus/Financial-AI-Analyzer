@@ -93,15 +93,15 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Reject known high and critical dependency advisories
         run: pnpm audit --audit-level=high
-      - name: Verify sources, calculations, types and web build
+      - name: Check API types for budget scenarios
         run: pnpm run check:api
-      - name: Check auth, TOTP, recovery, ownership and database roles on PostgreSQL 18
+      - name: Check budget periods, versions, tenant isolation and deletion on PostgreSQL 18
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/budgets.test.ts
       - name: Install browser for interface checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
-      - name: Check full application, payment review and registration over HTTP with PostgreSQL
+      - name: Check budget creation, limits, drill-down and Undo in real browsers
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/budgets-browser.test.ts
