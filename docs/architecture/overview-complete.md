@@ -32,6 +32,7 @@ Top N ограничивает список групп, не итог. Time gaps
 - POST `/finance/overview`: bounded агрегированные KPI/points/context, generation/revision, budget choices и warnings; no-store.
 - POST `/finance/overview-views`: собственные конфигурации.
 - `save_overview_view`, `delete_overview_view`, `reorder_overview_views`: обычный финансовый preview/commit, lease на revision/generation, action_id idempotency и History delta/Undo.
+- Durable financial rate limits разделяют чтения (240/IP/min) и записи (120/IP/min); route limits остаются 120 read или 60 write/min, authentication quotas неизменны. Автоматические чтения widgets на двух устройствах не расходуют бюджет сохранений.
 - Temporary filters/navigation/point hover/unfinished drag не создают writes. Сохранение завершённой конфигурации — отдельное явное действие.
 - Default-view late response не затирает пользовательский фильтр. Late analytics не возвращается после unmount/filter/access loss. Новый filter/revision скрывает старые totals до свежего расчёта.
 - Widget/view drafts остаются в памяти. После чужой revision форма блокируется; отмена не уничтожает черновик. Сохранение использует revision открытия draft, не подставляет свежую автоматически.

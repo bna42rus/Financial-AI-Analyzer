@@ -210,6 +210,8 @@ test('interactive finance reads and edits have separate durable limits without c
  const a=await append('-1000');
  for(let i=0;i<12;i++){const detail=await request('/finance/operation',{id:a.transactionId});assert.equal(detail.statusCode,200,detail.body);const d=detail.json(),r=await request('/finance/edit',{actionId:randomUUID(),generation:d.generation,revision:d.revision,intent:{kind:'operation',id:a.transactionId,patch:{comment:'Synthetic edit '+i}}});assert.equal(r.statusCode,200,r.body);}
  const d=(await request('/finance/operation',{id:a.transactionId})).json();assert.equal(d.comment,'Synthetic edit 11');assert.equal(d.source.amountMinor,'-1000');
+ // A burst of widget reads is independent from writes; all closed route quotas still apply.
+ for(let i=0;i<80;i++)assert.equal((await request('/finance/overview',{widgets:[{}]})).statusCode,400);
  // Invalid writes consume the same durable budget, and a fresh server cannot bypass it.
  for(let i=12;i<60;i++)assert.equal((await request('/finance/edit',{})).statusCode,400);
  assert.equal((await request('/finance/edit',{})).statusCode,429);const fresh=await createServer(fc);try{assert.equal((await fresh.fastify.inject({method:'POST',url:'/finance/edit',payload:{},headers:{origin:fc.origin,cookie,'content-type':'application/json'}})).statusCode,429);}finally{await fresh.close();}

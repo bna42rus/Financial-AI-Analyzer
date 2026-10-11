@@ -62,9 +62,11 @@ export async function createServer(config: Config) {
     const route = request.url.split('?')[0]!;
     const address = typeof (request.body as Record<string, unknown> | undefined)?.email === 'string' ? String((request.body as Record<string, unknown>).email).trim().toLowerCase() : '';
     // Interactive finance snapshots and field edits must not consume authentication budgets.
-    // These closed route budgets remain durable, bounded and subject to the normal server authority checks.
+    // Snapshots and writes have separate IP budgets so two devices and widget reads do not exhaust edits.
+    // Per-route limits and authentication budgets stay unchanged and durable; server authority still gates all data.
     const financial=config.profile==='finance'&&(financeReads.has(route)||financeWrites.has(route)),scope=financial?'finance:':'';
-    const budgets: [string, number, number][] = [[scope+'ip:' + request.ip, financial?120:30, 60]];
+    const ipScope=financial?(financeReads.has(route)?'finance:read:':'finance:write:'):'';
+    const budgets: [string, number, number][] = [[ipScope+'ip:' + request.ip, financial?(financeReads.has(route)?240:120):30, 60]];
     const invitationSecret = (request.body as Record<string, unknown> | undefined)?.invitationToken;
     if(typeof invitationSecret==='string') budgets.push(['invitation:'+route+':'+invitationSecret,5,300]);
     if (address) budgets.push(['account:' + route + ':' + address, route.endsWith('reset-request') ? 3 : 5, 300]);

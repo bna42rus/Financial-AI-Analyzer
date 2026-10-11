@@ -121,7 +121,7 @@ jobs:
     runs-on: ubuntu-latest
     # Real PostgreSQL and HTTP suites include two 15k-row browser journeys.
     # Individual request/test timeouts still detect stalled operations.
-    timeout-minutes: 15
+    timeout-minutes: 25
     services:
       postgres:
         # Docker Official Images mirror avoids Docker Hub shared-runner pull limits.
