@@ -35,7 +35,7 @@ export async function analyzerState(db:PoolClient,userId:string,value:unknown,pr
 export async function analyzerChat(db:PoolClient,userId:string,value:unknown){
  const r=object(value,['id','create','title','pinned','delete']),id=uuid(r.id);
  if(r.delete===true){object(value,['id','delete']);await db.query('DELETE FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,id]);return {id,deleted:true};}
- if(r.create===true){object(value,['id','create']);if(Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_chat WHERE user_id=$1',[userId])).rows[0].n)>=100)throw new HttpError(409,'CHAT_LIMIT');await db.query('INSERT INTO finance.analyzer_chat(user_id,id) VALUES($1,$2) ON CONFLICT DO NOTHING',[userId,id]);return {id};}
+ if(r.create===true){object(value,['id','create']);if((await db.query('SELECT id FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,id])).rowCount)return {id};if(Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_chat WHERE user_id=$1',[userId])).rows[0].n)>=100)throw new HttpError(409,'CHAT_LIMIT');await db.query('INSERT INTO finance.analyzer_chat(user_id,id) VALUES($1,$2) ON CONFLICT DO NOTHING',[userId,id]);return {id};}
  object(value,['id','title','pinned']);if(r.title===undefined&&r.pinned===undefined||r.pinned!==undefined&&typeof r.pinned!=='boolean')throw new TypeError('INVALID_CHAT');
  const title=r.title===undefined?null:safeText(r.title,100);if(title==='')throw new TypeError('EMPTY_TITLE');
  if(!(await db.query('UPDATE finance.analyzer_chat SET title=COALESCE($3,title),pinned=COALESCE($4,pinned),modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2 RETURNING id',[userId,id,title,r.pinned??null])).rowCount)throw new HttpError(404,'NOT_FOUND');return {id};

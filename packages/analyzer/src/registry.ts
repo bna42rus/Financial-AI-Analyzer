@@ -30,6 +30,7 @@ export function interpret(text:string,global:OperationsFilter,context?:Query,now
  const date=/ за (\d{4}-\d{2}-\d{2}) (?:по|—|до) (\d{4}-\d{2}-\d{2})$/u.exec(q);
  const month=new RegExp(' за ('+months.map(m=>m+'[а-я]*').join('|')+')(?: (20\\d{2}))?$','u').exec(q);
  const periodSuffix=date?.[0]??month?.[0];if(periodSuffix)stem=q.slice(0,-periodSuffix.length);
+ if(followUp&&q.startsWith('а за ')&&!periodSuffix)return {relevance:'ambiguous',periodFromQuestion:false,followUp:false};
  if(followUp&&context){metric=context.metric;grouping=stem==='а по категориям'?'category':context.grouping;comparison=context.comparison;}
  else if(/^(сколько я потратил(?: за выбранный период)?|мои расходы|покажи расходы)$/u.test(stem)){}
  else if(/^(на что ушли деньги|расходы по категориям|покажи расходы по категориям)$/u.test(stem))grouping='category';
