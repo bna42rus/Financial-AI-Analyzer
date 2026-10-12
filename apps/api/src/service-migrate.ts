@@ -1,8 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import { Pool } from 'pg';
+import { stagingDatabase } from './runtime-key.ts';
 
 // Explicit additive migration. This entry point cannot target the Production port.
 if (process.env.APP_ENV !== 'staging') throw new Error('STAGING_OPERATOR_REQUIRED');
+stagingDatabase(process.env.APP_ENV, process.env.SERVICE_MIGRATION_DATABASE_URL);
 const url = new URL(process.env.SERVICE_MIGRATION_DATABASE_URL ?? '');
 if (!['127.0.0.1','localhost'].includes(url.hostname) || url.port !== '5411') throw new Error('STAGING_DATABASE_REQUIRED');
 const pool = new Pool({ connectionString: url.toString(), max: 1 }), db = await pool.connect();
