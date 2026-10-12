@@ -1,8 +1,10 @@
 import {Pool} from 'pg';
 import {setTimeout} from 'node:timers/promises';
 import {runImportStage} from './import-ingestion.ts';
+import {stagingDatabase} from './runtime-key.ts';
 
-if(process.env.APP_ENV!=='development'||process.env.API_PROFILE!=='finance')throw new Error('Import worker requires the Development Finance profile');
+if(!['development','staging'].includes(process.env.APP_ENV??'')||process.env.API_PROFILE!=='finance')throw new Error('Import worker requires the Development or Staging Finance profile');
+stagingDatabase(process.env.APP_ENV,process.env.DATABASE_URL);
 const pool=new Pool({connectionString:process.env.DATABASE_URL,max:2});
 const role=(await pool.query('SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user')).rows[0];
 if(role.name!=='finance_api'||role.rolsuper||role.rolbypassrls)throw new Error('Import worker requires the scoped Finance database role');

@@ -1,0 +1,37 @@
+[Unit]
+Description=CashNeuro Staging mail (%i)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/srv/cashneuro/staging/backend-current/apps/api
+Environment=APP_ENV=staging
+Environment=MAIL_PROFILE=%i
+Environment=MAIL_TRANSPORT=postbox
+EnvironmentFile=/etc/cashneuro/staging/%i-mail.env
+LoadCredential=authorized-key.json:/etc/cashneuro/kms/staging/%i/authorized-key.json
+LoadCredential=wrapping-key.json:/etc/cashneuro/kms/staging/%i/wrapping-key.json
+LoadCredential=postbox.json:/etc/cashneuro/mail/staging-postbox.json
+ExecStart=/usr/bin/node --import tsx src/mail-main.ts
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=30
+LimitCORE=0
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+
