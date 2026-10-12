@@ -1,19 +1,22 @@
-import {object,choice,uuid} from '../../finance-core/src/model.ts';
+import {object,choice} from '../../finance-core/src/model.ts';
 import {parseOperationsFilter} from '../../finance-core/src/operations.ts';
 import type {OperationsFilter} from '../../finance-core/src/operations.ts';
+import {parseActionTool} from './actions.ts';
+import type {ActionTool} from './actions.ts';
 import {safeText} from '../../privacy/src/text.ts';
 
-export const registryVersion='analyzer/1';
+export const registryVersion='analyzer/2';
 export const registry=[
  {name:'query_finances',version:1,principal:'owner',access:'active_entitlement',scope:'filtered_current_finances',confirmation:'none'},
  {name:'set_inclusion',version:1,principal:'owner',access:'active_entitlement',scope:'fixed_answer_operations',confirmation:'preview_then_explicit_commit'},
+ {name:'edit_operations',version:1,principal:'owner',access:'active_entitlement',scope:'fixed_answer_operations',confirmation:'backend_policy'},
+ {name:'finance_action',version:1,principal:'owner',access:'active_entitlement',scope:'closed_backend_intents',confirmation:'backend_policy'},
 ] as const;
 export type Query={name:'query_finances';metric:'expenses'|'income'|'attention';grouping:'none'|'category'|'operation';comparison:'none'|'previous_same';filter:OperationsFilter};
-export type Tool=Query|{name:'set_inclusion';answerId:string;value:'include'|'exclude'};
+export type Tool=Query|ActionTool;
 export function parseTool(value:unknown):Tool {
- const r=object(value,['name','metric','grouping','comparison','filter','answerId','value']);
- if(r.name==='set_inclusion'){object(value,['name','answerId','value']);return {name:r.name,answerId:uuid(r.answerId),value:choice(r.value,['include','exclude'])};}
- object(value,['name','metric','grouping','comparison','filter']);if(r.name!=='query_finances')throw new TypeError('UNKNOWN_ANALYZER_TOOL');
+ if(value&&typeof value==='object'&&!Array.isArray(value)&&(value as {name?:unknown}).name!=='query_finances')return parseActionTool(value);
+ const r=object(value,['name','metric','grouping','comparison','filter']);if(r.name!=='query_finances')throw new TypeError('UNKNOWN_ANALYZER_TOOL');
  const filter=parseOperationsFilter(r.filter??{});if(filter.metric)throw new TypeError('METRIC_FILTER_CONFLICT');
  return {name:r.name,metric:choice(r.metric,['expenses','income','attention']),grouping:choice(r.grouping??'none',['none','category','operation']),comparison:choice(r.comparison??'none',['none','previous_same']),filter};
 }
@@ -49,3 +52,4 @@ export function interpret(text:string,global:OperationsFilter,context?:Query,now
 /** No provider SQL, transcripts, credentials or transaction dump in this contract. */
 export interface AnalyzerAdapter {readonly id:string;readonly model:string;readonly version:string;plan(input:{text:string;context?:Query;query:Query;registryVersion:string}):Promise<{tool:unknown;inputTokens:number;outputTokens:number}>}
 export function tokenUsage(value:unknown){if(typeof value!=='number'||!Number.isSafeInteger(value)||value<0||value>1000000)throw new TypeError('INVALID_PROVIDER_USAGE');return value;}
+

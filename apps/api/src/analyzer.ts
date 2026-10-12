@@ -8,7 +8,8 @@ import {interpret,parseTool,registryVersion,tokenUsage} from '../../../packages/
 import type {AnalyzerAdapter,Query} from '../../../packages/analyzer/src/registry.ts';
 import type {Answer,Quota} from '../../../packages/analyzer/src/types.ts';
 import {operationsDataset,assertReferences} from './operations.ts';
-import {prepareFinance,previewFinance} from './finance.ts';
+import {actionConfirmation} from '../../../packages/analyzer/src/actions.ts';
+import {prepareFinance,previewFinance,parseIntent} from './finance.ts';
 import {stableJSON} from './finance-history.ts';
 import {HttpError} from './types.ts';
 
@@ -27,7 +28,7 @@ export async function analyzerQuota(db:PoolClient,userId:string):Promise<Quota>{
 export async function analyzerState(db:PoolClient,userId:string,value:unknown,providerAvailable=false){
  const r=object(value??{},['chatId','search']);const search=r.search===undefined?'':safeText(r.search,200);const selectedId=r.chatId===undefined?null:uuid(r.chatId);
  const chats=(await db.query(`SELECT c.id,c.title,c.pinned,c.created_at AS "createdAt",c.modified_at AS "modifiedAt",($2='' OR strpos(lower(c.title),lower($2))>0 OR EXISTS(SELECT 1 FROM finance.analyzer_message m WHERE (m.user_id,m.chat_id)=(c.user_id,c.id) AND strpos(lower(m.question),lower($2))>0)) AS matches FROM finance.analyzer_chat c WHERE c.user_id=$1 ORDER BY c.pinned DESC,c.modified_at DESC,c.id`,[userId,search])).rows;
- const messages=(await db.query(`SELECT m.id,m.chat_id,m.question,m.answer,m.created_at AS "createdAt",m.action_id AS "actionId",CASE WHEN a.id IS NULL THEN NULL ELSE jsonb_build_object('status',a.status,'undone',a.undone,'result',CASE WHEN a.status='committed' THEN jsonb_build_object('status',a.result->>'status','actionId',a.id) ELSE NULL END) END AS outcome
+ const messages=(await db.query(`SELECT m.id,m.chat_id,m.question,m.answer,m.created_at AS "createdAt",m.action_id AS "actionId",CASE WHEN a.id IS NULL THEN NULL ELSE jsonb_build_object('status',a.status,'undone',a.undone,'tool',a.intent->'analyzer'->'tool','confirmation',a.intent->'analyzer'->'confirmation','result',CASE WHEN a.status='committed' THEN jsonb_build_object('status',a.result->>'status','actionId',a.id) ELSE NULL END) END AS outcome
  FROM finance.analyzer_message m LEFT JOIN finance.action a ON (a.user_id,a.id)=(m.user_id,m.action_id) WHERE m.user_id=$1 AND m.chat_id=$2 ORDER BY m.created_at,m.id`,[userId,selectedId??chats[0]?.id??null])).rows;
  if(selectedId&&!chats.some(c=>c.id===selectedId))throw new HttpError(404,'NOT_FOUND');
  return {chats:chats.map(c=>({...c,messages:messages.filter(m=>m.chat_id===c.id).map(({chat_id,...m})=>m)})),quota:await analyzerQuota(db,userId),providerAvailable,registryVersion};
@@ -79,14 +80,41 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  return {id,answer,quota:await analyzerQuota(db,userId)};
 }
 export async function analyzerPropose(db:PoolClient,userId:string,value:unknown){
- const r=object(value,['actionId','tool']),actionId=uuid(r.actionId),tool=parseTool(r.tool);if(tool.name!=='set_inclusion')throw new TypeError('INVALID_ACTION');
+ const r=object(value,['actionId','tool']),actionId=uuid(r.actionId),tool=parseTool(r.tool);if(tool.name==='query_finances')throw new TypeError('INVALID_ACTION');
+ // Lock and authorization also protect direct internal invocation, not only HTTP routing.
+ const state=await prepareFinance(db,userId);
  const message=(await db.query('SELECT answer,action_id FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,tool.answerId])).rows[0];if(!message?.answer.query)throw new HttpError(404,'NOT_FOUND');
  if(message.action_id&&message.action_id!==actionId)throw new HttpError(409,'ACTION_REUSED');
- const answer=message.answer as Answer,query=answer.query!,{state,operations}=await operationsDataset(db,userId);
+ const existing=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,actionId])).rows[0];
+ if(existing){
+  if(stableJSON(existing.intent.analyzer?.tool)!==stableJSON(tool))throw new HttpError(409,'ACTION_REUSED');
+  if(existing.status==='committed')return {...existing.result,requiresConfirmation:existing.intent.analyzer.confirmation};
+  if(existing.generation!==state.generation||existing.expected_revision!==state.revision||!existing.fresh)throw new HttpError(409,'FINANCE_CHANGED');
+  return {status:'previewed',actionId,intent:existing.intent.canonical,impact:existing.preview,generation:state.generation,requiresConfirmation:existing.intent.analyzer.confirmation};
+ }
+ const answer=message.answer as Answer,query=answer.query!;
  if(state.generation!==answer.generation||state.revision!==answer.revision)throw new HttpError(409,'FINANCE_CHANGED');
- const ids=queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id);
- if(!ids.length||ids.length>1000)throw new HttpError(409,'ANALYZER_SCOPE_LIMIT');
- const preview=await previewFinance(db,userId,{actionId,generation:answer.generation,revision:answer.revision,intent:{kind:'bulk_operations',operationIds:ids,patch:{analyticsOverride:tool.value}}});
+ const {operations,state:dataset}=await operationsDataset(db,userId);
+ const ids=queryOperations(operations,dataset,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id),scope=new Set(ids);
+ const fixed=(chosen:string[])=>{if(!chosen.length||chosen.length>1000)throw new HttpError(409,'ANALYZER_SCOPE_LIMIT');if(chosen.some(id=>!scope.has(id)))throw new HttpError(409,'ANALYZER_SCOPE_CHANGED');};
+ let raw:unknown;
+ if(tool.name==='set_inclusion'){fixed(ids);raw={kind:'bulk_operations',operationIds:ids,patch:{analyticsOverride:tool.value}};}
+ else if(tool.name==='edit_operations'){const chosen=tool.operationIds??ids;fixed(chosen);raw=chosen.length===1?{kind:'operation',id:chosen[0],patch:tool.patch}:{kind:'bulk_operations',operationIds:chosen,patch:tool.patch};}
+ else raw=tool.intent;
+ const intent=parseIntent(raw);
+ // Transaction writes cannot expand a financial answer's immutable selection.
+ if(['operation','components'].includes(intent.kind))fixed([(intent as {id:string}).id]);
+ if(['bulk_operations','apply_rules'].includes(intent.kind))fixed((intent as {operationIds:string[]}).operationIds);
+ if(intent.kind==='set_exclusion'&&intent.scope.kind==='operations')fixed(intent.scope.operationIds);
+ if(intent.kind==='link')fixed([intent.link!.sourceId,intent.link!.targetId]);
+ if(['duplicate_different','merge_duplicate'].includes(intent.kind)){const pair=(await db.query('SELECT left_id,right_id FROM finance.duplicate_candidate WHERE user_id=$1 AND id=$2',[userId,intent.id])).rows[0];if(!pair)throw new HttpError(404,'NOT_FOUND');fixed([pair.left_id,pair.right_id]);}
+ if(intent.kind==='delete_financial'&&intent.scope.kind==='operations')fixed(intent.scope.operationIds);
+ // Destructive account/period deletion has a dedicated reauthentication UI; never route around it.
+ if(intent.kind==='delete_financial'&&intent.scope.kind!=='operations')throw new HttpError(400,'DESTRUCTIVE_FLOW_REQUIRED');
+ const confirmation=actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
+ await db.query("UPDATE finance.action SET intent=jsonb_set(intent,'{analyzer}',$3::jsonb) WHERE user_id=$1 AND id=$2",[userId,actionId,JSON.stringify({tool,confirmation,registryVersion})]);
+ // New dependencies include linked operations affected outside the original question period.
+ if(preview.impact.affectedOperationIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING',[userId,tool.answerId,preview.impact.affectedOperationIds]);
  await db.query('UPDATE finance.analyzer_message SET action_id=$3 WHERE user_id=$1 AND id=$2',[userId,tool.answerId,actionId]);
- return {...preview,generation:state.generation};
+ return {...preview,generation:state.generation,requiresConfirmation:confirmation};
 }
