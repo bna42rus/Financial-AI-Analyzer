@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui, feature/import-review-expansion, feature/local-tabular-ocr, feature/comprehensive-spec-audit, feature/operations-views-pagination, feature/budgets-periods-versions, feature/overview-complete]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui, feature/import-review-expansion, feature/local-tabular-ocr, feature/comprehensive-spec-audit, feature/operations-views-pagination, feature/budgets-periods-versions, feature/overview-complete, feature/analyzer-foundation]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:
@@ -310,3 +310,4 @@ jobs:
             apps/web/test-results/**/analyzer-connected.png
           if-no-files-found: error
           retention-days: 7
+

@@ -7,3 +7,8 @@
 @media(max-width:700px){.layout{height:calc(100dvh - 180px);min-height:440px;}}
 .total {container-type:inline-size;}
 .total strong {display:block;max-width:100%;white-space:nowrap;overflow-x:auto;font-size:clamp(18px,12cqi,32px);}
+
+
+.editor {display:grid;gap:12px;margin-top:16px;}
+.editor label {display:grid;gap:6px;min-width:0;}
+.editor input,.editor select {padding:9px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:inherit;max-width:100%;}

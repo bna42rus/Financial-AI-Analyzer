@@ -186,3 +186,14 @@ Public и admin UI работают только в явно обозначен�
 
 
 Четвёртый Development блок: [продление доступа](../architecture/access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.
+
+
+## Расширение внутренних инструментов Анализатора
+
+- [x] Закрытый Registry analyzer/2 поверх существующих financial handlers, фиксированный answer scope, server-side permissions и strict intent parsing.
+- [x] Привязка tool/action к диалогу, повторный просмотр после reload, точные retries, общий preview/commit/History/Undo и privacy dependencies полного impact.
+- [x] UI изменения категорий/полей операций, названий структурных объектов, future rules и loan mode; политика одиночных и массовых подтверждений.
+- [x] 362 локальных теста текущего блока, исходные документы, типы, сборки и визуальная проверка desktop/mobile; состав проверок и ограничения указаны в контракте.
+- [ ] Результаты окончательного CI и owner Staging acceptance проверять отдельно по конкретному commit; текущий runtime ещё не означает завершение external AI.
+
+Контракт и ограничения: [analyzer-tools](../architecture/analyzer-tools.md).

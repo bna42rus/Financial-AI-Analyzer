@@ -14,7 +14,7 @@ export class WorkspaceCommand{
  constructor(private deps:{view:()=>FinanceState|null;request:(path:string,body:Record<string,unknown>)=>Promise<FinancePreview|FinanceReceipt>;load:()=>Promise<FinanceState>},private changed:(state:CommandState)=>void,private saved:(state:FinanceState)=>void,private unavailable:()=>void){}
  private publish(patch:Partial<CommandState>){if(this.disposed)return;this.state={...this.state,...patch};this.changed({...this.state});}
  begin(intent:WorkspaceIntent,title:string,confirmation:boolean,epoch?:{generation:string;revision:string}){const view=this.deps.view();if(!view||this.disposed||this.state.phase!=='idle')return;const snapshot=epoch??view;this.publish({title,error:'',message:'',bulkResult:null});return this.send({path:'/finance/preview',body:{actionId:crypto.randomUUID(),generation:snapshot.generation,revision:snapshot.revision,intent:structuredClone(intent)},confirmation,generation:snapshot.generation,undo:['undo','restore_history'].includes(intent.kind)});}
- adoptPreview(preview:FinancePreview,generation:string,title:string){const view=this.deps.view();if(!view||this.disposed||this.state.phase!=='idle'||view.generation!==generation)return;this.pending={path:'/finance/commit',body:{actionId:preview.actionId},confirmation:true,generation,undo:false};this.publish({phase:'preview',preview,title,error:'',message:'',bulkResult:null});}
+ adoptPreview(preview:FinancePreview|FinanceReceipt,generation:string,title:string,confirmation=true,undo=false){const view=this.deps.view();if(!view||this.disposed||this.state.phase!=='idle'||view.generation!==generation)return;this.pending={path:'/finance/commit',body:{actionId:preview.actionId},confirmation,generation,undo};if(preview.status==='committed'){this.publish({title,error:'',message:'',bulkResult:null});return this.send(this.pending);}this.publish({phase:'preview',preview,title,error:'',message:'',bulkResult:null});if(!confirmation)return this.send(this.pending);}
  confirm(){if(this.state.phase==='preview'&&this.pending)return this.send(this.pending);}
  retry(){if(this.state.phase==='retry'&&this.pending)return this.send(this.pending);}
  cancel(){if(this.state.phase==='preview'){this.pending=null;this.publish({phase:'idle',preview:null,title:''});}}
@@ -35,3 +35,4 @@ export class WorkspaceCommand{
  async reload(){if(this.disposed||!['idle','stale'].includes(this.state.phase))return;this.publish({phase:'sending',error:''});try{const view=await this.deps.load();if(this.disposed)return;this.saved(view);this.publish({phase:'idle',preview:null});}catch(e){if(this.disposed||this.accessError(e))return;this.publish({phase:'stale',error:'Данные не удалось обновить. Повторите позже.'});}}
  dispose(){this.disposed=true;this.pending=null;}
 }
+
