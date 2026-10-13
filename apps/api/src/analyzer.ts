@@ -95,7 +95,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
   }else answer={text:gate.value.relevance==='ambiguous'?'Уточните финансовый вопрос и период.':'Я помогаю разбираться в финансах. Спросите о своих расходах, доходах или операциях.',mode:gate.value.relevance==='ambiguous'?'clarification':'redirect',registryVersion};
   await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='gate' AND state='received'",[userId,id]);
  }
- // The gate sees sanitized text only. Unknown/ambiguous/unrelated requests cannot call a provider or financial tools.
+ // The external gate sees sanitized text only; unrelated/ambiguous responses never load financial facts or invoke a planner.
  if(query)await assertReferences(db,userId,query.filter);
  if(query&&adapter){if((await db.query('SELECT request_id FROM commerce.analyzer_usage WHERE user_id=$1 AND request_id=$2',[userId,id])).rowCount)throw new HttpError(409,'ACTION_REUSED');const quota=await analyzerQuota(db,userId);if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
   const plan=await adapter.plan({text,context,query,registryVersion}),tool=parseTool(plan.tool);if(tool.name!=='query_finances')throw new HttpError(400,'AI_ACTION_REQUIRES_CONFIRMATION');

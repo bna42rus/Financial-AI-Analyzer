@@ -26,7 +26,7 @@ const transport=createYandexTransport({realm:'staging/finance',apiKey:'synthetic
  return new Response(JSON.stringify({result:{alternatives:[{status:'ALTERNATIVE_STATUS_FINAL',message:{role:'assistant',text:JSON.stringify(value)}}],usage:{inputTextTokens:'20',completionTokens:'10',totalTokens:'30'},modelVersion:'synthetic-1'}}),{headers:{'content-type':'application/json'}});
 });
 before(async()=>{
- pg=await postgresFixture();metadata=new Pool({...((pg.finance as Pool&{options:PoolConfig}).options),max:2,statement_timeout:3000});
+ pg=await postgresFixture();const options=(pg.finance as Pool&{options:PoolConfig}).options;metadata=new Pool({...options,password:options.password,max:2,statement_timeout:3000,connectionTimeoutMillis:2000});
  config={profile:'finance',pool:pg.finance,baseURL:'https://api.example.test',origin:'https://app.example.test',authSecret:token(),wrappingKey:randomBytes(32),environment:'test',yandexAnalyzer:createYandexAnalyzer(metadata,transport)};
  server=await createServer(config);
 });
@@ -68,6 +68,14 @@ test('ownership precedes planner dispatch and foreign or arbitrary SQL plans can
 test('definitive provider refusal is sanitized and retry never dispatches again',async()=>{
  const id=await chat(),payload=body(id);behavior='http-gate';const r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,502,r.body);assert.equal(r.json().code,'AI_IDENTITY_DENIED');assert.ok(!r.body.includes('private'));await request('/finance/analyzer-query',payload);assert.equal(calls.length,1);assert.equal((await within(db=>analyzerQuota(db,'first',true))).used,0);
 });
+test('unlisted verified accounts and expired entitlement cannot dispatch to the provider',async()=>{
+ const id=await chat();await pg.owner.query("UPDATE commerce.access_cycle SET indefinite=false,access_end=clock_timestamp()-interval '1 second' WHERE user_id='first'");assert.equal((await request('/finance/analyzer-query',body(id))).statusCode,403);assert.equal(calls.length,0);
+ await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('second-account','second','second','credential',$1,now(),now())",[await hashPassword(password)]);
+ const login=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'second@example.test',password},headers:{origin:config.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200,login.body);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');const other=await chat(),r=await request('/finance/analyzer-query',body(other));assert.equal(r.statusCode,200,r.body);assert.equal(r.json().answer.mode,'unavailable');assert.equal(calls.length,0);
+});
+test('clarification plans complete without charging a customer quota unit',async()=>{
+ const id=await chat();behavior='clarification';const r=await request('/finance/analyzer-query',body(id));assert.equal(r.statusCode,200,r.body);assert.equal(r.json().answer.mode,'clarification');assert.equal(r.json().quota.used,0);assert.equal(r.json().quota.reserved,0);assert.equal(calls.length,2);assert.ok((await pg.owner.query('SELECT state FROM commerce.analyzer_request')).rows.every(row=>row.state==='completed'));
+});
 test('ambiguous planner delivery retains one quota reservation and cannot be silently retried',async()=>{
  await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":1}' WHERE user_id='first'");const id=await chat(),payload=body(id);behavior='timeout-plan';const r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,409,r.body);assert.equal(r.json().code,'AI_DELIVERY_UNKNOWN');assert.ok(!r.body.includes('secret'));assert.equal(calls.length,2);
  const q=await within(db=>analyzerQuota(db,'first',true));assert.equal(q.used,0);assert.equal(q.reserved,1);assert.equal(q.remaining,0);assert.equal((await request('/finance/analyzer-query',payload)).json().code,'AI_DELIVERY_UNKNOWN');assert.equal(calls.length,2);
@@ -75,7 +83,7 @@ test('ambiguous planner delivery retains one quota reservation and cannot be sil
 });
 test('received response survives financial rollback; cache retry bills original precise anchor and period',async()=>{
  const id=await chat(),payload=body(id);await pg.owner.query("CREATE FUNCTION finance.fail_yandex_message() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic failure';END $$;CREATE TRIGGER fail_yandex_message BEFORE INSERT ON finance.analyzer_message FOR EACH ROW EXECUTE FUNCTION finance.fail_yandex_message()");
- try{const first=await request('/finance/analyzer-query',payload);assert.equal(first.statusCode,500,first.body);}finally{await pg.owner.query('DROP TRIGGER fail_yandex_message ON finance.analyzer_message;DROP FUNCTION finance.fail_yandex_message()');}
+ try{const first=await request('/finance/analyzer-query',payload);assert.equal(first.statusCode,400,first.body);}finally{await pg.owner.query('DROP TRIGGER fail_yandex_message ON finance.analyzer_message;DROP FUNCTION finance.fail_yandex_message()');}
  assert.equal(calls.length,2);const reserved=(await pg.owner.query("SELECT anchor_at::text AS anchor,period_start::text AS period,state FROM commerce.analyzer_request WHERE step='plan'")).rows[0];assert.equal(reserved.state,'received');
  await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=anchor_at-interval '2 months' WHERE user_id='first'");const retry=await request('/finance/analyzer-query',payload);assert.equal(retry.statusCode,200,retry.body);assert.equal(calls.length,2);const billed=(await pg.owner.query('SELECT anchor_at::text AS anchor,period_start::text AS period FROM commerce.analyzer_usage')).rows[0];assert.deepEqual(billed,{anchor:reserved.anchor,period:reserved.period});assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
 });
