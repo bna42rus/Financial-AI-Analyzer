@@ -10,6 +10,8 @@
     "services:migrate": "node --import tsx src/service-migrate.ts",
     "test:integration": "pnpm run test:integration:base && node --import tsx --test --test-concurrency=1 test/overview.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer.test.ts",
     "operator": "node --import tsx src/operator.ts",
+    "owner:begin": "node --import tsx src/owner-main.ts begin",
+    "owner:complete": "node --import tsx src/owner-main.ts complete",
     "test:browser": "pnpm run test:browser:base && node --import tsx --test --test-concurrency=1 test/overview-browser.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer-browser.test.ts",
     "dev:mail": "node --import tsx src/mail-main.ts",
     "dev:imports": "node --import tsx src/import-main.ts",
