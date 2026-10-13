@@ -70,9 +70,9 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
   const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema},v=>parseGate(v));
   if(['financial','adjacent'].includes(gate.value.relevance)){
    const quota=await analyzerQuota(db,userId,true);
-   // A received plan owns its existing reservation and may finish after a rollback.
-   const ownReservation=(await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan' AND state='received'",[userId,id])).rowCount;
-   if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining&&!ownReservation)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
+   // Existing receipts and terminal outcomes are resolved without a new dispatch.
+   const priorPlan=(await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan'",[userId,id])).rowCount;
+   if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining&&!priorPlan)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
    const base=gate.value.followUp&&context?context.filter:filter;await assertReferences(db,userId,base);
    const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
    const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;

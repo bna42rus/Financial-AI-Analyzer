@@ -38,3 +38,17 @@ ALTER TABLE finance.analyzer_provider_plan FORCE ROW LEVEL SECURITY;
 CREATE POLICY own_provider_plan ON finance.analyzer_provider_plan TO finance_api USING(user_id=current_setting('app.user_id',true)) WITH CHECK(user_id=current_setting('app.user_id',true));
 GRANT SELECT,INSERT,DELETE ON finance.analyzer_provider_plan TO finance_api;
 REVOKE ALL ON finance.analyzer_provider_plan FROM PUBLIC,control_api,mail_finance,mail_control;
+
+-- A receipt can exist before the financial transaction creates a message and
+-- its dependencies. Purge references in such pending plans as well.
+CREATE FUNCTION finance.purge_analyzer_provider_reference() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$
+DECLARE reference_id uuid;
+BEGIN
+ IF TG_TABLE_NAME='source_observation' THEN reference_id=finance.canonical_operation(OLD.user_id,OLD.transaction_id);ELSE reference_id=OLD.id;END IF;
+ DELETE FROM finance.analyzer_provider_plan WHERE user_id=OLD.user_id AND strpos(payload::text,reference_id::text)>0;
+ RETURN OLD;
+END $$;
+REVOKE ALL ON FUNCTION finance.purge_analyzer_provider_reference() FROM PUBLIC,finance_api,control_api,mail_finance,mail_control;
+DO $$DECLARE t text;BEGIN FOREACH t IN ARRAY ARRAY['transaction','source_observation','account','category','counterparty'] LOOP
+ EXECUTE format('CREATE TRIGGER analyzer_provider_reference_delete BEFORE DELETE ON finance.%I FOR EACH ROW EXECUTE FUNCTION finance.purge_analyzer_provider_reference()',t);
+END LOOP;END $$;
