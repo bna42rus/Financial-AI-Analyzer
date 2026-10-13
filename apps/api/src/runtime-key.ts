@@ -6,7 +6,7 @@ export function stagingDatabase(environment: string | undefined, value: string |
   if (environment !== 'staging') return;
   try {
     const url = new URL(value ?? '');
-    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !['127.0.0.1','localhost'].includes(url.hostname) || url.port !== '5411') throw new Error();
+    if (!['postgres:', 'postgresql:'].includes(url.protocol) || !['127.0.0.1','localhost'].includes(url.hostname) || url.port !== '5411' || url.search || url.hash) throw new Error();
   } catch { throw new Error('STAGING_DATABASE_REQUIRED'); }
 }
 

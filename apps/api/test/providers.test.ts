@@ -96,7 +96,7 @@ test('Staging/Production cannot start with a local key or forged KMS marker; pro
   await assert.rejects(createServer({...config,environment:'production'} as never), /Production requires/);
   await assert.rejects(runtimeKey('production','finance',undefined,'base64'), /RUNTIME_KEY_CONFIGURATION_DENIED/);
   await assert.rejects(runtimeKey('staging','finance','plaintext-secret','base64'), /RUNTIME_KEY_CONFIGURATION_DENIED/);
-  for(const url of ['postgresql://user@127.0.0.1:5412/production','postgresql://user@remote.example:5411/staging','invalid']) assert.throws(()=>stagingDatabase('staging',url), /STAGING_DATABASE_REQUIRED/);
+  for(const url of ['postgresql://user@127.0.0.1:5412/production','postgresql://user@remote.example:5411/staging','postgresql://user@127.0.0.1:5411/staging?host=remote.example','postgresql://user@127.0.0.1:5411/staging?port=5412','postgresql://user@127.0.0.1:5411/staging#override','invalid']) assert.throws(()=>stagingDatabase('staging',url), /STAGING_DATABASE_REQUIRED/);
   assert.doesNotThrow(()=>stagingDatabase('staging','postgresql://user@127.0.0.1:5411/staging'));
 });
 
