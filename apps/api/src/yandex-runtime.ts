@@ -5,6 +5,7 @@ import { HttpError } from './types.ts';
 import { YandexFailure, isYandexTransport } from './yandex-transport.ts';
 import type { YandexTransport } from './yandex-transport.ts';
 import type { Catalog } from '../../../packages/analyzer/src/yandex-contract.ts';
+import { catalogLimits } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { safeText } from '../../../packages/privacy/src/text.ts';
 
 type Step = 'gate' | 'plan';
@@ -79,11 +80,13 @@ export function createYandexAnalyzer(pool: Pool, transport: YandexTransport): Ya
 /** Metadata only, after the relevance gate. Never load transaction rows here. */
 export async function yandexCatalog(db: PoolClient, userId: string): Promise<Catalog> {
   const accounts = (await db.query('SELECT id,display_name AS name FROM finance.account WHERE user_id=$1 AND merged_into_id IS NULL ORDER BY id LIMIT 101', [userId])).rows;
-  const categories = (await db.query('SELECT id,name,parent_id AS "parentId",role FROM finance.category WHERE user_id=$1 AND hidden=false ORDER BY id LIMIT 101', [userId])).rows;
+  const categories = (await db.query('SELECT id,name,parent_id AS "parentId",role FROM finance.category WHERE user_id=$1 AND hidden=false ORDER BY id LIMIT 251', [userId])).rows;
   const counterparties = (await db.query('SELECT id,name FROM finance.counterparty WHERE user_id=$1 AND merged_into_id IS NULL ORDER BY id LIMIT 101', [userId])).rows;
-  for (const rows of [accounts, categories, counterparties]) {
-    if (rows.length > 100) throw new HttpError(409, 'AI_CATALOG_LIMIT');
+  const catalog: Catalog = { accounts, categories, counterparties };
+  for (const key of Object.keys(catalogLimits) as (keyof Catalog)[]) {
+    const rows = catalog[key];
+    if (rows.length > catalogLimits[key]) throw new HttpError(409, 'AI_CATALOG_LIMIT');
     for (const row of rows) row.name = safeText(row.name, 160);
   }
-  return { accounts, categories, counterparties };
+  return catalog;
 }

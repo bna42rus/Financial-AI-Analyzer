@@ -7,6 +7,7 @@ import type { Query, Relevance } from './registry.ts';
 
 export const yandexContractVersion = 'yandex-analyzer/1';
 export type Catalog = { accounts: { id: string; name: string }[]; categories: { id: string; name: string; parentId: string | null; role: string }[]; counterparties: { id: string; name: string }[] };
+export const catalogLimits = { accounts: 100, categories: 250, counterparties: 100 } as const;
 export type ModelPlan = { status: 'query' | 'clarification' | 'unsupported'; query: Query | null };
 const ids = { type: 'array', maxItems: 100, uniqueItems: true, items: { type: 'string', format: 'uuid' } };
 const text = { type: 'string', maxLength: 160 };
@@ -46,7 +47,7 @@ export function parseModelPlan(value: unknown, base: OperationsFilter): ModelPla
 }
 export function modelInput(question: string, base: OperationsFilter, catalog: Catalog, currentDate: string) {
   const safe = (entries: { id: string; name: string }[]) => entries.map(e => ({ ...e, name: safeText(e.name, 160) }));
-  if (Object.values(catalog).some(entries => entries.length > 100)) throw new TypeError('AI_CATALOG_LIMIT');
+  if ((Object.keys(catalogLimits) as (keyof Catalog)[]).some(key => catalog[key].length > catalogLimits[key])) throw new TypeError('AI_CATALOG_LIMIT');
   const visible = Object.fromEntries(Object.entries(base).filter(([key]) => key in modelFilterProperties));
   if ('merchant' in visible) visible.merchant = safeText(visible.merchant, 160);
   return { question: safeQuestion(question), currentDate, timezone: 'Europe/Moscow', baseFilter: visible,

@@ -15,7 +15,7 @@ import type {Config} from '../src/types.ts';
 
 let pg:Awaited<ReturnType<typeof postgresFixture>>,server:Awaited<ReturnType<typeof createServer>>,metadata:Pool,config:Config,cookie:string,account:string,category:string;
 let behavior='normal',followUp=false,calls:{gate:boolean;input:Record<string,unknown>}[]=[];
-const password='Synthetic Analyzer password 123!',modelUri='gpt://b1g00000000000000000/yandexgpt-5.1',question='Подсчитай сумму покупок за сентябрь 2026';
+const password='Synthetic Analyzer password 123!',modelUri='gpt://b1g00000000000000000/yandexgpt-5.1',question='Подсчитай мои расходы на покупки за сентябрь 2026';
 const transport=createYandexTransport({realm:'staging/finance',apiKey:'synthetic-api-key-for-tests-only',modelUri,allowedEmails:['first@example.test'],maxDailyCalls:30,maxTokens:512,timeoutMs:1000},async(_url,options)=>{
  const body=JSON.parse(String(options?.body)),gate=!!body.jsonSchema.schema.properties.relevance,input=JSON.parse(body.messages[1].text);calls.push({gate,input});
  if(behavior==='http-gate'&&gate)return new Response('synthetic-private-body-must-not-be-reflected',{status:403});
