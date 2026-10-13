@@ -1,20 +1,25 @@
 import {PgBoss} from 'pg-boss';
 import type {Pool,PoolClient} from 'pg';
 import {digest,envelope} from './crypto.ts';
+import {isKmsKey} from './kms.ts';
+import type {UnlockedKmsKey} from './kms.ts';
 import {outbox} from './types.ts';
 import {renderMail} from './mail-templates.ts';
 import type {Message,MailOrigins} from './mail-templates.ts';
 export type MailProfile='finance'|'control';
-export type Transport={idempotent:boolean;deliver:(id:string,message:Message)=>Promise<{acceptance:'sandbox'}>};
+export type Transport={idempotent:boolean;deliver:(id:string,message:Message)=>Promise<{acceptance:'sandbox'|'postbox'}>};
 export class DeliveryFailure extends Error{constructor(public code:'TEMPORARY'|'REJECTED'|'DELIVERY_UNKNOWN',public retryable=false){super(code);}}
-export type WorkerConfig=MailOrigins&{profile:MailProfile;pool:Pool;wrappingKey:Buffer;environment:'development'|'test'};
+export type WorkerConfig=MailOrigins&{profile:MailProfile;pool:Pool;wrappingKey:Buffer;environment:'development'|'test'|'staging';kmsKey?:UnlockedKmsKey;postbox?:import('./postbox.ts').PostboxConfig};
 type Row={id:string;kind:string;sealed_payload:string;subject_id:string|null;expires_at:Date|null;lease_id:string|null;lease_until:Date|null;attempts:number;retry_count:number;source_scope:MailProfile};
 type Schema='identity'|'control'|'access';
 export async function assertMailRole(config:WorkerConfig){
- if(!['development','test'].includes(config.environment)||config.wrappingKey.length!==32)throw new Error('MAIL_CONFIGURATION_DENIED');
+ if(!['development','test','staging'].includes(config.environment)||config.wrappingKey.length!==32)throw new Error('MAIL_CONFIGURATION_DENIED');
+ if(config.environment==='staging'&&!isKmsKey(config.kmsKey,'staging/'+config.profile,config.wrappingKey))throw new Error('MAIL_CONFIGURATION_DENIED');
+ if(config.postbox&&config.environment!=='staging')throw new Error('MAIL_CONFIGURATION_DENIED');
  try{
-  for(const origin of [config.financeOrigin,config.controlOrigin]){const u=new URL(origin);if(u.origin!==origin||!['http:','https:'].includes(u.protocol))throw new Error();}
-  if(!/^[^\s@]+@example\.test$/.test(config.adminRecipient))throw new Error();
+  for(const origin of [config.financeOrigin,config.controlOrigin]){const u=new URL(origin);if(u.origin!==origin||!['http:','https:'].includes(u.protocol))throw new Error();if(config.environment==='staging'&&(u.protocol!=='https:'||!(u.hostname==='test.cashneuro.ru'||u.hostname.endsWith('.test.cashneuro.ru'))))throw new Error();}
+  if(config.postbox){if(!config.postbox.recipients.some(r=>r.toLowerCase()===config.adminRecipient.toLowerCase()))throw new Error();}
+  else if(!/^[^\s@]+@example\.test$/.test(config.adminRecipient))throw new Error();
  }catch{throw new Error('MAIL_CONFIGURATION_DENIED');}
  const role=(await config.pool.query('SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user')).rows[0];
  if(role.name!=='mail_'+config.profile||role.rolsuper||role.rolbypassrls)throw new Error('MAIL_ROLE_DENIED');
@@ -79,7 +84,7 @@ export async function deliverBatch(config:WorkerConfig,transport:Transport,limit
    if('suppressed' in row)continue;
    try{
     const result=await transport.deliver(row.id,row.message);
-    if(result.acceptance!=='sandbox')throw new DeliveryFailure('DELIVERY_UNKNOWN');
+    if(result.acceptance!==(config.postbox?'postbox':'sandbox'))throw new DeliveryFailure('DELIVERY_UNKNOWN');
     await config.pool.query(`UPDATE ${schema}.outbox SET state='sent',sent_at=clock_timestamp(),acceptance=$3,last_error=NULL,lease_id=NULL,lease_until=NULL WHERE id=$1 AND lease_id=$2 AND state='queued'`,[row.id,row.lease,result.acceptance]);
    }catch(error){
     const known=error instanceof DeliveryFailure,code=known?error.code:'DELIVERY_UNKNOWN',retry=known&&error.retryable&&code==='TEMPORARY'&&row.retryCount<5;
@@ -108,7 +113,7 @@ export async function startMailWorker(config:WorkerConfig){
  const boss=new PgBoss({schema:'jobs_mail_'+config.profile,db:{executeSql:(sql,values)=>config.pool.query(sql,values)},migrate:false,schedule:false,registerInstance:false,reindex:false});
  boss.on('error',()=>{process.stderr.write('Mail job failed.\n');});
  await boss.start();
- const transport=sandboxTransport(config);
+ const transport=config.postbox?(await import('./postbox.ts')).postboxTransport(config.postbox):sandboxTransport(config);
  await boss.work('mail-tick',{batchSize:1,pollingIntervalSeconds:1},async()=>{await enqueueReminders(config);await deliverBatch(config,transport);});
  let pending=false;
  const dispatch=async()=>{if(pending)return;pending=true;try{await boss.send('mail-tick',{}, {singletonKey:'tick'});}finally{pending=false;}};

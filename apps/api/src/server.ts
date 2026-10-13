@@ -9,16 +9,19 @@ import { fromNodeHeaders } from 'better-auth/node';
 import {accessWarning,describeDevice} from './mail-templates.ts';
 import {mailQueue,retryMail,resendInvitation} from './mail-admin.ts';
 import { envelope } from './crypto.ts';
+import { isKmsKey } from './kms.ts';
 import { makeAuth, current, requireAdmin, recordAuthResult } from './auth.ts';
 import { resetRequest, resetPassword, recoverAdmin } from './security.ts';
 import { realm, HttpError, fields, string, email, event, outbox } from './types.ts';
 import type { Config } from './types.ts';
 
 export async function createServer(config: Config) {
-  if (!['development', 'test'].includes(config.environment)) throw new Error('Production requires a KMS adapter and separate security acceptance');
+  if (!['development', 'test', 'staging'].includes(config.environment)) throw new Error('Production requires separate security and release acceptance');
+  if (config.environment === 'staging' && !isKmsKey(config.kmsKey, 'staging/' + config.profile, config.wrappingKey)) throw new Error('Staging requires its own KMS key');
   try {
     const base=new URL(config.baseURL), origin=new URL(config.origin);
     if (base.origin!==config.baseURL || origin.origin!==config.origin || !['http:','https:'].includes(base.protocol) || !['http:','https:'].includes(origin.protocol)) throw new Error();
+    if (config.environment === 'staging' && [base, origin].some(u => u.protocol !== 'https:' || !(u.hostname === 'test.cashneuro.ru' || u.hostname.endsWith('.test.cashneuro.ru')))) throw new Error();
   } catch { throw new Error('API and frontend must have explicit valid origins'); }
   const expectedRole = config.profile === 'control' ? 'control_api' : 'finance_api';
   const role = (await config.pool.query(`SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user`)).rows[0];

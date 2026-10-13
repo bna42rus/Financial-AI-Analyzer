@@ -1,5 +1,7 @@
 # API — Development foundation
 
+Staging KMS/Postbox integration: [runtime, installation and boundaries](../../docs/architecture/kms-postbox-staging.md). Production remains gated. The Development instructions below retain their local adapter/sandbox behavior.
+
 NestJS/Fastify + Better Auth 1.7.7 + Drizzle/PostgreSQL 18. Two processes use independent database credentials, auth secrets, wrapping keys, origins and cookie prefixes. Public registration and alternate authentication endpoints are closed. This block is an API foundation; the review UI of PR #7 still runs its explicit independent example.
 
 See [behavior, evidence and remaining work](../../docs/architecture/server-access-security.md).

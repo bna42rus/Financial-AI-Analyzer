@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx src/main.ts",
-    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts",
+    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts",
+    "kms:init": "node --import tsx src/kms-init.ts",
+    "services:migrate": "node --import tsx src/service-migrate.ts",
     "test:integration": "pnpm run test:integration:base && node --import tsx --test --test-concurrency=1 test/overview.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer.test.ts",
     "operator": "node --import tsx src/operator.ts",
     "test:browser": "pnpm run test:browser:base && node --import tsx --test --test-concurrency=1 test/overview-browser.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer-browser.test.ts",

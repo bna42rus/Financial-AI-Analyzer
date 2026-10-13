@@ -1,6 +1,12 @@
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
-import {randomBytes} from 'node:crypto';
+import {randomBytes,generateKeyPairSync} from 'node:crypto';
+import {mkdtemp,writeFile,rm} from 'node:fs/promises';
+import {join} from 'node:path';
+import {tmpdir} from 'node:os';
+import {unlockKmsKey,kmsRealms} from '../src/kms.ts';
+import {postboxTransport} from '../src/postbox.ts';
+import {createServer} from '../src/server.ts';
 import {postgresFixture} from './postgres.ts';
 import {envelope,token,digest} from '../src/crypto.ts';
 import {outbox} from '../src/types.ts';
@@ -46,6 +52,30 @@ test('delivery reaches encrypted durable sandbox; sent is acceptance and metadat
  const row=await state(id);assert.equal(row.state,'sent');assert.equal(row.acceptance,'sandbox');assert.equal(row.attempts,1);assert.ok(row.sent_at);
  const stored=(await pg.owner.query('SELECT sealed_message FROM mail.sandbox_inbox WHERE id=$1',[id])).rows[0].sealed_message;assert.ok(!stored.includes('user@example.test'));
  assert.match(JSON.parse(envelope(fc.wrappingKey).open(stored)).text,/Старые сессии/);assert.ok(!JSON.stringify(row).includes('user@example.test'));await deliverBatch(fc,sandboxTransport(fc));assert.equal((await state(id)).attempts,1);
+});
+
+test('Staging API and Postbox queue use a KMS-unlocked key; acceptance, retries and uncertain outcome persist safely',async t=>{
+ const dir=await mkdtemp(join(tmpdir(),'cashneuro-stage-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+ const realm='staging/finance',rsa=generateKeyPairSync('rsa',{modulusLength:2048}),auth=join(dir,'auth.json'),wrapped=join(dir,'wrapped.json');
+ await writeFile(auth,JSON.stringify({id:'synthetic',service_account_id:kmsRealms[realm].accountId,private_key:rsa.privateKey.export({type:'pkcs8',format:'pem'})}),{mode:0o600});
+ await writeFile(wrapped,JSON.stringify({v:1,realm,keyId:kmsRealms[realm].keyId,versionId:'synthetic-version',ciphertext:'YQ=='}),{mode:0o600});
+ t.mock.method(globalThis,'fetch',async(url:string)=>new Response(JSON.stringify(url.includes('/iam/')?{iamToken:'synthetic-token',expiresAt:new Date(Date.now()+3600000).toISOString()}:{keyId:kmsRealms[realm].keyId,versionId:'synthetic-version',plaintext:fc.wrappingKey.toString('base64')})));
+ const key=await unlockKmsKey(realm,auth,wrapped);t.after(()=>key.destroy());
+ const server=await createServer({profile:'finance',pool:pg.finance,environment:'staging',baseURL:'https://test.cashneuro.ru',origin:'https://test.cashneuro.ru',authSecret:randomBytes(32).toString('hex'),wrappingKey:key.bytes,kmsKey:key});
+ try{assert.equal((await server.fastify.inject({method:'GET',url:'/health'})).statusCode,200);}finally{await server.close();}
+ const postbox={environment:'staging' as const,sender:'notifications@cashneuro.ru',username:'synthetic',password:'synthetic',recipients:['user@example.test']};
+ const config:WorkerConfig={...fc,environment:'staging',wrappingKey:key.bytes,kmsKey:key,postbox,financeOrigin:'https://test.cashneuro.ru',controlOrigin:'https://admin.test.cashneuro.ru',adminRecipient:'user@example.test'};
+ const id=await queue('security_password_changed',{email:'user@example.test'},'identity',config);let calls=0;
+ const transport=postboxTransport(postbox,async()=>{calls++;return calls===1?{error:'TEMPORARY'}:{acceptance:'postbox'};});
+ await deliverBatch(config,transport);assert.equal((await state(id)).state,'queued');assert.equal((await state(id)).last_error,'TEMPORARY');
+ await pg.owner.query("UPDATE identity.outbox SET next_attempt_at=clock_timestamp()-interval '1 second' WHERE id=$1",[id]);
+ await deliverBatch(config,transport);assert.equal((await state(id)).state,'sent');assert.equal((await state(id)).acceptance,'postbox');
+ assert.equal((await pg.owner.query('SELECT 1 FROM mail.sandbox_inbox')).rowCount,0);
+ await deliverBatch(config,transport);assert.equal(calls,2);
+ const uncertain=await queue('security_password_changed',{email:'user@example.test'},'identity',config);
+ await deliverBatch(config,postboxTransport(postbox,async()=>({error:'DELIVERY_UNKNOWN'})));
+ assert.equal((await state(uncertain)).state,'failed');assert.equal((await state(uncertain)).last_error,'DELIVERY_UNKNOWN');
+ await deliverBatch(config,transport);assert.equal(calls,2);
 });
 test('finance/control queues and wrapping keys stay independent',async()=>{
  const f=await queue(),c=await queue('security_admin_recovery',{email:'owner@example.test'},'control',cc),i=await invite();

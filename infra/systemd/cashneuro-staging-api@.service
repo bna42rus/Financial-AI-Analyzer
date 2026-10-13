@@ -1,0 +1,35 @@
+[Unit]
+Description=CashNeuro Staging api (%i)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=120
+StartLimitBurst=3
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/srv/cashneuro/staging/backend-current/apps/api
+Environment=APP_ENV=staging
+Environment=API_PROFILE=%i
+EnvironmentFile=/etc/cashneuro/staging/%i-api.env
+LoadCredential=authorized-key.json:/etc/cashneuro/kms/staging/%i/authorized-key.json
+LoadCredential=wrapping-key.json:/etc/cashneuro/kms/staging/%i/wrapping-key.json
+ExecStart=/usr/bin/node --import tsx src/main.ts
+Restart=on-failure
+RestartSec=15
+TimeoutStopSec=30
+LimitCORE=0
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
+
