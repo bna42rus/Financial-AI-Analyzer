@@ -1,0 +1,45 @@
+name: staging-owner-bootstrap
+on:
+  pull_request:
+    branches: [main, feature/kms-postbox]
+    paths:
+      - apps/api/src/owner-*.ts
+      - apps/api/src/mail-templates.ts
+      - apps/api/test/owner-*.test.ts
+      - apps/api/package.json
+      - .github/workflows/staging-owner-bootstrap.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  owner-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:18.4
+        env:
+          POSTGRES_PASSWORD: synthetic-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager and dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check API types, cryptography, KMS and SMTP boundaries
+        run: pnpm run check:api
+      - name: Check privileged setup configuration and secret handling
+        run: pnpm --filter @finance/api exec node --import tsx --test test/owner-config.test.ts
+      - name: Check first owner, existing authentication and mail roles on PostgreSQL 18
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/owner-bootstrap.test.ts test/security.test.ts test/mail.test.ts
