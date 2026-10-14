@@ -1,5 +1,6 @@
 import { constants } from 'node:fs';
-import { open } from 'node:fs/promises';
+import { open, lstat, link, unlink } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { performance } from 'node:perf_hooks';
 import { gatePrompt, gateSchema, parseGate } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { benchmarkDigest, BenchmarkLedger } from './benchmark-ledger.ts';
@@ -30,6 +31,30 @@ export async function assertInactiveOperator(path: string) {
     }
     if (running) throw new BenchmarkFailure('BENCH_OPERATOR_ACTIVE');
   } finally { await file.close(); }
+}
+/** Archive only the lock belonging to the last verified Giga HTTP rejection.
+ * Unknown delivery, a live PID or any subsequent incomplete OSS call cannot
+ * qualify. The journal and the original operator lock remain untouched. */
+export async function archiveRejectedGigaLock(lockPath: string, ledgerPath: string) {
+  const before = await lstat(lockPath);
+  await assertInactiveOperator(lockPath);
+  const saved = await BenchmarkLedger.load(ledgerPath, { readOnly: true });
+  let rejectionId: string;
+  try {
+    const event = saved.checkOssContinuation();
+    if ([...saved.records.keys()].at(-1) !== event.rejectionId) throw new BenchmarkFailure('BENCH_OSS_CONTINUATION_NOT_ALLOWED');
+    rejectionId = event.rejectionId;
+  } finally { await saved.close(); }
+  const after = await lstat(lockPath);
+  if (before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs || after.nlink !== 1) throw new BenchmarkFailure('BENCH_OPERATOR_LOCK_INVALID');
+  const archive = join(dirname(lockPath), `diagnostic-giga-${rejectionId}.lock`);
+  // link is exclusive: existing evidence can never be replaced. A crash
+  // between link and unlink leaves two links and fails closed on the next run.
+  await link(lockPath, archive);
+  await unlink(lockPath);
+  const directory = await open(dirname(lockPath), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+  try { await directory.sync(); } finally { await directory.close(); }
+  return archive;
 }
 /** Exactly one explicit diagnostic dispatch. Never releases the old reservation
  * or lock, and never retries a cached, failed, or ambiguous diagnostic attempt. */

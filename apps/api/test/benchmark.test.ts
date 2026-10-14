@@ -5,14 +5,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { benchmarkPromptVersion, runSmoke, runComparison, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
+import { benchmarkPromptVersion, runSmoke, runComparison, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { isYandexTransport } from '../src/yandex-transport.ts';
-import { assertInactiveOperator, probeRequestId, runProbe, runFormatProbe } from '../src/benchmark-probe.ts';
+import { assertInactiveOperator, archiveRejectedGigaLock, probeRequestId, runProbe, runFormatProbe } from '../src/benchmark-probe.ts';
 import { revisedGatePrompt, revisedPlanPrompt, resolvedPlanPrompt, resolvedBenchmarkPromptVersion } from '../src/benchmark-prompts.ts';
 import { parseReferencePlan } from '../src/benchmark-reference-plan.ts';
+import { parseDeltaPlan, deltaPlanPrompt, deltaPlanSchema } from '../src/benchmark-delta-plan.ts';
+import { transferScenarios, transferFixtureVersion } from '../src/benchmark-transfer-fixtures.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
 const response = (value: unknown, change: Record<string, unknown> = {}) => new Response(JSON.stringify({ model,
@@ -774,4 +776,179 @@ test('inspection distinguishes a missing receipt without changing or releasing i
   assert.equal(report.unresolved[0]!.error, 'BENCH_RECEIPT_MISSING'); assert.equal(report.cost.spentAtoms, '0');
   assert.equal(report.cost.heldAtoms, before.held.toString()); assert.deepEqual(ledger.totals(), before);
   assert.throws(() => inspectBenchmark(ledger, 'other' as 'cloud-oss'), /BENCH_CONFIGURATION_INVALID/);
+}));
+
+async function seedGigaRejection(ledger: BenchmarkLedger, receiptChange: Record<string, unknown> = {}, proofChange: Record<string, unknown> = {}) {
+  const oss = createBenchmarkTransport('cloud-oss', { apiKey: key }), giga = createBenchmarkTransport('cloud-giga', { apiKey: key });
+  await seedFundedSmoke(ledger, oss); await ledger.allowFundedSmoke();
+  const proofId = benchmarkDigest('giga-known-financial-gate'), rejectionId = benchmarkDigest('giga-rejected-plan');
+  await ledger.reserve(proofId, giga.price, giga.bound);
+  await ledger.receipt({ id: proofId, usage: { inputTokens: 1206, outputTokens: 13, modelVersion: giga.bound.modelVersion },
+    value: { relevance: 'financial', followUp: false }, code: null, fingerprint: 'fixture-v1', latencyMs: 1, cachedTokens: null, reasoningTokens: null, ...proofChange });
+  await ledger.reserve(rejectionId, giga.price, giga.bound);
+  await ledger.receipt({ id: rejectionId, usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE_HTTP_400', fingerprint: null,
+    latencyMs: 1, cachedTokens: null, reasoningTokens: null, ...receiptChange });
+  return { oss, giga, proofId, rejectionId };
+}
+test('retiring the verified Giga rejection retains every atom, restricts new calls to OSS and survives reload', async () => sandbox(async (dir, ledger) => {
+  const { oss, giga } = await seedGigaRejection(ledger), before = ledger.totals();
+  assert.equal(before.blocked, true); assert.equal(before.held, 7516800640n);
+  await ledger.allowOssContinuation();
+  assert.deepEqual(ledger.totals(), { ...before, blocked: false });
+  assert.equal(smokeCostReport(ledger).requiresReconciliation, true);
+  const source = await readFile(join(dir, 'ledger.jsonl'));
+  await ledger.allowOssContinuation(); assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+  await assert.rejects(ledger.reserve('c'.repeat(64), giga.price, giga.bound), /BENCH_CANDIDATE_RETIRED/);
+  const loaded = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'));
+  try {
+    assert.deepEqual(loaded.totals(), ledger.totals());
+    await loaded.reserve('d'.repeat(64), oss.price, oss.bound);
+    assert.equal(loaded.totals().held, before.held + tokenCost(oss.price, oss.bound.inputTokens, oss.bound.outputTokens));
+    await assert.rejects(loaded.allowOssContinuation(), /BENCH_RECONCILIATION_REQUIRED/);
+    await assert.rejects(loaded.reserve('e'.repeat(64), oss.price, oss.bound), /BENCH_RECONCILIATION_REQUIRED/);
+  } finally { await loaded.close(); }
+}));
+test('OSS continuation cannot excuse delivery loss, another HTTP error or an unproven gate', async () => {
+  for (const change of [{ code: 'BENCH_PROVIDER_FAILURE' }, { code: 'BENCH_PROVIDER_FAILURE_HTTP_402' }, { code: null }]) await sandbox(async (dir, ledger) => {
+    await seedGigaRejection(ledger, change); const source = await readFile(join(dir, 'ledger.jsonl')), before = ledger.totals();
+    await assert.rejects(ledger.allowOssContinuation(), /BENCH_OSS_CONTINUATION_NOT_ALLOWED/);
+    assert.deepEqual(ledger.totals(), before); assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+  });
+  await sandbox(async (_, ledger) => {
+    await seedGigaRejection(ledger, {}, { value: { relevance: 'unrelated', followUp: false } });
+    await assert.rejects(ledger.allowOssContinuation(), /BENCH_OSS_CONTINUATION_NOT_ALLOWED/);
+  });
+});
+test('retiring Giga never bypasses the original shared smoke ceiling', async () => sandbox(async (_, ledger) => {
+  const { oss } = await seedGigaRejection(ledger); await ledger.allowOssContinuation();
+  let stopped = false;
+  for (let i = 0; i < 30; i++) {
+    const id = benchmarkDigest({ costlyOss: i });
+    try { await ledger.reserve(id, oss.price, oss.bound); }
+    catch (error) { assert.match(String(error), /BENCH_BUDGET_EXHAUSTED/); stopped = true; break; }
+    await ledger.receipt({ id, usage: { inputTokens: oss.bound.inputTokens, outputTokens: oss.bound.outputTokens, modelVersion: oss.bound.modelVersion },
+      value: null, code: null, fingerprint: 'fixture-v1', latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+  }
+  assert.equal(stopped, true); assert.ok(ledger.totals().spent + ledger.totals().held <= 45_000_000_000n);
+  assert.equal(ledger.totals().held, 7516800640n);
+}));
+test('a completed Giga rejection archives only its inactive diagnostic lock without modifying money or the journal', async () => sandbox(async (dir, ledger) => {
+  const { rejectionId } = await seedGigaRejection(ledger), path = join(dir, 'diagnostic.lock');
+  const source = await readFile(join(dir, 'ledger.jsonl')), before = ledger.totals();
+  await writeFile(path, '2147483647', { mode: 0o600 });
+  const archive = await archiveRejectedGigaLock(path, join(dir, 'ledger.jsonl'));
+  assert.equal(archive, join(dir, `diagnostic-giga-${rejectionId}.lock`)); assert.equal(await readFile(archive, 'utf8'), '2147483647');
+  await assert.rejects(readFile(path), { code: 'ENOENT' }); assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+  assert.deepEqual(ledger.totals(), before);
+}));
+test('lock recovery refuses active processes, delivery loss, symlinks and existing archives', async () => {
+  await sandbox(async (dir, ledger) => {
+    const { rejectionId } = await seedGigaRejection(ledger), path = join(dir, 'diagnostic.lock');
+    await writeFile(path, String(process.pid), { mode: 0o600 });
+    await assert.rejects(archiveRejectedGigaLock(path, join(dir, 'ledger.jsonl')), /BENCH_OPERATOR_ACTIVE/);
+    await writeFile(path, '2147483647'); await symlink(path, join(dir, 'linked.lock'));
+    await assert.rejects(archiveRejectedGigaLock(join(dir, 'linked.lock'), join(dir, 'ledger.jsonl')));
+    const archive = join(dir, `diagnostic-giga-${rejectionId}.lock`); await writeFile(archive, 'preserved', { mode: 0o600 });
+    await assert.rejects(archiveRejectedGigaLock(path, join(dir, 'ledger.jsonl')), { code: 'EEXIST' });
+    assert.equal(await readFile(path, 'utf8'), '2147483647'); assert.equal(await readFile(archive, 'utf8'), 'preserved');
+  });
+  await sandbox(async (dir, ledger) => {
+    await seedGigaRejection(ledger, { code: 'BENCH_PROVIDER_FAILURE' }); const path = join(dir, 'diagnostic.lock');
+    await writeFile(path, '2147483647', { mode: 0o600 });
+    await assert.rejects(archiveRejectedGigaLock(path, join(dir, 'ledger.jsonl')), /BENCH_OSS_CONTINUATION_NOT_ALLOWED/);
+    assert.equal(await readFile(path, 'utf8'), '2147483647');
+  });
+});
+test('delta contract inherits semantic state on the server, resolves category replacement and rejects invalid explicit values', () => {
+  const prior = { metric: 'income', grouping: 'category', comparison: 'previous_same' } as const;
+  const base = { ...october, categoryIds: ['22222222-2222-4222-8222-222222222222'], subcategoryIds: ['33333333-3333-4333-8333-333333333333'] };
+  assert.deepEqual(parseDeltaPlan({ status: 'query', changes: {} }, base, syntheticCatalog, prior).plan,
+    { status: 'query', query: { name: 'query_finances', ...prior, filter: base } });
+  const changed = parseDeltaPlan({ status: 'query', changes: { grouping: 'none', comparison: 'none', filter: { categoryNames: ['Продукты'] } } }, base, syntheticCatalog, prior);
+  assert.deepEqual(changed.plan.query?.filter, { ...october, categoryIds: ['11111111-1111-4111-8111-111111111111'] });
+  assert.equal(changed.plan.query?.metric, 'income'); assert.equal(changed.plan.query?.grouping, 'none'); assert.equal(changed.plan.query?.comparison, 'none');
+  assert.equal(parseDeltaPlan({ status: 'query', changes: { metric: 'attention' } }, october, syntheticCatalog).plan.query?.grouping, 'operation');
+  assert.equal(parseDeltaPlan({ status: 'query', changes: { filter: { categoryNames: ['Нет'] } } }, october, syntheticCatalog).resolution, 'reference_missing');
+  for (const changes of [{ metric: null }, { metric: 'budget' }, { grouping: null }, { comparison: false }, { filter: null }, { filter: { categoryIds: ['forged'] } }, { sql: 'SELECT 1' }]) {
+    assert.throws(() => parseDeltaPlan({ status: 'query', changes }, october, syntheticCatalog));
+  }
+  assert.throws(() => parseDeltaPlan({ status: 'unsupported', changes: { metric: 'expenses' } }, october, syntheticCatalog));
+  assert.throws(() => parseDeltaPlan({ status: 'query', changes: {}, query: null }, october, syntheticCatalog));
+});
+const scriptedDeltas: Record<string, unknown> = {
+  total: {}, income: { metric: 'income' }, groups: { grouping: 'category' }, attention: { metric: 'attention' }, compare: { comparison: 'previous_same' },
+  date: { filter: { from: '2026-09-01', through: '2026-09-30' } }, category: { filter: { categoryNames: ['Продукты'] } }, selected: {}, leaf: { filter: { categoryNames: ['Такси'] } },
+  'scope-1': { filter: { from: '2026-09-01', through: '2026-09-30', categoryNames: ['Продукты'] } },
+  'scope-2': { grouping: 'category' }, 'scope-3': { filter: { categoryNames: ['Такси'] } }, 'scope-4': { filter: { from: '2026-10-01', through: '2026-10-31' } },
+  'scope-5': { metric: 'income', filter: { from: '2026-10-01', through: '2026-10-31' } }, 'scope-6': { grouping: 'category' },
+  'global-1': { grouping: 'category' }, 'global-2': { comparison: 'previous_same' }, 'global-3': { comparison: 'none' },
+  'global-4': { grouping: 'operation' }, 'global-5': { grouping: 'none' }, 'global-6': { metric: 'income' },
+};
+function deltaFixtureClient(onRequest: (body: any) => void = () => {}, forceBadFirstGate = false) {
+  return createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options!.body)), input = JSON.parse(body.messages[1].content); onRequest(body);
+    const isGate = body.messages[0].content === revisedGatePrompt;
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+    if (isGate) return response(forceBadFirstGate && turn.id === 'total' ? { relevance: 'unrelated', followUp: false } : turn.expectedGate);
+    assert.equal(body.messages[0].content, deltaPlanPrompt); assert.deepEqual(body.response_format.json_schema.schema, deltaPlanSchema);
+    return response({ status: turn.id === 'write' ? 'unsupported' : 'query', changes: scriptedDeltas[turn.id] ?? {} });
+  }) as typeof fetch, 'empty-tools');
+}
+test('delta smoke verifies original goldens with sparse changes in every context mode, and replays without a new payment', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = deltaFixtureClient(body => {
+    calls++; const input = JSON.parse(body.messages[1].content);
+    assert.equal('catalog' in input, false); assert.equal('expectedPlan' in input, false);
+    assert.doesNotMatch(JSON.stringify(body), /11111111|22222222|33333333|categoryIds|subcategoryIds/);
+  });
+  for (const mode of ['task', 'window', 'transcript'] as const) {
+    const result = await runSmoke(client, ledger, mode, 'after-funding', true, 'delta');
+    assert.equal(result.passed, 24); assert.equal(result.benchmarkPromptVersion, 'cashneuro-smoke-prompt/4');
+    assert.equal(result.fixtureVersion, fixtureVersion); assert.equal(result.responseContract, 'cashneuro-response/2');
+  }
+  const source = await readFile(join(dir, 'ledger.jsonl')), before = calls;
+  const readonly = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'), { readOnly: true });
+  try {
+    const report = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), readonly, 'task', 'after-funding', true, 'delta');
+    assert.equal(report.passed, 24); assert.equal(report.checks.reduce((n, c) => n + c.replayCalls, 0), 46); assert.equal(calls, before);
+  } finally { await readonly.close(); }
+  assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+}));
+test('independent transfer corpus is frozen, disjoint and gated before any paid call', async () => sandbox(async (_, ledger) => {
+  const turns = transferScenarios.flatMap(s => s.turns), questions = new Set(smokeScenarios.flatMap(s => s.turns).map(t => t.question));
+  assert.equal(turns.length, 72); assert.equal(transferScenarios.filter(s => s.turns.length === 6).length, 6);
+  assert.equal(new Set(turns.map(t => t.id)).size, 72); assert.ok(turns.every(t => !questions.has(t.question)));
+  assert.equal(transferFixtureVersion, 'cashneuro-transfer/1');
+  let calls = 0; const client = deltaFixtureClient(() => { calls++; });
+  await assert.rejects(runTransfer(client, ledger), /BENCH_REPLAY_ONLY/); assert.equal(calls, 0);
+  const imperfect = deltaFixtureClient(() => { calls++; }, true);
+  const baseline = await runSmoke(imperfect, ledger, 'task', 'after-funding', false, 'delta'); assert.equal(baseline.passed, 23);
+  const before = calls; await assert.rejects(runTransfer(client, ledger), /BENCH_TRANSFER_BASELINE_REQUIRED/); assert.equal(calls, before);
+}));
+test('delta retains the last successful task across clarification and unrelated turns; actual mistakes cannot be hidden by goldens', async () => sandbox(async (_, ledger) => {
+  const scenarios = [transferScenarios.find(s => s.id === 'transfer-interruption')!, transferScenarios.find(s => s.id === 'transfer-globals')!];
+  // Exercise all 72 turns but give all other turns deliberately unrelated gates.
+  // The selected dialogs use independent, hand-authored sparse model responses.
+  const changes: Record<string, unknown> = {
+    'tx-1': { filter: { from: '2026-08-01', through: '2026-08-31', categoryNames: ['Продукты'] } },
+    'tx-2': { filter: { categoryNames: ['Орбитальные станции'] } }, 'tx-3': { grouping: 'category' },
+    'tx-5': { grouping: 'operation' }, 'tx-6': { metric: 'income', filter: { from: '2026-07-01', through: '2026-07-31' } },
+    'tg-1': { filter: { from: '2026-05-01', through: '2026-05-31' } }, 'tg-2': { grouping: 'category' },
+    'tg-3': {}, 'tg-4': {}, 'tg-5': {}, 'tg-6': { filter: { from: '2026-09-01', through: '2026-09-30', categoryNames: ['Продукты'] } },
+  };
+  const seen: Record<string, any> = {};
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options!.body)), input = JSON.parse(body.messages[1].content);
+    const turn = scenarios.flatMap(s => s.turns).find(t => t.question === input.question);
+    if (body.messages[0].content === revisedGatePrompt) return response(turn?.expectedGate ?? { relevance: 'unrelated', followUp: false });
+    seen[turn!.id] = input;
+    return response({ status: 'query', changes: changes[turn!.id] });
+  }) as typeof fetch, 'empty-tools');
+  const result = await runSmoke(client, ledger, 'task', 'after-funding', true, 'delta', 'transfer');
+  for (const turn of scenarios.flatMap(s => s.turns)) {
+    const check = result.checks.find(c => c.id === turn.id)!; assert.equal(check.gate, true, turn.id); assert.notEqual(check.plan, false, turn.id);
+  }
+  assert.deepEqual(seen['tx-3'].previousTask, { metric: 'expenses', grouping: 'none', comparison: 'none' });
+  assert.deepEqual(seen['tx-5'].previousTask, { metric: 'expenses', grouping: 'category', comparison: 'none' });
+  assert.equal(seen['tx-6'].previousTask, null); assert.ok(result.passed < 72);
 }));

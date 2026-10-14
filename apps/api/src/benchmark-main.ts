@@ -7,24 +7,26 @@ import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { candidates, createBenchmarkTransport, replayOnlyBenchmarkTransport, BenchmarkFailure } from './benchmark-transport.ts';
 import type { Candidate } from './benchmark-transport.ts';
 import { BenchmarkLedger } from './benchmark-ledger.ts';
-import { runSmoke, runComparison, smokeCostReport, inspectBenchmark } from './benchmark-engine.ts';
+import { runSmoke, runComparison, runTransfer, smokeCostReport, inspectBenchmark } from './benchmark-engine.ts';
 import type { ContextMode } from './benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
-import { assertInactiveOperator, probeRequestId, runProbe, formatProbeRequestId, runFormatProbe } from './benchmark-probe.ts';
+import { assertInactiveOperator, archiveRejectedGigaLock, probeRequestId, runProbe, formatProbeRequestId, runFormatProbe } from './benchmark-probe.ts';
 
 const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
   const inspection = action === '--inspect';
+  const delta = action === '--live-delta' || action === '--report-delta';
+  const transfer = action === '--live-transfer' || action === '--report-transfer';
   const formatProbe = action === '--probe-format';
   const compatible = action === '--compare-fixed' || action === '--report-fixed';
   const diagnostic = action === '--probe' || action === '--probe-after-funding' || formatProbe;
   const comparison = action === '--compare' || action === '--compare-fixed';
   const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison || compatible;
-  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || inspection;
+  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || action === '--report-delta' || action === '--report-transfer' || inspection;
   const revised = action === '--live-revised' || action === '--report-revised';
-  const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved || delta || transfer;
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect', '--live-delta', '--report-delta', '--live-transfer', '--report-transfer'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga' || (delta || transfer) && (candidate !== 'cloud-oss' || mode !== 'task')) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -53,23 +55,32 @@ async function main() {
   if (recovery) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
   const lockPath = join(stateDirectory, recovery ? 'diagnostic.lock' : 'operator.lock');
   let lock;
-  try { lock = await open(lockPath, 'wx', 0o600); } catch { throw new BenchmarkFailure('BENCH_LOCKED'); }
+  try { lock = await open(lockPath, 'wx', 0o600); } catch (error) {
+    if (delta && !report && (error as NodeJS.ErrnoException).code === 'EEXIST') {
+      await archiveRejectedGigaLock(lockPath, join(stateDirectory, 'smoke-ledger.jsonl'));
+      try { lock = await open(lockPath, 'wx', 0o600); } catch { throw new BenchmarkFailure('BENCH_LOCKED'); }
+    } else throw new BenchmarkFailure('BENCH_LOCKED');
+  }
   let ledger: BenchmarkLedger | undefined; let clean = report; let probeId: string | undefined;
   try {
     await lock.writeFile(String(process.pid)); await lock.sync();
     if (recovery) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
     ledger = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'), { readOnly: report });
-    const contract = compatible ? 'empty-tools' : 'legacy';
+    const contract = compatible || delta || transfer ? 'empty-tools' : 'legacy';
     const transport = report ? replayOnlyBenchmarkTransport(candidate as Candidate, contract) :
       createBenchmarkTransport(candidate as Candidate, object(await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json'), ['cloud', 'yandex'])[selected.provider], fetch, contract);
     if (diagnostic) probeId = formatProbe ? formatProbeRequestId(transport) : probeRequestId(transport, probePhase);
     if (fundedSmoke) await ledger.allowFundedSmoke();
+    if (delta && !report) {
+      await ledger.allowOssContinuation();
+      await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), ledger, 'task', 'after-funding', false, 'revised');
+    }
     // A revised paid trial requires a completed baseline for the same model/mode.
     if (revised && !report) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding');
     if (resolved && !report && !comparison) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding', false, 'revised');
-    const result = formatProbe ? await runFormatProbe(transport, ledger) : diagnostic ? await runProbe(transport, ledger, probePhase) : comparison ? await runComparison(transport, ledger, mode as ContextMode) :
-      await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke || report || revised || resolved ? 'after-funding' : 'initial', report || revised || resolved, resolved ? 'resolved' : revised ? 'revised' : 'original');
-    console.log(JSON.stringify({ ...result, ...((report || revised || resolved) && 'checks' in result ? { checks: result.checks.filter(c => !c.gate || c.plan === false) } : {}),
+    const result = transfer ? await runTransfer(transport, ledger) : formatProbe ? await runFormatProbe(transport, ledger) : diagnostic ? await runProbe(transport, ledger, probePhase) : comparison ? await runComparison(transport, ledger, mode as ContextMode) :
+      await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke || report || revised || resolved || delta ? 'after-funding' : 'initial', report || revised || resolved || delta, delta ? 'delta' : resolved ? 'resolved' : revised ? 'revised' : 'original');
+    console.log(JSON.stringify({ ...result, ...((report || revised || resolved || delta || transfer) && 'checks' in result ? { checks: result.checks.filter(c => !c.gate || c.plan === false) } : {}),
       ...(report ? { report: 'saved-smoke/1', paidCalls: 0 } : {}), cost: smokeCostReport(ledger) }));
     clean = !ledger.totals().blocked;
   } catch (error) {

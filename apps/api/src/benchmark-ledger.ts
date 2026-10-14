@@ -5,13 +5,14 @@ import { dirname } from 'node:path';
 import type { FileHandle } from 'node:fs/promises';
 import { rubAtoms, tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import type { Usage, TokenPrice, DispatchBound } from '../../../packages/analyzer/src/cost.ts';
-import { BenchmarkFailure } from './benchmark-transport.ts';
+import { BenchmarkFailure, candidates } from './benchmark-transport.ts';
 
 export type ProbePurpose = 'operator_probe' | 'operator_probe_after_funding';
 type Reservation = { type: 'reserve'; id: string; atoms: string; price: TokenPrice; bound: DispatchBound; purpose?: ProbePurpose };
 type Receipt = { type: 'receipt'; id: string; usage: Usage | null; atoms: string | null; value: unknown; code: string | null; fingerprint: string | null; latencyMs: number; cachedTokens: number | null; reasoningTokens: number | null };
 type FundedContinuation = { type: 'continue_with_held_rejections'; id: string; rejectionIds: string[]; proofId: string };
-type Event = Reservation | Receipt | FundedContinuation;
+type RetiredCandidate = { type: 'retain_rejected_candidate'; id: string; rejectionId: string; proofId: string; modelVersion: string };
+type Event = Reservation | Receipt | FundedContinuation | RetiredCandidate;
 export const benchmarkBudget = { project: 1000n * rubAtoms, smoke: 45n * rubAtoms };
 export const benchmarkDigest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 /** Caller holds the one process lock for the entire live run. All reservations
@@ -21,6 +22,7 @@ export class BenchmarkLedger {
   private queue: Promise<unknown> = Promise.resolve();
   private poisoned = false;
   private heldRejections = new Set<string>();
+  private retirement?: RetiredCandidate;
   private constructor(file: FileHandle, private readonly readOnly = false) { this.file = file; }
   static async load(path: string, options: { readOnly?: boolean } = {}): Promise<BenchmarkLedger> {
     const file = await open(path, (options.readOnly ? constants.O_RDONLY : constants.O_RDWR | constants.O_CREAT | constants.O_APPEND) | constants.O_NOFOLLOW, 0o600);
@@ -51,6 +53,10 @@ export class BenchmarkLedger {
       this.heldRejections = new Set(event.rejectionIds);
       return;
     }
+    if (event.type === 'retain_rejected_candidate') {
+      if (benchmarkDigest(event) !== benchmarkDigest(this.ossContinuation())) throw new Error();
+      this.heldRejections.add(event.rejectionId); this.retirement = event; return;
+    }
     const old = this.records.get(event.id);
     if (event.type === 'reserve') {
       if (event.purpose !== undefined) {
@@ -64,17 +70,46 @@ export class BenchmarkLedger {
       old.receipt = event;
     } else throw new Error();
   }
-  totals() {
+  totals() { return this.calculateTotals(); }
+  private calculateTotals(allowedRejection?: string) {
     let spent = 0n, held = 0n; let blocked = this.poisoned;
     const fingerprints = new Map<string, string | null>();
     for (const [id, { reserve, receipt }] of this.records) {
-      if (!receipt?.usage) { held += BigInt(reserve.atoms); if (!this.heldRejections.has(id)) blocked = true; }
+      if (!receipt?.usage) { held += BigInt(reserve.atoms); if (!this.heldRejections.has(id) && id !== allowedRejection) blocked = true; }
       else { spent += BigInt(receipt.atoms!);
         if (receipt.usage.inputTokens > reserve.bound.inputTokens || receipt.usage.outputTokens > reserve.bound.outputTokens || receipt.usage.modelVersion !== reserve.bound.modelVersion) blocked = true;
         if (fingerprints.has(reserve.bound.modelVersion) && fingerprints.get(reserve.bound.modelVersion) !== receipt.fingerprint) blocked = true;
         fingerprints.set(reserve.bound.modelVersion, receipt.fingerprint); }
     }
     return { spent, held, blocked };
+  }
+  private ossContinuation(): RetiredCandidate {
+    const pending = [...this.records.entries()].filter(([id, r]) => !r.receipt?.usage && !this.heldRejections.has(id));
+    const entries = [...this.records.entries()], last = entries.at(-1), proof = entries.at(-2);
+    const spec = candidates['cloud-giga'];
+    if (this.poisoned || this.retirement || this.heldRejections.size !== 2 || pending.length !== 1 || !last || !proof || pending[0]![0] !== last[0]) throw new BenchmarkFailure('BENCH_OSS_CONTINUATION_NOT_ALLOWED');
+    const [rejectionId, rejected] = last, [proofId, proven] = proof;
+    const gate = proven.receipt?.value as { relevance?: unknown; followUp?: unknown } | null;
+    const bound = { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model };
+    if (rejected.reserve.purpose !== undefined || rejected.receipt?.code !== 'BENCH_PROVIDER_FAILURE_HTTP_400' || rejected.receipt.usage !== null ||
+        proven.receipt?.code !== null || !proven.receipt.usage || gate?.relevance !== 'financial' || gate.followUp !== false ||
+        [rejected, proven].some(r => benchmarkDigest(r.reserve.price) !== benchmarkDigest(spec.price) || benchmarkDigest(r.reserve.bound) !== benchmarkDigest(bound)) ||
+        this.calculateTotals(rejectionId).blocked) throw new BenchmarkFailure('BENCH_OSS_CONTINUATION_NOT_ALLOWED');
+    const data = { rejectionId, proofId, modelVersion: spec.model };
+    return { type: 'retain_rejected_candidate', id: benchmarkDigest({ action: 'close-giga-trial/1', ...data }), ...data };
+  }
+  /** No funds are released. Only the verified rejected Giga trial is retired;
+   * all future reservations are restricted to OSS and retain the same cap. */
+  checkOssContinuation() {
+    if (this.retirement) { if (this.totals().blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED'); return this.retirement; }
+    return this.ossContinuation();
+  }
+  async allowOssContinuation() {
+    return this.exclusive(async () => {
+      const event = this.checkOssContinuation();
+      if (!this.retirement) await this.append(event);
+      return event;
+    });
   }
   private fundedContinuation(): FundedContinuation {
     if (this.poisoned || this.heldRejections.size || this.records.size !== 3) throw new BenchmarkFailure('BENCH_FUNDED_CONTINUATION_NOT_ALLOWED');
@@ -110,6 +145,7 @@ export class BenchmarkLedger {
   }
   async reserve(id: string, price: TokenPrice, bound: DispatchBound) {
     return this.exclusive(async () => {
+    if (this.retirement && bound.modelVersion !== candidates['cloud-oss'].model) throw new BenchmarkFailure('BENCH_CANDIDATE_RETIRED');
     if (!/^[a-f0-9]{64}$/.test(id) || this.records.has(id)) throw new BenchmarkFailure('BENCH_RESERVATION_INVALID');
     const total = this.totals(), amount = tokenCost(price, bound.inputTokens, bound.outputTokens);
     if (total.blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
