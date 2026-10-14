@@ -16,9 +16,10 @@ const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
   const diagnostic = action === '--probe' || action === '--probe-after-funding';
-  const report = action === '--report';
-  const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  const report = action === '--report' || action === '--report-revised';
+  const revised = action === '--live-revised' || action === '--report-revised';
+  const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised;
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -52,8 +53,11 @@ async function main() {
       createBenchmarkTransport(candidate as Candidate, object(await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json'), ['cloud', 'yandex'])[selected.provider]);
     if (diagnostic) probeId = probeRequestId(transport, probePhase);
     if (fundedSmoke) await ledger.allowFundedSmoke();
-    const result = diagnostic ? await runProbe(transport, ledger, probePhase) : await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke || report ? 'after-funding' : 'initial', report);
-    console.log(JSON.stringify({ ...result, ...(report && 'checks' in result ? { report: 'saved-smoke/1', paidCalls: 0, checks: result.checks.filter(c => !c.gate || c.plan === false) } : {}), cost: smokeCostReport(ledger) }));
+    // A revised paid trial requires a completed baseline for the same model/mode.
+    if (revised && !report) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding');
+    const result = diagnostic ? await runProbe(transport, ledger, probePhase) : await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke || report || revised ? 'after-funding' : 'initial', report || revised, revised ? 'revised' : 'original');
+    console.log(JSON.stringify({ ...result, ...((report || revised) && 'checks' in result ? { checks: result.checks.filter(c => !c.gate || c.plan === false) } : {}),
+      ...(report ? { report: 'saved-smoke/1', paidCalls: 0 } : {}), cost: smokeCostReport(ledger) }));
     clean = !ledger.totals().blocked;
   } catch (error) {
     if (ledger) console.log(JSON.stringify({ candidate, mode, error: error instanceof BenchmarkFailure ? error.code : 'BENCH_FAILED', cost: smokeCostReport(ledger) }));

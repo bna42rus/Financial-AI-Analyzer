@@ -11,6 +11,7 @@ import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-co
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { isYandexTransport } from '../src/yandex-transport.ts';
 import { assertInactiveOperator, probeRequestId, runProbe } from '../src/benchmark-probe.ts';
+import { revisedGatePrompt, revisedPlanPrompt } from '../src/benchmark-prompts.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
 const response = (value: unknown, change: Record<string, unknown> = {}) => new Response(JSON.stringify({ model,
@@ -427,3 +428,56 @@ test('offline transport never reserves and readonly loading never creates a miss
     await assert.rejects(readFile(path), { code: 'ENOENT' });
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('revised trial keeps original receipts, propagates bounded gate state and replays both versions for free', async () => sandbox(async (dir, ledger) => {
+  let calls = 0, revisedGates = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options?.body)), input = JSON.parse(body.messages[1].content);
+    const prompt = body.messages[0].content;
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+    const isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    if (prompt === revisedGatePrompt) {
+      revisedGates++;
+      assert.deepEqual(Object.keys(input).sort(), ['hasFinancialContext', 'previousTask', 'question']);
+      assert.equal(Boolean(input.previousTask), input.hasFinancialContext);
+      if (input.previousTask) assert.deepEqual(Object.keys(input.previousTask).sort(), ['comparison', 'grouping', 'metric']);
+      if (turn.id === 'scope-3') assert.deepEqual(input.previousTask, { metric: 'expenses', grouping: 'category', comparison: 'none' });
+    }
+    assert.ok(!String(options?.body).includes('11111111-'));
+    let planned = scriptedPlans[turn.id];
+    if (!isGate && input.question === 'А по категориям?') planned = rawPlan({}, input.previousTask.metric, 'category', input.previousTask.comparison);
+    if (!isGate && turn.id === 'income' && prompt !== revisedPlanPrompt) planned = rawPlan({}, 'income', 'category');
+    return response(isGate ? { ...turn.expectedGate, followUp: input.hasFinancialContext ? turn.expectedGate.followUp : false } : planned);
+  }) as typeof fetch);
+  await seedFundedSmoke(ledger, client); await ledger.allowFundedSmoke();
+  const original = await runSmoke(client, ledger, 'task', 'after-funding');
+  assert.equal(original.passed, 22); assert.equal(calls, 46);
+  const before = await readFile(join(dir, 'ledger.jsonl')), held = ledger.totals().held, size = ledger.records.size;
+  const revised = await runSmoke(client, ledger, 'task', 'after-funding', false, 'revised');
+  assert.equal(revised.benchmarkPromptVersion, 'cashneuro-smoke-prompt/2');
+  assert.equal(revised.passed, 24); assert.equal(calls, 92); assert.equal(revisedGates, 24);
+  assert.equal(ledger.records.size, size + 46); assert.equal(ledger.totals().held, held);
+  assert.ok((await readFile(join(dir, 'ledger.jsonl'))).subarray(0, before.length).equals(before));
+  const saved = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'), { readOnly: true });
+  try {
+    const source = await readFile(join(dir, 'ledger.jsonl'));
+    const oldReport = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), saved, 'task', 'after-funding', true);
+    const newReport = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), saved, 'task', 'after-funding', true, 'revised');
+    assert.equal(oldReport.passed, 22); assert.equal(newReport.passed, 24);
+    assert.ok(newReport.checks.every(c => c.replayCalls === c.calls));
+    assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+    assert.deepEqual(smokeCostReport(saved), smokeCostReport(ledger));
+  } finally { await saved.close(); }
+}));
+test('revised parser failures retain usage and expose only a fixed local phase', async () => sandbox(async (dir, ledger) => {
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options?.body)), isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    return response(isGate ? { relevance: 'financial', followUp: false } : rawPlan({ from: key }));
+  }) as typeof fetch);
+  const result = await runSmoke(client, ledger, 'task', 'after-funding', true, 'revised');
+  assert.equal(result.passed, 0);
+  assert.ok(result.checks.every(c => c.diagnostics!.errors.some(e => e.step === 'plan' && e.code === 'BENCH_PLAN_INVALID_TOOL')));
+  assert.equal(smokeCostReport(ledger).reportedCalls, 48); assert.equal(smokeCostReport(ledger).failedCalls, 24);
+  assert.equal(ledger.totals().held, 0n);
+  assert.ok(!(await readFile(join(dir, 'ledger.jsonl'), 'utf8')).includes(key));
+}));
