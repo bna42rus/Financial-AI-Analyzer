@@ -44,9 +44,9 @@ test('bad credentials, unknown model or oversized context never dispatch', async
   await assert.rejects(client.complete('test', {}, {}, async () => { throw new Error('no budget'); }), /no budget/); assert.equal(calls, 0);
 });
 test('every refusal, redirect, lost response and read failure is one attempt without reflected secrets', async () => {
-  for (const status of [302, 401, 403, 429, 500]) {
+  for (const status of [302, 400, 401, 402, 403, 404, 422, 429, 500, 503]) {
     let calls = 0; const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => { calls++; return new Response(key, { status }); }) as typeof fetch);
-    await assert.rejects(client.complete('test', {}, {}, async () => {}), (e: unknown) => e instanceof BenchmarkFailure && e.usage === undefined && !JSON.stringify(e).includes(key));
+    await assert.rejects(client.complete('test', {}, {}, async () => {}), (e: unknown) => e instanceof BenchmarkFailure && e.code.endsWith(`_HTTP_${status}`) && e.usage === undefined && !JSON.stringify(e).includes(key));
     assert.equal(calls, 1);
   }
   let calls = 0; const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => { calls++; throw new Error(key); }) as typeof fetch);
