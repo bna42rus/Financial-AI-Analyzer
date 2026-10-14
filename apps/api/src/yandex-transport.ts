@@ -3,7 +3,7 @@ import { email } from './types.ts';
 import { tokenUsage } from '../../../packages/analyzer/src/registry.ts';
 
 export const yandexEndpoint = 'https://ai.api.cloud.yandex.net/foundationModels/v1/completion';
-export class YandexFailure extends Error { constructor(public code: string, public unknownOutcome = false) { super(code); } }
+export class YandexFailure extends Error { constructor(public code: string, public unknownOutcome = false, public diagnostic?: 'ROOT' | 'QUERY' | 'FILTER' | 'REFERENCE' | 'TOOL') { super(code); } }
 export type YandexSettings = { realm: 'staging/finance'; apiKey: string; modelUri: string; allowedEmails: string[]; maxDailyCalls: number; maxTokens: number; timeoutMs: number };
 export type Completion = { value: unknown; inputTokens: number; outputTokens: number; modelVersion: string };
 export type YandexTransport = { model: string; dailyLimit: number; allowed(email: string): boolean; complete(prompt: string, input: unknown, schema: unknown): Promise<Completion> };
@@ -28,7 +28,7 @@ export function createYandexTransport(settings: YandexSettings, fetcher: typeof 
     async complete(prompt, input, schema) {
       const body = JSON.stringify({ modelUri: config.modelUri, completionOptions: { stream: false, temperature: 0, maxTokens: String(config.maxTokens), reasoningOptions: { mode: 'DISABLED' } },
         messages: [{ role: 'system', text: prompt }, { role: 'user', text: JSON.stringify(input) }], jsonSchema: { schema } });
-      if (Buffer.byteLength(body) > 65536) throw new YandexFailure('AI_CONTEXT_LIMIT');
+      if (Buffer.byteLength(JSON.stringify(input)) > 8192 || Buffer.byteLength(body) > 16384) throw new YandexFailure('AI_CONTEXT_LIMIT');
       let response: Response;
       try { response = await fetcher(yandexEndpoint, { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(config.timeoutMs),
         headers: { 'content-type': 'application/json', authorization: 'Api-Key ' + config.apiKey, 'x-folder-id': config.modelUri.split('/')[2]!, 'x-data-logging-enabled': 'false' }, body }); }

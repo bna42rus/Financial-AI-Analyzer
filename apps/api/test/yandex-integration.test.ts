@@ -23,6 +23,7 @@ const transport=createYandexTransport({realm:'staging/finance',apiKey:'synthetic
  let value:unknown=gate?{relevance:behavior==='unrelated'?'unrelated':behavior==='ambiguous'?'ambiguous':'financial',followUp}:{status:'query',query:{name:'query_finances',metric:'expenses',grouping:'none',comparison:'none',filter:{from:'2026-09-01',through:'2026-09-30',...(behavior==='foreign-plan'?{accountIds:[randomUUID()]}:{})}}};
  if(!gate&&behavior==='invalid-plan')value={status:'query',query:{name:'sql',query:'SELECT * FROM finance.transaction'}};
  if(!gate&&behavior==='clarification')value={status:'clarification',query:null};
+ if(!gate&&['named-plan','unknown-name'].includes(behavior))value={status:'query',query:{name:'query_finances',metric:'expenses',grouping:'category',comparison:'none',filter:{categoryNames:[behavior==='named-plan'?'Продукты':'Неизвестная категория']}}};
  return new Response(JSON.stringify({result:{alternatives:[{status:'ALTERNATIVE_STATUS_FINAL',message:{role:'assistant',text:JSON.stringify(value)}}],usage:{inputTextTokens:'20',completionTokens:'10',totalTokens:'30'},modelVersion:'synthetic-1'}}),{headers:{'content-type':'application/json'}});
 });
 before(async()=>{
@@ -46,12 +47,21 @@ beforeEach(async()=>{
 test('native two-stage request computes money on the server, records actual metadata, and exact retry is free',async()=>{
  const id=await chat(),payload=body(id),r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,200,r.body);const answer=r.json();assert.equal(answer.answer.mode,'ai');assert.equal(answer.answer.result.totals.expenses,'24690');assert.equal(answer.answer.provider.version,'synthetic-1');assert.equal(answer.quota.used,1);assert.equal(answer.quota.reserved,0);assert.equal(calls.length,2);
  assert.deepEqual(Object.keys(calls[0]!.input).sort(),['hasFinancialContext','question']);assert.ok(!JSON.stringify(calls[1]!.input).includes('Synthetic safe source'));assert.ok(!JSON.stringify(calls[1]!.input).includes('12345'));
+ assert.ok(!('catalog' in calls[1]!.input));assert.ok(!JSON.stringify(calls[1]!.input).includes(category));assert.ok(Buffer.byteLength(JSON.stringify(calls[1]!.input))<512);
  const retry=await request('/finance/analyzer-query',payload);assert.deepEqual(retry.json(),answer);assert.equal(calls.length,2);const usage=(await pg.owner.query('SELECT * FROM commerce.analyzer_usage')).rows[0];assert.equal(usage.units,1);assert.equal(usage.input_tokens,40);assert.equal(usage.output_tokens,20);assert.equal(usage.model,modelUri);
  assert.equal((await request('/finance/analyzer-query',{...payload,text:'Другая покупка'})).statusCode,409);
 });
 test('deterministic questions stay free while explicit AI dates retain other global filters',async()=>{
  const id=await chat(),finite=await request('/finance/analyzer-query',body(id,{text:'Мои расходы'}));assert.equal(finite.statusCode,200,finite.body);assert.equal(finite.json().answer.mode,'deterministic');assert.equal(calls.length,0);
  const r=await request('/finance/analyzer-query',body(id,{filter:{from:'2026-10-01',through:'2026-10-31',accountIds:[account]}}));assert.equal(r.statusCode,200,r.body);assert.deepEqual(r.json().answer.query.filter.accountIds,[account]);assert.equal(r.json().answer.query.filter.from,'2026-09-01');assert.equal(r.json().answer.result.totals.expenses,'24690');
+});
+test('named plans resolve owned categories locally and unknown labels clarify without billing or losing filters',async()=>{
+ const id=await chat();behavior='named-plan';const filter={from:'2026-09-01',through:'2026-09-30',accountIds:[account]};
+ const r=await request('/finance/analyzer-query',body(id,{filter}));assert.equal(r.statusCode,200,r.body);
+ assert.deepEqual(r.json().answer.query.filter,{...filter,categoryIds:[category]});assert.equal(r.json().answer.result.totals.expenses,'24690');
+ assert.ok(!JSON.stringify(calls).includes(category));assert.ok(!JSON.stringify(calls).includes(account));assert.ok(!JSON.stringify(calls).includes('Продукты'));
+ behavior='unknown-name';const ambiguous=await request('/finance/analyzer-query',body(id,{filter}));assert.equal(ambiguous.statusCode,200,ambiguous.body);
+ assert.equal(ambiguous.json().answer.mode,'clarification');assert.equal(ambiguous.json().quota.used,1);assert.equal(ambiguous.json().quota.reserved,0);
 });
 test('unrelated and ambiguous gates never load financial rows and never consume a customer quota unit',async()=>{
  const id=await chat();await pg.owner.query('ALTER TABLE finance.transaction RENAME TO transaction_gate_canary');try{for(const mode of ['unrelated','ambiguous']){behavior=mode;const r=await request('/finance/analyzer-query',body(id,{text:'Расскажи интересную историю'}));assert.equal(r.statusCode,200,r.body);assert.equal(r.json().answer.result,undefined);assert.equal(r.json().quota.used,0);}}finally{await pg.owner.query('ALTER TABLE finance.transaction_gate_canary RENAME TO transaction');}assert.equal(calls.length,2);assert.ok(calls.every(c=>c.gate));
@@ -62,8 +72,10 @@ test('sensitive text and explicit injection are stopped before external dispatch
 });
 test('ownership precedes planner dispatch and foreign or arbitrary SQL plans cannot access financial data',async()=>{
  const id=await chat(),foreign=await request('/finance/analyzer-query',body(id,{filter:{accountIds:[randomUUID()]}}));assert.equal(foreign.statusCode,409,foreign.body);assert.equal(calls.length,1);
- behavior='foreign-plan';const r=await request('/finance/analyzer-query',body(id));assert.equal(r.statusCode,400,r.body);assert.equal(r.json().code,'AI_SCOPE_DENIED');assert.equal((await within(db=>analyzerQuota(db,'first',true))).reserved,0);
+ behavior='foreign-plan';const r=await request('/finance/analyzer-query',body(id));assert.equal(r.statusCode,502,r.body);assert.equal(r.json().code,'AI_PLAN_INVALID');assert.equal((await within(db=>analyzerQuota(db,'first',true))).reserved,0);
  behavior='invalid-plan';const invalid=await request('/finance/analyzer-query',body(id));assert.equal(invalid.statusCode,502,invalid.body);assert.equal(invalid.json().code,'AI_PLAN_INVALID');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
+ const diagnostics=(await pg.owner.query("SELECT error_code,input_tokens,output_tokens FROM commerce.analyzer_request WHERE state='failed'")).rows;
+ assert.ok(diagnostics.every(row=>/^AI_PLAN_INVALID__(FILTER|QUERY)$/.test(row.error_code)));assert.ok(diagnostics.every(row=>row.input_tokens===20&&row.output_tokens===10));
 });
 test('definitive provider refusal is sanitized and retry never dispatches again',async()=>{
  const id=await chat(),payload=body(id);behavior='http-gate';const r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,502,r.body);assert.equal(r.json().code,'AI_IDENTITY_DENIED');assert.ok(!r.body.includes('private'));await request('/finance/analyzer-query',payload);assert.equal(calls.length,1);assert.equal((await within(db=>analyzerQuota(db,'first',true))).used,0);

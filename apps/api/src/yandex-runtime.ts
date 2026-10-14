@@ -5,7 +5,7 @@ import { HttpError } from './types.ts';
 import { YandexFailure, isYandexTransport } from './yandex-transport.ts';
 import type { YandexTransport } from './yandex-transport.ts';
 import type { Catalog } from '../../../packages/analyzer/src/yandex-contract.ts';
-import { catalogLimits } from '../../../packages/analyzer/src/yandex-contract.ts';
+import { catalogLimits, YandexPlanError } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { safeText } from '../../../packages/privacy/src/text.ts';
 
 type Step = 'gate' | 'plan';
@@ -37,7 +37,7 @@ export function createYandexAnalyzer(pool: Pool, transport: YandexTransport): Ya
         if (old) {
           if (old.fingerprint !== fingerprint || old.model !== transport.model) throw new HttpError(409, 'AI_REQUEST_CHANGED');
           if (['sent', 'unknown'].includes(old.state)) throw new HttpError(409, 'AI_DELIVERY_UNKNOWN');
-          if (old.state === 'failed') throw new HttpError(502, old.error_code ?? 'AI_RESPONSE_INVALID');
+          if (old.state === 'failed') throw new HttpError(502, old.error_code?.startsWith('AI_PLAN_INVALID__') ? 'AI_PLAN_INVALID' : old.error_code ?? 'AI_RESPONSE_INVALID');
           const cache = (await db.query('SELECT payload FROM finance.analyzer_provider_plan WHERE user_id=$1 AND request_id=$2 AND step=$3 AND chat_id=$4', [request.userId, request.requestId, request.step, request.chatId])).rows[0];
           if (!cache) throw new HttpError(409, 'AI_RESPONSE_UNAVAILABLE');
           return { value: parse(cache.payload, true), inputTokens: old.input_tokens, outputTokens: old.output_tokens, modelVersion: old.model_version } as Result<T>;
@@ -53,7 +53,7 @@ export function createYandexAnalyzer(pool: Pool, transport: YandexTransport): Ya
       try {
         completion = await transport.complete(request.prompt, request.input, request.schema);
         let parsed: T;
-        try { parsed = parse(completion.value, false); } catch { throw new YandexFailure('AI_PLAN_INVALID'); }
+        try { parsed = parse(completion.value, false); } catch (error) { throw new YandexFailure('AI_PLAN_INVALID', false, error instanceof YandexPlanError ? error.phase : undefined); }
         await within(pool, request.userId, async db => {
           await db.query('INSERT INTO finance.analyzer_provider_plan(user_id,request_id,step,chat_id,payload) VALUES($1,$2,$3,$4,$5)', [request.userId, request.requestId, request.step, request.chatId, JSON.stringify(parsed)]);
           await db.query(`UPDATE commerce.analyzer_request SET state='received',input_tokens=$4,output_tokens=$5,model_version=$6,updated_at=clock_timestamp()
@@ -64,7 +64,7 @@ export function createYandexAnalyzer(pool: Pool, transport: YandexTransport): Ya
         const known = error instanceof YandexFailure, code = known ? error.code : 'AI_DELIVERY_UNKNOWN';
         const unknown = !known || error.unknownOutcome;
         await within(pool, request.userId, db => db.query(`UPDATE commerce.analyzer_request SET state=$4,error_code=$5,input_tokens=$6,output_tokens=$7,model_version=$8,updated_at=clock_timestamp()
-          WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state='sent'`, [request.userId, request.requestId, request.step, unknown ? 'unknown' : 'failed', code, completion?.inputTokens ?? 0, completion?.outputTokens ?? 0, completion?.modelVersion ?? null]));
+          WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state='sent'`, [request.userId, request.requestId, request.step, unknown ? 'unknown' : 'failed', known && error.diagnostic ? code + '__' + error.diagnostic : code, completion?.inputTokens ?? 0, completion?.outputTokens ?? 0, completion?.modelVersion ?? null]));
         throw new HttpError(unknown ? 409 : 502, code);
       }
     },

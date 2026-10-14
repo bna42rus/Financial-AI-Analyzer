@@ -14,7 +14,7 @@ import {stableJSON} from './finance-history.ts';
 import {HttpError} from './types.ts';
 import type {YandexAnalyzer} from './yandex-runtime.ts';
 import {yandexCatalog} from './yandex-runtime.ts';
-import {gatePrompt,gateSchema,parseGate,planPrompt,planSchema,parseModelPlan,modelInput} from '../../../packages/analyzer/src/yandex-contract.ts';
+import {gatePrompt,gateSchema,parseGate,planPrompt,planSchema,parseModelPlan,modelInput,yandexContractVersion} from '../../../packages/analyzer/src/yandex-contract.ts';
 import type {ModelPlan} from '../../../packages/analyzer/src/yandex-contract.ts';
 
 export async function analyzerQuota(db:PoolClient,userId:string,journal=false):Promise<Quota>{
@@ -66,7 +66,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  let external:{id:string;model:string;version:string}|undefined;
  if(!query&&yandex&&actorEmail&&yandex.transport.allowed(actorEmail)&&!/(?:игнорир(?:уй|уйте).{0,50}(?:правил|инструкц)|ignore.{0,30}(?:instructions|rules)|system prompt|\bSQL\b|HMAC|api[_ -]?key|парол)/iu.test(text)){
   const workspace=(await db.query('SELECT generation,revision FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
-  const binding={request,context,registryVersion,generation:workspace.generation,revision:workspace.revision};
+  const binding={request,context,registryVersion,yandexContractVersion,generation:workspace.generation,revision:workspace.revision};
   const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema},v=>parseGate(v));
   if(['financial','adjacent'].includes(gate.value.relevance)){
    const quota=await analyzerQuota(db,userId,true);
@@ -76,8 +76,8 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
    const base=gate.value.followUp&&context?context.filter:filter;await assertReferences(db,userId,base);
    const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
    const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;
-   const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,catalog,currentDate),schema:planSchema,periodStart:quota.periodStart!,anchorAt},(v,cached):ModelPlan=>{
-    if(!cached)return parseModelPlan(v,base);
+   const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,currentDate),schema:planSchema,periodStart:quota.periodStart!,anchorAt},(v,cached):ModelPlan=>{
+    if(!cached)return parseModelPlan(v,base,catalog);
     const saved=object(v,['status','query']);
     if(saved.status!=='query')return parseModelPlan(saved,base);
     const tool=parseTool(saved.query);if(tool.name!=='query_finances')throw new TypeError('INVALID_AI_PLAN');return {status:'query',query:tool};

@@ -47,10 +47,32 @@ test('relevance gate and read plans are closed and retain global scope while exp
   for (const query of [{ ...plan.query, name: 'sql' }, { ...plan.query, filter: { operationIds: [randomUUID()] } }, { ...plan.query, filter: { search: 'raw dump' } }, { ...plan.query, filter: { from: '2026-02-30' } }, { ...plan.query, filter: { amountFrom: 10.5 } }]) assert.throws(() => parseModelPlan({ ...plan, query }, {}));
   assert.deepEqual(parseModelPlan({ status: 'unsupported', query: null }, {}), { status: 'unsupported', query: null });
 });
-test('outbound context contains only safe labels and selected filters, never operations, comments or HMAC aliases', () => {
-  const catalog = { accounts: [{ id: randomUUID(), name: 'Synthetic account' }], categories: [], counterparties: [] };
-  const input = modelInput('Покупки за сентябрь?', { operationIds: [randomUUID()], comment: 'Private saved comment', search: 'Private history search' }, catalog, '2026-10-13');
+test('outbound context contains only the question and period, never catalogs, reference IDs or private filters', () => {
+  const id = randomUUID();
+  const input = modelInput('Покупки за сентябрь?', { operationIds: [id], accountIds: [id], categoryIds: [id], merchant: 'Private merchant', comment: 'Private saved comment', search: 'Private history search' }, '2026-10-13');
   const wire = JSON.stringify(input); assert.ok(!wire.includes('Private saved comment')); assert.ok(!wire.includes('Private history search')); assert.ok(!wire.includes('operationIds'));
-  for (const value of ['Карта 4111 1111 1111 1111', 'Почта owner@example.test', 'Паспорт 4510 123456']) assert.throws(() => modelInput(value, {}, catalog, '2026-10-13'));
-  assert.throws(() => modelInput('Расходы?', {}, { ...catalog, accounts: [{ id: randomUUID(), name: '4111 1111 1111 1111' }] }, '2026-10-13'));
+  assert.ok(!wire.includes(id)); assert.ok(!wire.includes('Private merchant')); assert.ok(!('catalog' in input));
+  for (const value of ['Карта 4111 1111 1111 1111', 'Почта owner@example.test', 'Паспорт 4510 123456']) assert.throws(() => modelInput(value, {}, '2026-10-13'));
+});
+
+test('named references resolve only uniquely owned objects; ambiguity and unknown names clarify without widening scope', () => {
+  const account = randomUUID(), category = randomUUID(), leaf = randomUUID(), other = randomUUID();
+  const catalog = { accounts: [{id:account,name:'Моя карта'}], categories: [{id:category,name:'Мои поездки',parentId:null,role:'expense'},{id:leaf,name:'Такси',parentId:category,role:'expense'}], counterparties: [] };
+  const plan = (filter:unknown) => ({status:'query',query:{name:'query_finances',metric:'expenses',grouping:'category',comparison:'none',filter}});
+  const base = {from:'2026-09-01',through:'2026-09-30',operationIds:[other],includeExcluded:true};
+  assert.deepEqual(parseModelPlan(plan({accountNames:[' моя КАРТА '],categoryNames:['Мои поездки'],subcategoryNames:['Мои поездки / Такси']}),base,catalog).query?.filter,
+    {...base,accountIds:[account],categoryIds:[category],subcategoryIds:[leaf]});
+  assert.equal(parseModelPlan(plan({categoryNames:['Неизвестная категория']}),base,catalog).status,'clarification');
+  const ambiguous = {...catalog,accounts:[...catalog.accounts,{id:other,name:'Моя карта'}]};
+  assert.equal(parseModelPlan(plan({accountNames:['Моя карта']}),base,ambiguous).status,'clarification');
+  for (const filter of [{accountIds:[account]},{categoryNames:[]},{categoryNames:['Мои поездки','МОИ ПОЕЗДКИ']},{categoryNames:[null]},{amountFrom:1.5},{attention:null}]) assert.throws(() => parseModelPlan(plan(filter),base,catalog));
+});
+
+test('planner budget stops oversized input before dispatch and selected scope adds no catalog overhead', async () => {
+  const input = modelInput('Разложи расходы по категориям', {from:'2026-09-01',through:'2026-09-30',categoryIds:Array.from({length:100},()=>randomUUID())}, '2026-10-13');
+  assert.ok(Buffer.byteLength(JSON.stringify(input))<512);
+  let calls=0;
+  const client=createYandexTransport(settings,(async()=>{calls++;return response({});}) as typeof fetch);
+  await assert.rejects(client.complete(gatePrompt,{question:'x'.repeat(8193)},gateSchema),/AI_CONTEXT_LIMIT/);
+  assert.equal(calls,0);
 });
