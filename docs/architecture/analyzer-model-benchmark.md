@@ -2,7 +2,8 @@
 
 Статус: изолированный стенд; `cloud-oss task` 14 октября 2026: prompt/1 —
 14/24 хода, 0,934387020 ₽; prompt/2 — 21/24, 0,960758540 ₽; prompt/3 —
-19/24, 1,070502420 ₽; prompt/4 — 17/24, 1,027608440 ₽ за набор
+19/24, 1,070502420 ₽; prompt/4 — 17/24, 1,027608440 ₽;
+prompt/5 — 24/24, 1,420499680 ₽ за набор
 по зафиксированному тарифу. Все результаты
 сохранены. GigaChat prompt/3: 24/24 ответа отклонены транспортом, 0,355813000 ₽;
 понимание вопросов пока не оценено. Format-probe установил отказ на пустом
@@ -384,8 +385,8 @@ known calls: 6011 input / 65 output, 0,074127200 ₽. Точный отверг�
 В текущей конфигурации GigaChat3-10B-A1.8B исключён из дальнейшего платного
 smoke: 4/5 false negatives плюс неподтверждённая совместимость plan schema.
 Это частичный trial, не результат 24/24, не сравнение всех моделей семейства
-GigaChat и не доказательство качества более крупной модели. OSS prompt/2
-остаётся лучшим завершённым development-результатом: 21/24, до приёмки далеко.
+GigaChat и не доказательство качества более крупной модели. На этом этапе
+OSS prompt/2 был лучшим завершённым development-результатом: 21/24.
 
 Known tariff spend — 3,425497700 ₽; holds — 7,516800640 ₽ (старые
 4,304003840 ₽ и новый Giga400 reserve 3,212796800 ₽); upper bound —
@@ -479,11 +480,11 @@ scope-4 унаследовал неверную группировку. Два �
 
 Прогон: 46 вызовов, 19 554 input / 11 762 output, 1,027608440 ₽; средняя
 стоимость хода ceil 0,042817019 ₽, за правильный ход ceil 0,060447556 ₽.
-Теперь known tariff spend — 4,453106140 ₽, holds — прежние 7,516800640 ₽,
+После prompt/4 known tariff spend — 4,453106140 ₽, holds — прежние 7,516800640 ₽,
 upper bound — 11,969906780 ₽. Ни одного нового unknown/technical failed call;
 requiresReconciliation остаётся true из-за сохранённых старых holds.
-72-turn transfer не допущен: baseline не 24/24. OSS prompt/2 остаётся
-лучшим завершённым development-результатом 21/24; ни один trial не принят.
+На этапе prompt/4 72-turn transfer не допущен: baseline не 24/24.
+OSS prompt/2 тогда оставался лучшим результатом 21/24; ни один trial не принят.
 
 Контракт prompt/4 разрешает пропущенные поля. Прежний receipt хранит уже
 построенный локальный plan, поэтому по нему нельзя отличить omission от
@@ -500,7 +501,8 @@ scope. Явное снятие всех категорий через текст
 Registry условием; ручное снятие фильтра поддерживается прежним resolveScope.
 Schema находится также в system prompt с примерами вне smoke/transfer,
 чтобы не предполагать, что constrained decoding передаёт смысл модели.
-Это проверяемая гипотеза улучшения, а не уже измеренный успех GPT-OSS.
+После первого VPS прогона prompt/5 подтверждён результат 24/24 на smoke/1;
+перенос на независимые формулировки ещё не измерен.
 
 Сервер наследует только при inherit. Отсутствующее обязательное поле или
 неверная форма приводит к ROOT и немедленной остановке платного batch;
@@ -527,7 +529,7 @@ source-spec integrity. Проверены missing fields, calendar errors, яв�
 inherit/none, observed date/category cases, сохранение реальных ошибок и
 каскада продолжений, replay snapshots, неизменные старые receipts/holds,
 предварительный запрет при отсутствующем baseline и привязка holdout к версии.
-Это тесты harness с scripted transport. Реальный результат prompt/5 pending.
+Это тесты harness с scripted transport. Реальный результат prompt/5 записан ниже.
 Полный CI для предшествующего 138b9bda44e71d015dae2cc484ff2a97da5f109d прошёл:
 https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38604575362.
 
@@ -541,3 +543,37 @@ prompt/5 реализует ограниченный inherit/set, а не все
 Целевые 100 ₽ на пользователя в месяц требуют отдельного end-to-end измерения
 AI, поиска, документов и длинного контекста; нынешний 45 ₽ stand cap этого
 не доказывает. Память, полный Registry и billing reconciliation остаются pending.
+
+## GPT-OSS prompt/5: первый успешный основной набор
+
+Владелец передал итог VPS `--live-explicit cloud-oss task` для кода
+00976d3b886fcb58d306299efb6a38ecf4c4f65a: smoke/1 24/24, prompt/5,
+response/2, task, after-funding. Все gate/plan checks успешны; `checks:[]`
+в summary означает отсутствие неуспешных ходов, а не отсутствие проверок.
+Исходный summary сохранён в
+`docs/evidence/analyzer-smoke-oss-prompt5-20261014.json`. Это operator readback,
+не независимо выполненный агентом вызов VPS; подробные validated decisions
+и immutable receipts остаются в root-private journal на сервере.
+
+Этот batch: 46 вызовов, 35 988 input / 13 930 output, 1,420499680 ₽ по
+зафиксированному тарифу. Mean/per-correct ceil 0,059187487 ₽, median
+0,064002420 ₽, p95 0,071024740 ₽, maximum 0,073408620 ₽ за ход.
+Суммарно 261 calls / 258 reported, 30 technical failed calls (прежние),
+known spend 5,873605820 ₽, holds 7,516800640 ₽, upper bound 13,390406460 ₽.
+Новых unknown/technical failures нет. Требуется billing reconciliation старых
+holds; immutableModelVersionVerified остаётся false. Цена относится только к
+gate+planner, без final response, search, documents или всего продукта.
+
+Полный CI этого кода прошёл после инфраструктурного retry: первоначально
+ECR PostgreSQL image pull получил toomanyrequests до checkout и тестов.
+https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38607131425.
+Следующий оплачиваемый шаг — ранее зафиксированный transfer/1, 72 новых
+хода через `--live-transfer-explicit cloud-oss task`, с тем же prompt/5,
+response/2, тарифом, cap и ledger. Допуск 24/24 теперь выполнен.
+Прохождение smoke не заменяет independent acceptance и не разрешает runtime AI.
+
+Для нестабильного SSH запускать длительный batch в отдельной tmux session;
+обрыв Windows терминала не должен завершать server-side job. После обычного
+SSH входа повторное подключение к той же session показывает продолжающийся
+процесс/результат; повторный оплачиваемый запуск не нужен. Journal и locks
+при сетевом обрыве не сбрасываются.

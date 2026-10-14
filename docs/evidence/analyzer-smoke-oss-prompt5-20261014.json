@@ -1,0 +1,31 @@
+{
+  "candidate": "cloud-oss",
+  "fixtureVersion": "cashneuro-smoke/1",
+  "benchmarkPromptVersion": "cashneuro-smoke-prompt/5",
+  "responseContract": "cashneuro-response/2",
+  "mode": "task",
+  "runPhase": "after-funding",
+  "turns": 24,
+  "passed": 24,
+  "costPerTurnAtoms": {
+    "meanCeil": "59187487",
+    "median": "64002420",
+    "p95": "71024740",
+    "maximum": "73408620",
+    "perCorrectTurnCeil": "59187487"
+  },
+  "checks": [],
+  "cost": {
+    "calls": 261,
+    "reportedCalls": 258,
+    "failedCalls": 30,
+    "inputTokens": 146558,
+    "outputTokens": 60664,
+    "spentAtoms": "5873605820",
+    "heldAtoms": "7516800640",
+    "budgetUsedUpperBoundAtoms": "13390406460",
+    "requiresReconciliation": true,
+    "latencyP95Ms": 1837,
+    "immutableModelVersionVerified": false
+  }
+}
