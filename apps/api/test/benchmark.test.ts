@@ -58,7 +58,7 @@ test('invalid JSON, truncation, refusal, tool calls and changed aliases preserve
     { choices: [{ finish_reason: 'length', message: { role: 'assistant', content: '{}' } }] },
     { choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: '{}', refusal: 'No' } }] },
     { choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: '{}', tool_calls: [{}] } }] },
-    { model: 'another-model' },
+    { model: 'another-model' }, { model: key },
   ]) {
     const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => response({}, change)) as typeof fetch);
     await assert.rejects(client.complete('test', {}, {}, async () => {}), (e: unknown) => e instanceof BenchmarkFailure && e.usage?.inputTokens === 100 && e.usage?.outputTokens === 10 && !JSON.stringify(e).includes('secret broken'));
@@ -180,3 +180,13 @@ test('schema-invalid paid response is accounted as failure; ambiguous delivery s
     await assert.rejects(runSmoke(client, ledger, 'task'), /BENCH_RECONCILIATION_REQUIRED/); assert.equal(calls, 1);
   });
 });
+test('receipt stores only validated local results, not reflected arbitrary provider names', async () => sandbox(async (dir, ledger) => {
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options?.body));
+    const isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    return response(isGate ? { relevance: 'financial', followUp: false } : rawPlan({ categoryNames: [key] }));
+  }) as typeof fetch);
+  await runSmoke(client, ledger, 'task');
+  const source = await readFile(join(dir, 'ledger.jsonl'), 'utf8'); assert.ok(!source.includes(key));
+  assert.ok(source.includes('clarification'));
+}));

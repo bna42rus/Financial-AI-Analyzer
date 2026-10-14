@@ -26,7 +26,8 @@ export async function runSmoke(transport: BenchmarkTransport, ledger: BenchmarkL
     if (cached) {
       currentCalls.push({ id, replay: true });
       if (!cached.receipt?.usage) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
-      return cached.receipt.code ? null : parse(cached.receipt.value);
+      // The journal holds the already validated local result, not provider text.
+      return cached.receipt.code ? null : cached.receipt.value as T;
     }
     const started = performance.now(); let completed: BenchmarkResult | undefined; let parsed: T | undefined;
     try {
@@ -42,7 +43,7 @@ export async function runSmoke(transport: BenchmarkTransport, ledger: BenchmarkL
       if (ledger.totals().blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
       return null;
     }
-    await ledger.receipt({ id, usage: completed!.usage, value: completed!.value, code: null, fingerprint: completed!.fingerprint,
+    await ledger.receipt({ id, usage: completed!.usage, value: parsed, code: null, fingerprint: completed!.fingerprint,
       latencyMs: Math.ceil(performance.now() - started), cachedTokens: completed!.cachedTokens, reasoningTokens: completed!.reasoningTokens });
     if (ledger.totals().blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
     return parsed!;

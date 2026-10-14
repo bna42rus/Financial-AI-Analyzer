@@ -57,7 +57,8 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
         const u = decoded?.usage; if (!u || typeof u !== 'object') throw new Error();
         const inputTokens = usageTokens(u.prompt_tokens), outputTokens = usageTokens(u.completion_tokens);
         if (usageTokens(u.total_tokens) !== inputTokens + outputTokens) throw new Error();
-        usage = { inputTokens, outputTokens, modelVersion: typeof decoded.model === 'string' ? decoded.model : null };
+        // Never persist arbitrary provider text as a model identifier.
+        usage = { inputTokens, outputTokens, modelVersion: decoded.model === model ? model : null };
         if (typeof decoded.system_fingerprint === 'string' && /^[A-Za-z0-9._-]{1,160}$/.test(decoded.system_fingerprint)) fingerprint = decoded.system_fingerprint;
         const detail = (value: unknown, maximum: number): number | null => value === undefined ? null : (() => { const n = usageTokens(value); if (n > maximum) throw new Error(); return n; })();
         const cachedTokens = detail(u.prompt_tokens_details?.cached_tokens, inputTokens);
