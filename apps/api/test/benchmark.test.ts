@@ -9,6 +9,7 @@ import { runSmoke, smokeCostReport } from '../src/benchmark-engine.ts';
 import { smokeScenarios } from '../src/benchmark-fixtures.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { isYandexTransport } from '../src/yandex-transport.ts';
+import { assertInactiveOperator, probeRequestId, runProbe } from '../src/benchmark-probe.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
 const response = (value: unknown, change: Record<string, unknown> = {}) => new Response(JSON.stringify({ model,
@@ -190,3 +191,71 @@ test('receipt stores only validated local results, not reflected arbitrary provi
   const source = await readFile(join(dir, 'ledger.jsonl'), 'utf8'); assert.ok(!source.includes(key));
   assert.ok(source.includes('clarification'));
 }));
+
+test('explicit probe preserves the rejected call reserve and replays without payment after reload', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => {
+    calls++; return response({ relevance: 'financial', followUp: false });
+  }) as typeof fetch);
+  const oldId = 'a'.repeat(64);
+  await ledger.reserve(oldId, client.price, client.bound);
+  await ledger.receipt({ id: oldId, usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1569, cachedTokens: null, reasoningTokens: null });
+  const held = ledger.totals().held;
+  const first = await runProbe(client, ledger);
+  assert.equal(calls, 1); assert.equal(first.callsThisRun, 1); assert.equal(first.error, null);
+  assert.equal(ledger.totals().held, held); assert.equal(ledger.totals().blocked, true);
+  assert.equal(ledger.records.get(oldId)!.receipt!.usage, null);
+  const restarted = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'));
+  try {
+    const replay = await runProbe(client, restarted);
+    assert.equal(calls, 1); assert.equal(replay.callsThisRun, 0); assert.equal(replay.replay, true);
+    await assert.rejects(restarted.reserveProbe('b'.repeat(64), client.price, client.bound), /BENCH_PROBE_NOT_ALLOWED/);
+    await assert.rejects(restarted.reserve('c'.repeat(64), client.price, client.bound), /BENCH_RECONCILIATION_REQUIRED/);
+  } finally { await restarted.close(); }
+}));
+test('probe cannot bypass delivery loss, crash, changed bounds/prices or the shared budget', async () => {
+  for (const code of ['BENCH_DELIVERY_UNKNOWN', 'BENCH_RESPONSE_INVALID', null]) await sandbox(async (_, ledger) => {
+    let calls = 0;
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => { calls++; return response({}); }) as typeof fetch);
+    await ledger.reserve('a'.repeat(64), client.price, client.bound);
+    if (code) await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code, fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    await assert.rejects(runProbe(client, ledger), /BENCH_PROBE_NOT_ALLOWED/); assert.equal(calls, 0);
+  });
+  await sandbox(async (_, ledger) => {
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key });
+    const costly = { ...client.price, inputRubPerMillion: '200', outputRubPerMillion: '300' };
+    await ledger.reserve('a'.repeat(64), costly, client.bound);
+    await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    await assert.rejects(ledger.reserveProbe('b'.repeat(64), costly, client.bound), /BENCH_BUDGET_EXHAUSTED/);
+    await assert.rejects(ledger.reserveProbe('b'.repeat(64), client.price, client.bound), /BENCH_PROBE_NOT_ALLOWED/);
+    await assert.rejects(ledger.reserveProbe('b'.repeat(64), costly, { ...client.bound, outputTokens: 10 }), /BENCH_PROBE_NOT_ALLOWED/);
+  });
+});
+test('probe keeps both reserves on rejection; diagnostics never persist reflected credentials', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => {
+    calls++; return new Response(JSON.stringify({ error: { message: `Unsupported max_completion_tokens ${key}` } }), { status: 422 });
+  }) as typeof fetch);
+  await ledger.reserve('a'.repeat(64), client.price, client.bound);
+  await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+  const oldHeld = ledger.totals().held;
+  const result = await runProbe(client, ledger);
+  assert.equal(result.error, 'BENCH_PROVIDER_FAILURE_HTTP_422');
+  assert.deepEqual(result.referencedParameters, ['max_completion_tokens']);
+  assert.equal(ledger.totals().held, oldHeld * 2n); assert.equal(calls, 1);
+  const replay = await runProbe(client, ledger); assert.equal(calls, 1); assert.equal(replay.callsThisRun, 0);
+  assert.ok(!JSON.stringify(result).includes(key));
+  assert.ok(!(await readFile(join(dir, 'ledger.jsonl'), 'utf8')).includes(key));
+}));
+test('operator probe refuses active, unsafe or malformed original locks without deleting them', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cashneuro-probe-lock-')), path = join(dir, 'operator.lock');
+  try {
+    await writeFile(path, String(process.pid), { mode: 0o600 });
+    await assert.rejects(assertInactiveOperator(path), /BENCH_OPERATOR_ACTIVE/);
+    assert.equal(await readFile(path, 'utf8'), String(process.pid));
+    await chmod(path, 0o644); await assert.rejects(assertInactiveOperator(path), /BENCH_OPERATOR_LOCK_INVALID/);
+    await chmod(path, 0o600); await writeFile(path, '0'); await assert.rejects(assertInactiveOperator(path), /BENCH_OPERATOR_LOCK_INVALID/);
+    await writeFile(path, '2147483647'); await assertInactiveOperator(path);
+    await symlink(path, join(dir, 'link')); await assert.rejects(assertInactiveOperator(join(dir, 'link')));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});

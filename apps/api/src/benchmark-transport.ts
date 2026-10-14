@@ -14,7 +14,7 @@ export const candidates = {
 } as const satisfies Record<string, { provider: string; model: string; contextTokens: number; price: TokenPrice }>;
 export type Candidate = keyof typeof candidates;
 export class BenchmarkFailure extends Error {
-  code: string; usage?: Usage; fingerprint?: string;
+  code: string; usage?: Usage; fingerprint?: string; referencedParameters?: string[];
   constructor(code: string, usage?: Usage, fingerprint?: string) { super(code); this.code = code; this.usage = usage; this.fingerprint = fingerprint; }
 }
 export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: string | null; cachedTokens: number | null; reasoningTokens: number | null };
@@ -48,8 +48,23 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
       if (!response.ok) {
         // Preserve only the numeric HTTP status, never an untrusted error body.
         const code = [401, 403].includes(response.status) ? 'BENCH_IDENTITY_DENIED' : 'BENCH_PROVIDER_FAILURE';
-        try { await response.body?.cancel(); } catch { /* HTTP rejection is already known. */ }
-        throw new BenchmarkFailure(`${code}_HTTP_${response.status}`);
+        const failure = new BenchmarkFailure(`${code}_HTTP_${response.status}`);
+        const reader = response.body?.getReader();
+        try {
+          if (reader) {
+            const parts: Uint8Array[] = []; let bytes = 0;
+            while (true) {
+              const part = await reader.read(); if (part.done) break;
+              bytes += part.value.byteLength; if (bytes > 16384) break;
+              parts.push(part.value);
+            }
+            const text = Buffer.concat(parts).toString('utf8');
+            // Only fixed public parameter names survive; reflected keys/text do not.
+            failure.referencedParameters = ['max_completion_tokens', 'max_tokens', 'response_format', 'json_schema', 'messages', 'model', 'temperature'].filter(name => text.includes(name));
+          }
+        } catch { /* A body read error does not erase the known HTTP status. */ }
+        finally { try { await reader?.cancel(); } catch { /* No retry. */ } }
+        throw failure;
       }
       let usage: Usage | undefined; let fingerprint: string | undefined;
       try {

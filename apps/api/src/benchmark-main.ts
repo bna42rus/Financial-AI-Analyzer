@@ -10,11 +10,13 @@ import { BenchmarkLedger } from './benchmark-ledger.ts';
 import { runSmoke, smokeCostReport } from './benchmark-engine.ts';
 import type { ContextMode } from './benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
+import { assertInactiveOperator, probeRequestId, runProbe } from './benchmark-probe.ts';
 
 const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
-  if (extra.length || !['--dry-run', '--live'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode)) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  if (extra.length || !['--dry-run', '--live', '--probe'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || action === '--probe' && mode !== 'task') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  const diagnostic = action === '--probe';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
     console.log(JSON.stringify({ candidate, mode, fixtureVersion, scenarios: smokeScenarios.length,
@@ -34,24 +36,30 @@ async function main() {
   }
   // Exclusive process lock. If the process dies, keep the lock: reconcile the
   // last reservation/provider billing before an operator removes it.
-  const lockPath = join(stateDirectory, 'operator.lock');
+  if (diagnostic) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
+  const lockPath = join(stateDirectory, diagnostic ? 'diagnostic.lock' : 'operator.lock');
   let lock;
   try { lock = await open(lockPath, 'wx', 0o600); } catch { throw new BenchmarkFailure('BENCH_LOCKED'); }
-  let ledger: BenchmarkLedger | undefined; let clean = false;
+  let ledger: BenchmarkLedger | undefined; let clean = false; let probeId: string | undefined;
   try {
     await lock.writeFile(String(process.pid)); await lock.sync();
+    if (diagnostic) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
     ledger = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'));
     const raw = await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json');
     const keys = object(raw, ['cloud', 'yandex']);
     const transport = createBenchmarkTransport(candidate as Candidate, keys[selected.provider]);
-    const result = await runSmoke(transport, ledger, mode as ContextMode);
+    if (diagnostic) probeId = probeRequestId(transport);
+    const result = diagnostic ? await runProbe(transport, ledger) : await runSmoke(transport, ledger, mode as ContextMode);
     console.log(JSON.stringify({ ...result, cost: smokeCostReport(ledger) }));
     clean = !ledger.totals().blocked;
   } catch (error) {
     if (ledger) console.log(JSON.stringify({ candidate, mode, error: error instanceof BenchmarkFailure ? error.code : 'BENCH_FAILED', cost: smokeCostReport(ledger) }));
     throw error;
   } finally {
-    if (ledger) { clean = !ledger.totals().blocked; await ledger.close(); }
+    if (ledger) {
+      clean = diagnostic ? Boolean(probeId) && (!ledger.records.has(probeId!) || Boolean(ledger.records.get(probeId!)?.receipt)) : !ledger.totals().blocked;
+      await ledger.close();
+    }
     await lock.close();
     if (clean) await unlink(lockPath);
   }
