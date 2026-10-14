@@ -54,7 +54,7 @@ test('durable user/project reservation settles exact actual cost; exact retry is
   await service.call(r,v=>v);assert.equal(paidCalls,1);assert.equal(tokenizerCalls,1);
   const cost=(await pg.owner.query('SELECT * FROM commerce.ai_cost_reservation')).rows[0];
   assert.equal(cost.state,'settled');assert.equal(BigInt(cost.settled_atoms),tokenCost(policy.price,20,10));
-  const balance=(await pg.owner.query('SELECT * FROM commerce.ai_user_budget')).rows[0];assert.equal(BigInt(balance.spent_atoms),rubAmount('0.024'));assert.equal(balance.reserved_atoms,'0');
+  const balance=(await pg.owner.query('SELECT *,anchor_at::text AS precise_anchor FROM commerce.ai_user_budget')).rows[0];assert.equal(BigInt(balance.spent_atoms),rubAmount('0.024'));assert.equal(balance.reserved_atoms,'0');assert.equal(balance.precise_anchor,r.anchorAt);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
 });
 test('bad JSON/truncation costs are reported and settled without a customer charge or private cache',async()=>{
@@ -85,6 +85,7 @@ test('last user budget is reserved atomically across concurrent requests without
   const first=service.call(a,v=>v);
   await waitForPaid();
   await assert.rejects(service.call(b,v=>v),/AI_USER_COST_EXHAUSTED/);assert.equal(paidCalls,1);barrier.resolve();await first;
+  const balance=(await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows[0];assert.equal(balance.spent_atoms,rubAmount('99.524').toString());assert.equal(balance.reserved_atoms,'0');
 });
 test('global project reserve prevents a second user overspending the same cap',async()=>{
   behavior='block';barrier=deferred();const service=createYandexAnalyzer(metadata,transport,{...policy,projectLimitRub:'0.5'}),a=await request(),b=await request('second');

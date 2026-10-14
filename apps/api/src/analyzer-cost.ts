@@ -42,11 +42,13 @@ export async function reserveCost(db: PoolClient, identity: CostIdentity, policy
 
 export async function settleCost(db: PoolClient, userId: string, requestId: string, step: string, usage?: Usage, notSent = false): Promise<boolean> {
   if (usage && notSent) throw new CostError('AI_USAGE_INVALID');
-  const found = (await db.query(`SELECT * FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2 AND step=$3`, [userId, requestId, step])).rows[0];
+  // pg Date objects truncate timestamp microseconds. Preserve exact DB keys;
+  // otherwise a settlement silently updates zero user-budget rows.
+  const found = (await db.query(`SELECT *,anchor_at::text AS anchor_at,period_start::text AS period_start,project_period_start::text AS project_period_start FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2 AND step=$3`, [userId, requestId, step])).rows[0];
   if (!found) return false;
   await db.query(`SELECT 1 FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2 FOR UPDATE`, [found.project_id, found.project_period_start]);
   await db.query(`SELECT 1 FROM commerce.ai_user_budget WHERE user_id=$1 AND anchor_at=$2 AND period_start=$3 FOR UPDATE`, [userId, found.anchor_at, found.period_start]);
-  const r = (await db.query(`SELECT * FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2 AND step=$3 FOR UPDATE`, [userId, requestId, step])).rows[0];
+  const r = (await db.query(`SELECT *,anchor_at::text AS anchor_at,period_start::text AS period_start,project_period_start::text AS project_period_start FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2 AND step=$3 FOR UPDATE`, [userId, requestId, step])).rows[0];
   if (['settled', 'released'].includes(r.state)) {
     if (usage && (r.reported_input_tokens !== usage.inputTokens || r.reported_output_tokens !== usage.outputTokens || r.reported_model_version !== usage.modelVersion)) throw new CostError('AI_RECEIPT_CHANGED');
     return false;
