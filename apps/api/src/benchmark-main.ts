@@ -1,0 +1,52 @@
+import { mkdir, open, unlink, realpath, lstat } from 'node:fs/promises';
+import { join } from 'node:path';
+import { privateJson } from './kms.ts';
+import { object } from '../../../packages/finance-core/src/model.ts';
+import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
+import { candidates, createBenchmarkTransport, BenchmarkFailure } from './benchmark-transport.ts';
+import type { Candidate } from './benchmark-transport.ts';
+import { BenchmarkLedger } from './benchmark-ledger.ts';
+import { runSmoke, smokeCostReport } from './benchmark-engine.ts';
+import type { ContextMode } from './benchmark-engine.ts';
+import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
+
+const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
+async function main() {
+  const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
+  if (extra.length || !['--dry-run', '--live'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode)) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  const selected = candidates[candidate as Candidate];
+  if (action === '--dry-run') {
+    console.log(JSON.stringify({ candidate, mode, fixtureVersion, scenarios: smokeScenarios.length,
+      turns: smokeScenarios.reduce((sum, s) => sum + s.turns.length, 0), price: selected.price,
+      maximumReservationRub: (Number(tokenCost(selected.price, selected.contextTokens, 1200)) / 1e9).toFixed(9),
+      smokeBudgetRub: '45', overallApprovedBudgetRub: '1000', paidCalls: 0 })); return;
+  }
+  if (process.getuid?.() !== 0) throw new BenchmarkFailure('BENCH_OPERATOR_REQUIRED');
+  await mkdir(stateDirectory, { recursive: true, mode: 0o700 });
+  const stat = await lstat(stateDirectory);
+  if (await realpath(stateDirectory) !== stateDirectory || !stat.isDirectory() || stat.uid !== 0 || (stat.mode & 0o777) !== 0o700) throw new BenchmarkFailure('BENCH_STATE_DIRECTORY_INVALID');
+  // Exclusive process lock. If the process dies, keep the lock: reconcile the
+  // last reservation/provider billing before an operator removes it.
+  const lockPath = join(stateDirectory, 'operator.lock');
+  let lock;
+  try { lock = await open(lockPath, 'wx', 0o600); } catch { throw new BenchmarkFailure('BENCH_LOCKED'); }
+  let ledger: BenchmarkLedger | undefined; let clean = false;
+  try {
+    await lock.writeFile(String(process.pid)); await lock.sync();
+    ledger = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'));
+    const raw = await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json');
+    const keys = object(raw, ['cloud', 'yandex']);
+    const transport = createBenchmarkTransport(candidate as Candidate, keys[selected.provider]);
+    const result = await runSmoke(transport, ledger, mode as ContextMode);
+    console.log(JSON.stringify({ ...result, cost: smokeCostReport(ledger) }));
+    clean = !ledger.totals().blocked;
+  } catch (error) {
+    if (ledger) console.log(JSON.stringify({ candidate, mode, error: error instanceof BenchmarkFailure ? error.code : 'BENCH_FAILED', cost: smokeCostReport(ledger) }));
+    throw error;
+  } finally {
+    if (ledger) { clean = !ledger.totals().blocked; await ledger.close(); }
+    await lock.close();
+    if (clean) await unlink(lockPath);
+  }
+}
+main().catch(error => { console.error(error instanceof BenchmarkFailure ? error.code : 'BENCH_FAILED'); process.exitCode = 1; });

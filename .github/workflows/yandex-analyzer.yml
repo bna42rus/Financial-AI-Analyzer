@@ -1,7 +1,7 @@
 name: yandex-analyzer
 on:
   pull_request:
-    branches: [main, feature/staging-owner-bootstrap, feature/yandex-analyzer]
+    branches: [main, feature/staging-owner-bootstrap, feature/yandex-analyzer, feature/analyzer-context-budget]
   workflow_dispatch:
 permissions:
   contents: read
