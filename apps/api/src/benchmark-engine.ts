@@ -6,7 +6,7 @@ import type { ModelPlan } from '../../../packages/analyzer/src/yandex-contract.t
 import type { Query } from '../../../packages/analyzer/src/registry.ts';
 import type { OperationsFilter } from '../../../packages/finance-core/src/operations.ts';
 import type { BenchmarkTransport, BenchmarkResult } from './benchmark-transport.ts';
-import { BenchmarkFailure } from './benchmark-transport.ts';
+import { BenchmarkFailure, replayOnlyBenchmarkTransport } from './benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from './benchmark-ledger.ts';
 import { smokeScenarios, fixtureVersion, syntheticCatalog } from './benchmark-fixtures.ts';
 import { revisedBenchmarkPromptVersion, revisedGatePrompt, revisedPlanPrompt, resolvedBenchmarkPromptVersion, resolvedPlanPrompt } from './benchmark-prompts.ts';
@@ -108,4 +108,14 @@ export function smokeCostReport(ledger: BenchmarkLedger) {
     spentAtoms: total.spent.toString(), heldAtoms: total.held.toString(), budgetUsedUpperBoundAtoms: (total.spent + total.held).toString(), requiresReconciliation: total.blocked || total.held > 0n,
     latencyP95Ms: latencies.length ? latencies[Math.ceil(latencies.length * .95) - 1] : null,
     immutableModelVersionVerified: false };
+}
+
+// Freeze prompt/3, schema and goldens for the cross-model comparison. A missing
+// completed OSS baseline fails offline before any possible candidate dispatch.
+export async function runComparison(transport: BenchmarkTransport, ledger: BenchmarkLedger, mode: ContextMode) {
+  if (transport.candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
+  const baseline = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), ledger, mode, 'after-funding', false, 'resolved');
+  const result = await runSmoke(transport, ledger, mode, 'after-funding', true, 'resolved');
+  return { ...result, baseline: { candidate: baseline.candidate, mode: baseline.mode, benchmarkPromptVersion: baseline.benchmarkPromptVersion,
+    turns: baseline.turns, passed: baseline.passed, costPerTurnAtoms: baseline.costPerTurnAtoms } };
 }

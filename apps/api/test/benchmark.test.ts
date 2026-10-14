@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { benchmarkPromptVersion, runSmoke, smokeCostReport } from '../src/benchmark-engine.ts';
+import { benchmarkPromptVersion, runSmoke, runComparison, smokeCostReport } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
@@ -566,4 +566,48 @@ test('resolved journal distinguishes model clarification from local missing name
   const source = await readFile(join(dir, 'ledger.jsonl'), 'utf8');
   assert.ok(source.includes('model_clarification')); assert.ok(source.includes('reference_missing'));
   assert.ok(!source.includes(key));
+}));
+
+test('Giga comparison uses the same frozen request contents, distinct receipts and the shared journal/budget', async () => sandbox(async (dir, ledger) => {
+  const payloads: Record<string, unknown[]> = { 'cloud-oss': [], 'cloud-giga': [] };
+  function client(candidate: 'cloud-oss' | 'cloud-giga') {
+    return createBenchmarkTransport(candidate, { apiKey: key }, (async (_, options) => {
+      const body = JSON.parse(String(options?.body)), { model: requestedModel, ...payload } = body;
+      payloads[candidate]!.push(payload);
+      const input = JSON.parse(body.messages[1].content), isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+      const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+      let planned = scriptedPlans[turn.id];
+      if (!isGate && input.question === 'А по категориям?') planned = rawPlan({}, input.previousTask.metric, 'category', input.previousTask.comparison);
+      return response(isGate ? { ...turn.expectedGate, followUp: input.hasFinancialContext ? turn.expectedGate.followUp : false } : planned, { model: requestedModel });
+    }) as typeof fetch);
+  }
+  const oss = client('cloud-oss'), giga = client('cloud-giga');
+  await seedFundedSmoke(ledger, oss); await ledger.allowFundedSmoke();
+  await runSmoke(oss, ledger, 'task', 'after-funding', false, 'resolved');
+  const path = join(dir, 'ledger.jsonl'), source = await readFile(path), held = ledger.totals().held, spent = ledger.totals().spent;
+  const compared = await runComparison(giga, ledger, 'task');
+  assert.equal(compared.candidate, 'cloud-giga'); assert.equal(compared.passed, 24); assert.equal(compared.baseline.passed, 24);
+  assert.equal(compared.benchmarkPromptVersion, compared.baseline.benchmarkPromptVersion);
+  assert.deepEqual(payloads['cloud-giga'], payloads['cloud-oss']);
+  assert.equal(payloads['cloud-giga']!.length, 46); assert.equal(ledger.records.size, 95);
+  assert.equal(ledger.totals().held, held); assert.equal(ledger.totals().spent - spent, 46n * 1342000n);
+  assert.ok((await readFile(path)).subarray(0, source.length).equals(source));
+  const saved = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const latest = await readFile(path);
+    const replay = await runComparison(replayOnlyBenchmarkTransport('cloud-giga'), saved, 'task');
+    assert.equal(replay.passed, 24); assert.ok(replay.checks.every(c => c.replayCalls === c.calls));
+    assert.equal(payloads['cloud-giga']!.length, 46); assert.equal(payloads['cloud-oss']!.length, 46);
+    assert.deepEqual(await readFile(path), latest);
+  } finally { await saved.close(); }
+}));
+test('comparison rejects an absent baseline, changed mode or unsupported candidate before paid dispatch', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const giga = createBenchmarkTransport('cloud-giga', { apiKey: key }, (async () => { calls++; return response({}); }) as typeof fetch);
+  const source = await readFile(join(dir, 'ledger.jsonl'));
+  await assert.rejects(runComparison(giga, ledger, 'task'), /BENCH_REPLAY_ONLY/);
+  await assert.rejects(runComparison(giga, ledger, 'window'), /BENCH_REPLAY_ONLY/);
+  await assert.rejects(runComparison(replayOnlyBenchmarkTransport('cloud-oss'), ledger, 'task'), /BENCH_CONFIGURATION_INVALID/);
+  assert.equal(calls, 0); assert.equal(ledger.records.size, 0);
+  assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
 }));
