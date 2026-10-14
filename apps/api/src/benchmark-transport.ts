@@ -45,7 +45,12 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
       let response: Response;
       try { response = await fetcher(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body, redirect: 'error', signal: AbortSignal.timeout(30000) }); }
       catch { throw new BenchmarkFailure('BENCH_DELIVERY_UNKNOWN'); }
-      if (!response.ok) { await response.body?.cancel(); throw new BenchmarkFailure([401, 403].includes(response.status) ? 'BENCH_IDENTITY_DENIED' : 'BENCH_PROVIDER_FAILURE'); }
+      if (!response.ok) {
+        // Preserve only the numeric HTTP status, never an untrusted error body.
+        const code = [401, 403].includes(response.status) ? 'BENCH_IDENTITY_DENIED' : 'BENCH_PROVIDER_FAILURE';
+        try { await response.body?.cancel(); } catch { /* HTTP rejection is already known. */ }
+        throw new BenchmarkFailure(`${code}_HTTP_${response.status}`);
+      }
       let usage: Usage | undefined; let fingerprint: string | undefined;
       try {
         const reader = response.body?.getReader(); if (!reader) throw new Error();
