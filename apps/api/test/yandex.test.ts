@@ -76,3 +76,48 @@ test('planner budget stops oversized input before dispatch and selected scope ad
   await assert.rejects(client.complete(gatePrompt,{question:'x'.repeat(8193)},gateSchema),/AI_CONTEXT_LIMIT/);
   assert.equal(calls,0);
 });
+
+test('explicit category replaces stale subcategory; explicit leaf resolves its parent locally',()=>{
+  const root=randomUUID(),other=randomUUID(),leaf=randomUUID();
+  const catalog={accounts:[],counterparties:[],categories:[{id:root,name:'Поездки',parentId:null,role:'expense'},{id:other,name:'Продукты',parentId:null,role:'expense'},{id:leaf,name:'Такси',parentId:root,role:'expense'}]};
+  const plan=(filter:unknown)=>({status:'query',query:{name:'query_finances',metric:'expenses',grouping:'category',comparison:'none',filter}});
+  const selected=parseModelPlan(plan({subcategoryNames:['Такси']}),{categoryIds:[other]},catalog).query!.filter;assert.deepEqual(selected.categoryIds,[root]);assert.deepEqual(selected.subcategoryIds,[leaf]);
+  const changed=parseModelPlan(plan({categoryNames:['Продукты']}),{categoryIds:[root],subcategoryIds:[leaf]},catalog).query!.filter;assert.deepEqual(changed.categoryIds,[other]);assert.equal(changed.subcategoryIds,undefined);
+});
+
+test('bad JSON and truncated text retain reported usage without retaining provider content', async () => {
+  for (const change of [{ alternatives: [{message:{role:'assistant',text:'private-invalid-json'},status:'ALTERNATIVE_STATUS_FINAL'}] }, { alternatives: [{message:{role:'assistant',text:'{}'},status:'ALTERNATIVE_STATUS_TRUNCATED_FINAL'}] }]) {
+    const client=createYandexTransport(settings,(async()=>response({},change)) as typeof fetch);
+    await assert.rejects(client.complete(gatePrompt,{},gateSchema),(e:unknown)=>{
+      assert.ok(e instanceof YandexFailure); assert.equal(e.code,'AI_RESPONSE_INVALID');
+      assert.deepEqual(e.usage,{inputTokens:20,outputTokens:10,modelVersion:'synthetic-1'});
+      assert.ok(!JSON.stringify(e).includes('private-invalid-json')); return true;
+    });
+  }
+});
+test('missing usage stays unknown instead of becoming a zero-cost receipt', async () => {
+  const client=createYandexTransport(settings,(async()=>response({}, {usage:null})) as typeof fetch);
+  await assert.rejects(client.complete(gatePrompt,{},gateSchema),(e:unknown)=>e instanceof YandexFailure&&e.usage===undefined);
+});
+const tokenized=()=>new Response(JSON.stringify({tokens:Array.from({length:20},(_,i)=>({id:String(i),text:'synthetic',special:false})),modelVersion:'synthetic-1'}));
+test('tokenizer sees identical schema/body; durable reservation precedes the only paid dispatch', async () => {
+  let reserved=false,wire='',count=0;
+  const client=createYandexTransport(settings,(async(url,opts)=>{
+    count++;
+    if(String(url).endsWith('/tokenizeCompletion')){wire=String(opts?.body);assert.equal(reserved,false);return tokenized();}
+    assert.equal(reserved,true);assert.equal(String(opts?.body),wire);assert.equal(url,yandexEndpoint);return response({});
+  }) as typeof fetch);
+  await client.complete(gatePrompt,{},gateSchema,async bound=>{assert.deepEqual(bound,{inputTokens:20,outputTokens:512,modelVersion:'synthetic-1'});reserved=true;});
+  assert.equal(count,2);
+});
+test('failed tokenization or denied reservation causes no paid dispatch', async () => {
+  for(const mode of ['tokenizer-fails','reserve-denied']){
+    let paid=0;
+    const client=createYandexTransport(settings,(async url=>{
+      if(String(url).endsWith('/tokenizeCompletion'))return mode==='tokenizer-fails'?new Response('{}',{status:500}):tokenized();
+      paid++;return response({});
+    }) as typeof fetch);
+    await assert.rejects(client.complete(gatePrompt,{},gateSchema,async()=>{throw new YandexFailure('AI_USER_COST_EXHAUSTED',false,undefined,undefined,false);}));
+    assert.equal(paid,0);
+  }
+});

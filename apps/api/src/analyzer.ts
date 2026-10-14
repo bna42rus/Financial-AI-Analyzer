@@ -3,6 +3,7 @@ import type {PoolClient} from 'pg';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
 import {parseWidget,calculateWidget} from '../../../packages/finance-core/src/overview.ts';
 import {parseOperationsFilter,queryOperations} from '../../../packages/finance-core/src/operations.ts';
+import type {OperationsFilter} from '../../../packages/finance-core/src/operations.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
 import {interpret,parseTool,registryVersion,tokenUsage} from '../../../packages/analyzer/src/registry.ts';
 import type {AnalyzerAdapter,Query} from '../../../packages/analyzer/src/registry.ts';
@@ -16,6 +17,7 @@ import type {YandexAnalyzer} from './yandex-runtime.ts';
 import {yandexCatalog} from './yandex-runtime.ts';
 import {gatePrompt,gateSchema,parseGate,planPrompt,planSchema,parseModelPlan,modelInput,yandexContractVersion} from '../../../packages/analyzer/src/yandex-contract.ts';
 import type {ModelPlan} from '../../../packages/analyzer/src/yandex-contract.ts';
+import {resolveScope,contextVersion} from '../../../packages/analyzer/src/context.ts';
 
 export async function analyzerQuota(db:PoolClient,userId:string,journal=false):Promise<Quota>{
  const c=(await db.query(`WITH cycle AS (SELECT *,clock_timestamp() AS now FROM commerce.access_cycle WHERE user_id=$1),
@@ -57,23 +59,26 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  if(!(await db.query('SELECT id FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,chatId])).rowCount)throw new HttpError(404,'NOT_FOUND');
  if(Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_message WHERE user_id=$1 AND chat_id=$2',[userId,chatId])).rows[0].n)>=100)throw new HttpError(409,'MESSAGE_LIMIT');
  const now=(await db.query('SELECT clock_timestamp() AS now')).rows[0].now as Date;
- let context:Query|undefined;
- if(contextId){const c=(await db.query('SELECT context FROM finance.analyzer_message WHERE user_id=$1 AND chat_id=$2 AND id=$3',[userId,chatId,contextId])).rows[0];if(!c?.context)throw new HttpError(409,'CONTEXT_UNAVAILABLE');const tool=parseTool(c.context);if(tool.name!=='query_finances')throw new TypeError('INVALID_CONTEXT');context=tool;}
- const intent=interpret(text,filter,context,now);let query=intent.query;
+ let context:Query|undefined,previousGlobal:OperationsFilter|undefined;
+ if(contextId){const c=(await db.query('SELECT context,request FROM finance.analyzer_message WHERE user_id=$1 AND chat_id=$2 AND id=$3',[userId,chatId,contextId])).rows[0];if(!c?.context)throw new HttpError(409,'CONTEXT_UNAVAILABLE');const tool=parseTool(c.context);if(tool.name!=='query_finances')throw new TypeError('INVALID_CONTEXT');context=tool;if(c.request?.filter)previousGlobal=parseOperationsFilter(c.request.filter);}
+ const intent=interpret(text,filter,context,now,previousGlobal);let query=intent.query;
  if(query?.filter.operationIds){const resolved=(await db.query('SELECT finance.canonical_operation($1,id) AS id FROM unnest($2::uuid[]) AS id',[userId,query.filter.operationIds])).rows.map(r=>r.id);query={...query,filter:{...query.filter,operationIds:[...new Set<string>(resolved)]}};}
  let answer:Answer={text:intent.relevance==='unrelated'?'Я помогаю разбираться в финансах. Спросите о своих расходах, доходах или операциях.':intent.relevance==='ambiguous'?'Уточните показатель и период: например, «Расходы по категориям за сентябрь 2026».':'Для такого вопроса нужна подключённая AI-модель. Сейчас доступны точные расчёты расходов, доходов, категорий, крупных операций и сравнение с предыдущим периодом.',mode:intent.relevance==='unrelated'?'redirect':intent.relevance==='ambiguous'?'clarification':'unavailable',registryVersion};
  let usage:{inputTokens:number;outputTokens:number}|undefined;
  let external:{id:string;model:string;version:string}|undefined;
  if(!query&&yandex&&actorEmail&&yandex.transport.allowed(actorEmail)&&!/(?:игнорир(?:уй|уйте).{0,50}(?:правил|инструкц)|ignore.{0,30}(?:instructions|rules)|system prompt|\bSQL\b|HMAC|api[_ -]?key|парол)/iu.test(text)){
   const workspace=(await db.query('SELECT generation,revision FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
-  const binding={request,context,registryVersion,yandexContractVersion,generation:workspace.generation,revision:workspace.revision};
-  const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema},v=>parseGate(v));
+  const binding={request,context,registryVersion,yandexContractVersion,contextVersion,generation:workspace.generation,revision:workspace.revision};
+  const costQuota=yandex.cost?await analyzerQuota(db,userId,true):undefined;
+  const costAnchor=yandex.cost?(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0]?.anchor:undefined;
+  if(yandex.cost&&(!costQuota?.periodStart||!costAnchor))throw new HttpError(409,'AI_BUDGET_PERIOD_REQUIRED');
+  const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema,...(yandex.cost?{periodStart:costQuota!.periodStart!,anchorAt:costAnchor}:{})},v=>parseGate(v));
   if(['financial','adjacent'].includes(gate.value.relevance)){
    const quota=await analyzerQuota(db,userId,true);
    // Existing receipts and terminal outcomes are resolved without a new dispatch.
    const priorPlan=(await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan'",[userId,id])).rowCount;
    if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining&&!priorPlan)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
-   const base=gate.value.followUp&&context?context.filter:filter;await assertReferences(db,userId,base);
+   const base=resolveScope(filter,gate.value.followUp&&context?context.filter:undefined,previousGlobal).filter;await assertReferences(db,userId,base);
    const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
    const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;
    const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,currentDate),schema:planSchema,periodStart:quota.periodStart!,anchorAt},(v,cached):ModelPlan=>{

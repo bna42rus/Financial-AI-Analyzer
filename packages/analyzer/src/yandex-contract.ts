@@ -3,6 +3,7 @@ import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 import type { OperationsFilter } from '../../finance-core/src/operations.ts';
 import { safeText } from '../../privacy/src/text.ts';
 import { parseTool } from './registry.ts';
+import { resolveScope } from './context.ts';
 import type { Query, Relevance } from './registry.ts';
 
 export const yandexContractVersion = 'yandex-analyzer/2';
@@ -82,7 +83,8 @@ export function parseModelPlan(value: unknown, base: OperationsFilter, catalog: 
     }
     references[nameFields[field]] = [...new Set(ids)];
   }
-  const tool = checked('TOOL', () => parseTool({ ...q, filter: parseOperationsFilter({ ...base, ...delta, ...references }) }));
+  if (references.subcategoryIds && !references.categoryIds) references.categoryIds = [...new Set(references.subcategoryIds.map(id => catalog.categories.find(c => c.id === id)!.parentId!))];
+  const tool = checked('TOOL', () => parseTool({ ...q, filter: resolveScope(base, undefined, undefined, parseOperationsFilter({ ...delta, ...references })).filter }));
   if (tool.name !== 'query_finances' || tool.comparison !== 'none' && (!tool.filter.from || !tool.filter.through)) throw new TypeError('INVALID_AI_PLAN');
   return { status, query: tool };
 }
