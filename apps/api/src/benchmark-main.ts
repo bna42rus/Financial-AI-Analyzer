@@ -16,7 +16,8 @@ const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
   const diagnostic = action === '--probe' || action === '--probe-after-funding';
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke;
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -37,20 +38,21 @@ async function main() {
   }
   // Exclusive process lock. If the process dies, keep the lock: reconcile the
   // last reservation/provider billing before an operator removes it.
-  if (diagnostic) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
-  const lockPath = join(stateDirectory, diagnostic ? 'diagnostic.lock' : 'operator.lock');
+  if (recovery) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
+  const lockPath = join(stateDirectory, recovery ? 'diagnostic.lock' : 'operator.lock');
   let lock;
   try { lock = await open(lockPath, 'wx', 0o600); } catch { throw new BenchmarkFailure('BENCH_LOCKED'); }
   let ledger: BenchmarkLedger | undefined; let clean = false; let probeId: string | undefined;
   try {
     await lock.writeFile(String(process.pid)); await lock.sync();
-    if (diagnostic) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
+    if (recovery) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
     ledger = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'));
     const raw = await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json');
     const keys = object(raw, ['cloud', 'yandex']);
     const transport = createBenchmarkTransport(candidate as Candidate, keys[selected.provider]);
     if (diagnostic) probeId = probeRequestId(transport, probePhase);
-    const result = diagnostic ? await runProbe(transport, ledger, probePhase) : await runSmoke(transport, ledger, mode as ContextMode);
+    if (fundedSmoke) await ledger.allowFundedSmoke();
+    const result = diagnostic ? await runProbe(transport, ledger, probePhase) : await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke ? 'after-funding' : 'initial');
     console.log(JSON.stringify({ ...result, cost: smokeCostReport(ledger) }));
     clean = !ledger.totals().blocked;
   } catch (error) {

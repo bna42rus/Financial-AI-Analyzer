@@ -10,7 +10,8 @@ import { BenchmarkFailure } from './benchmark-transport.ts';
 export type ProbePurpose = 'operator_probe' | 'operator_probe_after_funding';
 type Reservation = { type: 'reserve'; id: string; atoms: string; price: TokenPrice; bound: DispatchBound; purpose?: ProbePurpose };
 type Receipt = { type: 'receipt'; id: string; usage: Usage | null; atoms: string | null; value: unknown; code: string | null; fingerprint: string | null; latencyMs: number; cachedTokens: number | null; reasoningTokens: number | null };
-type Event = Reservation | Receipt;
+type FundedContinuation = { type: 'continue_with_held_rejections'; id: string; rejectionIds: string[]; proofId: string };
+type Event = Reservation | Receipt | FundedContinuation;
 export const benchmarkBudget = { project: 1000n * rubAtoms, smoke: 45n * rubAtoms };
 export const benchmarkDigest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 /** Caller holds the one process lock for the entire live run. All reservations
@@ -19,6 +20,7 @@ export class BenchmarkLedger {
   file: FileHandle; records = new Map<string, { reserve: Reservation; receipt?: Receipt }>(); previous = '0'.repeat(64);
   private queue: Promise<unknown> = Promise.resolve();
   private poisoned = false;
+  private heldRejections = new Set<string>();
   private constructor(file: FileHandle) { this.file = file; }
   static async load(path: string): Promise<BenchmarkLedger> {
     const file = await open(path, constants.O_RDWR | constants.O_CREAT | constants.O_APPEND | constants.O_NOFOLLOW, 0o600);
@@ -41,6 +43,12 @@ export class BenchmarkLedger {
   }
   private apply(event: Event) {
     if (!event || !/^[a-f0-9]{64}$/.test(event.id)) throw new Error();
+    if (event.type === 'continue_with_held_rejections') {
+      const expected = this.fundedContinuation();
+      if (benchmarkDigest(event) !== benchmarkDigest(expected)) throw new Error();
+      this.heldRejections = new Set(event.rejectionIds);
+      return;
+    }
     const old = this.records.get(event.id);
     if (event.type === 'reserve') {
       if (event.purpose !== undefined) {
@@ -57,14 +65,33 @@ export class BenchmarkLedger {
   totals() {
     let spent = 0n, held = 0n; let blocked = this.poisoned;
     const fingerprints = new Map<string, string | null>();
-    for (const { reserve, receipt } of this.records.values()) {
-      if (!receipt?.usage) { held += BigInt(reserve.atoms); blocked = true; }
+    for (const [id, { reserve, receipt }] of this.records) {
+      if (!receipt?.usage) { held += BigInt(reserve.atoms); if (!this.heldRejections.has(id)) blocked = true; }
       else { spent += BigInt(receipt.atoms!);
         if (receipt.usage.inputTokens > reserve.bound.inputTokens || receipt.usage.outputTokens > reserve.bound.outputTokens || receipt.usage.modelVersion !== reserve.bound.modelVersion) blocked = true;
         if (fingerprints.has(reserve.bound.modelVersion) && fingerprints.get(reserve.bound.modelVersion) !== receipt.fingerprint) blocked = true;
         fingerprints.set(reserve.bound.modelVersion, receipt.fingerprint); }
     }
     return { spent, held, blocked };
+  }
+  private fundedContinuation(): FundedContinuation {
+    if (this.poisoned || this.heldRejections.size || this.records.size !== 3) throw new BenchmarkFailure('BENCH_FUNDED_CONTINUATION_NOT_ALLOWED');
+    const entries = [...this.records.entries()], [firstId, first] = entries[0]!, [probeId, probe] = entries[1]!, [proofId, proof] = entries[2]!;
+    const usage = proof.receipt?.usage;
+    const gate = proof.receipt?.value as { relevance?: unknown; followUp?: unknown } | null;
+    if (first.reserve.purpose !== undefined || !first.receipt || first.receipt.usage !== null || !/^BENCH_(PROVIDER_FAILURE|IDENTITY_DENIED)(?:_HTTP_[3-5]\d{2})?$/.test(first.receipt.code ?? '') ||
+        probe.reserve.purpose !== 'operator_probe' || !probe.receipt || probe.receipt.usage !== null || probe.receipt.code !== 'BENCH_PROVIDER_FAILURE_HTTP_402' ||
+        proof.reserve.purpose !== 'operator_probe_after_funding' || !proof.receipt || proof.receipt.code !== null || !usage || usage.modelVersion !== proof.reserve.bound.modelVersion ||
+        usage.inputTokens > proof.reserve.bound.inputTokens || usage.outputTokens > proof.reserve.bound.outputTokens || gate?.relevance !== 'financial' || gate.followUp !== false ||
+        [probe, proof].some(record => benchmarkDigest(record.reserve.price) !== benchmarkDigest(first.reserve.price) || benchmarkDigest(record.reserve.bound) !== benchmarkDigest(first.reserve.bound))) throw new BenchmarkFailure('BENCH_FUNDED_CONTINUATION_NOT_ALLOWED');
+    const data = { rejectionIds: [firstId, probeId], proofId };
+    return { type: 'continue_with_held_rejections', id: benchmarkDigest({ action: 'funded-smoke/1', ...data }), ...data };
+  }
+  async allowFundedSmoke() {
+    return this.exclusive(async () => {
+      if (this.heldRejections.size) return;
+      await this.append(this.fundedContinuation());
+    });
   }
   private async append(event: Event) {
     try {

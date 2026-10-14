@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { runSmoke, smokeCostReport } from '../src/benchmark-engine.ts';
-import { smokeScenarios } from '../src/benchmark-fixtures.ts';
+import { benchmarkPromptVersion, runSmoke, smokeCostReport } from '../src/benchmark-engine.ts';
+import { fixtureVersion, smokeScenarios } from '../src/benchmark-fixtures.ts';
+import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { isYandexTransport } from '../src/yandex-transport.ts';
 import { assertInactiveOperator, probeRequestId, runProbe } from '../src/benchmark-probe.ts';
@@ -302,5 +303,85 @@ test('post-funding probe cannot bypass non-payment failures, missing receipts or
     await ledger.reserveProbe('b'.repeat(64), price, client.bound);
     await ledger.receipt({ id: 'b'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE_HTTP_402', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
     await assert.rejects(ledger.reserveProbe('c'.repeat(64), price, client.bound, 'operator_probe_after_funding'), /BENCH_BUDGET_EXHAUSTED/);
+  });
+});
+
+async function seedFundedSmoke(ledger: BenchmarkLedger, client: ReturnType<typeof createBenchmarkTransport>, proofChange: Record<string, unknown> = {}) {
+  // Reproduce the exact failed first smoke ID, not a convenient unrelated fixture.
+  const question = smokeScenarios[0]!.turns[0]!.question;
+  const oldId = benchmarkDigest({ fixtureVersion, benchmarkPromptVersion, mode: 'task', caseId: 'total', candidate: client.candidate, price: client.price,
+    step: 'gate', prompt: gatePrompt, input: { question, hasFinancialContext: false }, schema: gateSchema });
+  await ledger.reserve(oldId, client.price, client.bound);
+  await ledger.receipt({ id: oldId, usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1569, cachedTokens: null, reasoningTokens: null });
+  const probeId = probeRequestId(client);
+  await ledger.reserveProbe(probeId, client.price, client.bound);
+  await ledger.receipt({ id: probeId, usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE_HTTP_402', fingerprint: null, latencyMs: 100, cachedTokens: null, reasoningTokens: null });
+  const proofId = probeRequestId(client, 'after-funding');
+  await ledger.reserveProbe(proofId, client.price, client.bound, 'operator_probe_after_funding');
+  await ledger.receipt({ id: proofId, usage: { inputTokens: 212, outputTokens: 192, modelVersion: model }, value: { relevance: 'financial', followUp: false }, code: null,
+    fingerprint: 'fixture-v1', latencyMs: 100, cachedTokens: null, reasoningTokens: null, ...proofChange });
+  return { oldId, probeId, proofId };
+}
+test('funded smoke preserves both old reserves, avoids the failed cached id and resumes without payment', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options?.body)), input = JSON.parse(body.messages[1].content);
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+    const isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    const gate = { ...turn.expectedGate, followUp: input.hasFinancialContext ? turn.expectedGate.followUp : false };
+    let planned = scriptedPlans[turn.id];
+    if (!isGate && input.question === 'А по категориям?') planned = rawPlan({}, input.previousTask.metric, 'category', input.previousTask.comparison);
+    return response(isGate ? gate : planned);
+  }) as typeof fetch);
+  const { oldId } = await seedFundedSmoke(ledger, client);
+  const held = ledger.totals().held, before = await readFile(join(dir, 'ledger.jsonl'), 'utf8');
+  await ledger.allowFundedSmoke();
+  assert.equal(ledger.totals().held, held); assert.equal(ledger.totals().blocked, false);
+  const first = await runSmoke(client, ledger, 'task', 'after-funding');
+  assert.equal(first.turns, 24); assert.equal(first.passed, 24); assert.equal(calls, 46);
+  assert.equal(ledger.records.get(oldId)!.receipt!.usage, null); assert.equal(ledger.totals().held, held);
+  assert.equal(smokeCostReport(ledger).requiresReconciliation, true);
+  assert.equal(smokeCostReport(ledger).budgetUsedUpperBoundAtoms, (ledger.totals().spent + held).toString());
+  const source = await readFile(join(dir, 'ledger.jsonl'), 'utf8'); assert.ok(source.startsWith(before));
+  const restarted = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'));
+  try {
+    await restarted.allowFundedSmoke();
+    const replay = await runSmoke(client, restarted, 'task', 'after-funding');
+    assert.equal(replay.passed, 24); assert.equal(calls, 46); assert.equal(replay.checks[0]!.replayCalls, 2);
+    assert.equal(restarted.totals().held, held);
+  } finally { await restarted.close(); }
+}));
+test('funded continuation refuses failed, absent, wrong-model or oversized proof without releasing funds', async () => {
+  for (const proofChange of [
+    { usage: null, code: 'BENCH_DELIVERY_UNKNOWN' }, { code: 'BENCH_PLAN_INVALID' },
+    { value: { relevance: 'unrelated', followUp: false } },
+    { usage: { inputTokens: 212, outputTokens: 192, modelVersion: 'other' } },
+    { usage: { inputTokens: 212, outputTokens: 1201, modelVersion: model } },
+  ]) await sandbox(async (_, ledger) => {
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key });
+    await seedFundedSmoke(ledger, client, proofChange); const held = ledger.totals().held;
+    await assert.rejects(ledger.allowFundedSmoke(), /BENCH_FUNDED_CONTINUATION_NOT_ALLOWED/);
+    assert.equal(ledger.totals().held, held); assert.equal(ledger.totals().blocked, true);
+  });
+});
+test('funded continuation keeps the shared ceiling and freezes any new ambiguous call', async () => {
+  await sandbox(async (_, ledger) => {
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key });
+    await seedFundedSmoke(ledger, client); await ledger.allowFundedSmoke(); const held = ledger.totals().held;
+    for (let n = 0; n < 18; n++) {
+      const id = benchmarkDigest({ fundedBudget: n }); await ledger.reserve(id, client.price, client.bound);
+      await ledger.receipt({ id, usage: { ...client.bound }, value: {}, code: null, fingerprint: 'fixture-v1', latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    }
+    await assert.rejects(ledger.reserve('f'.repeat(64), client.price, client.bound), /BENCH_BUDGET_EXHAUSTED/);
+    assert.equal(ledger.totals().held, held);
+  });
+  await sandbox(async (_, ledger) => {
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key });
+    await seedFundedSmoke(ledger, client); await ledger.allowFundedSmoke(); const held = ledger.totals().held;
+    await ledger.reserve('f'.repeat(64), client.price, client.bound);
+    await ledger.receipt({ id: 'f'.repeat(64), usage: null, value: null, code: 'BENCH_DELIVERY_UNKNOWN', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    await ledger.allowFundedSmoke();
+    assert.equal(ledger.totals().blocked, true); assert.ok(ledger.totals().held > held);
+    await assert.rejects(ledger.reserve('e'.repeat(64), client.price, client.bound), /BENCH_RECONCILIATION_REQUIRED/);
   });
 });
