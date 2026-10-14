@@ -1,5 +1,6 @@
 import { mkdir, open, unlink, realpath, lstat } from 'node:fs/promises';
 import { join } from 'node:path';
+import { constants } from 'node:fs';
 import { privateJson } from './kms.ts';
 import { object } from '../../../packages/finance-core/src/model.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
@@ -25,6 +26,12 @@ async function main() {
   await mkdir(stateDirectory, { recursive: true, mode: 0o700 });
   const stat = await lstat(stateDirectory);
   if (await realpath(stateDirectory) !== stateDirectory || !stat.isDirectory() || stat.uid !== 0 || (stat.mode & 0o777) !== 0o700) throw new BenchmarkFailure('BENCH_STATE_DIRECTORY_INVALID');
+  for (const path of ['/var/lib', '/var/lib/cashneuro', stateDirectory]) {
+    const meta = await lstat(path);
+    if (!meta.isDirectory() || meta.uid !== 0 || (meta.mode & 0o022)) throw new BenchmarkFailure('BENCH_STATE_DIRECTORY_INVALID');
+    const directory = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+    try { await directory.sync(); } finally { await directory.close(); }
+  }
   // Exclusive process lock. If the process dies, keep the lock: reconcile the
   // last reservation/provider billing before an operator removes it.
   const lockPath = join(stateDirectory, 'operator.lock');

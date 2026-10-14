@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { constants } from 'node:fs';
 import { open } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import type { FileHandle } from 'node:fs/promises';
 import { rubAtoms, tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import type { Usage, TokenPrice, DispatchBound } from '../../../packages/analyzer/src/cost.ts';
@@ -23,6 +24,10 @@ export class BenchmarkLedger {
     try {
       const stat = await file.stat();
       if (!stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o777) !== 0o600 || stat.uid !== process.getuid?.() || stat.size > 4_194_304) throw new Error();
+      // Persist the initial directory entry too, before a paid dispatch can
+      // happen. File fsync alone does not guarantee survival of its creation.
+      const directory = await open(dirname(path), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
+      try { await directory.sync(); } finally { await directory.close(); }
       const ledger = new BenchmarkLedger(file), source = await file.readFile('utf8');
       if (source && !source.endsWith('\n')) throw new Error();
       for (const line of source.split('\n').filter(Boolean)) {
