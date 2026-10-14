@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { benchmarkPromptVersion, runSmoke, runComparison, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
+import { benchmarkPromptVersion, runSmoke, runComparison, runExplicitTrial, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
@@ -15,6 +15,7 @@ import { revisedGatePrompt, revisedPlanPrompt, resolvedPlanPrompt, resolvedBench
 import { parseReferencePlan } from '../src/benchmark-reference-plan.ts';
 import { parseDeltaPlan, deltaPlanPrompt, deltaPlanSchema } from '../src/benchmark-delta-plan.ts';
 import { transferScenarios, transferFixtureVersion } from '../src/benchmark-transfer-fixtures.ts';
+import { parseExplicitPlan, explicitPlanPrompt, explicitPlanSchema } from '../src/benchmark-explicit-plan.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
 const response = (value: unknown, change: Record<string, unknown> = {}) => new Response(JSON.stringify({ model,
@@ -951,4 +952,104 @@ test('delta retains the last successful task across clarification and unrelated 
   assert.deepEqual(seen['tx-3'].previousTask, { metric: 'expenses', grouping: 'none', comparison: 'none' });
   assert.deepEqual(seen['tx-5'].previousTask, { metric: 'expenses', grouping: 'category', comparison: 'none' });
   assert.equal(seen['tx-6'].previousTask, null); assert.ok(result.passed < 72);
+}));
+
+const explicitDecision = (changes: Record<string, any> = {}, status = 'query') => {
+  const { from = 'inherit', through = 'inherit', categoryNames = [], ...filter } = changes.filter ?? {};
+  return { status, metric: changes.metric ?? 'inherit', grouping: changes.grouping ?? 'inherit', comparison: changes.comparison ?? 'inherit', from, through, categoryNames, filter };
+};
+test('mandatory decisions distinguish inheritance from an explicit reset and missing fields cannot silently become defaults', () => {
+  const prior = { metric: 'income', grouping: 'category', comparison: 'previous_same' } as const;
+  const inherited = parseExplicitPlan(explicitDecision(), october, syntheticCatalog, prior);
+  assert.deepEqual(inherited.plan.query, { name: 'query_finances', ...prior, filter: october });
+  assert.deepEqual(inherited.decisions, { metric: 'inherit', grouping: 'inherit', comparison: 'inherit', from: 'inherit', through: 'inherit', categoryCount: 0, filterFields: [] });
+  const reset = parseExplicitPlan(explicitDecision({ grouping: 'none', comparison: 'none' }), october, syntheticCatalog, prior);
+  assert.equal(reset.plan.query?.grouping, 'none'); assert.equal(reset.plan.query?.comparison, 'none'); assert.equal(reset.plan.query?.metric, 'income');
+  for (const field of explicitPlanSchema.required) {
+    const incomplete: Record<string, unknown> = explicitDecision(); delete incomplete[field];
+    assert.throws(() => parseExplicitPlan(incomplete, october, syntheticCatalog), error => error instanceof Error && 'phase' in error && error.phase === 'ROOT');
+  }
+  for (const bad of [{ grouping: null }, { grouping: 'subtotal' }, { metric: false }, { comparison: 'previous_year' }, { from: '' }, { categoryNames: null }, { filter: { categoryIds: ['forged'] } }, { query: null }]) {
+    assert.throws(() => parseExplicitPlan({ ...explicitDecision(), ...bad }, october, syntheticCatalog));
+  }
+  assert.throws(() => parseExplicitPlan({ ...explicitDecision(), from: '2026-02-30', through: '2026-03-01' }, october, syntheticCatalog), error => error instanceof Error && 'phase' in error && error.phase === 'FILTER');
+  assert.throws(() => parseExplicitPlan(explicitDecision({ grouping: 'category' }, 'unsupported'), october, syntheticCatalog));
+  assert.deepEqual(parseExplicitPlan(explicitDecision({}, 'unsupported'), october, syntheticCatalog).plan, { status: 'unsupported', query: null });
+});
+test('explicit fields cover the observed date/category/grouping/comparison errors without widening or leaking reference labels', () => {
+  const grouped = parseExplicitPlan(explicitDecision({ metric: 'expenses', grouping: 'category' }), october, syntheticCatalog);
+  assert.equal(grouped.plan.query?.grouping, 'category'); assert.equal(grouped.decisions.grouping, 'category');
+  const compare = parseExplicitPlan(explicitDecision({ metric: 'expenses', comparison: 'previous_same' }), october, syntheticCatalog);
+  assert.equal(compare.plan.query?.comparison, 'previous_same');
+  const scoped = parseExplicitPlan(explicitDecision({ metric: 'expenses', filter: { from: '2026-09-01', through: '2026-09-30', categoryNames: ['Продукты'] } }), october, syntheticCatalog);
+  assert.deepEqual(scoped.plan.query?.filter, { from: '2026-09-01', through: '2026-09-30', categoryIds: ['11111111-1111-4111-8111-111111111111'] });
+  const taxi = parseExplicitPlan(explicitDecision({ filter: { categoryNames: ['Такси'] } }), scoped.plan.query!.filter, syntheticCatalog, { metric: 'expenses', grouping: 'category', comparison: 'none' });
+  assert.equal(taxi.plan.query?.grouping, 'category'); assert.equal(taxi.decisions.grouping, 'inherit');
+  assert.deepEqual(taxi.plan.query?.filter, { from: '2026-09-01', through: '2026-09-30', categoryIds: ['22222222-2222-4222-8222-222222222222'], subcategoryIds: ['33333333-3333-4333-8333-333333333333'] });
+  const invalidName = parseExplicitPlan({ ...explicitDecision(), categoryNames: [key] }, october, syntheticCatalog);
+  assert.equal(invalidName.resolution, 'reference_missing'); assert.doesNotMatch(JSON.stringify(invalidName), new RegExp(key));
+  assert.equal(invalidName.decisions.categoryCount, 1); assert.equal(parseExplicitPlan(explicitDecision({ metric: 'attention' }), october, syntheticCatalog).plan.query?.grouping, 'operation');
+  assert.ok(explicitPlanPrompt.endsWith(JSON.stringify(explicitPlanSchema)));
+  for (const turn of transferScenarios.flatMap(s => s.turns)) assert.equal(explicitPlanPrompt.includes(turn.question), false);
+});
+function explicitFixtureClient(onRequest: (body: any) => void = () => {}, badGrouping = false) {
+  return createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options!.body)), input = JSON.parse(body.messages[1].content); onRequest(body);
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+    if (body.messages[0].content === revisedGatePrompt) return response(turn.expectedGate);
+    assert.equal(body.messages[0].content, explicitPlanPrompt); assert.deepEqual(body.response_format.json_schema.schema, explicitPlanSchema);
+    return response(explicitDecision(badGrouping && turn.id === 'groups' ? { metric: 'expenses', grouping: 'none' } : scriptedDeltas[turn.id] as Record<string, unknown> ?? {}, turn.id === 'write' ? 'unsupported' : 'query'));
+  }) as typeof fetch, 'empty-tools');
+}
+test('mandatory-decision trial propagates actual state, preserves the original goldens and replays decisions without payment', async () => sandbox(async (dir, ledger) => {
+  const client = explicitFixtureClient(body => assert.doesNotMatch(JSON.stringify(body), /11111111|22222222|33333333|categoryIds|subcategoryIds|expectedPlan/));
+  const result = await runSmoke(client, ledger, 'task', 'after-funding', true, 'explicit');
+  assert.equal(result.passed, 24); assert.equal(result.benchmarkPromptVersion, 'cashneuro-smoke-prompt/5');
+  assert.equal(result.checks.find(c => c.id === 'scope-3')?.diagnostics?.decisions?.grouping, 'inherit');
+  const source = await readFile(join(dir, 'ledger.jsonl')), total = ledger.totals();
+  const readonly = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'), { readOnly: true });
+  try {
+    const replay = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), readonly, 'task', 'after-funding', true, 'explicit');
+    assert.deepEqual(replay.checks.map(c => c.diagnostics), result.checks.map(c => c.diagnostics));
+    assert.equal(replay.checks.reduce((n, c) => n + c.replayCalls, 0), 46); assert.deepEqual(readonly.totals(), total);
+  } finally { await readonly.close(); }
+  assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+}));
+test('wrong explicit choices remain scored failures, propagate to follow-ups and are visible in the report', async () => sandbox(async (_, ledger) => {
+  const result = await runSmoke(explicitFixtureClient(() => {}, true), ledger, 'task', 'after-funding', true, 'explicit');
+  assert.equal(result.passed, 20);
+  assert.deepEqual(result.checks.filter(c => c.plan === false).map(c => c.id), ['groups', 'global-1', 'global-2', 'global-3']);
+  const failure = result.checks.find(c => c.id === 'groups')!;
+  assert.equal(failure.gate, true); assert.equal(failure.plan, false); assert.equal(failure.diagnostics?.decisions?.grouping, 'none');
+  assert.equal(failure.diagnostics?.actualPlan?.query?.grouping, 'none');
+}));
+test('missing mandatory decisions stop on the first planner response and repeats cannot dispatch again', async () => sandbox(async (_, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options!.body));
+    return response(body.messages[0].content === revisedGatePrompt ? { relevance: 'financial', followUp: false } : { status: 'query' });
+  }) as typeof fetch, 'empty-tools');
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'explicit'), /BENCH_CAPABILITY_FAILURE/);
+  assert.equal(calls, 2); assert.equal(ledger.records.size, 2); assert.equal(ledger.totals().held, 0n); assert.ok(ledger.totals().spent > 0n);
+  assert.equal([...ledger.records.values()].at(-1)?.receipt?.code, 'BENCH_PLAN_INVALID_ROOT');
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'explicit'), /BENCH_CAPABILITY_FAILURE/); assert.equal(calls, 2);
+}));
+test('transfer admission is tied to the exact prompt version; prompt/4 cannot authorize prompt/5', async () => sandbox(async (_, ledger) => {
+  await runSmoke(deltaFixtureClient(), ledger, 'task', 'after-funding', false, 'delta');
+  let calls = 0; const client = explicitFixtureClient(() => { calls++; }, true);
+  await assert.rejects(runTransfer(client, ledger, 'explicit'), /BENCH_REPLAY_ONLY/); assert.equal(calls, 0);
+  const trial = await runSmoke(client, ledger, 'task', 'after-funding', false, 'explicit'); assert.equal(trial.passed, 20);
+  const before = calls; await assert.rejects(runTransfer(client, ledger, 'explicit'), /BENCH_TRANSFER_BASELINE_REQUIRED/); assert.equal(calls, before);
+}));
+test('paid explicit trial requires the saved previous trial, appends distinct receipts and retains every old reservation', async () => sandbox(async (dir, ledger) => {
+  await seedGigaRejection(ledger); await ledger.allowOssContinuation(); const held = ledger.totals().held;
+  let calls = 0; const client = explicitFixtureClient(() => { calls++; });
+  const path = join(dir, 'ledger.jsonl'), beforeMissing = await readFile(path);
+  await assert.rejects(runExplicitTrial(client, ledger), /BENCH_REPLAY_ONLY/); assert.equal(calls, 0); assert.deepEqual(await readFile(path), beforeMissing);
+  const imperfectBaseline = await runSmoke(deltaFixtureClient(() => {}, true), ledger, 'task', 'after-funding', false, 'delta');
+  assert.equal(imperfectBaseline.passed, 23); const before = await readFile(path, 'utf8'), oldCount = ledger.records.size;
+  const result = await runExplicitTrial(client, ledger); assert.equal(result.passed, 24); assert.equal(calls, 46);
+  assert.equal(ledger.records.size, oldCount + 46); assert.equal(ledger.totals().held, held); assert.equal(smokeCostReport(ledger).requiresReconciliation, true);
+  assert.ok((await readFile(path, 'utf8')).startsWith(before));
+  const source = await readFile(path); await runExplicitTrial(client, ledger); assert.equal(calls, 46); assert.deepEqual(await readFile(path), source);
 }));
