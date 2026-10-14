@@ -12,8 +12,12 @@ import {actionConfirmation} from '../../../packages/analyzer/src/actions.ts';
 import {prepareFinance,previewFinance,parseIntent} from './finance.ts';
 import {stableJSON} from './finance-history.ts';
 import {HttpError} from './types.ts';
+import type {YandexAnalyzer} from './yandex-runtime.ts';
+import {yandexCatalog} from './yandex-runtime.ts';
+import {gatePrompt,gateSchema,parseGate,planPrompt,planSchema,parseModelPlan,modelInput,yandexContractVersion} from '../../../packages/analyzer/src/yandex-contract.ts';
+import type {ModelPlan} from '../../../packages/analyzer/src/yandex-contract.ts';
 
-export async function analyzerQuota(db:PoolClient,userId:string):Promise<Quota>{
+export async function analyzerQuota(db:PoolClient,userId:string,journal=false):Promise<Quota>{
  const c=(await db.query(`WITH cycle AS (SELECT *,clock_timestamp() AS now FROM commerce.access_cycle WHERE user_id=$1),
  grid AS (SELECT *, greatest(0,(extract(year FROM now AT TIME ZONE timezone)::int-extract(year FROM anchor_at AT TIME ZONE timezone)::int)*12+extract(month FROM now AT TIME ZONE timezone)::int-extract(month FROM anchor_at AT TIME ZONE timezone)::int) AS n FROM cycle),
  slot AS (SELECT *,n-CASE WHEN ((anchor_at AT TIME ZONE timezone)+make_interval(months=>n)) AT TIME ZONE timezone>now THEN 1 ELSE 0 END AS k FROM grid)
@@ -22,16 +26,19 @@ export async function analyzerQuota(db:PoolClient,userId:string):Promise<Quota>{
  if(!c||!Number.isSafeInteger(c.quota_policy?.limit)||c.quota_policy.limit<0)return {available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null};
  // Preserve the canonical database timestamp: pg Date serialization truncates microseconds.
  const used=Number((await db.query('SELECT COALESCE(sum(units),0) AS n FROM commerce.analyzer_usage WHERE user_id=$1 AND anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND period_start=$2',[userId,c.start])).rows[0].n),limit=c.quota_policy.limit;
- const warning=used>=limit?100:used*100>=limit*95?95:used*100>=limit*80?80:null;
- return {available:true,limit,used,remaining:Math.max(0,limit-used),periodStart:c.start.toISOString(),resetAt:c.finish.toISOString(),warning};
+ const reserved=journal?Number((await db.query(`SELECT count(*) AS n FROM commerce.analyzer_request r WHERE r.user_id=$1 AND r.step='plan'
+   AND r.state IN ('sent','received','unknown') AND r.anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND r.period_start=$2
+   AND NOT EXISTS(SELECT 1 FROM commerce.analyzer_usage u WHERE u.user_id=r.user_id AND u.request_id=r.request_id)`,[userId,c.start])).rows[0].n):0;
+ const occupied=used+reserved,warning=occupied>=limit?100:occupied*100>=limit*95?95:occupied*100>=limit*80?80:null;
+ return {available:true,limit,used,remaining:Math.max(0,limit-occupied),periodStart:c.start.toISOString(),resetAt:c.finish.toISOString(),warning,...(journal?{reserved}:{})};
 }
-export async function analyzerState(db:PoolClient,userId:string,value:unknown,providerAvailable=false){
+export async function analyzerState(db:PoolClient,userId:string,value:unknown,providerAvailable=false,journal=false){
  const r=object(value??{},['chatId','search']);const search=r.search===undefined?'':safeText(r.search,200);const selectedId=r.chatId===undefined?null:uuid(r.chatId);
  const chats=(await db.query(`SELECT c.id,c.title,c.pinned,c.created_at AS "createdAt",c.modified_at AS "modifiedAt",($2='' OR strpos(lower(c.title),lower($2))>0 OR EXISTS(SELECT 1 FROM finance.analyzer_message m WHERE (m.user_id,m.chat_id)=(c.user_id,c.id) AND strpos(lower(m.question),lower($2))>0)) AS matches FROM finance.analyzer_chat c WHERE c.user_id=$1 ORDER BY c.pinned DESC,c.modified_at DESC,c.id`,[userId,search])).rows;
  const messages=(await db.query(`SELECT m.id,m.chat_id,m.question,m.answer,m.created_at AS "createdAt",m.action_id AS "actionId",CASE WHEN a.id IS NULL THEN NULL ELSE jsonb_build_object('status',a.status,'undone',a.undone,'tool',a.intent->'analyzer'->'tool','confirmation',a.intent->'analyzer'->'confirmation','result',CASE WHEN a.status='committed' THEN jsonb_build_object('status',a.result->>'status','actionId',a.id) ELSE NULL END) END AS outcome
  FROM finance.analyzer_message m LEFT JOIN finance.action a ON (a.user_id,a.id)=(m.user_id,m.action_id) WHERE m.user_id=$1 AND m.chat_id=$2 ORDER BY m.created_at,m.id`,[userId,selectedId??chats[0]?.id??null])).rows;
  if(selectedId&&!chats.some(c=>c.id===selectedId))throw new HttpError(404,'NOT_FOUND');
- return {chats:chats.map(c=>({...c,messages:messages.filter(m=>m.chat_id===c.id).map(({chat_id,...m})=>m)})),quota:await analyzerQuota(db,userId),providerAvailable,registryVersion};
+ return {chats:chats.map(c=>({...c,messages:messages.filter(m=>m.chat_id===c.id).map(({chat_id,...m})=>m)})),quota:await analyzerQuota(db,userId,journal),providerAvailable,registryVersion};
 }
 export async function analyzerChat(db:PoolClient,userId:string,value:unknown){
  const r=object(value,['id','create','title','pinned','delete']),id=uuid(r.id);
@@ -41,11 +48,12 @@ export async function analyzerChat(db:PoolClient,userId:string,value:unknown){
  const title=r.title===undefined?null:safeText(r.title,100);if(title==='')throw new TypeError('EMPTY_TITLE');
  if(!(await db.query('UPDATE finance.analyzer_chat SET title=COALESCE($3,title),pinned=COALESCE($4,pinned),modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2 RETURNING id',[userId,id,title,r.pinned??null])).rowCount)throw new HttpError(404,'NOT_FOUND');return {id};
 }
-export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,adapter?:AnalyzerAdapter){
+export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,adapter?:AnalyzerAdapter,yandex?:YandexAnalyzer,actorEmail?:string){
  const r=object(value,['id','chatId','text','filter','contextId']),id=uuid(r.id),chatId=uuid(r.chatId),text=safeText(r.text,2000),filter=parseOperationsFilter(r.filter??{}),contextId=r.contextId===undefined?null:uuid(r.contextId);
  if(!text)throw new TypeError('EMPTY_QUERY');const request={chatId,text,filter,contextId};
  const previous=(await db.query('SELECT request,answer FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];
- if(previous){if(stableJSON(previous.request)!==stableJSON(request))throw new HttpError(409,'ACTION_REUSED');return {id,answer:previous.answer,quota:await analyzerQuota(db,userId)};}
+ if(previous){if(stableJSON(previous.request)!==stableJSON(request))throw new HttpError(409,'ACTION_REUSED');return {id,answer:previous.answer,quota:await analyzerQuota(db,userId,!!yandex)};}
+ if(yandex&&(await db.query('SELECT 1 FROM commerce.analyzer_usage WHERE user_id=$1 AND request_id=$2',[userId,id])).rowCount)throw new HttpError(409,'ACTION_REUSED');
  if(!(await db.query('SELECT id FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,chatId])).rowCount)throw new HttpError(404,'NOT_FOUND');
  if(Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_message WHERE user_id=$1 AND chat_id=$2',[userId,chatId])).rows[0].n)>=100)throw new HttpError(409,'MESSAGE_LIMIT');
  const now=(await db.query('SELECT clock_timestamp() AS now')).rows[0].now as Date;
@@ -55,7 +63,39 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  if(query?.filter.operationIds){const resolved=(await db.query('SELECT finance.canonical_operation($1,id) AS id FROM unnest($2::uuid[]) AS id',[userId,query.filter.operationIds])).rows.map(r=>r.id);query={...query,filter:{...query.filter,operationIds:[...new Set<string>(resolved)]}};}
  let answer:Answer={text:intent.relevance==='unrelated'?'Я помогаю разбираться в финансах. Спросите о своих расходах, доходах или операциях.':intent.relevance==='ambiguous'?'Уточните показатель и период: например, «Расходы по категориям за сентябрь 2026».':'Для такого вопроса нужна подключённая AI-модель. Сейчас доступны точные расчёты расходов, доходов, категорий, крупных операций и сравнение с предыдущим периодом.',mode:intent.relevance==='unrelated'?'redirect':intent.relevance==='ambiguous'?'clarification':'unavailable',registryVersion};
  let usage:{inputTokens:number;outputTokens:number}|undefined;
- // The gate sees sanitized text only. Unknown/ambiguous/unrelated requests cannot call a provider or financial tools.
+ let external:{id:string;model:string;version:string}|undefined;
+ if(!query&&yandex&&actorEmail&&yandex.transport.allowed(actorEmail)&&!/(?:игнорир(?:уй|уйте).{0,50}(?:правил|инструкц)|ignore.{0,30}(?:instructions|rules)|system prompt|\bSQL\b|HMAC|api[_ -]?key|парол)/iu.test(text)){
+  const workspace=(await db.query('SELECT generation,revision FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
+  const binding={request,context,registryVersion,yandexContractVersion,generation:workspace.generation,revision:workspace.revision};
+  const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema},v=>parseGate(v));
+  if(['financial','adjacent'].includes(gate.value.relevance)){
+   const quota=await analyzerQuota(db,userId,true);
+   // Existing receipts and terminal outcomes are resolved without a new dispatch.
+   const priorPlan=(await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan'",[userId,id])).rowCount;
+   if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining&&!priorPlan)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
+   const base=gate.value.followUp&&context?context.filter:filter;await assertReferences(db,userId,base);
+   const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+   const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;
+   const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,currentDate),schema:planSchema,periodStart:quota.periodStart!,anchorAt},(v,cached):ModelPlan=>{
+    if(!cached)return parseModelPlan(v,base,catalog);
+    const saved=object(v,['status','query']);
+    if(saved.status!=='query')return parseModelPlan(saved,base);
+    const tool=parseTool(saved.query);if(tool.name!=='query_finances')throw new TypeError('INVALID_AI_PLAN');return {status:'query',query:tool};
+   });
+   if(planned.value.status==='query'){
+    query=planned.value.query!;
+    try{await assertReferences(db,userId,query.filter);}catch{await yandex.discard(userId,id,'AI_SCOPE_DENIED');throw new HttpError(400,'AI_SCOPE_DENIED');}
+    usage={inputTokens:gate.inputTokens+planned.inputTokens,outputTokens:gate.outputTokens+planned.outputTokens};
+    external={id:'yandex-ai-studio',model:yandex.transport.model,version:planned.modelVersion};
+    intent.periodFromQuestion=query.filter.from!==base.from||query.filter.through!==base.through;intent.followUp=!!context&&gate.value.followUp;
+   }else{
+    answer={text:planned.value.status==='clarification'?'Уточните показатель, период или название категории.':'Этот запрос пока выходит за возможности подключённых финансовых инструментов. Попробуйте вопрос о расходах, доходах или операциях для проверки.',mode:planned.value.status==='clarification'?'clarification':'unavailable',registryVersion};
+    await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='plan' AND state='received'",[userId,id]);
+   }
+  }else answer={text:gate.value.relevance==='ambiguous'?'Уточните финансовый вопрос и период.':'Я помогаю разбираться в финансах. Спросите о своих расходах, доходах или операциях.',mode:gate.value.relevance==='ambiguous'?'clarification':'redirect',registryVersion};
+  await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='gate' AND state='received'",[userId,id]);
+ }
+ // The external gate sees sanitized text only; unrelated/ambiguous responses never load financial facts or invoke a planner.
  if(query)await assertReferences(db,userId,query.filter);
  if(query&&adapter){if((await db.query('SELECT request_id FROM commerce.analyzer_usage WHERE user_id=$1 AND request_id=$2',[userId,id])).rowCount)throw new HttpError(409,'ACTION_REUSED');const quota=await analyzerQuota(db,userId);if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
   const plan=await adapter.plan({text,context,query,registryVersion}),tool=parseTool(plan.tool);if(tool.name!=='query_finances')throw new HttpError(400,'AI_ACTION_REQUIRES_CONFIRMATION');
@@ -71,13 +111,14 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
   // Linked source facts outside the visible period contribute to terminal allocations.
   const links=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1',[userId])).rows;
   const connected=new Set(dependencyIds);let grew=true;while(grew){grew=false;for(const link of links)if(connected.has(link.source_id)||connected.has(link.target_id))for(const linked of [link.source_id,link.target_id])if(!connected.has(linked)){connected.add(linked);grew=true;}}dependencyIds=[...connected];
-  answer={text:result.operationCount?'Расчёт по вашим сохранённым операциям.':'По этим условиям операций нет.',mode:adapter?'test_adapter':'deterministic',registryVersion,query,result,widget,generation:state.generation,revision:state.revision,accountCount:new Set(selected.map(o=>o.accountId)).size,actionOperationCount:queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).total,computedAt:now.toISOString(),periodFromQuestion:intent.periodFromQuestion,followUp:intent.followUp,...(adapter?{provider:{id:adapter.id,model:adapter.model,version:adapter.version}}:{})};
+  answer={text:result.operationCount?'Расчёт по вашим сохранённым операциям.':'По этим условиям операций нет.',mode:external?'ai':adapter?'test_adapter':'deterministic',registryVersion,query,result,widget,generation:state.generation,revision:state.revision,accountCount:new Set(selected.map(o=>o.accountId)).size,actionOperationCount:queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).total,computedAt:now.toISOString(),periodFromQuestion:intent.periodFromQuestion,followUp:intent.followUp,...(external?{provider:external}:adapter?{provider:{id:adapter.id,model:adapter.model,version:adapter.version}}:{})};
  }
  await db.query('INSERT INTO finance.analyzer_message(user_id,id,chat_id,question,answer,context,request) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,chatId,text,JSON.stringify(answer),query?JSON.stringify(query):null,JSON.stringify(request)]);
  if(dependencyIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[])',[userId,id,dependencyIds]);
  await db.query("UPDATE finance.analyzer_chat SET title=CASE WHEN title='Новый диалог' AND $3 THEN $4 ELSE title END,modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2",[userId,chatId,!!query,text.slice(0,100)]);
  if(usage&&adapter){const quota=await analyzerQuota(db,userId);await db.query('INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version) SELECT user_id,$2,anchor_at,$3,1,$4,$5,$6,$7,$8 FROM commerce.access_cycle WHERE user_id=$1',[userId,id,quota.periodStart,usage.inputTokens,usage.outputTokens,adapter.id,adapter.model,adapter.version]);}
- return {id,answer,quota:await analyzerQuota(db,userId)};
+ if(usage&&external){const billed=await db.query("INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version) SELECT user_id,request_id,anchor_at,period_start,1,$3,$4,$5,$6,$7 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan' AND state='received'",[userId,id,usage.inputTokens,usage.outputTokens,external.id,external.model,external.version]);if(billed.rowCount!==1)throw new HttpError(409,'AI_STATE_CHANGED');await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND state='received'",[userId,id]);}
+ return {id,answer,quota:await analyzerQuota(db,userId,!!yandex)};
 }
 export async function analyzerPropose(db:PoolClient,userId:string,value:unknown){
  const r=object(value,['actionId','tool']),actionId=uuid(r.actionId),tool=parseTool(r.tool);if(tool.name==='query_finances')throw new TypeError('INVALID_ACTION');

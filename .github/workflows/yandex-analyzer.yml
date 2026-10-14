@@ -1,0 +1,45 @@
+name: yandex-analyzer
+on:
+  pull_request:
+    branches: [main, feature/staging-owner-bootstrap]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  analyzer-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:18.4
+        env:
+          POSTGRES_PASSWORD: synthetic-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s
+          --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check API types, native REST contract and privacy boundaries
+        run: pnpm run check:api
+      - name: Check deterministic finance and closed Analyzer Registry
+        run: pnpm test
+      - name: Check and build Finance and Control interfaces
+        run: |
+          pnpm run check:web
+          pnpm run check:admin
+          pnpm run build:web
+          pnpm run build:admin
+      - name: Check isolated PostgreSQL, quota, rollback, role isolation and existing authentication
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/yandex-integration.test.ts test/analyzer.test.ts test/security.test.ts test/mail.test.ts test/owner-bootstrap.test.ts

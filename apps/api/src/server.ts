@@ -35,6 +35,14 @@ export async function createServer(config: Config) {
   const application = config.profile === 'finance' ? await import('./application.ts') : null;
   const finance = config.profile === 'finance' ? await import('./finance.ts') : null;
   if(config.analyzerAdapter&&(config.environment!=='test'||config.analyzerAdapter.id!=='test-fixture'))throw new Error('Only an explicit synthetic Analyzer adapter is enabled before provider acceptance');
+  if(config.yandexAnalyzer){
+    const {isYandexAnalyzer}=await import('./yandex-runtime.ts');
+    if(config.profile!=='finance'||!['test','staging'].includes(config.environment)||config.analyzerAdapter||!isYandexAnalyzer(config.yandexAnalyzer))throw new Error('AI_RUNTIME_CONFIGURATION_DENIED');
+    const metadata=(await config.yandexAnalyzer.pool.query('SELECT current_user AS role,current_database() AS name')).rows[0];
+    const main=(await config.pool.query('SELECT current_database() AS name')).rows[0];
+    if(metadata.role!=='finance_api'||metadata.name!==main.name||config.yandexAnalyzer.pool===config.pool)throw new Error('AI_METADATA_ROLE_DENIED');
+    await config.yandexAnalyzer.pool.query('SELECT 1 FROM commerce.analyzer_request LIMIT 0');
+  }
   const analyzer = config.profile === 'finance' ? await import('./analyzer.ts') : null;
   const overview = config.profile === 'finance' ? await import('./overview.ts') : null;
   const budgets = config.profile === 'finance' ? await import('./budgets.ts') : null;
@@ -200,9 +208,9 @@ export async function createServer(config: Config) {
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
-        if(path==='/finance/analyzer-state')result=await analyzer!.analyzerState(db,s.user.id,request.body,!!config.analyzerAdapter);
+        if(path==='/finance/analyzer-state')result=await analyzer!.analyzerState(db,s.user.id,request.body,!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!config.yandexAnalyzer);
         else if(path==='/finance/analyzer-chat')result=await analyzer!.analyzerChat(db,s.user.id,request.body);
-        else if(path==='/finance/analyzer-query')result=await analyzer!.analyzerQuery(db,s.user.id,request.body,config.analyzerAdapter);
+        else if(path==='/finance/analyzer-query')result=await analyzer!.analyzerQuery(db,s.user.id,request.body,config.analyzerAdapter,config.yandexAnalyzer,s.user.email);
         else if(path==='/finance/analyzer-propose')result=await analyzer!.analyzerPropose(db,s.user.id,request.body);
         else if(path==='/finance/overview')result=await overview!.queryOverview(db,s.user.id,request.body);
         else if(path==='/finance/overview-views')result=await overview!.overviewViews(db,s.user.id);
