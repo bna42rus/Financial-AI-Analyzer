@@ -21,6 +21,14 @@ export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: strin
 export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound;
   complete(prompt: string, input: unknown, schema: unknown, reserve: () => Promise<void>): Promise<BenchmarkResult> };
 
+// No credentials, fetch or reservation callback: a missing cached request fails.
+export function replayOnlyBenchmarkTransport(candidate: Candidate): BenchmarkTransport {
+  if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
+  const spec = candidates[candidate];
+  return { candidate, price: spec.price, bound: { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model },
+    async complete() { throw new BenchmarkFailure('BENCH_REPLAY_ONLY'); } };
+}
+
 export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];

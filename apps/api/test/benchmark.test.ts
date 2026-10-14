@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtemp, rm, readFile, writeFile, chmod, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { createBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
+import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
 import { benchmarkPromptVersion, runSmoke, smokeCostReport } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from '../src/benchmark-fixtures.ts';
@@ -384,4 +384,46 @@ test('funded continuation keeps the shared ceiling and freezes any new ambiguous
     assert.equal(ledger.totals().blocked, true); assert.ok(ledger.totals().held > held);
     await assert.rejects(ledger.reserve('e'.repeat(64), client.price, client.bound), /BENCH_RECONCILIATION_REQUIRED/);
   });
+});
+
+test('offline audit reproduces saved mistakes and errors without credentials or journal changes', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options?.body)), input = JSON.parse(body.messages[1].content);
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+    const isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    let planned = scriptedPlans[turn.id];
+    if (input.question === 'А по категориям?') planned = rawPlan({}, input.previousTask?.metric ?? 'expenses', 'category', input.previousTask?.comparison ?? 'none');
+    if (turn.id === 'income' && input.selectedPeriod?.from === '2026-10-01') planned = rawPlan();
+    if (turn.id === 'date') planned = { invalid: true };
+    return response(isGate ? { ...turn.expectedGate, followUp: input.hasFinancialContext ? turn.expectedGate.followUp : false } : planned);
+  }) as typeof fetch);
+  await seedFundedSmoke(ledger, client); await ledger.allowFundedSmoke();
+  const live = await runSmoke(client, ledger, 'task', 'after-funding');
+  assert.equal(live.passed, 22);
+  const path = join(dir, 'ledger.jsonl'), source = await readFile(path);
+  const saved = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const report = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), saved, 'task', 'after-funding', true);
+    assert.equal(report.passed, live.passed); assert.equal(calls, 46);
+    assert.ok(report.checks.every(c => c.replayCalls === c.calls));
+    assert.equal(report.checks.find(c => c.id === 'income')!.diagnostics!.actualPlan!.query!.metric, 'expenses');
+    assert.deepEqual(report.checks.find(c => c.id === 'date')!.diagnostics!.errors, [{ step: 'plan', code: 'BENCH_PLAN_INVALID' }]);
+    assert.deepEqual(smokeCostReport(saved), smokeCostReport(ledger));
+    await assert.rejects(saved.reserve('f'.repeat(64), client.price, client.bound), /BENCH_REPLAY_ONLY/);
+    assert.equal(saved.totals().blocked, false);
+    await assert.rejects(runSmoke(replayOnlyBenchmarkTransport('cloud-giga'), saved, 'task', 'after-funding', true), /BENCH_REPLAY_ONLY/);
+    assert.deepEqual(await readFile(path), source);
+    assert.ok(!JSON.stringify(report).includes(key));
+  } finally { await saved.close(); }
+}));
+test('offline transport never reserves and readonly loading never creates a missing ledger', async () => {
+  let reserved = false;
+  await assert.rejects(replayOnlyBenchmarkTransport('cloud-oss').complete('', {}, {}, async () => { reserved = true; }), /BENCH_REPLAY_ONLY/);
+  assert.equal(reserved, false);
+  const dir = await mkdtemp(join(tmpdir(), 'cashneuro-readonly-')), path = join(dir, 'missing.jsonl');
+  try {
+    await assert.rejects(BenchmarkLedger.load(path, { readOnly: true }));
+    await assert.rejects(readFile(path), { code: 'ENOENT' });
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });
