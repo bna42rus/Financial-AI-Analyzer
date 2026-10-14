@@ -4,6 +4,7 @@ import type {OperationsFilter} from '../../finance-core/src/operations.ts';
 import {parseActionTool} from './actions.ts';
 import type {ActionTool} from './actions.ts';
 import {safeText} from '../../privacy/src/text.ts';
+import {resolveScope} from './context.ts';
 
 export const registryVersion='analyzer/2';
 export const registry=[
@@ -24,7 +25,7 @@ export type Relevance='financial'|'adjacent'|'ambiguous'|'unrelated';
 export type Interpretation={relevance:Relevance;query?:Query;periodFromQuestion:boolean;followUp:boolean};
 const months=['январ','феврал','март','апрел','ма[йя]','июн','июл','август','сентябр','октябр','ноябр','декабр'];
 /** Finite deterministic commands are explicitly separate from an AI classifier. */
-export function interpret(text:string,global:OperationsFilter,context?:Query,now=new Date()):Interpretation {
+export function interpret(text:string,global:OperationsFilter,context?:Query,now=new Date(),previousGlobal?:OperationsFilter):Interpretation {
  const q=safeText(text,2000).toLocaleLowerCase('ru-RU').replace(/ё/g,'е').replace(/[?!.,]+$/g,'').trim();
  const financial=/(расход|доход|потрат|деньг|операци|категори|кредит|вклад|счет|банк|финанс|ставк|курс|налог|тариф|бюджет)/u.test(q);
  const followUp=/^а (по категориям|за .+)$/u.test(q);
@@ -42,7 +43,7 @@ export function interpret(text:string,global:OperationsFilter,context?:Query,now
  else if(/^(покажи крупные расходы|крупнейшие расходы)$/u.test(stem))grouping='operation';
  else if(/^сравни расходы с предыдущим периодом$/u.test(stem))comparison='previous_same';
  else return {relevance:followUp||q.length<8?'ambiguous':financial?'financial':'unrelated',periodFromQuestion:false,followUp:false};
- let filter:OperationsFilter=structuredClone(followUp&&context?context.filter:global);
+ let filter:OperationsFilter=resolveScope(global,followUp&&context?context.filter:undefined,previousGlobal).filter;
  if(date)filter={...filter,from:date[1],through:date[2]};
  if(month){const n=months.findIndex(m=>new RegExp('^'+m).test(month[1]!)),year=Number(month[2]??new Intl.DateTimeFormat('en',{timeZone:'Europe/Moscow',year:'numeric'}).format(now));filter={...filter,from:`${year}-${String(n+1).padStart(2,'0')}-01`,through:new Date(Date.UTC(year,n+1,0)).toISOString().slice(0,10)};}
  filter=parseOperationsFilter(filter);

@@ -17,6 +17,7 @@ let pg:Awaited<ReturnType<typeof postgresFixture>>,server:Awaited<ReturnType<typ
 let behavior='normal',followUp=false,calls:{gate:boolean;input:Record<string,unknown>}[]=[];
 const password='Synthetic Analyzer password 123!',modelUri='gpt://b1g00000000000000000/yandexgpt-5.1',question='Подсчитай мои расходы на покупки за сентябрь 2026';
 const transport=createYandexTransport({realm:'staging/finance',apiKey:'synthetic-api-key-for-tests-only',modelUri,allowedEmails:['first@example.test'],maxDailyCalls:30,maxTokens:512,timeoutMs:1000},async(_url,options)=>{
+ if(String(_url).endsWith('/tokenizeCompletion'))return new Response(JSON.stringify({tokens:Array.from({length:20},(_,i)=>({id:String(i),text:'synthetic',special:false})),modelVersion:'synthetic-1'}));
  const body=JSON.parse(String(options?.body)),gate=!!body.jsonSchema.schema.properties.relevance,input=JSON.parse(body.messages[1].text);calls.push({gate,input});
  if(behavior==='http-gate'&&gate)return new Response('synthetic-private-body-must-not-be-reflected',{status:403});
  if(behavior==='timeout-plan'&&!gate)throw new Error('synthetic-secret-network-error');
@@ -24,7 +25,7 @@ const transport=createYandexTransport({realm:'staging/finance',apiKey:'synthetic
  if(!gate&&behavior==='invalid-plan')value={status:'query',query:{name:'sql',query:'SELECT * FROM finance.transaction'}};
  if(!gate&&behavior==='clarification')value={status:'clarification',query:null};
  if(!gate&&['named-plan','unknown-name'].includes(behavior))value={status:'query',query:{name:'query_finances',metric:'expenses',grouping:'category',comparison:'none',filter:{categoryNames:[behavior==='named-plan'?'Продукты':'Неизвестная категория']}}};
- return new Response(JSON.stringify({result:{alternatives:[{status:'ALTERNATIVE_STATUS_FINAL',message:{role:'assistant',text:JSON.stringify(value)}}],usage:{inputTextTokens:'20',completionTokens:'10',totalTokens:'30'},modelVersion:'synthetic-1'}}),{headers:{'content-type':'application/json'}});
+ return new Response(JSON.stringify({result:{alternatives:[{status:'ALTERNATIVE_STATUS_FINAL',message:{role:'assistant',text:behavior==='bad-json'&&!gate?'synthetic-private-invalid-json':JSON.stringify(value)}}],usage:{inputTextTokens:'20',completionTokens:'10',totalTokens:'30'},modelVersion:'synthetic-1'}}),{headers:{'content-type':'application/json'}});
 });
 before(async()=>{
  pg=await postgresFixture();const options=(pg.finance as Pool&{options:PoolConfig}).options;metadata=new Pool({...options,password:options.password,max:2,statement_timeout:3000,connectionTimeoutMillis:2000});
@@ -43,6 +44,24 @@ beforeEach(async()=>{
  const login=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'first@example.test',password},headers:{origin:config.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200,login.body);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');
  account=randomUUID();await within(async db=>{const s=await financeView(db,'first');category=s.categories.find(c=>c.name==='Продукты'&&c.parentId===null)!.id;await acceptAccount(db,'first',importEpoch(s),{id:account,bankId:'tbank',systemName:'Synthetic Analyzer account',type:'bank_account'});await syntheticOperations(db,'first',2,account,category);});
  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds',NULL,'Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10}')");
+});
+
+const costPolicy={projectId:'staging/finance/http-tests',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:'1000',price:{version:'synthetic-800',currency:'RUB' as const,inputRubPerMillion:'800',outputRubPerMillion:'800'}};
+test('authenticated Finance route bills both stages in money and one successful customer unit',async()=>{
+ const original=config.yandexAnalyzer;config.yandexAnalyzer=createYandexAnalyzer(metadata,transport,costPolicy);
+ try{const id=await chat(),payload=body(id),r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,200,r.body);assert.equal(r.json().quota.used,1);
+  const costs=(await pg.owner.query("SELECT state,settled_atoms FROM commerce.ai_cost_reservation WHERE user_id='first'")).rows;assert.equal(costs.length,2);assert.ok(costs.every(r=>r.state==='settled'&&r.settled_atoms==='24000000'));
+  assert.equal((await pg.owner.query("SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget WHERE user_id='first'")).rows[0].spent_atoms,'48000000');
+  assert.equal((await request('/finance/analyzer-query',payload)).statusCode,200);assert.equal(calls.length,2);
+ }finally{config.yandexAnalyzer=original;}
+});
+test('authenticated malformed plan response keeps both paid usages while customer units remain unchanged',async()=>{
+ const original=config.yandexAnalyzer;config.yandexAnalyzer=createYandexAnalyzer(metadata,transport,costPolicy);
+ try{behavior='bad-json';const id=await chat(),r=await request('/finance/analyzer-query',body(id));assert.equal(r.statusCode,502,r.body);
+  assert.equal((await within(db=>analyzerQuota(db,'first',true))).used,0);
+  const costs=(await pg.owner.query("SELECT state,settled_atoms FROM commerce.ai_cost_reservation WHERE user_id='first'")).rows;assert.equal(costs.length,2);assert.ok(costs.every(r=>r.state==='settled'&&r.settled_atoms==='24000000'));
+  const receipt=(await pg.owner.query("SELECT input_tokens,output_tokens,usage_state FROM commerce.analyzer_request WHERE step='plan' AND user_id='first'")).rows[0];assert.deepEqual(receipt,{input_tokens:20,output_tokens:10,usage_state:'reported'});
+ }finally{config.yandexAnalyzer=original;}
 });
 test('native two-stage request computes money on the server, records actual metadata, and exact retry is free',async()=>{
  const id=await chat(),payload=body(id),r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,200,r.body);const answer=r.json();assert.equal(answer.answer.mode,'ai');assert.equal(answer.answer.result.totals.expenses,'24690');assert.equal(answer.answer.provider.version,'synthetic-1');assert.equal(answer.quota.used,1);assert.equal(answer.quota.reserved,0);assert.equal(calls.length,2);

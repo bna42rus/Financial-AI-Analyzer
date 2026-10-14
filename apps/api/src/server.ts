@@ -37,7 +37,7 @@ export async function createServer(config: Config) {
   if(config.analyzerAdapter&&(config.environment!=='test'||config.analyzerAdapter.id!=='test-fixture'))throw new Error('Only an explicit synthetic Analyzer adapter is enabled before provider acceptance');
   if(config.yandexAnalyzer){
     const {isYandexAnalyzer}=await import('./yandex-runtime.ts');
-    if(config.profile!=='finance'||!['test','staging'].includes(config.environment)||config.analyzerAdapter||!isYandexAnalyzer(config.yandexAnalyzer))throw new Error('AI_RUNTIME_CONFIGURATION_DENIED');
+    if(config.profile!=='finance'||!['test','staging'].includes(config.environment)||config.analyzerAdapter||!isYandexAnalyzer(config.yandexAnalyzer)||config.environment!=='test'&&!config.yandexAnalyzer.cost)throw new Error('AI_RUNTIME_CONFIGURATION_DENIED');
     const metadata=(await config.yandexAnalyzer.pool.query('SELECT current_user AS role,current_database() AS name')).rows[0];
     const main=(await config.pool.query('SELECT current_database() AS name')).rows[0];
     if(metadata.role!=='finance_api'||metadata.name!==main.name||config.yandexAnalyzer.pool===config.pool)throw new Error('AI_METADATA_ROLE_DENIED');

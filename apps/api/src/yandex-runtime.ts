@@ -7,6 +7,9 @@ import type { YandexTransport } from './yandex-transport.ts';
 import type { Catalog } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { catalogLimits, YandexPlanError } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { safeText } from '../../../packages/privacy/src/text.ts';
+import { CostError } from '../../../packages/analyzer/src/cost.ts';
+import { costPolicy, reserveCost, settleCost } from './analyzer-cost.ts';
+import type { CostPolicy } from './analyzer-cost.ts';
 
 type Step = 'gate' | 'plan';
 type Call = { userId: string; chatId: string; requestId: string; step: Step; binding: unknown; prompt: string; input: unknown; schema: unknown; periodStart?: string; anchorAt?: string };
@@ -14,7 +17,7 @@ type Result<T> = { value: T; inputTokens: number; outputTokens: number; modelVer
 const services = new WeakSet<object>();
 export function isYandexAnalyzer(value: unknown): value is YandexAnalyzer { return !!value && typeof value === 'object' && services.has(value); }
 export type YandexAnalyzer = {
-  transport: YandexTransport; pool: Pool;
+  transport: YandexTransport; pool: Pool; cost?: CostPolicy;
   call<T>(request: Call, parse: (value: unknown, cached: boolean) => T): Promise<Result<T>>;
   discard(userId: string, requestId: string, code: string): Promise<void>;
 };
@@ -25,10 +28,11 @@ async function within<T>(pool: Pool, userId: string, action: (db: PoolClient) =>
 }
 /** Separate connections persist dispatch/receipt even if the financial transaction
  * rolls back. They never acquire access/workspace locks or reference their rows. */
-export function createYandexAnalyzer(pool: Pool, transport: YandexTransport): YandexAnalyzer {
+export function createYandexAnalyzer(pool: Pool, transport: YandexTransport, policy?: CostPolicy): YandexAnalyzer {
   if (!isYandexTransport(transport)) throw new YandexFailure('AI_CONFIGURATION_DENIED');
+  const cost = policy ? costPolicy(policy) : undefined;
   const service: YandexAnalyzer = {
-    pool, transport,
+    pool, transport, cost,
     async call<T>(request: Call, parse: (value: unknown, cached: boolean) => T): Promise<Result<T>> {
       const fingerprint = createHash('sha256').update(stableJSON({ userId: request.userId, chatId: request.chatId, step: request.step, binding: request.binding })).digest('hex');
       const previous = await within(pool, request.userId, async db => {
@@ -44,28 +48,42 @@ export function createYandexAnalyzer(pool: Pool, transport: YandexTransport): Ya
         }
         const count = Number((await db.query("SELECT count(*) AS n FROM commerce.analyzer_request WHERE user_id=$1 AND created_at>=(date_trunc('day',clock_timestamp() AT TIME ZONE 'Europe/Moscow') AT TIME ZONE 'Europe/Moscow')", [request.userId])).rows[0].n);
         if (count >= transport.dailyLimit) throw new HttpError(429, 'AI_DAILY_LIMIT');
-        await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,model,period_start,anchor_at)
-          VALUES($1,$2,$3,$4,'sent',$5,$6,$7)`, [request.userId, request.requestId, request.step, fingerprint, transport.model, request.periodStart ?? null, request.anchorAt ?? null]);
+        await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,model,period_start,anchor_at,usage_state)
+          VALUES($1,$2,$3,$4,'sent',$5,$6,$7,$8)`, [request.userId, request.requestId, request.step, fingerprint, transport.model, request.periodStart ?? null, request.anchorAt ?? null, cost ? 'not_sent' : 'unknown']);
         return null;
       });
       if (previous) return previous;
       let completion: Awaited<ReturnType<YandexTransport['complete']>> | undefined;
       try {
-        completion = await transport.complete(request.prompt, request.input, request.schema);
+        completion = await transport.complete(request.prompt, request.input, request.schema, cost ? async bound => {
+          if (!request.anchorAt || !request.periodStart) throw new YandexFailure('AI_BUDGET_PERIOD_REQUIRED', false, undefined, undefined, false);
+          try {
+            await within(pool, request.userId, db => reserveCost(db, { userId: request.userId, requestId: request.requestId, step: request.step, anchorAt: request.anchorAt!, periodStart: request.periodStart! }, cost, bound));
+          } catch (error) { if (error instanceof CostError) throw new YandexFailure(error.code, false, undefined, undefined, false); throw error; }
+        } : undefined);
+        if (cost) {
+          const violation = await within(pool, request.userId, db => settleCost(db, request.userId, request.requestId, request.step, completion));
+          if (violation) throw new YandexFailure('AI_PROVIDER_CONTRACT_CHANGED', false, undefined, completion);
+        }
         let parsed: T;
         try { parsed = parse(completion.value, false); } catch (error) { throw new YandexFailure('AI_PLAN_INVALID', false, error instanceof YandexPlanError ? error.phase : undefined); }
         await within(pool, request.userId, async db => {
           await db.query('INSERT INTO finance.analyzer_provider_plan(user_id,request_id,step,chat_id,payload) VALUES($1,$2,$3,$4,$5)', [request.userId, request.requestId, request.step, request.chatId, JSON.stringify(parsed)]);
-          await db.query(`UPDATE commerce.analyzer_request SET state='received',input_tokens=$4,output_tokens=$5,model_version=$6,updated_at=clock_timestamp()
+          await db.query(`UPDATE commerce.analyzer_request SET state='received',input_tokens=$4,output_tokens=$5,model_version=$6,usage_state='reported',updated_at=clock_timestamp()
             WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state='sent'`, [request.userId, request.requestId, request.step, completion!.inputTokens, completion!.outputTokens, completion!.modelVersion]);
         });
         return { ...completion, value: parsed };
       } catch (error) {
         const known = error instanceof YandexFailure, code = known ? error.code : 'AI_DELIVERY_UNKNOWN';
         const unknown = !known || error.unknownOutcome;
-        await within(pool, request.userId, db => db.query(`UPDATE commerce.analyzer_request SET state=$4,error_code=$5,input_tokens=$6,output_tokens=$7,model_version=$8,updated_at=clock_timestamp()
-          WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state='sent'`, [request.userId, request.requestId, request.step, unknown ? 'unknown' : 'failed', known && error.diagnostic ? code + '__' + error.diagnostic : code, completion?.inputTokens ?? 0, completion?.outputTokens ?? 0, completion?.modelVersion ?? null]));
-        throw new HttpError(unknown ? 409 : 502, code);
+        const receipt = completion ?? (known ? error.usage : undefined), notSent = known && !error.dispatched;
+        await within(pool, request.userId, async db => {
+          if (cost) await settleCost(db, request.userId, request.requestId, request.step, receipt, notSent);
+          await db.query(`UPDATE commerce.analyzer_request SET state=$4,error_code=$5,input_tokens=$6,output_tokens=$7,model_version=$8,usage_state=$9,updated_at=clock_timestamp()
+          WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state='sent'`, [request.userId, request.requestId, request.step, unknown ? 'unknown' : 'failed', known && error.diagnostic ? code + '__' + error.diagnostic : code, receipt?.inputTokens ?? null, receipt?.outputTokens ?? null, receipt?.modelVersion ?? null, receipt ? 'reported' : notSent ? 'not_sent' : 'unknown']);
+        });
+        const exhausted = ['AI_USER_COST_EXHAUSTED','AI_PROJECT_COST_EXHAUSTED'].includes(code);
+        throw new HttpError(exhausted ? 429 : unknown ? 409 : 502, code);
       }
     },
     async discard(userId, requestId, code) {
