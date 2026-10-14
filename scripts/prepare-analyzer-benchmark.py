@@ -7,6 +7,7 @@ import pathlib
 import re
 import stat
 import sys
+import warnings
 
 def main():
     if os.geteuid() != 0:
@@ -26,8 +27,10 @@ def main():
     target = directory / 'provider-keys.json'
     if target.exists() or target.is_symlink():
         sys.exit('Файл ключей уже существует. Он не перезаписан.')
-    with open('/dev/tty', 'r+') as tty:
-        secret = getpass.getpass('Cloud.ru Key Secret (ввод скрыт): ', stream=tty)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', getpass.GetPassWarning)
+        with open('/dev/tty', 'w') as tty:
+            secret = getpass.getpass('Cloud.ru Key Secret (ввод скрыт): ', stream=tty)
     if not re.fullmatch(r'[\x21-\x7e]{20,512}', secret):
         sys.exit('Неверный формат Key Secret. Ключ не сохранялся.')
     descriptor = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
@@ -46,5 +49,7 @@ def main():
 if __name__ == '__main__':
     try:
         main()
+    except getpass.GetPassWarning:
+        sys.exit('Скрытый ввод недоступен. Подключись к VPS через интерактивный SSH-терминал.')
     except (OSError, EOFError):
         sys.exit('Сохранение не завершено. Секрет не выводился.')
