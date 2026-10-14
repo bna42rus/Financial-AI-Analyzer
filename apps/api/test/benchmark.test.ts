@@ -6,12 +6,13 @@ import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
 import { benchmarkPromptVersion, runSmoke, smokeCostReport } from '../src/benchmark-engine.ts';
-import { fixtureVersion, smokeScenarios } from '../src/benchmark-fixtures.ts';
+import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { isYandexTransport } from '../src/yandex-transport.ts';
 import { assertInactiveOperator, probeRequestId, runProbe } from '../src/benchmark-probe.ts';
-import { revisedGatePrompt, revisedPlanPrompt } from '../src/benchmark-prompts.ts';
+import { revisedGatePrompt, revisedPlanPrompt, resolvedPlanPrompt } from '../src/benchmark-prompts.ts';
+import { parseReferencePlan } from '../src/benchmark-reference-plan.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
 const response = (value: unknown, change: Record<string, unknown> = {}) => new Response(JSON.stringify({ model,
@@ -480,4 +481,89 @@ test('revised parser failures retain usage and expose only a fixed local phase',
   assert.equal(smokeCostReport(ledger).reportedCalls, 48); assert.equal(smokeCostReport(ledger).failedCalls, 24);
   assert.equal(ledger.totals().held, 0n);
   assert.ok(!(await readFile(join(dir, 'ledger.jsonl'), 'utf8')).includes(key));
+}));
+
+test('depth-neutral names resolve unique owned roots/leaves and preserve date and category replacement', () => {
+  const food = syntheticCatalog.categories[0]!, travel = syntheticCatalog.categories[1]!, taxi = syntheticCatalog.categories[2]!;
+  const oldScope = { from: '2026-09-01', through: '2026-09-30', categoryIds: [food.id] };
+  const leaf = parseReferencePlan(rawPlan({ categoryNames: ['такси'] }), oldScope, syntheticCatalog);
+  assert.equal(leaf.resolution, null);
+  assert.deepEqual(leaf.plan.query!.filter, { from: oldScope.from, through: oldScope.through, categoryIds: [travel.id], subcategoryIds: [taxi.id] });
+  const root = parseReferencePlan(rawPlan({ categoryNames: ['Продукты'] }), leaf.plan.query!.filter, syntheticCatalog);
+  assert.deepEqual(root.plan.query!.filter, oldScope);
+  const both = parseReferencePlan(rawPlan({ categoryNames: ['Поездки', 'Такси'] }), october, syntheticCatalog);
+  assert.deepEqual(both.plan.query!.filter, { ...october, categoryIds: [travel.id], subcategoryIds: [taxi.id] });
+  assert.equal(parseReferencePlan(rawPlan({ subcategoryNames: ['Такси'] }), october, syntheticCatalog).resolution, null);
+  const longParent = { ...travel, name: 'П'.repeat(159) }, longLeaf = { ...taxi, name: 'Т'.repeat(60) };
+  assert.equal(parseReferencePlan(rawPlan({ categoryNames: [longLeaf.name] }), october, { ...syntheticCatalog, categories: [longParent, longLeaf] }).plan.status, 'query');
+});
+test('unknown, ambiguous and mixed classifications clarify; qualified paths cannot widen to another parent', () => {
+  const food = syntheticCatalog.categories[0]!, travel = syntheticCatalog.categories[1]!, taxi = syntheticCatalog.categories[2]!;
+  const duplicate = { ...taxi, id: '44444444-4444-4444-8444-444444444444', parentId: food.id };
+  const catalog = { ...syntheticCatalog, categories: [...syntheticCatalog.categories, duplicate] };
+  assert.equal(parseReferencePlan(rawPlan({ categoryNames: ['Такси'] }), october, catalog).resolution, 'reference_ambiguous');
+  assert.equal(parseReferencePlan(rawPlan({ categoryNames: ['Неизвестное'] }), october, catalog).resolution, 'reference_missing');
+  assert.equal(parseReferencePlan(rawPlan({ categoryNames: ['Продукты', 'Поездки / Такси'] }), october, catalog).resolution, 'mixed_classification_scope');
+  const selected = parseReferencePlan(rawPlan({ categoryNames: ['Поездки / Такси'] }), october, catalog);
+  assert.deepEqual(selected.plan.query!.filter, { ...october, categoryIds: [travel.id], subcategoryIds: [taxi.id] });
+  const rootCollision = { ...catalog, categories: [...catalog.categories, { ...travel, id: '55555555-5555-4555-8555-555555555555', name: 'Такси' }] };
+  assert.equal(parseReferencePlan(rawPlan({ categoryNames: ['Такси'] }), october, rootCollision).resolution, 'reference_ambiguous');
+  assert.equal(parseReferencePlan({ status: 'clarification', query: null }, october, catalog).resolution, 'model_clarification');
+  assert.equal(parseReferencePlan({ status: 'unsupported', query: null }, october, catalog).resolution, null);
+});
+test('depth-neutral parser remains closed and rejects invalid reference labels before persistence', () => {
+  for (const filter of [{ categoryNames: [] }, { categoryNames: ['Такси', 'такси'] }, { categoryNames: [key, key] }, { categoryNames: ['Такси'], categoryIds: ['11111111-1111-4111-8111-111111111111'] }]) {
+    assert.throws(() => parseReferencePlan(rawPlan(filter), october, syntheticCatalog));
+  }
+  assert.throws(() => parseReferencePlan(rawPlan({ categoryNames: ['Нет'], arbitrarySql: 'SELECT 1' }), october, syntheticCatalog));
+  assert.throws(() => parseReferencePlan(rawPlan({ categoryNames: ['Нет'] }, 'invalid'), october, syntheticCatalog));
+});
+test('resolved version stores safe resolution reasons and restores the taxi continuation without changing prior trials', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options?.body)), input = JSON.parse(body.messages[1].content), prompt = body.messages[0].content;
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+    const isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    assert.ok(!String(options?.body).includes(taxiId));
+    let gate = { ...turn.expectedGate, followUp: input.hasFinancialContext ? turn.expectedGate.followUp : false };
+    if (turn.id === 'scope-4' && !input.hasFinancialContext) gate = { relevance: 'ambiguous', followUp: false };
+    let planned = scriptedPlans[turn.id];
+    if (!isGate && input.question === 'А по категориям?') planned = rawPlan({}, input.previousTask.metric, 'category', input.previousTask.comparison);
+    if (!isGate && ['leaf', 'scope-3'].includes(turn.id)) planned = prompt === resolvedPlanPrompt ? rawPlan({ categoryNames: ['Такси'] }, 'expenses', turn.id === 'scope-3' ? 'category' : 'none') : { status: 'clarification', query: null };
+    return response(isGate ? gate : planned);
+  }) as typeof fetch);
+  const taxiId = syntheticCatalog.categories[2]!.id;
+  await seedFundedSmoke(ledger, client); await ledger.allowFundedSmoke();
+  const before = await runSmoke(client, ledger, 'task', 'after-funding', true, 'revised');
+  assert.equal(before.passed, 21);
+  const path = join(dir, 'ledger.jsonl'), source = await readFile(path), held = ledger.totals().held;
+  const resolved = await runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved');
+  assert.equal(resolved.passed, 24); assert.equal(resolved.benchmarkPromptVersion, 'cashneuro-smoke-prompt/3');
+  assert.equal(calls, 91); assert.equal(ledger.totals().held, held);
+  assert.ok((await readFile(path)).subarray(0, source.length).equals(source));
+  const saved = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const latest = await readFile(path);
+    const oldReport = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), saved, 'task', 'after-funding', true, 'revised');
+    const report = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), saved, 'task', 'after-funding', true, 'resolved');
+    assert.equal(oldReport.passed, 21); assert.equal(report.passed, 24); assert.equal(calls, 91);
+    assert.deepEqual(await readFile(path), latest);
+    assert.ok(!latest.toString().includes(key));
+  } finally { await saved.close(); }
+}));
+
+test('resolved journal distinguishes model clarification from local missing names without retaining reflected text', async () => sandbox(async (dir, ledger) => {
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options?.body)), input = JSON.parse(body.messages[1].content);
+    const isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+    return response(isGate ? { relevance: 'financial', followUp: false } : input.question === 'Покажи расходы на такси.' ?
+      { status: 'clarification', query: null } : rawPlan({ categoryNames: [key] }));
+  }) as typeof fetch);
+  const result = await runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved');
+  assert.equal(result.checks.find(c => c.id === 'leaf')!.diagnostics!.resolution, 'model_clarification');
+  assert.equal(result.checks.find(c => c.id === 'scope-3')!.diagnostics!.resolution, 'reference_missing');
+  assert.equal(smokeCostReport(ledger).reportedCalls, 48); assert.equal(smokeCostReport(ledger).failedCalls, 0);
+  const source = await readFile(join(dir, 'ledger.jsonl'), 'utf8');
+  assert.ok(source.includes('model_clarification')); assert.ok(source.includes('reference_missing'));
+  assert.ok(!source.includes(key));
 }));
