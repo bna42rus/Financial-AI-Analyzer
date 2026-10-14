@@ -7,7 +7,7 @@ import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { candidates, createBenchmarkTransport, replayOnlyBenchmarkTransport, BenchmarkFailure } from './benchmark-transport.ts';
 import type { Candidate } from './benchmark-transport.ts';
 import { BenchmarkLedger } from './benchmark-ledger.ts';
-import { runSmoke, runComparison, smokeCostReport } from './benchmark-engine.ts';
+import { runSmoke, runComparison, smokeCostReport, inspectBenchmark } from './benchmark-engine.ts';
 import type { ContextMode } from './benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
 import { assertInactiveOperator, probeRequestId, runProbe, formatProbeRequestId, runFormatProbe } from './benchmark-probe.ts';
@@ -15,15 +15,16 @@ import { assertInactiveOperator, probeRequestId, runProbe, formatProbeRequestId,
 const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
+  const inspection = action === '--inspect';
   const formatProbe = action === '--probe-format';
   const compatible = action === '--compare-fixed' || action === '--report-fixed';
   const diagnostic = action === '--probe' || action === '--probe-after-funding' || formatProbe;
   const comparison = action === '--compare' || action === '--compare-fixed';
   const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison || compatible;
-  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed';
+  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || inspection;
   const revised = action === '--live-revised' || action === '--report-revised';
   const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -41,6 +42,11 @@ async function main() {
     if (!meta.isDirectory() || meta.uid !== 0 || (meta.mode & 0o022)) throw new BenchmarkFailure('BENCH_STATE_DIRECTORY_INVALID');
     const directory = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
     try { await directory.sync(); } finally { await directory.close(); }
+  }
+  if (inspection) {
+    const saved = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'), { readOnly: true });
+    try { console.log(JSON.stringify(inspectBenchmark(saved, candidate as Candidate))); } finally { await saved.close(); }
+    return;
   }
   // Exclusive process lock. If the process dies, keep the lock: reconcile the
   // last reservation/provider billing before an operator removes it.

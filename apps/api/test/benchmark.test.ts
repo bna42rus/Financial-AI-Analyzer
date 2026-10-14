@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { benchmarkPromptVersion, runSmoke, runComparison, smokeCostReport } from '../src/benchmark-engine.ts';
+import { benchmarkPromptVersion, runSmoke, runComparison, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
@@ -750,4 +750,28 @@ test('corrected comparison also stops on a gate that fails the closed schema and
   await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved'), /BENCH_CAPABILITY_FAILURE/);
   assert.equal(calls, 1); assert.equal(smokeCostReport(ledger).reportedCalls, 1);
   assert.equal(ledger.totals().spent, 1342000n); assert.equal(ledger.totals().held, 0n);
+}));
+
+test('offline inspection exposes a known rejection and full reserve while dispatch remains blocked', async () => sandbox(async (dir, ledger) => {
+  const giga = createBenchmarkTransport('cloud-giga', { apiKey: key });
+  await ledger.reserve('a'.repeat(64), giga.price, giga.bound);
+  await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE_HTTP_400', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+  const path = join(dir, 'ledger.jsonl'), source = await readFile(path), totals = ledger.totals();
+  const saved = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const report = inspectBenchmark(saved, 'cloud-giga');
+    assert.equal(report.paidCalls, 0); assert.equal(report.recent[0]!.error, 'BENCH_PROVIDER_FAILURE_HTTP_400');
+    assert.equal(report.recent[0]!.usage, null); assert.equal(report.unresolved[0]!.heldAtoms, tokenCost(giga.price, giga.bound.inputTokens, giga.bound.outputTokens).toString());
+    assert.equal(report.cost.requiresReconciliation, true); assert.deepEqual(saved.totals(), totals);
+    assert.deepEqual(await readFile(path), source); assert.equal(inspectBenchmark(saved, 'cloud-oss').recordedCalls, 0);
+    await assert.rejects(saved.reserve('b'.repeat(64), giga.price, giga.bound), /BENCH_RECONCILIATION_REQUIRED/);
+  } finally { await saved.close(); }
+}));
+test('inspection distinguishes a missing receipt without changing or releasing its reservation', async () => sandbox(async (_, ledger) => {
+  const oss = createBenchmarkTransport('cloud-oss', { apiKey: key });
+  await ledger.reserve('a'.repeat(64), oss.price, oss.bound);
+  const before = ledger.totals(), report = inspectBenchmark(ledger, 'cloud-oss');
+  assert.equal(report.unresolved[0]!.error, 'BENCH_RECEIPT_MISSING'); assert.equal(report.cost.spentAtoms, '0');
+  assert.equal(report.cost.heldAtoms, before.held.toString()); assert.deepEqual(ledger.totals(), before);
+  assert.throws(() => inspectBenchmark(ledger, 'other' as 'cloud-oss'), /BENCH_CONFIGURATION_INVALID/);
 }));

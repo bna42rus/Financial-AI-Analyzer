@@ -6,7 +6,8 @@ import type { ModelPlan } from '../../../packages/analyzer/src/yandex-contract.t
 import type { Query } from '../../../packages/analyzer/src/registry.ts';
 import type { OperationsFilter } from '../../../packages/finance-core/src/operations.ts';
 import type { BenchmarkTransport, BenchmarkResult } from './benchmark-transport.ts';
-import { BenchmarkFailure, replayOnlyBenchmarkTransport } from './benchmark-transport.ts';
+import { BenchmarkFailure, replayOnlyBenchmarkTransport, candidates } from './benchmark-transport.ts';
+import type { Candidate } from './benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from './benchmark-ledger.ts';
 import { smokeScenarios, fixtureVersion, syntheticCatalog } from './benchmark-fixtures.ts';
 import { revisedBenchmarkPromptVersion, revisedGatePrompt, revisedPlanPrompt, resolvedBenchmarkPromptVersion, resolvedPlanPrompt } from './benchmark-prompts.ts';
@@ -111,6 +112,19 @@ export function smokeCostReport(ledger: BenchmarkLedger) {
     spentAtoms: total.spent.toString(), heldAtoms: total.held.toString(), budgetUsedUpperBoundAtoms: (total.spent + total.held).toString(), requiresReconciliation: total.blocked || total.held > 0n,
     latencyP95Ms: latencies.length ? latencies[Math.ceil(latencies.length * .95) - 1] : null,
     immutableModelVersionVerified: false };
+}
+
+// Inspection is available while reconciliation blocks all paid dispatches. It
+// does not reconstruct a batch or turn missing usage into a zero-cost receipt.
+export function inspectBenchmark(ledger: BenchmarkLedger, candidate: Candidate) {
+  if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
+  const spec = candidates[candidate];
+  const rows = [...ledger.records.values()].filter(r => spec.provider === 'yandex' ?
+    r.reserve.bound.modelVersion.endsWith('/' + spec.model) : r.reserve.bound.modelVersion === spec.model);
+  return { candidate, inspection: 'saved-ledger/1', paidCalls: 0, recordedCalls: rows.length,
+    recent: rows.slice(-8).map(r => ({ error: r.receipt?.code ?? null, usage: r.receipt?.usage ?? null, result: r.receipt?.value ?? null })),
+    unresolved: rows.filter(r => !r.receipt?.usage).map(r => ({ id: r.reserve.id, error: r.receipt?.code ?? 'BENCH_RECEIPT_MISSING', heldAtoms: r.reserve.atoms })),
+    cost: smokeCostReport(ledger) };
 }
 
 // Freeze prompt/3, schema and goldens for the cross-model comparison. A missing
