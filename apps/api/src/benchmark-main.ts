@@ -10,18 +10,19 @@ import { BenchmarkLedger } from './benchmark-ledger.ts';
 import { runSmoke, runComparison, smokeCostReport } from './benchmark-engine.ts';
 import type { ContextMode } from './benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
-import { assertInactiveOperator, probeRequestId, runProbe } from './benchmark-probe.ts';
+import { assertInactiveOperator, probeRequestId, runProbe, formatProbeRequestId, runFormatProbe } from './benchmark-probe.ts';
 
 const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
-  const diagnostic = action === '--probe' || action === '--probe-after-funding';
+  const formatProbe = action === '--probe-format';
+  const diagnostic = action === '--probe' || action === '--probe-after-funding' || formatProbe;
   const comparison = action === '--compare';
   const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison;
   const report = action === '--report' || action === '--report-revised' || action === '--report-resolved';
   const revised = action === '--live-revised' || action === '--report-revised';
   const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || comparison && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe) && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -53,12 +54,12 @@ async function main() {
     ledger = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'), { readOnly: report });
     const transport = report ? replayOnlyBenchmarkTransport(candidate as Candidate) :
       createBenchmarkTransport(candidate as Candidate, object(await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json'), ['cloud', 'yandex'])[selected.provider]);
-    if (diagnostic) probeId = probeRequestId(transport, probePhase);
+    if (diagnostic) probeId = formatProbe ? formatProbeRequestId(transport) : probeRequestId(transport, probePhase);
     if (fundedSmoke) await ledger.allowFundedSmoke();
     // A revised paid trial requires a completed baseline for the same model/mode.
     if (revised && !report) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding');
     if (resolved && !report && !comparison) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding', false, 'revised');
-    const result = diagnostic ? await runProbe(transport, ledger, probePhase) : comparison ? await runComparison(transport, ledger, mode as ContextMode) :
+    const result = formatProbe ? await runFormatProbe(transport, ledger) : diagnostic ? await runProbe(transport, ledger, probePhase) : comparison ? await runComparison(transport, ledger, mode as ContextMode) :
       await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke || report || revised || resolved ? 'after-funding' : 'initial', report || revised || resolved, resolved ? 'resolved' : revised ? 'revised' : 'original');
     console.log(JSON.stringify({ ...result, ...((report || revised || resolved) && 'checks' in result ? { checks: result.checks.filter(c => !c.gate || c.plan === false) } : {}),
       ...(report ? { report: 'saved-smoke/1', paidCalls: 0 } : {}), cost: smokeCostReport(ledger) }));

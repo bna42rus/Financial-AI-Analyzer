@@ -10,8 +10,8 @@ import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../sr
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { isYandexTransport } from '../src/yandex-transport.ts';
-import { assertInactiveOperator, probeRequestId, runProbe } from '../src/benchmark-probe.ts';
-import { revisedGatePrompt, revisedPlanPrompt, resolvedPlanPrompt } from '../src/benchmark-prompts.ts';
+import { assertInactiveOperator, probeRequestId, runProbe, runFormatProbe } from '../src/benchmark-probe.ts';
+import { revisedGatePrompt, revisedPlanPrompt, resolvedPlanPrompt, resolvedBenchmarkPromptVersion } from '../src/benchmark-prompts.ts';
 import { parseReferencePlan } from '../src/benchmark-reference-plan.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
@@ -610,4 +610,84 @@ test('comparison rejects an absent baseline, changed mode or unsupported candida
   await assert.rejects(runComparison(replayOnlyBenchmarkTransport('cloud-oss'), ledger, 'task'), /BENCH_CONFIGURATION_INVALID/);
   assert.equal(calls, 0); assert.equal(ledger.records.size, 0);
   assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+}));
+
+test('response diagnostics expose fixed validation phases and shapes without reflected provider text', async () => {
+  const good = JSON.stringify({ relevance: 'financial', followUp: false });
+  for (const [phase, choice] of [
+    ['FINISH', { finish_reason: key, message: { role: 'assistant', content: good } }],
+    ['ROLE', { finish_reason: 'stop', message: { role: key, content: good } }],
+    ['REFUSAL', { finish_reason: 'stop', message: { role: 'assistant', content: good, refusal: key } }],
+    ['TOOL_CALLS', { finish_reason: 'stop', message: { role: 'assistant', content: good, tool_calls: [] } }],
+    ['TOOL_CALLS', { finish_reason: 'stop', message: { role: 'assistant', content: good, tool_calls: [{ name: key }] } }],
+    ['FUNCTION_CALL', { finish_reason: 'stop', message: { role: 'assistant', content: good, function_call: { name: key } } }],
+    ['JSON', { finish_reason: 'stop', message: { role: 'assistant', content: '```json\n' + key + '\n```' } }],
+  ] as const) {
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => response({}, { choices: [choice] })) as typeof fetch);
+    await assert.rejects(client.complete('test', {}, {}, async () => {}), (error: unknown) => {
+      assert.ok(error instanceof BenchmarkFailure); assert.equal(error.responsePhase, phase); assert.ok(error.usage);
+      assert.ok(!JSON.stringify(error).includes(key));
+      if (phase === 'JSON') { assert.equal(error.responseShape!.contentIsJson, false); assert.equal(error.responseShape!.contentHasFence, true); }
+      return true;
+    });
+  }
+});
+test('batch stops on the first invalid response, retains paid usage and refuses paid continuation on replay', async () => sandbox(async (_, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => {
+    calls++; return response({}, { choices: [{ finish_reason: 'length', message: { role: 'assistant', content: '{}' } }] });
+  }) as typeof fetch);
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved'), /BENCH_CAPABILITY_FAILURE/);
+  assert.equal(calls, 1); assert.equal(ledger.records.size, 1); assert.equal(smokeCostReport(ledger).reportedCalls, 1);
+  assert.equal(ledger.totals().spent, 2196000n); assert.equal(ledger.totals().held, 0n);
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved'), /BENCH_CAPABILITY_FAILURE/);
+  assert.equal(calls, 1); assert.equal(ledger.records.size, 1);
+  await assert.rejects(runSmoke(replayOnlyBenchmarkTransport('cloud-oss'), ledger, 'task', 'after-funding', true, 'resolved'), /BENCH_REPLAY_ONLY/);
+  assert.equal(calls, 1);
+}));
+// Historical Giga receipts from the pre-stop runner. No raw provider content.
+async function seedFormatFailures(ledger: BenchmarkLedger) {
+  const client = createBenchmarkTransport('cloud-giga', { apiKey: key });
+  for (const turn of smokeScenarios.flatMap(s => s.turns)) {
+    const id = benchmarkDigest({ fixtureVersion, benchmarkPromptVersion: resolvedBenchmarkPromptVersion, mode: 'task', caseId: turn.id,
+      candidate: client.candidate, price: client.price, step: 'gate', prompt: revisedGatePrompt,
+      input: { question: turn.question, hasFinancialContext: false, previousTask: null }, schema: gateSchema, attempt: 'after-funding/1' });
+    await ledger.reserve(id, client.price, client.bound);
+    await ledger.receipt({ id, usage: { inputTokens: 100, outputTokens: 10, modelVersion: client.bound.modelVersion }, value: null, code: 'BENCH_RESPONSE_INVALID',
+      fingerprint: 'fixture-v1', latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+  }
+}
+test('one format probe identifies the envelope failure, preserves old receipts and repeats without payment', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-giga', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options?.body));
+    return response({}, { model: body.model, choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify({ relevance: 'financial', followUp: false }), tool_calls: [] } }] });
+  }) as typeof fetch);
+  await assert.rejects(runFormatProbe(client, ledger), /BENCH_REPLAY_ONLY/); assert.equal(calls, 0);
+  await seedFormatFailures(ledger); const path = join(dir, 'ledger.jsonl'), source = await readFile(path), spent = ledger.totals().spent;
+  const first = await runFormatProbe(client, ledger);
+  assert.equal(calls, 1); assert.equal(first.callsThisRun, 1); assert.equal(first.error, 'BENCH_RESPONSE_INVALID');
+  assert.deepEqual(first.diagnostics, { gate: null, responsePhase: 'TOOL_CALLS', responseShape: { finishReason: 'stop', role: 'assistant', toolCalls: 'empty_array',
+    functionCall: 'missing', refusal: 'missing', content: 'string', contentIsJson: true, contentHasFence: false } });
+  assert.equal(ledger.totals().spent - spent, 1342000n); assert.equal(ledger.records.size, 25);
+  assert.ok((await readFile(path)).subarray(0, source.length).equals(source));
+  assert.ok(!(await readFile(path, 'utf8')).includes(key));
+  const saved = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const replay = await runFormatProbe(replayOnlyBenchmarkTransport('cloud-giga'), saved);
+    assert.equal(replay.callsThisRun, 0); assert.equal(replay.replay, true); assert.deepEqual(replay.diagnostics, first.diagnostics);
+    const report = await runSmoke(replayOnlyBenchmarkTransport('cloud-giga'), saved, 'task', 'after-funding', true, 'resolved');
+    assert.equal(report.turns, 24); assert.equal(report.passed, 0); assert.equal(calls, 1);
+  } finally { await saved.close(); }
+}));
+test('unknown format-probe delivery retains the whole new reserve and cannot dispatch again', async () => sandbox(async (_, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-giga', { apiKey: key }, (async () => { calls++; throw new Error(key); }) as typeof fetch);
+  await seedFormatFailures(ledger);
+  const first = await runFormatProbe(client, ledger);
+  assert.equal(first.error, 'BENCH_DELIVERY_UNKNOWN'); assert.equal(first.usage, null);
+  const held = tokenCost(client.price, client.bound.inputTokens, client.bound.outputTokens);
+  assert.equal(ledger.totals().held, held); assert.equal(ledger.totals().blocked, true);
+  const replay = await runFormatProbe(client, ledger); assert.equal(replay.callsThisRun, 0); assert.equal(calls, 1);
+  assert.equal(ledger.totals().held, held); assert.ok(!JSON.stringify(first).includes(key));
 }));

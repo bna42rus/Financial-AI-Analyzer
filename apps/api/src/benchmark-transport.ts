@@ -13,19 +13,39 @@ export const candidates = {
     price: { version: 'yandex-20261014-qwen36', currency: 'RUB', inputRubPerMillion: '200', outputRubPerMillion: '300' } },
 } as const satisfies Record<string, { provider: string; model: string; contextTokens: number; price: TokenPrice }>;
 export type Candidate = keyof typeof candidates;
+export type ResponsePhase = 'BODY' | 'USAGE' | 'DETAILS' | 'MODEL' | 'CHOICES' | 'FINISH' | 'ROLE' | 'REFUSAL' | 'TOOL_CALLS' | 'FUNCTION_CALL' | 'CONTENT' | 'JSON';
+export type ResponseShape = { finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'function_call' | 'other' | 'missing';
+  role: 'assistant' | 'other' | 'missing'; toolCalls: 'missing' | 'null' | 'empty_array' | 'nonempty_array' | 'other';
+  functionCall: 'missing' | 'null' | 'present'; refusal: 'missing' | 'null' | 'empty_string' | 'present';
+  content: 'missing' | 'null' | 'string' | 'other'; contentIsJson: boolean | null; contentHasFence: boolean | null };
+function responseShape(choice: unknown): ResponseShape {
+  const c = choice && typeof choice === 'object' ? choice as Record<string, unknown> : {};
+  const m = c.message && typeof c.message === 'object' ? c.message as Record<string, unknown> : {};
+  const finish = c.finish_reason;
+  const finishReason = ['stop', 'length', 'content_filter', 'tool_calls', 'function_call'].includes(String(finish)) ? finish as ResponseShape['finishReason'] : finish === undefined ? 'missing' : 'other';
+  let contentIsJson: boolean | null = null;
+  if (typeof m.content === 'string' && m.content.length <= 32768) { try { JSON.parse(m.content); contentIsJson = true; } catch { contentIsJson = false; } }
+  return { finishReason, role: m.role === 'assistant' ? 'assistant' : m.role === undefined ? 'missing' : 'other',
+    toolCalls: m.tool_calls === undefined ? 'missing' : m.tool_calls === null ? 'null' : Array.isArray(m.tool_calls) ? m.tool_calls.length ? 'nonempty_array' : 'empty_array' : 'other',
+    functionCall: m.function_call === undefined ? 'missing' : m.function_call === null ? 'null' : 'present',
+    refusal: m.refusal === undefined ? 'missing' : m.refusal === null ? 'null' : m.refusal === '' ? 'empty_string' : 'present',
+    content: m.content === undefined ? 'missing' : m.content === null ? 'null' : typeof m.content === 'string' ? 'string' : 'other',
+    contentIsJson, contentHasFence: typeof m.content === 'string' ? m.content.trimStart().startsWith('```') : null };
+}
 export class BenchmarkFailure extends Error {
   code: string; usage?: Usage; fingerprint?: string; referencedParameters?: string[];
+  responsePhase?: ResponsePhase; responseShape?: ResponseShape;
   constructor(code: string, usage?: Usage, fingerprint?: string) { super(code); this.code = code; this.usage = usage; this.fingerprint = fingerprint; }
 }
-export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: string | null; cachedTokens: number | null; reasoningTokens: number | null };
-export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound;
+export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: string | null; cachedTokens: number | null; reasoningTokens: number | null; responseShape?: ResponseShape };
+export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound; replayOnly?: boolean;
   complete(prompt: string, input: unknown, schema: unknown, reserve: () => Promise<void>): Promise<BenchmarkResult> };
 
 // No credentials, fetch or reservation callback: a missing cached request fails.
 export function replayOnlyBenchmarkTransport(candidate: Candidate): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];
-  return { candidate, price: spec.price, bound: { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model },
+  return { candidate, price: spec.price, replayOnly: true, bound: { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model },
     async complete() { throw new BenchmarkFailure('BENCH_REPLAY_ONLY'); } };
 }
 
@@ -75,6 +95,7 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
         throw failure;
       }
       let usage: Usage | undefined; let fingerprint: string | undefined;
+      let phase: ResponsePhase = 'BODY', shape: ResponseShape | undefined;
       try {
         const reader = response.body?.getReader(); if (!reader) throw new Error();
         const parts: Uint8Array[] = []; let bytes = 0;
@@ -82,21 +103,29 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
           if (bytes > 131072) { await reader.cancel(); throw new Error(); } parts.push(part.value); }
         const decoded = JSON.parse(Buffer.concat(parts).toString('utf8'));
         // Extract billable usage before interpreting choices, JSON or refusals.
-        const u = decoded?.usage; if (!u || typeof u !== 'object') throw new Error();
+        phase = 'USAGE'; const u = decoded?.usage; if (!u || typeof u !== 'object') throw new Error();
         const inputTokens = usageTokens(u.prompt_tokens), outputTokens = usageTokens(u.completion_tokens);
         if (usageTokens(u.total_tokens) !== inputTokens + outputTokens) throw new Error();
         // Never persist arbitrary provider text as a model identifier.
         usage = { inputTokens, outputTokens, modelVersion: decoded.model === model ? model : null };
         if (typeof decoded.system_fingerprint === 'string' && /^[A-Za-z0-9._-]{1,160}$/.test(decoded.system_fingerprint)) fingerprint = decoded.system_fingerprint;
         const detail = (value: unknown, maximum: number): number | null => value === undefined ? null : (() => { const n = usageTokens(value); if (n > maximum) throw new Error(); return n; })();
-        const cachedTokens = detail(u.prompt_tokens_details?.cached_tokens, inputTokens);
+        phase = 'DETAILS'; const cachedTokens = detail(u.prompt_tokens_details?.cached_tokens, inputTokens);
         const reasoningTokens = detail(u.completion_tokens_details?.reasoning_tokens, outputTokens);
         // Reasoning and cached counts are subsets, not additional billable tokens.
-        if (decoded.model !== model || !Array.isArray(decoded.choices) || decoded.choices.length !== 1) throw new Error();
+        phase = 'MODEL'; if (decoded.model !== model) throw new Error();
+        phase = 'CHOICES'; if (!Array.isArray(decoded.choices) || decoded.choices.length !== 1) throw new Error();
         const c = decoded.choices[0];
-        if (c.finish_reason !== 'stop' || c.message?.role !== 'assistant' || c.message.refusal || c.message.tool_calls || typeof c.message.content !== 'string' || c.message.content.length > 32768) throw new Error();
-        return { value: JSON.parse(c.message.content), usage, fingerprint: fingerprint ?? null, cachedTokens, reasoningTokens };
-      } catch { throw new BenchmarkFailure('BENCH_RESPONSE_INVALID', usage, fingerprint); }
+        shape = responseShape(c);
+        phase = 'FINISH'; if (c?.finish_reason !== 'stop') throw new Error();
+        phase = 'ROLE'; if (c.message?.role !== 'assistant') throw new Error();
+        phase = 'REFUSAL'; if (c.message.refusal) throw new Error();
+        phase = 'TOOL_CALLS'; if (c.message.tool_calls) throw new Error();
+        phase = 'FUNCTION_CALL'; if (c.message.function_call !== undefined && c.message.function_call !== null) throw new Error();
+        phase = 'CONTENT'; if (typeof c.message.content !== 'string' || c.message.content.length > 32768) throw new Error();
+        phase = 'JSON'; const value = JSON.parse(c.message.content);
+        return { value, usage, fingerprint: fingerprint ?? null, cachedTokens, reasoningTokens, responseShape: shape };
+      } catch { const failure = new BenchmarkFailure('BENCH_RESPONSE_INVALID', usage, fingerprint); failure.responsePhase = phase; failure.responseShape = shape; throw failure; }
     },
   };
 }
