@@ -691,3 +691,63 @@ test('unknown format-probe delivery retains the whole new reserve and cannot dis
   const replay = await runFormatProbe(client, ledger); assert.equal(replay.callsThisRun, 0); assert.equal(calls, 1);
   assert.equal(ledger.totals().held, held); assert.ok(!JSON.stringify(first).includes(key));
 }));
+
+test('corrected response contract accepts missing/null/empty tools but rejects every real or malformed action', async () => {
+  const good = JSON.stringify({ relevance: 'financial', followUp: false });
+  async function complete(extra: Record<string, unknown>) {
+    const client = createBenchmarkTransport('cloud-giga', { apiKey: key }, (async () => response({}, { model: candidates['cloud-giga'].model,
+      choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: good, function_call: null, refusal: null, ...extra } }] })) as typeof fetch, 'empty-tools');
+    assert.equal(client.responseContract, 'cashneuro-response/2');
+    return client.complete('test', {}, {}, async () => {});
+  }
+  for (const extra of [{}, { tool_calls: null }, { tool_calls: [] }]) assert.deepEqual((await complete(extra)).value, JSON.parse(good));
+  for (const tool_calls of [[{ type: 'function', function: { name: key } }], {}, '', false, 0]) await assert.rejects(complete({ tool_calls }), (e: unknown) =>
+    e instanceof BenchmarkFailure && e.responsePhase === 'TOOL_CALLS' && Boolean(e.usage) && !JSON.stringify(e).includes(key));
+  await assert.rejects(complete({ tool_calls: [], function_call: { name: key } }), (e: unknown) => e instanceof BenchmarkFailure && e.responsePhase === 'FUNCTION_CALL');
+  await assert.rejects(complete({ tool_calls: [], content: '```json\n' + good + '\n```' }), (e: unknown) => e instanceof BenchmarkFailure && e.responsePhase === 'JSON');
+});
+test('corrected adapter uses a new receipt namespace and keeps old Giga failures and held costs replayable', async () => sandbox(async (dir, ledger) => {
+  const payloads: Record<string, unknown[]> = { 'cloud-oss': [], 'cloud-giga': [] };
+  function client(candidate: 'cloud-oss' | 'cloud-giga') {
+    return createBenchmarkTransport(candidate, { apiKey: key }, (async (_, options) => {
+      const body = JSON.parse(String(options?.body)), { model: requestedModel, ...payload } = body;
+      payloads[candidate]!.push(payload);
+      const input = JSON.parse(body.messages[1].content), isGate = Boolean(body.response_format.json_schema.schema.properties.relevance);
+      const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question)!;
+      let planned = scriptedPlans[turn.id];
+      if (!isGate && input.question === 'А по категориям?') planned = rawPlan({}, input.previousTask.metric, 'category', input.previousTask.comparison);
+      const value = isGate ? { ...turn.expectedGate, followUp: input.hasFinancialContext ? turn.expectedGate.followUp : false } : planned;
+      return response({}, { model: requestedModel, choices: [{ finish_reason: 'stop', message: { role: 'assistant', content: JSON.stringify(value),
+        ...(candidate === 'cloud-giga' ? { tool_calls: [], function_call: null, refusal: null } : {}) } }] });
+    }) as typeof fetch, candidate === 'cloud-giga' ? 'empty-tools' : 'legacy');
+  }
+  const oss = client('cloud-oss'), giga = client('cloud-giga');
+  await seedFundedSmoke(ledger, oss); await ledger.allowFundedSmoke(); await seedFormatFailures(ledger);
+  await runSmoke(oss, ledger, 'task', 'after-funding', false, 'resolved');
+  const path = join(dir, 'ledger.jsonl'), source = await readFile(path), held = ledger.totals().held, spent = ledger.totals().spent;
+  const compared = await runComparison(giga, ledger, 'task');
+  assert.equal(compared.responseContract, 'cashneuro-response/2'); assert.equal(compared.passed, 24);
+  assert.equal(ledger.records.size, 119); assert.equal(ledger.totals().held, held);
+  assert.equal(ledger.totals().spent - spent, 46n * 1342000n);
+  assert.deepEqual(payloads['cloud-giga'], payloads['cloud-oss']);
+  assert.ok((await readFile(path)).subarray(0, source.length).equals(source));
+  const saved = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const latest = await readFile(path);
+    const old = await runSmoke(replayOnlyBenchmarkTransport('cloud-giga'), saved, 'task', 'after-funding', true, 'resolved');
+    assert.equal(old.passed, 0); assert.equal(old.turns, 24);
+    const replay = await runComparison(replayOnlyBenchmarkTransport('cloud-giga', 'empty-tools'), saved, 'task');
+    assert.equal(replay.passed, 24); assert.ok(replay.checks.every(c => c.replayCalls === c.calls));
+    assert.deepEqual(await readFile(path), latest); assert.equal(payloads['cloud-giga']!.length, 46);
+  } finally { await saved.close(); }
+}));
+test('corrected comparison also stops on a gate that fails the closed schema and never retries it', async () => sandbox(async (_, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-giga', { apiKey: key }, (async () => {
+    calls++; return response({ wrong: true }, { model: candidates['cloud-giga'].model });
+  }) as typeof fetch, 'empty-tools');
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved'), /BENCH_CAPABILITY_FAILURE/);
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved'), /BENCH_CAPABILITY_FAILURE/);
+  assert.equal(calls, 1); assert.equal(smokeCostReport(ledger).reportedCalls, 1);
+  assert.equal(ledger.totals().spent, 1342000n); assert.equal(ledger.totals().held, 0n);
+}));

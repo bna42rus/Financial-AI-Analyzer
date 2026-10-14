@@ -16,13 +16,14 @@ const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
   const formatProbe = action === '--probe-format';
+  const compatible = action === '--compare-fixed' || action === '--report-fixed';
   const diagnostic = action === '--probe' || action === '--probe-after-funding' || formatProbe;
-  const comparison = action === '--compare';
-  const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison;
-  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved';
+  const comparison = action === '--compare' || action === '--compare-fixed';
+  const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison || compatible;
+  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed';
   const revised = action === '--live-revised' || action === '--report-revised';
   const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe) && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga') throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -52,8 +53,9 @@ async function main() {
     await lock.writeFile(String(process.pid)); await lock.sync();
     if (recovery) await assertInactiveOperator(join(stateDirectory, 'operator.lock'));
     ledger = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'), { readOnly: report });
-    const transport = report ? replayOnlyBenchmarkTransport(candidate as Candidate) :
-      createBenchmarkTransport(candidate as Candidate, object(await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json'), ['cloud', 'yandex'])[selected.provider]);
+    const contract = compatible ? 'empty-tools' : 'legacy';
+    const transport = report ? replayOnlyBenchmarkTransport(candidate as Candidate, contract) :
+      createBenchmarkTransport(candidate as Candidate, object(await privateJson('/etc/cashneuro/ai/benchmark/provider-keys.json'), ['cloud', 'yandex'])[selected.provider], fetch, contract);
     if (diagnostic) probeId = formatProbe ? formatProbeRequestId(transport) : probeRequestId(transport, probePhase);
     if (fundedSmoke) await ledger.allowFundedSmoke();
     // A revised paid trial requires a completed baseline for the same model/mode.

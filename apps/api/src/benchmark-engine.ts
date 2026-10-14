@@ -27,12 +27,13 @@ export async function runSmoke(transport: BenchmarkTransport, ledger: BenchmarkL
   if (ledger.totals().blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
   async function call<T>(caseId: string, step: 'gate' | 'plan', prompt: string, input: unknown, schema: unknown, parse: (value: unknown) => T): Promise<T | null> {
     const id = benchmarkDigest({ fixtureVersion, benchmarkPromptVersion: promptVersion, mode, caseId, candidate: transport.candidate, price: transport.price, step, prompt, input, schema,
+      ...(transport.responseContract ? { responseContract: transport.responseContract } : {}),
       ...(runPhase === 'after-funding' ? { attempt: 'after-funding/1' } : {}) });
     const cached = ledger.records.get(id);
     if (cached) {
       currentCalls.push({ id, replay: true, step });
       if (!cached.receipt?.usage) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
-      if (cached.receipt.code === 'BENCH_RESPONSE_INVALID' && !transport.replayOnly) throw new BenchmarkFailure('BENCH_CAPABILITY_FAILURE');
+      if (!transport.replayOnly && (cached.receipt.code === 'BENCH_RESPONSE_INVALID' || transport.responseContract && step === 'gate' && cached.receipt.code === 'BENCH_PLAN_INVALID')) throw new BenchmarkFailure('BENCH_CAPABILITY_FAILURE');
       // The journal holds the already validated local result, not provider text.
       return cached.receipt.code ? null : cached.receipt.value as T;
     }
@@ -48,7 +49,7 @@ export async function runSmoke(transport: BenchmarkTransport, ledger: BenchmarkL
       await ledger.receipt({ id, usage: failure.usage ?? null, value: null, code: failure.code, fingerprint: failure.fingerprint ?? null,
         latencyMs: Math.ceil(performance.now() - started), cachedTokens: completed?.cachedTokens ?? null, reasoningTokens: completed?.reasoningTokens ?? null });
       if (ledger.totals().blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
-      if (failure.code === 'BENCH_RESPONSE_INVALID') throw new BenchmarkFailure('BENCH_CAPABILITY_FAILURE');
+      if (failure.code === 'BENCH_RESPONSE_INVALID' || transport.responseContract && step === 'gate' && failure.code === 'BENCH_PLAN_INVALID') throw new BenchmarkFailure('BENCH_CAPABILITY_FAILURE');
       return null;
     }
     await ledger.receipt({ id, usage: completed!.usage, value: parsed, code: null, fingerprint: completed!.fingerprint,
@@ -94,7 +95,7 @@ export async function runSmoke(transport: BenchmarkTransport, ledger: BenchmarkL
   }
   const costs = checks.map(c => BigInt(c.costAtoms)).sort((a, b) => a < b ? -1 : a > b ? 1 : 0);
   const total = costs.reduce((sum, n) => sum + n, 0n), passed = checks.filter(c => c.gate && c.plan !== false).length;
-  return { candidate: transport.candidate, fixtureVersion, benchmarkPromptVersion: promptVersion, mode, runPhase, turns: checks.length, passed,
+  return { candidate: transport.candidate, fixtureVersion, benchmarkPromptVersion: promptVersion, ...(transport.responseContract ? { responseContract: transport.responseContract } : {}), mode, runPhase, turns: checks.length, passed,
     costPerTurnAtoms: { meanCeil: ((total + BigInt(checks.length) - 1n) / BigInt(checks.length)).toString(),
       median: costs[Math.ceil(costs.length * .5) - 1]!.toString(), p95: costs[Math.ceil(costs.length * .95) - 1]!.toString(), maximum: costs.at(-1)!.toString(),
       perCorrectTurnCeil: passed ? ((total + BigInt(passed) - 1n) / BigInt(passed)).toString() : null }, checks };

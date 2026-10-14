@@ -4,7 +4,8 @@
 14/24 хода, 0,934387020 ₽; prompt/2 — 21/24, 0,960758540 ₽; prompt/3 —
 19/24, 1,070502420 ₽ за набор по зафиксированному тарифу. Все результаты
 сохранены. GigaChat prompt/3: 24/24 ответа отклонены транспортом, 0,355813000 ₽;
-понимание вопросов пока не оценено. Следующий шаг — один format-probe.
+понимание вопросов пока не оценено. Format-probe установил отказ на пустом
+tool_calls:[] при валидном JSON; исправленный response/2 trial пока не запускался.
 Основание: согласованный `analyzer-design-audit.md`, общий бюджет первых
 испытаний 1 000 ₽. Эта работа не включает AI в приложении и не меняет БД.
 
@@ -344,3 +345,27 @@ message/tool_calls в API, а каталог указывает Structure Output
 Это не устанавливает причину реального отказа в этом trial:
 https://cloud.ru/docs/foundation-models/ug/topics/api-ref__specs и
 https://cloud.ru/docs/foundation-models/ug/topics/overview__available__models.
+
+## Подтверждённая ошибка приёма пустого tool_calls
+
+Format-probe 14 октября: TOOL_CALLS, empty_array, finish:stop, role:assistant,
+function_call:null, refusal:null, contentIsJson:true, без Markdown fence.
+1203 input / 13 output, 0,014835200 ₽. Причина отказа установлена: legacy
+адаптер трактовал наличие пустого массива как вызов инструмента.
+Общий тарифный расход после диагностики — 3,351370500 ₽, upper bound с
+прежними удержаниями — 7,655374340 ₽.
+
+`cashneuro-response/2` принимает tool_calls absent/null/[] как отсутствие
+действия. Непустой массив, некорректный тип, function_call, refusal, незавершённый
+ответ и неверный JSON остаются отказами. Typed gate по-прежнему проверяется
+локально; для исправленного адаптера его невалидная схема тоже останавливает
+batch на первом платном ответе, а повтор не продолжает отправку.
+
+`--compare-fixed cloud-giga task` использует прежний prompt/3, payload/caps и
+эталоны, но responseContract включён в request ID. Старые 24 отказа и проба
+остаются неизменны и учтены в том же потолке; старые cached ошибки не подменяют
+новый результат. OSS baseline воспроизводится бесплатно. Завершённый fixed
+trial повторяется без оплаты; `--report-fixed cloud-giga task` читает его
+из read-only журнала без credentials/fetch. Legacy отчёт воспроизводит прежний
+0/24. Production transport не меняется. Принятие пустого списка не разрешает
+настоящие tools или автоматическое исправление JSON.

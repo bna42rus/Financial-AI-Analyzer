@@ -13,6 +13,12 @@ export const candidates = {
     price: { version: 'yandex-20261014-qwen36', currency: 'RUB', inputRubPerMillion: '200', outputRubPerMillion: '300' } },
 } as const satisfies Record<string, { provider: string; model: string; contextTokens: number; price: TokenPrice }>;
 export type Candidate = keyof typeof candidates;
+export type ResponseContract = 'legacy' | 'empty-tools';
+export const correctedResponseContractVersion = 'cashneuro-response/2';
+function contractFields(contract: ResponseContract): { responseContract?: typeof correctedResponseContractVersion } {
+  if (!['legacy', 'empty-tools'].includes(contract)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
+  return contract === 'empty-tools' ? { responseContract: correctedResponseContractVersion } : {};
+}
 export type ResponsePhase = 'BODY' | 'USAGE' | 'DETAILS' | 'MODEL' | 'CHOICES' | 'FINISH' | 'ROLE' | 'REFUSAL' | 'TOOL_CALLS' | 'FUNCTION_CALL' | 'CONTENT' | 'JSON';
 export type ResponseShape = { finishReason: 'stop' | 'length' | 'content_filter' | 'tool_calls' | 'function_call' | 'other' | 'missing';
   role: 'assistant' | 'other' | 'missing'; toolCalls: 'missing' | 'null' | 'empty_array' | 'nonempty_array' | 'other';
@@ -38,18 +44,18 @@ export class BenchmarkFailure extends Error {
   constructor(code: string, usage?: Usage, fingerprint?: string) { super(code); this.code = code; this.usage = usage; this.fingerprint = fingerprint; }
 }
 export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: string | null; cachedTokens: number | null; reasoningTokens: number | null; responseShape?: ResponseShape };
-export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound; replayOnly?: boolean;
+export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound; replayOnly?: boolean; responseContract?: typeof correctedResponseContractVersion;
   complete(prompt: string, input: unknown, schema: unknown, reserve: () => Promise<void>): Promise<BenchmarkResult> };
 
 // No credentials, fetch or reservation callback: a missing cached request fails.
-export function replayOnlyBenchmarkTransport(candidate: Candidate): BenchmarkTransport {
+export function replayOnlyBenchmarkTransport(candidate: Candidate, contract: ResponseContract = 'legacy'): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];
-  return { candidate, price: spec.price, replayOnly: true, bound: { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model },
+  return { candidate, price: spec.price, ...contractFields(contract), replayOnly: true, bound: { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model },
     async complete() { throw new BenchmarkFailure('BENCH_REPLAY_ONLY'); } };
 }
 
-export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch): BenchmarkTransport {
+export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy'): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];
   const r = object(credentials, ['apiKey', 'folderId']);
@@ -62,7 +68,7 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
   // No unverified bytes/4 estimate: reserve the complete documented context
   // window. In particular Qwen cannot fit the 45 RUB smoke-phase reservation.
   const bound = { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: model };
-  return { candidate, price: spec.price, bound,
+  return { candidate, price: spec.price, bound, ...contractFields(contract),
     async complete(prompt, input, schema, reserve) {
       const body = JSON.stringify({ model, messages: [{ role: 'system', content: prompt }, { role: 'user', content: JSON.stringify(input) }],
         temperature: 0, stream: false, n: 1,
@@ -120,7 +126,9 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
         phase = 'FINISH'; if (c?.finish_reason !== 'stop') throw new Error();
         phase = 'ROLE'; if (c.message?.role !== 'assistant') throw new Error();
         phase = 'REFUSAL'; if (c.message.refusal) throw new Error();
-        phase = 'TOOL_CALLS'; if (c.message.tool_calls) throw new Error();
+        phase = 'TOOL_CALLS';
+        const calls = c.message.tool_calls;
+        if (contract === 'legacy' ? Boolean(calls) : calls !== undefined && calls !== null && !(Array.isArray(calls) && calls.length === 0)) throw new Error();
         phase = 'FUNCTION_CALL'; if (c.message.function_call !== undefined && c.message.function_call !== null) throw new Error();
         phase = 'CONTENT'; if (typeof c.message.content !== 'string' || c.message.content.length > 32768) throw new Error();
         phase = 'JSON'; const value = JSON.parse(c.message.content);
