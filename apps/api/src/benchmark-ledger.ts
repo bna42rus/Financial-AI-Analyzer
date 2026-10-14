@@ -7,7 +7,8 @@ import { rubAtoms, tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import type { Usage, TokenPrice, DispatchBound } from '../../../packages/analyzer/src/cost.ts';
 import { BenchmarkFailure } from './benchmark-transport.ts';
 
-type Reservation = { type: 'reserve'; id: string; atoms: string; price: TokenPrice; bound: DispatchBound; purpose?: 'operator_probe' };
+export type ProbePurpose = 'operator_probe' | 'operator_probe_after_funding';
+type Reservation = { type: 'reserve'; id: string; atoms: string; price: TokenPrice; bound: DispatchBound; purpose?: ProbePurpose };
 type Receipt = { type: 'receipt'; id: string; usage: Usage | null; atoms: string | null; value: unknown; code: string | null; fingerprint: string | null; latencyMs: number; cachedTokens: number | null; reasoningTokens: number | null };
 type Event = Reservation | Receipt;
 export const benchmarkBudget = { project: 1000n * rubAtoms, smoke: 45n * rubAtoms };
@@ -43,8 +44,8 @@ export class BenchmarkLedger {
     const old = this.records.get(event.id);
     if (event.type === 'reserve') {
       if (event.purpose !== undefined) {
-        if (event.purpose !== 'operator_probe') throw new Error();
-        this.assertProbeAllowed(event.price, event.bound);
+        if (!['operator_probe', 'operator_probe_after_funding'].includes(event.purpose)) throw new Error();
+        this.assertProbeAllowed(event.price, event.bound, event.purpose);
       }
       if (old || !/^\d{1,16}$/.test(event.atoms) || BigInt(event.atoms) !== tokenCost(event.price, event.bound.inputTokens, event.bound.outputTokens) || BigInt(event.atoms) <= 0n || typeof event.bound.modelVersion !== 'string') throw new Error();
       this.records.set(event.id, { reserve: event });
@@ -87,22 +88,28 @@ export class BenchmarkLedger {
     await this.append({ type: 'reserve', id, atoms: amount.toString(), price, bound });
     });
   }
-  private assertProbeAllowed(price: TokenPrice, bound: DispatchBound) {
+  private assertProbeAllowed(price: TokenPrice, bound: DispatchBound, purpose: ProbePurpose = 'operator_probe') {
     // An explicit operator probe is allowed only after one known HTTP rejection.
     // Its full old reservation remains held; delivery loss/crash/drift do not qualify.
-    if (this.poisoned || this.records.size !== 1) throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
-    const old = [...this.records.values()][0]!;
-    if (!old.receipt || old.receipt.usage !== null || !/^BENCH_(PROVIDER_FAILURE|IDENTITY_DENIED)(?:_HTTP_[3-5]\d{2})?$/.test(old.receipt.code ?? '') ||
+    const afterFunding = purpose === 'operator_probe_after_funding';
+    if (!['operator_probe', 'operator_probe_after_funding'].includes(purpose) || this.poisoned || this.records.size !== (afterFunding ? 2 : 1)) throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
+    const records = [...this.records.values()], old = records[0]!;
+    if (old.reserve.purpose !== undefined || !old.receipt || old.receipt.usage !== null || !/^BENCH_(PROVIDER_FAILURE|IDENTITY_DENIED)(?:_HTTP_[3-5]\d{2})?$/.test(old.receipt.code ?? '') ||
         benchmarkDigest(old.reserve.price) !== benchmarkDigest(price) || benchmarkDigest(old.reserve.bound) !== benchmarkDigest(bound)) throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
+    if (afterFunding) {
+      const probe = records[1]!;
+      if (probe.reserve.purpose !== 'operator_probe' || !probe.receipt || probe.receipt.usage !== null || probe.receipt.code !== 'BENCH_PROVIDER_FAILURE_HTTP_402' ||
+          benchmarkDigest(probe.reserve.price) !== benchmarkDigest(price) || benchmarkDigest(probe.reserve.bound) !== benchmarkDigest(bound)) throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
+    }
     const total = this.totals(), amount = tokenCost(price, bound.inputTokens, bound.outputTokens);
     if (total.spent + total.held + amount > benchmarkBudget.smoke || total.spent + total.held + amount > benchmarkBudget.project) throw new BenchmarkFailure('BENCH_BUDGET_EXHAUSTED');
   }
-  async reserveProbe(id: string, price: TokenPrice, bound: DispatchBound) {
+  async reserveProbe(id: string, price: TokenPrice, bound: DispatchBound, purpose: ProbePurpose = 'operator_probe') {
     return this.exclusive(async () => {
       if (!/^[a-f0-9]{64}$/.test(id) || this.records.has(id)) throw new BenchmarkFailure('BENCH_RESERVATION_INVALID');
-      this.assertProbeAllowed(price, bound);
+      this.assertProbeAllowed(price, bound, purpose);
       const atoms = tokenCost(price, bound.inputTokens, bound.outputTokens).toString();
-      await this.append({ type: 'reserve', id, atoms, price, bound, purpose: 'operator_probe' });
+      await this.append({ type: 'reserve', id, atoms, price, bound, purpose });
     });
   }
   async receipt(receipt: Omit<Receipt, 'type' | 'atoms'>) {

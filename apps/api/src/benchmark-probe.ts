@@ -7,8 +7,11 @@ import { BenchmarkFailure } from './benchmark-transport.ts';
 import type { BenchmarkResult, BenchmarkTransport } from './benchmark-transport.ts';
 
 const input = { question: 'Сколько потрачено за выбранный период?', hasFinancialContext: false };
-export function probeRequestId(transport: BenchmarkTransport) {
-  return benchmarkDigest({ purpose: 'operator-probe/1', candidate: transport.candidate, price: transport.price, prompt: gatePrompt, input, schema: gateSchema });
+export type ProbePhase = 'initial' | 'after-funding';
+const probeVersion = (phase: ProbePhase) => phase === 'initial' ? 'operator-probe/1' : 'operator-probe-after-funding/1';
+export function probeRequestId(transport: BenchmarkTransport, phase: ProbePhase = 'initial') {
+  if (!['initial', 'after-funding'].includes(phase)) throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
+  return benchmarkDigest({ purpose: probeVersion(phase), candidate: transport.candidate, price: transport.price, prompt: gatePrompt, input, schema: gateSchema });
 }
 export async function assertInactiveOperator(path: string) {
   const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -28,14 +31,15 @@ export async function assertInactiveOperator(path: string) {
 }
 /** Exactly one explicit diagnostic dispatch. Never releases the old reservation
  * or lock, and never retries a cached, failed, or ambiguous diagnostic attempt. */
-export async function runProbe(transport: BenchmarkTransport, ledger: BenchmarkLedger) {
-  const id = probeRequestId(transport);
+export async function runProbe(transport: BenchmarkTransport, ledger: BenchmarkLedger, phase: ProbePhase = 'initial') {
+  const id = probeRequestId(transport, phase);
+  const purpose = phase === 'initial' ? 'operator_probe' : 'operator_probe_after_funding';
   const replay = Boolean(ledger.records.has(id));
-  if (replay && ledger.records.get(id)?.reserve.purpose !== 'operator_probe') throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
+  if (replay && ledger.records.get(id)?.reserve.purpose !== purpose) throw new BenchmarkFailure('BENCH_PROBE_NOT_ALLOWED');
   if (!replay) {
     const started = performance.now(); let completed: BenchmarkResult | undefined;
     try {
-      completed = await transport.complete(gatePrompt, input, gateSchema, () => ledger.reserveProbe(id, transport.price, transport.bound));
+      completed = await transport.complete(gatePrompt, input, gateSchema, () => ledger.reserveProbe(id, transport.price, transport.bound, purpose));
       const value = parseGate(completed.value);
       await ledger.receipt({ id, usage: completed.usage, value, code: null, fingerprint: completed.fingerprint,
         latencyMs: Math.ceil(performance.now() - started), cachedTokens: completed.cachedTokens, reasoningTokens: completed.reasoningTokens });
@@ -48,7 +52,7 @@ export async function runProbe(transport: BenchmarkTransport, ledger: BenchmarkL
     }
   }
   const receipt = ledger.records.get(id)?.receipt;
-  return { probe: 'operator-probe/1', candidate: transport.candidate, callsThisRun: replay ? 0 : 1, replay,
+  return { probe: probeVersion(phase), candidate: transport.candidate, callsThisRun: replay ? 0 : 1, replay,
     error: receipt?.code ?? (receipt ? null : 'BENCH_RECONCILIATION_REQUIRED'), result: receipt?.code ? null : receipt?.value ?? null,
     referencedParameters: receipt?.code ? (receipt.value as { referencedParameters?: string[] } | null)?.referencedParameters ?? [] : [],
     usage: receipt?.usage ?? null, originalReservationPreserved: true };

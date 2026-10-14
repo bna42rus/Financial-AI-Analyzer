@@ -259,3 +259,48 @@ test('operator probe refuses active, unsafe or malformed original locks without 
     await symlink(path, join(dir, 'link')); await assert.rejects(assertInactiveOperator(join(dir, 'link')));
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('post-funding probe has a separate id, preserves both old reserves and replays without dispatch', async () => sandbox(async (dir, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => {
+    calls++;
+    return calls === 1 ? new Response('Payment Required', { status: 402 }) : response({ relevance: 'financial', followUp: false });
+  }) as typeof fetch);
+  await ledger.reserve('a'.repeat(64), client.price, client.bound);
+  await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+  await assert.rejects(runProbe(client, ledger, 'after-funding'), /BENCH_PROBE_NOT_ALLOWED/); assert.equal(calls, 0);
+  const rejected = await runProbe(client, ledger); assert.equal(rejected.error, 'BENCH_PROVIDER_FAILURE_HTTP_402');
+  const held = ledger.totals().held;
+  assert.notEqual(probeRequestId(client), probeRequestId(client, 'after-funding'));
+  const funded = await runProbe(client, ledger, 'after-funding');
+  assert.equal(calls, 2); assert.equal(funded.callsThisRun, 1); assert.equal(funded.error, null);
+  assert.equal(ledger.totals().held, held); assert.equal(ledger.records.size, 3);
+  const restarted = await BenchmarkLedger.load(join(dir, 'ledger.jsonl'));
+  try {
+    const replay = await runProbe(client, restarted, 'after-funding');
+    assert.equal(replay.callsThisRun, 0); assert.equal(calls, 2); assert.equal(restarted.totals().held, held);
+    await assert.rejects(restarted.reserveProbe('b'.repeat(64), client.price, client.bound, 'operator_probe_after_funding'), /BENCH_PROBE_NOT_ALLOWED/);
+    await assert.rejects(runProbe(client, restarted, 'third-attempt' as 'initial'), /BENCH_PROBE_NOT_ALLOWED/);
+  } finally { await restarted.close(); }
+}));
+test('post-funding probe cannot bypass non-payment failures, missing receipts or the cumulative cap', async () => {
+  for (const code of ['BENCH_PROVIDER_FAILURE_HTTP_400', 'BENCH_DELIVERY_UNKNOWN', null]) await sandbox(async (_, ledger) => {
+    let calls = 0;
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => { calls++; return response({}); }) as typeof fetch);
+    await ledger.reserve('a'.repeat(64), client.price, client.bound);
+    await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    const id = probeRequestId(client);
+    await ledger.reserveProbe(id, client.price, client.bound);
+    if (code) await ledger.receipt({ id, usage: null, value: null, code, fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    await assert.rejects(runProbe(client, ledger, 'after-funding'), /BENCH_PROBE_NOT_ALLOWED/); assert.equal(calls, 0);
+  });
+  await sandbox(async (_, ledger) => {
+    const client = createBenchmarkTransport('cloud-oss', { apiKey: key });
+    const price = { ...client.price, inputRubPerMillion: '120', outputRubPerMillion: '300' };
+    await ledger.reserve('a'.repeat(64), price, client.bound);
+    await ledger.receipt({ id: 'a'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    await ledger.reserveProbe('b'.repeat(64), price, client.bound);
+    await ledger.receipt({ id: 'b'.repeat(64), usage: null, value: null, code: 'BENCH_PROVIDER_FAILURE_HTTP_402', fingerprint: null, latencyMs: 1, cachedTokens: null, reasoningTokens: null });
+    await assert.rejects(ledger.reserveProbe('c'.repeat(64), price, client.bound, 'operator_probe_after_funding'), /BENCH_BUDGET_EXHAUSTED/);
+  });
+});
