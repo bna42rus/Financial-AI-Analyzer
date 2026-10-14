@@ -26,7 +26,7 @@ export function resolveScope(current: OperationsFilter, task?: OperationsFilter,
       if (global[key] !== undefined) { result[key] = structuredClone(global[key]); sources[key] = 'global'; }
     }
   }
-  if (explicit.categoryIds && !explicit.subcategoryIds && canonical(explicit.categoryIds) !== canonical(base.categoryIds)) { delete result.subcategoryIds; delete sources.subcategoryIds; }
+  if (explicit.categoryIds && !explicit.subcategoryIds && canonical(explicit.categoryIds) !== canonical(result.categoryIds)) { delete result.subcategoryIds; delete sources.subcategoryIds; }
   for (const key of Object.keys(explicit) as (keyof OperationsFilter)[]) { result[key] = structuredClone(explicit[key]); sources[key] = 'message'; }
   return { filter: parseOperationsFilter(result), sources };
 }

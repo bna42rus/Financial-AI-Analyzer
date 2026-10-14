@@ -36,6 +36,11 @@ test('an independent flag never resets the task category, while a new explicit c
   assert.deepEqual(resolveScope({...task,subcategoryIds:[id]},undefined,undefined,{categoryIds:[id]}).filter.categoryIds,[id]);
   assert.equal(resolveScope({...task,subcategoryIds:[id]},undefined,undefined,{categoryIds:[id]}).filter.subcategoryIds,undefined);
 });
+test('latest explicit category removes a newly selected global leaf even when it equals the old task category',()=>{
+  const leaf='10000000-0000-4000-8000-000000000003';
+  const r=resolveScope({...globals,subcategoryIds:[leaf]},task,globals,{categoryIds:[other]});
+  assert.deepEqual(r.filter.categoryIds,[other]);assert.equal(r.filter.subcategoryIds,undefined);assert.equal(r.sources.categoryIds,'message');
+});
 const price = { version: 'cloud-261002', currency: 'RUB' as const, inputRubPerMillion: '15.86', outputRubPerMillion: '61' };
 test('million-token rates and sub-copeck costs are exact integer accounting values', () => {
   assert.equal(tokenCost(price, 3000, 500), rubAmount('0.07808'));

@@ -6,3 +6,6 @@ test('cost configuration pins a versioned RUB tariff and explicit bounded projec
   assert.deepEqual(costPolicy(policy),policy);
   for(const change of [{projectLimitRub:'1001'},{projectLimitRub:1000},{projectLimitRub:'0'},{projectPeriodEnd:policy.projectPeriodStart},{projectPeriodStart:'not-a-date'},{projectId:'secret\ntext'},{price:{...policy.price,currency:'USD'}},{arbitrary:'field'}])assert.throws(()=>costPolicy({...policy,...change}));
 });
+test('invalid calendar dates and normalized overflow timestamps cannot define a project window',()=>{
+  for(const projectPeriodStart of ['2026-02-30T00:00:00Z','2026-10-14T24:00:00Z','2026-10-14T00:60:00Z'])assert.throws(()=>costPolicy({...policy,projectPeriodStart}));
+});

@@ -9,7 +9,8 @@ export function costPolicy(value: unknown): CostPolicy {
   const r = object(value, ['projectId', 'projectPeriodStart', 'projectPeriodEnd', 'projectLimitRub', 'price']);
   if (typeof r.projectId !== 'string' || !/^[a-z0-9._/-]{1,80}$/.test(r.projectId) || typeof r.projectPeriodStart !== 'string' || typeof r.projectPeriodEnd !== 'string') throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');
   const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/;
-  if (!iso.test(r.projectPeriodStart) || !iso.test(r.projectPeriodEnd) || !Number.isFinite(Date.parse(r.projectPeriodStart)) || Date.parse(r.projectPeriodEnd) <= Date.parse(r.projectPeriodStart)) throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');
+  for (const stamp of [r.projectPeriodStart, r.projectPeriodEnd]) if (!iso.test(stamp) || !Number.isFinite(Date.parse(stamp)) || new Date(stamp).toISOString().slice(0,19) !== stamp.slice(0,19)) throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');
+  if (Date.parse(r.projectPeriodEnd) <= Date.parse(r.projectPeriodStart)) throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');
   const limit = rubAmount(r.projectLimitRub);
   if (limit <= 0n || limit > 1_000n * 1_000_000_000n) throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');
   return { ...r, price: tokenPrice(r.price) } as CostPolicy;
@@ -21,8 +22,8 @@ export async function reserveCost(db: PoolClient, identity: CostIdentity, policy
   const p = costPolicy(policy), amount = tokenCost(p.price, bound.inputTokens, bound.outputTokens);
   if (amount <= 0n || !/^[A-Za-z0-9._-]{1,100}$/.test(bound.modelVersion)) throw new CostError('AI_USAGE_INVALID');
   await db.query(`INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [p.projectId, p.projectPeriodStart, p.projectPeriodEnd, rubAmount(p.projectLimitRub).toString()]);
-  const project = (await db.query(`SELECT *,period_start<=clock_timestamp() AND period_end>clock_timestamp() AS active FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2 FOR UPDATE`, [p.projectId, p.projectPeriodStart])).rows[0];
-  if (!project.active || new Date(project.period_end).getTime() !== Date.parse(p.projectPeriodEnd) || BigInt(project.limit_atoms) !== rubAmount(p.projectLimitRub)) throw new CostError('AI_PROJECT_BUDGET_CHANGED');
+  const project = (await db.query(`SELECT *,period_start<=clock_timestamp() AND period_end>clock_timestamp() AS active,period_end=$3::timestamptz AS matches_end FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2 FOR UPDATE`, [p.projectId, p.projectPeriodStart, p.projectPeriodEnd])).rows[0];
+  if (!project.active || !project.matches_end || BigInt(project.limit_atoms) !== rubAmount(p.projectLimitRub)) throw new CostError('AI_PROJECT_BUDGET_CHANGED');
   if (project.blocked) throw new CostError('AI_PROVIDER_CONTRACT_CHANGED');
   await db.query(`INSERT INTO commerce.ai_user_budget(user_id,anchor_at,period_start,limit_atoms) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [identity.userId, identity.anchorAt, identity.periodStart, baseMonthlyCost.toString()]);
   const user = (await db.query(`SELECT * FROM commerce.ai_user_budget WHERE user_id=$1 AND anchor_at=$2 AND period_start=$3 FOR UPDATE`, [identity.userId, identity.anchorAt, identity.periodStart])).rows[0];
