@@ -572,6 +572,70 @@ https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38607131425.
 response/2, тарифом, cap и ledger. Допуск 24/24 теперь выполнен.
 Прохождение smoke не заменяет independent acceptance и не разрешает runtime AI.
 
+## Первый независимый transfer/1: 68/72 и regression prompt/6
+
+Оператор предоставил полный read-only report: prompt/5, response/2, task,
+72 хода, 68 успешных (94,44%). 36/36 ходов диалогов успешны; среди отдельных
+вопросов 32/36. Четыре строгих расхождения: transfer-05 добавил attention:true
+при metric:attention; transfer-24 передал 1000/2500 вместо 100000/250000;
+transfer-25 выбрал operation вместо итога none; transfer-35 без контекста
+выбрал unrelated вместо ambiguous. Исходный результат не переоценивается
+и сохранён в `docs/evidence/analyzer-transfer-oss-prompt5-20261014.json`.
+
+Paid batch: 141 вызов, 112 328 input / 43 714 output, 4,448076080 ₽.
+Mean ceil 0,061778835 ₽, per-correct ceil 0,065412884 ₽. Итого known spend
+10,321681900 ₽, holds 7,516800640 ₽, upper bound 17,838482540 ₽. Новых
+unknown/technical failures нет. Повтор report не оплатил новые calls.
+Эти суммы по-прежнему gate+planner и frozen tariff, а не provider invoice.
+
+В finance-core metricMatches('attention') уже требует reviewReasons.length>0;
+явный attention:true проверяет тот же признак. В этой выборке он избыточен,
+а не ошибка денежных итогов. Это подтверждено отдельным core query test.
+Prompt/6 канонизирует только такое модельное дополнение, сохраняя в diagnostics
+`redundant_attention_filter` и исходные filterFields. Existing manual/task
+filters не снимаются; при base.attention:false явное новое true сохраняется.
+Исторический 68/72 остаётся результатом исходного строгого контракта. Проверка
+этого равенства не заменяет end-to-end provenance/account-count acceptance.
+
+Денежный контракт prompt/6 больше не предлагает модели умножать на 100.
+Обязательные amountFromText/amountThroughText — inherit либо буквальная сумма
+из текущего вопроса; прежние amountFrom/amountThrough в model filter запрещены.
+Сервер разбирает десятичные рубли, копейки, compound суммы, знак и поддержанные
+тысячи/миллионы через BigInt, проверяет signed PostgreSQL bigint bounds и
+не округляет. Проверка полного исходного выражения отвергает выдуманное число,
+подстроку большей суммы, потерянные копейки и неподдержанный формат. В таком
+случае clarification с фиксированным money_literal_invalid, без guess/retry.
+Raw денежная цитата не сохраняется: receipt содержит только validated minor
+values, enums и локальную причину. Неподдержанные валюты/форматы требуют
+уточнения; это не полный money-language parser всех будущих формулировок.
+
+Planner уточняет различие общей суммы и списка: само слово «операции» в
+условии отбора не создаёт operation grouping. Gate отличает неопределённую
+команду без объекта/контекста от ясно посторонней темы. Все изменённые
+инструкции и schema имеют отдельный prompt/6 namespace; old versions остаются.
+
+`--live-regression cloud-oss task` сначала бесплатно воспроизводит полные
+сохранённые smoke/1 и transfer/1 prompt/5. Затем оплачивает 24 smoke хода
+prompt/6; при результате менее 24/24 большая часть не вызывается. После
+24/24 выполняет 72 прежних transfer хода. Итог — 96 development regression
+ходов с отдельными subset quality/cost и общим cost-per-turn. Report variant
+не читает ключи и не использует сеть; готовые receipt IDs replay без оплаты.
+Общий 45 ₽ cap, старые holds и остановка при новом unknown остаются прежними.
+
+После просмотра этих ошибок transfer/1 считается seen regression corpus.
+Новый успех 72/72 на нём нельзя назвать новым независимым качеством.
+Нужен свежий приёмочный holdout, включая ранее согласованные 180 singles /
+40 dialogs, дополнительные Registry tools и прочие приёмочные ворота.
+Runtime AI, fine-tuning и Production не включаются.
+
+Локальная проверка prompt/6: 96 API unit tests (66 benchmark), types,
+source-spec hashes/evidence и git diff check успешны. Проверены unit/decimal
+conversion, пределы BigInt, literal grounding, canonical attention identity,
+все четыре observed cases, immutable old reports, предварительный запрет
+без обоих baseline batches, остановка при smoke regression и объединённые
+96-turn quality/cost subsets. Scripted tests подтверждают код, не новый
+результат GPT-OSS. Реальный paid regression prompt/6 ещё pending.
+
 Для нестабильного SSH запускать длительный batch в отдельной tmux session;
 обрыв Windows терминала не должен завершать server-side job. После обычного
 SSH входа повторное подключение к той же session показывает продолжающийся

@@ -4,7 +4,7 @@ import { parseModelPlan, YandexPlanError, modelFilterProperties } from '../../..
 import type { Catalog, ModelPlan } from '../../../packages/analyzer/src/yandex-contract.ts';
 import type { OperationsFilter } from '../../../packages/finance-core/src/operations.ts';
 
-export type PlanResolution = 'model_clarification' | 'reference_missing' | 'reference_ambiguous' | 'mixed_classification_scope' | 'server_reference_clarification' | null;
+export type PlanResolution = 'model_clarification' | 'reference_missing' | 'reference_ambiguous' | 'mixed_classification_scope' | 'server_reference_clarification' | 'money_literal_invalid' | null;
 export type ReferencePlan = { plan: ModelPlan; resolution: PlanResolution };
 const folded = (s: string) => s.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/\s+/gu, ' ').trim();
 function checked<T>(phase: YandexPlanError['phase'], action: () => T): T {

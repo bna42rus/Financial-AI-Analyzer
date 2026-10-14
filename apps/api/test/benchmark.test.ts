@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { benchmarkPromptVersion, runSmoke, runComparison, runExplicitTrial, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
+import { benchmarkPromptVersion, runSmoke, runComparison, runExplicitTrial, runLiteralRegression, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
@@ -16,6 +16,11 @@ import { parseReferencePlan } from '../src/benchmark-reference-plan.ts';
 import { parseDeltaPlan, deltaPlanPrompt, deltaPlanSchema } from '../src/benchmark-delta-plan.ts';
 import { transferScenarios, transferFixtureVersion } from '../src/benchmark-transfer-fixtures.ts';
 import { parseExplicitPlan, explicitPlanPrompt, explicitPlanSchema } from '../src/benchmark-explicit-plan.ts';
+import { parseMoneyLiteral, parseQuotedMoney } from '../src/benchmark-money.ts';
+import { parseLiteralPlan, literalGatePrompt, literalPlanPrompt, literalPlanSchema } from '../src/benchmark-literal-plan.ts';
+import { queryOperations } from '../../../packages/finance-core/src/operations.ts';
+import type { OperationRow } from '../../../packages/finance-core/src/operations.ts';
+import { facet } from '../../../packages/finance-core/src/model.ts';
 const key = 'synthetic-benchmark-api-key-not-a-secret';
 const model = candidates['cloud-oss'].model;
 const response = (value: unknown, change: Record<string, unknown> = {}) => new Response(JSON.stringify({ model,
@@ -1052,4 +1057,109 @@ test('paid explicit trial requires the saved previous trial, appends distinct re
   assert.equal(ledger.records.size, oldCount + 46); assert.equal(ledger.totals().held, held); assert.equal(smokeCostReport(ledger).requiresReconciliation, true);
   assert.ok((await readFile(path, 'utf8')).startsWith(before));
   const source = await readFile(path); await runExplicitTrial(client, ledger); assert.equal(calls, 46); assert.deepEqual(await readFile(path), source);
+}));
+
+const literalDecision = (changes: Record<string, any> = {}, fromText = 'inherit', throughText = 'inherit', status = 'query') =>
+  ({ ...explicitDecision(changes, status), amountFromText: fromText, amountThroughText: throughText });
+test('currency literals use exact BigInt conversion for decimal/grouped rubles, compound kopecks, signs and scaled units', () => {
+  const cases: [string, string][] = [['1000', '100000'], ['2500 рублей', '250000'], ['99 рублей 50 копеек', '9950'],
+    ['99,50 руб', '9950'], ['1 234.5 ₽', '123450'], ['50 копеек', '50'], ['-7 рублей 8 копеек', '-708'], ['-0,08 руб', '-8'],
+    ['+0 рублей', '0'], ['1,5 тыс рублей', '150000'], ['2 млн руб', '200000000'], ['999999999999 тыс руб', '99999999999900000']];
+  for (const [input, expected] of cases) assert.equal(parseMoneyLiteral(input), expected, input);
+  for (const bad of ['1.999 рублей', '1e3', 'NaN', 'Infinity', '12 34 руб', '100 долларов', '0,5 копейки', '1,50 руб 50 коп', '1000000000000 млн руб', '50 процентов']) assert.throws(() => parseMoneyLiteral(bad), bad);
+});
+test('monetary grounding rejects invented thresholds, partial quantities and substring matches instead of guessing', () => {
+  const question = 'Доходы по суммам от 1000 до 2500 рублей включительно.';
+  assert.equal(parseQuotedMoney('1000', question), '100000'); assert.equal(parseQuotedMoney('2500 рублей', question), '250000');
+  assert.throws(() => parseQuotedMoney('100000', question)); assert.throws(() => parseQuotedMoney('100', question));
+  assert.equal(parseQuotedMoney('99 рублей 50 копеек', 'Общий доход не выше 99 рублей 50 копеек.'), '9950');
+  assert.throws(() => parseQuotedMoney('99', 'Общий доход не выше 99 рублей 50 копеек.'));
+  assert.throws(() => parseQuotedMoney('50', 'Доход с суммой до 50 копеек.'));
+  assert.throws(() => parseQuotedMoney('50', 'Рост доходов на 50%.'));
+  assert.throws(() => parseQuotedMoney('2026', 'Доходы за 2026-10-01.'));
+});
+test('literal planner fixes the observed unit issue without teaching the answer or retaining raw quoted text', () => {
+  const question = 'Общий доход по операциям с суммой от 1000 до 2500 рублей включительно.';
+  const result = parseLiteralPlan(literalDecision({ metric: 'income', grouping: 'none' }, '1000', '2500 рублей'), question, october, syntheticCatalog);
+  assert.deepEqual(result.plan.query?.filter, { ...october, amountFrom: '100000', amountThrough: '250000' });
+  assert.deepEqual(result.money, { fromMinor: '100000', throughMinor: '250000' });
+  assert.equal(JSON.stringify(result).includes('2500 рублей'), false);
+  const ungrounded = parseLiteralPlan(literalDecision({ metric: 'income' }, '100000'), question, october, syntheticCatalog);
+  assert.equal(ungrounded.plan.status, 'clarification'); assert.equal(ungrounded.resolution, 'money_literal_invalid');
+  assert.throws(() => parseLiteralPlan(literalDecision({ filter: { amountFrom: '1000' } }), question, october, syntheticCatalog));
+  assert.throws(() => parseLiteralPlan(literalDecision({}, '2500', '1000'), question, october, syntheticCatalog));
+  assert.throws(() => parseLiteralPlan(literalDecision({}, '1000', 'inherit', 'unsupported'), question, october, syntheticCatalog));
+  const missing = literalDecision() as Record<string, unknown>; delete missing.amountThroughText;
+  assert.throws(() => parseLiteralPlan(missing, question, october, syntheticCatalog));
+  assert.equal(literalPlanPrompt.includes('Суммы условий — целые строки копеек.'), false);
+});
+test('only a redundant model attention addition is canonicalized; manual and contradictory filters remain explicit', () => {
+  const value = literalDecision({ metric: 'attention', grouping: 'operation', filter: { attention: true } });
+  const result = parseLiteralPlan(value, 'Операции на проверку.', october, syntheticCatalog);
+  assert.deepEqual(result.plan.query?.filter, october); assert.deepEqual(result.normalizations, ['redundant_attention_filter']);
+  assert.deepEqual(result.decisions.filterFields, ['attention']);
+  assert.equal(parseLiteralPlan(value, 'Операции на проверку.', { ...october, attention: false }, syntheticCatalog).plan.query?.filter.attention, true);
+  assert.equal(parseLiteralPlan(value, 'Операции на проверку.', { ...october, attention: true }, syntheticCatalog).plan.query?.filter.attention, true);
+  assert.equal(parseLiteralPlan(literalDecision({ metric: 'expenses', filter: { attention: true } }), 'Расходы на проверку.', october, syntheticCatalog).plan.query?.filter.attention, true);
+  const row = (id: string, reviewReasons: string[]): OperationRow => ({ id, accountId: '11111111-1111-4111-8111-111111111111', date: { precision: 'day', date: '2026-10-12' },
+    amountMinor: '-10000', analyticsRole: 'expense', decompositionActive: false, reviewReasons, unresolvedMinor: '0', neutralMinor: '0', excludedMinor: '0',
+    parts: [{ id: 'part-' + id, componentId: null, allocationId: null, amountMinor: '-10000', role: 'expense', categoryId: null, subcategoryId: null, basis: [], included: true }],
+    classification: { kind: facet('purchase'), role: facet('expense'), category: facet<string | null>(null), subcategory: facet<string | null>(null), counterparty: facet<string | null>(null), merchant: facet('Синтетическая покупка') }, comment: '' });
+  const rows = [row('review', ['possible_duplicate']), row('clean', [])], catalog = { accounts: [], categories: [], counterparties: [] };
+  const simple = queryOperations(rows, catalog, { filter: { ...october, metric: 'attention' }, sort: 'date', direction: 'asc', group: 'none' });
+  const redundant = queryOperations(rows, catalog, { filter: { ...october, metric: 'attention', attention: true }, sort: 'date', direction: 'asc', group: 'none' });
+  assert.deepEqual(simple, redundant); assert.deepEqual(simple.operations.map(o => o.id), ['review']);
+});
+test('literal trial verifies all four observed transfer cases while preserving original fixtures and actual diagnostics', async () => sandbox(async (_, ledger) => {
+  const selected = transferScenarios.flatMap(s => s.turns).filter(t => ['transfer-05', 'transfer-24', 'transfer-25', 'transfer-35'].includes(t.id));
+  const responses: Record<string, unknown> = {
+    'transfer-05': literalDecision({ metric: 'attention', grouping: 'operation', filter: { attention: true } }),
+    'transfer-24': literalDecision({ metric: 'income', grouping: 'none' }, '1000', '2500 рублей'),
+    'transfer-25': literalDecision({ metric: 'income', grouping: 'none' }, 'inherit', '99 рублей 50 копеек'),
+  };
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options!.body)), input = JSON.parse(body.messages[1].content), turn = selected.find(t => t.question === input.question);
+    if (body.messages[0].content === literalGatePrompt) return response(turn?.expectedGate ?? { relevance: 'unrelated', followUp: false });
+    assert.equal(body.messages[0].content, literalPlanPrompt); assert.deepEqual(body.response_format.json_schema.schema, literalPlanSchema);
+    return response(responses[turn!.id]);
+  }) as typeof fetch, 'empty-tools');
+  const result = await runSmoke(client, ledger, 'task', 'after-funding', true, 'literal', 'transfer');
+  assert.equal(result.benchmarkPromptVersion, 'cashneuro-smoke-prompt/6'); assert.equal(result.fixtureVersion, 'cashneuro-transfer/1');
+  for (const turn of selected) { const check = result.checks.find(c => c.id === turn.id)!; assert.equal(check.gate, true, turn.id); assert.notEqual(check.plan, false, turn.id); }
+  assert.deepEqual(result.checks.find(c => c.id === 'transfer-24')?.diagnostics?.money, { fromMinor: '100000', throughMinor: '250000' });
+  assert.deepEqual(result.checks.find(c => c.id === 'transfer-05')?.diagnostics?.normalizations, ['redundant_attention_filter']);
+}));
+test('regression requires both saved batches before dispatch and does not spend on transfer when the simple batch fails', async () => sandbox(async (dir, ledger) => {
+  await seedGigaRejection(ledger); await ledger.allowOssContinuation();
+  const held = ledger.totals().held; let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => { calls++; return response({ relevance: 'unrelated', followUp: false }); }) as typeof fetch, 'empty-tools');
+  await assert.rejects(runLiteralRegression(client, ledger), /BENCH_REPLAY_ONLY/); assert.equal(calls, 0);
+  await runSmoke(explicitFixtureClient(), ledger, 'task', 'after-funding', false, 'explicit');
+  await assert.rejects(runLiteralRegression(client, ledger), /BENCH_REPLAY_ONLY/); assert.equal(calls, 0);
+  await runSmoke(client, ledger, 'task', 'after-funding', false, 'explicit', 'transfer'); calls = 0;
+  const result = await runLiteralRegression(client, ledger); assert.equal(result.regression, 'smoke-only/1'); assert.equal(result.turns, 24); assert.equal(calls, 24);
+  assert.ok(result.passed < 24); assert.equal(ledger.totals().held, held);
+  const source = await readFile(join(dir, 'ledger.jsonl'));
+  const replay = await runLiteralRegression(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), ledger);
+  assert.equal(replay.passed, result.passed); assert.equal(calls, 24); assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+}));
+test('completed regression reports both subsets and their combined cost and repeats without a new dispatch', async () => sandbox(async (dir, ledger) => {
+  await seedGigaRejection(ledger); await ledger.allowOssContinuation();
+  await runSmoke(explicitFixtureClient(), ledger, 'task', 'after-funding', false, 'explicit');
+  const unrelated = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => response({ relevance: 'unrelated', followUp: false })) as typeof fetch, 'empty-tools');
+  await runSmoke(unrelated, ledger, 'task', 'after-funding', false, 'explicit', 'transfer');
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options!.body)), input = JSON.parse(body.messages[1].content);
+    const turn = smokeScenarios.flatMap(s => s.turns).find(t => t.question === input.question);
+    if (body.messages[0].content === literalGatePrompt) return response(turn?.expectedGate ?? { relevance: 'unrelated', followUp: false });
+    return response(literalDecision(scriptedDeltas[turn!.id] as Record<string, unknown> ?? {}, 'inherit', 'inherit', turn!.id === 'write' ? 'unsupported' : 'query'));
+  }) as typeof fetch, 'empty-tools');
+  const result = await runLiteralRegression(client, ledger);
+  assert.equal(result.regression, 'seen-corpora/1'); assert.equal(result.turns, 96); assert.equal(result.passed, 26); assert.equal(calls, 118);
+  assert.equal(result.costPerTurnAtoms.meanCeil, '2699250');
+  assert.ok('subsets' in result); assert.deepEqual(result.subsets.map(s => s.turns), [24, 72]);
+  const source = await readFile(join(dir, 'ledger.jsonl'));
+  const replay = await runLiteralRegression(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), ledger);
+  assert.equal(replay.passed, result.passed); assert.equal(calls, 118); assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
 }));
