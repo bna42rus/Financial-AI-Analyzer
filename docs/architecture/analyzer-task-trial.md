@@ -219,3 +219,9 @@ Software positive scheduler test использует один синтетич�
 всех 120 slots: это проверка фаз, стоимости, replay и критериев завершения,
 не замена языкового испытания настоящего фиксированного корпуса. Другие
 fault tests проверяют реальные shared workflow/HTTP/parser/finance paths.
+
+Source identity включает static relative import/re-export closure, в том
+числе исходный cost ledger, operator lock helpers, loader ключа, money/privacy
+helpers, а также package/lock files. Порядок ключей hash map не зависит от
+локали. Изменение этих правил требует нового binding и не переиспользует
+старые оплаченные request IDs.

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, rm, unlink, chmod, symlink } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
@@ -212,6 +213,13 @@ test('service-pilot binding preserves the previously frozen corpus/prompts and l
   assert.equal(binding.currentTariffConfirmed, true); assert.equal(binding.tariff.version, '261015'); assert.equal(binding.incrementalCapAtoms, '20000000000'); assert.equal(binding.maximumCalls, 240);
   assert.equal(binding.manifest.corpusSha256, '8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f');
   assert.equal(binding.manifest.promptsSha256, 'e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8');
+});
+
+test('the frozen source identity includes transitive cost-ledger, lock, credential and privacy dependencies plus pinned package resolution', async () => {
+  const { binding } = await pilotBinding(), sources = binding.manifest.source;
+  for (const path of ['dependency:apps/api/src/benchmark-ledger.ts', 'dependency:apps/api/src/benchmark-probe.ts', 'dependency:apps/api/src/kms.ts', 'dependency:packages/privacy/src/text.ts', '../../../pnpm-lock.yaml', 'package.json']) assert.ok(sources[path], path);
+  const bytes = await readFile(new URL('../src/benchmark-ledger.ts', import.meta.url));
+  assert.equal(sources['dependency:apps/api/src/benchmark-ledger.ts'], createHash('sha256').update(bytes).digest('hex'));
 });
 
 test('Moscow midnight and a stale tariff stop before reserve/HTTP, while saved replay remains available without a clock guard', async () => sandbox(async f => {

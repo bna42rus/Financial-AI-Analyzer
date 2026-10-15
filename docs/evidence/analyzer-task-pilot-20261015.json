@@ -71,10 +71,11 @@
     "reportReadsNoKeysAndMakesNoNetworkCalls": true
   },
   "localValidation": {
-    "newPilotTestsPassed": 21,
-    "trialAndPilotTestsPassed": 34,
+    "newPilotTestsPassed": 22,
+    "trialAndPilotTestsPassed": 35,
     "apiTypes": "passed",
-    "ci": "pending"
+    "ci": "pending",
+    "apiUnitTestsPassed": 154
   },
   "invariants": [
     "Unknown delivery/usage keeps a full reserve and stops all new dispatch",
@@ -86,6 +87,7 @@
     "Exact provider metadata snapshot checked on every operator live invocation; receipt model/bounds/fingerprint drift stops dispatch",
     "Credential reflection never enters persisted payload or fingerprint",
     "Holdout requires all 92 exact passing development/repeat slots; budget/unknown/semantic failures keep it unopened",
-    "All 120 exact slots required even for provisional_pilot_passed; modelAccepted and runtimeAiEnabled always false"
+    "All 120 exact slots required even for provisional_pilot_passed; modelAccepted and runtimeAiEnabled always false",
+    "Source identity includes transitive local imports and pinned package/lock files, including the original cost ledger and operator lock helpers"
   ]
 }

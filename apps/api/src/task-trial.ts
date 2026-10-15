@@ -140,14 +140,28 @@ export async function evaluateTrialScenario(turns: TrialTurn[], modelForTurn: (t
 }
 
 const fingerprintPaths = [
-  'src/task-trial.ts', 'src/task-trial-main.ts', 'src/task-pilot-journal.ts', 'src/task-pilot-runner.ts', 'test/fixtures/task-trial-corpus-v1.json', 'src/analyzer-task-workflow.ts', 'src/benchmark-transport.ts',
+  'src/task-trial.ts', 'src/task-trial-main.ts', 'src/task-pilot-journal.ts', 'src/task-pilot-runner.ts', 'package.json', '../../../package.json', '../../../pnpm-lock.yaml', 'test/fixtures/task-trial-corpus-v1.json', 'src/analyzer-task-workflow.ts', 'src/benchmark-transport.ts',
   '../../../packages/analyzer/src/task-protocol.ts', '../../../packages/analyzer/src/task-context.ts', '../../../packages/analyzer/src/task-literals.ts',
   '../../../packages/analyzer/src/money-literals.ts', '../../../packages/analyzer/src/closed-schema.ts', '../../../packages/analyzer/src/registry.ts',
   '../../../packages/analyzer/src/cost.ts', '../../../packages/finance-core/src/operations.ts', '../../../packages/finance-core/src/overview.ts', '../../../packages/finance-core/src/model.ts',
 ];
 export async function taskTrialManifest() {
-  const { corpus, hash } = await loadTrialCorpus(), source: Record<string, string> = {};
-  for (const path of fingerprintPaths) source[path] = digest(await readFile(new URL(path.startsWith('../../../') ? path : '../' + path, import.meta.url), 'utf8'));
+  const { corpus, hash } = await loadTrialCorpus(), hashes: Record<string, string> = {}, root = new URL('../../../', import.meta.url).href, seen = new Set<string>();
+  const pending = fingerprintPaths.map(key => ({ key, url: new URL(key.startsWith('../../../') ? key : '../' + key, import.meta.url) }));
+  for (let at = 0; at < pending.length; at++) {
+    const { key, url } = pending[at]!;
+    if (!url.href.startsWith(root) || pending.length > 300) throw new BenchmarkFailure('TASK_TRIAL_SOURCE_INVALID');
+    if (seen.has(url.href)) continue; seen.add(url.href);
+    const text = await readFile(url, 'utf8'); hashes[key] = digest(text);
+    if (!/\.(?:ts|tsx|js|mjs)$/.test(url.pathname)) continue;
+    // Closed static relative imports/re-exports include the budget ledger,
+    // literal arithmetic, privacy helpers and other local transitive code.
+    // Bare npm/node imports are bound through pinned package/lock files.
+    for (const pattern of [/^\s*import\s+(?:[^;'"`]+\s+from\s+)?['"](\.[^'"`]+)['"]/gmu, /^\s*export\s+(?:type\s+)?(?:\{[^}]*\}|\*)\s+from\s+['"](\.[^'"`]+)['"]/gmu]) {
+      for (const match of text.matchAll(pattern)) { const dependency = new URL(match[1]!, url); if (!seen.has(dependency.href)) pending.push({ key: 'dependency:' + dependency.href.slice(root.length), url: dependency }); }
+    }
+  }
+  const source = Object.fromEntries(Object.entries(hashes).sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0));
   const spec = candidates['cloud-oss'], bound = { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model };
   return { experiment: taskTrialVersion, corpusVersion: corpus.version, corpusSha256: hash, sourceSha256: digest(JSON.stringify(source)), source,
     workflow: taskWorkflowBinding, responseContract: correctedResponseContractVersion, candidate: 'cloud-oss', model: spec.model, bound, price: spec.price,
