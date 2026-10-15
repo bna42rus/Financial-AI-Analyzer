@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx src/main.ts",
-    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts",
+    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts test/task-trial.test.ts",
     "benchmark": "node --import tsx src/benchmark-main.ts",
     "benchmark:audit-review": "node --import tsx src/benchmark-audit-review-main.ts",
     "kms:init": "node --import tsx src/kms-init.ts",
@@ -19,7 +19,8 @@
     "dev:imports": "node --import tsx src/import-main.ts",
     "test:integration:base": "node --import tsx --test --test-concurrency=1 test/security.test.ts test/mail.test.ts test/finance.test.ts test/finance-structure.test.ts test/finance-entities.test.ts test/finance-history.test.ts test/finance-reset.test.ts test/finance-chains.test.ts test/import-validation.test.ts test/import-ingestion.test.ts test/operations.test.ts test/budgets.test.ts",
     "test:browser:base": "node --import tsx --test --test-concurrency=1 test/browser.test.ts test/review-browser.test.ts test/operations-browser.test.ts test/budgets-browser.test.ts",
-    "test:analyzer-tasks": "node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts"
+    "test:analyzer-tasks": "node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts",
+    "benchmark:task-trial": "node --import tsx src/task-trial-main.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.7",

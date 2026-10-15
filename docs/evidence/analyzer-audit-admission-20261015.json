@@ -139,5 +139,13 @@
     "billingReconciled": false,
     "holdsReleased": false,
     "evidence": "docs/evidence/analyzer-vps-inspection-20261015.json"
+  },
+  "taskTrialPreparation": {
+    "status": "offline_corpus_and_get_preflight_implemented_paid_blocked",
+    "paidDispatchEnabled": false,
+    "baseTurns": 96,
+    "independentRepeatTurns": 24,
+    "newUnitTestsPassed": 12,
+    "evidence": "docs/evidence/analyzer-task-trial-20261015.json"
   }
 }

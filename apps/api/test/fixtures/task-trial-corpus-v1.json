@@ -1,0 +1,2906 @@
+{
+  "version": "cashneuro-task-trial-corpus/1",
+  "scope": "Current read-only task protocol only. Not a replacement for the 420-turn full-product acceptance program or the 96 previously seen regressions.",
+  "currentDate": "2026-10-15",
+  "singles": [
+    {
+      "id": "single-01",
+      "split": "development",
+      "family": "total",
+      "question": "Сколько потрачено за выбранный период?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-02",
+      "split": "development",
+      "family": "income",
+      "question": "Покажи мои доходы.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "2100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-03",
+      "split": "development",
+      "family": "attention",
+      "question": "Какие операции требуют внимания?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "attention",
+          "grouping": "operation",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-04",
+      "split": "development",
+      "family": "category-period",
+      "question": "Сумма расходов на продукты за сентябрь 2026 года.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000010"
+            ]
+          }
+        },
+        "totalMinor": "160000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-05",
+      "split": "development",
+      "family": "leaf",
+      "question": "Покажи расходы на такси.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000011"
+            ],
+            "subcategoryIds": [
+              "50000000-0000-4000-8000-000000000012"
+            ]
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-06",
+      "split": "development",
+      "family": "grouping",
+      "question": "Разложи расходы по категориям.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "category",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-07",
+      "split": "development",
+      "family": "comparison",
+      "question": "Сравни расходы с предыдущим таким же периодом.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "previous_same",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-08",
+      "split": "development",
+      "family": "explicit-period",
+      "question": "Сколько потратил в сентябре 2026 года?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30"
+          }
+        },
+        "totalMinor": "195000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-09",
+      "split": "development",
+      "family": "explicit-period",
+      "question": "Расходы за 2026-09-02 по 2026-09-04 одной суммой.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-02",
+            "through": "2026-09-04"
+          }
+        },
+        "totalMinor": "160000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-10",
+      "split": "development",
+      "family": "relative-period",
+      "question": "Сколько потратил сегодня?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-15",
+            "through": "2026-10-15"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-11",
+      "split": "development",
+      "family": "relative-period",
+      "question": "Сколько потратил вчера?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-14",
+            "through": "2026-10-14"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-12",
+      "split": "development",
+      "family": "relative-period",
+      "question": "Сколько потратил за текущий месяц?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-15"
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-13",
+      "split": "development",
+      "family": "relative-period",
+      "question": "Сколько потратил за предыдущий месяц?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30"
+          }
+        },
+        "totalMinor": "195000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-14",
+      "split": "development",
+      "family": "explicit-period",
+      "question": "Сумма расходов за февраль 2024 года.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2024-02-01",
+            "through": "2024-02-29"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-15",
+      "split": "development",
+      "family": "attention",
+      "question": "Выведи операции, которые надо проверить, за сентябрь 2026 года.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "attention",
+          "grouping": "operation",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30"
+          }
+        },
+        "totalMinor": "1",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-16",
+      "split": "development",
+      "family": "money-range",
+      "question": "Общий доход по операциям с суммой от 1000 до 2500 рублей включительно.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "amountFrom": "100000",
+            "amountThrough": "250000",
+            "amountBasis": "absolute_operation"
+          }
+        },
+        "totalMinor": "100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-17",
+      "split": "development",
+      "family": "money-minor",
+      "question": "Сумма доходов по операциям не выше 99 рублей 50 копеек.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "amountThrough": "9950",
+            "amountBasis": "absolute_operation"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-18",
+      "split": "development",
+      "family": "money-strict",
+      "question": "Сумма доходов по операциям больше 1000 рублей.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "amountFrom": "100001",
+            "amountBasis": "absolute_operation"
+          }
+        },
+        "totalMinor": "2000000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-19",
+      "split": "development",
+      "family": "money-inclusive",
+      "question": "Сумма доходов по операциям не меньше 1000 рублей.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "amountFrom": "100000",
+            "amountBasis": "absolute_operation"
+          }
+        },
+        "totalMinor": "2100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-20",
+      "split": "development",
+      "family": "money-signed",
+      "question": "Расходы за сентябрь 2026 года по операциям со знаковой суммой от -1200 до -400 рублей включительно.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30",
+            "amountFrom": "-120000",
+            "amountThrough": "-40000",
+            "amountBasis": "signed_operation"
+          }
+        },
+        "totalMinor": "160000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-21",
+      "split": "development",
+      "family": "unknown-name",
+      "question": "Сколько потратил на категорию Единороги?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "clarification"
+      }
+    },
+    {
+      "id": "single-22",
+      "split": "development",
+      "family": "unsupported-period",
+      "question": "Сколько потратил после моей зарплаты?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "clarification"
+      }
+    },
+    {
+      "id": "single-23",
+      "split": "development",
+      "family": "unrelated",
+      "question": "Какая погода в Москве?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "unrelated",
+        "status": "redirect"
+      }
+    },
+    {
+      "id": "single-24",
+      "split": "development",
+      "family": "negative-operation",
+      "question": "Какие медицинские операции требуют внимания хирурга?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "unrelated",
+        "status": "redirect"
+      }
+    },
+    {
+      "id": "single-25",
+      "split": "development",
+      "family": "negative-operation",
+      "question": "Объясни операции над строками в Python.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "unrelated",
+        "status": "redirect"
+      }
+    },
+    {
+      "id": "single-26",
+      "split": "development",
+      "family": "negative-operation",
+      "question": "Выполни арифметические операции: два плюс три.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "unrelated",
+        "status": "redirect"
+      }
+    },
+    {
+      "id": "single-27",
+      "split": "development",
+      "family": "ambiguous",
+      "question": "А это?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "ambiguous",
+        "status": "clarification"
+      }
+    },
+    {
+      "id": "single-28",
+      "split": "development",
+      "family": "ambiguous",
+      "question": "Продолжи.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "ambiguous",
+        "status": "clarification"
+      }
+    },
+    {
+      "id": "single-29",
+      "split": "development",
+      "family": "unsupported-write",
+      "question": "Удали все мои операции.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "unsupported"
+      }
+    },
+    {
+      "id": "single-30",
+      "split": "development",
+      "family": "financial-adjacent",
+      "question": "Посчитай мои расходы за выбранный период и расскажи погоду в Москве.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "adjacent",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-31",
+      "split": "development",
+      "family": "unsupported-grouping",
+      "question": "Разложи расходы по магазинам.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "unsupported"
+      }
+    },
+    {
+      "id": "single-32",
+      "split": "development",
+      "family": "unsupported-web",
+      "question": "Какая ключевая ставка сейчас?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "unsupported"
+      }
+    },
+    {
+      "id": "single-33",
+      "split": "holdout",
+      "family": "total",
+      "question": "Подсчитай итог моих расходов в выбранном периоде.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-34",
+      "split": "holdout",
+      "family": "income",
+      "question": "Какая общая сумма поступивших доходов?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "2100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-35",
+      "split": "holdout",
+      "family": "attention",
+      "question": "Покажи банковские операции для проверки.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "attention",
+          "grouping": "operation",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-36",
+      "split": "holdout",
+      "family": "category-period",
+      "question": "За сентябрь 2026 года сколько ушло на продукты?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000010"
+            ]
+          }
+        },
+        "totalMinor": "160000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-37",
+      "split": "holdout",
+      "family": "leaf",
+      "question": "Итог трат на такси за выбранные даты.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000011"
+            ],
+            "subcategoryIds": [
+              "50000000-0000-4000-8000-000000000012"
+            ]
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-38",
+      "split": "holdout",
+      "family": "grouping",
+      "question": "Доходы раздельно по категориям.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "category",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "totalMinor": "2100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-39",
+      "split": "holdout",
+      "family": "comparison",
+      "question": "Расходы за сентябрь 2026 года в сравнении с предыдущим таким же периодом.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "previous_same",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30"
+          }
+        },
+        "totalMinor": "195000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-40",
+      "split": "holdout",
+      "family": "relative-period",
+      "question": "Доходы за этот месяц.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-15"
+          }
+        },
+        "totalMinor": "2100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-41",
+      "split": "holdout",
+      "family": "money-scale",
+      "question": "Доходы по операциям от 1 до 2 тысяч рублей включительно.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "amountFrom": "100000",
+            "amountThrough": "200000",
+            "amountBasis": "absolute_operation"
+          }
+        },
+        "totalMinor": "100000",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-42",
+      "split": "holdout",
+      "family": "money-strict",
+      "question": "Итог доходов по операциям меньше 1000 рублей.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "amountThrough": "99999",
+            "amountBasis": "absolute_operation"
+          }
+        },
+        "totalMinor": "0",
+        "parentTurnId": null
+      }
+    },
+    {
+      "id": "single-43",
+      "split": "holdout",
+      "family": "unknown-name",
+      "question": "Общая сумма расходов по категории Лунные путешествия.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "clarification"
+      }
+    },
+    {
+      "id": "single-44",
+      "split": "holdout",
+      "family": "negative-operation",
+      "question": "Какая операция на колене безопаснее?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "unrelated",
+        "status": "redirect"
+      }
+    },
+    {
+      "id": "single-45",
+      "split": "holdout",
+      "family": "ambiguous",
+      "question": "А дальше?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "ambiguous",
+        "status": "clarification"
+      }
+    },
+    {
+      "id": "single-46",
+      "split": "holdout",
+      "family": "unsupported-write",
+      "question": "Переименуй категорию Продукты в Еда.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "unsupported"
+      }
+    },
+    {
+      "id": "single-47",
+      "split": "holdout",
+      "family": "unsupported-component-money",
+      "question": "Посчитай расходы, где расходная часть смешанной операции больше 500 рублей.",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31"
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "unsupported"
+      }
+    },
+    {
+      "id": "single-48",
+      "split": "holdout",
+      "family": "selected",
+      "question": "Какова общая сумма моих трат с учётом выбранной категории и периода?",
+      "global": {
+        "revision": 0,
+        "filter": {
+          "from": "2026-10-01",
+          "through": "2026-10-31",
+          "categoryIds": [
+            "50000000-0000-4000-8000-000000000011"
+          ]
+        },
+        "touched": {}
+      },
+      "expected": {
+        "relevance": "financial",
+        "status": "query",
+        "query": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000011"
+            ]
+          }
+        },
+        "totalMinor": "17000",
+        "parentTurnId": null
+      }
+    }
+  ],
+  "dialogs": [
+    {
+      "id": "scope",
+      "split": "development",
+      "turns": [
+        {
+          "id": "scope-1",
+          "split": "development",
+          "family": "new",
+          "question": "Сколько потратил на продукты в сентябре 2026 года?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000010"
+                ]
+              }
+            },
+            "totalMinor": "160000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "scope-2",
+          "split": "development",
+          "family": "grouping",
+          "question": "А по категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000010"
+                ]
+              }
+            },
+            "totalMinor": "160000",
+            "parentTurnId": "scope-1"
+          }
+        },
+        {
+          "id": "scope-3",
+          "split": "development",
+          "family": "leaf",
+          "question": "А теперь на такси?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ],
+                "subcategoryIds": [
+                  "50000000-0000-4000-8000-000000000012"
+                ]
+              }
+            },
+            "totalMinor": "35000",
+            "parentTurnId": "scope-2"
+          }
+        },
+        {
+          "id": "scope-4",
+          "split": "development",
+          "family": "period",
+          "question": "А за октябрь 2026 года?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ],
+                "subcategoryIds": [
+                  "50000000-0000-4000-8000-000000000012"
+                ]
+              }
+            },
+            "totalMinor": "17000",
+            "parentTurnId": "scope-3"
+          }
+        },
+        {
+          "id": "scope-5",
+          "split": "development",
+          "family": "new-reset",
+          "question": "Покажи мои доходы.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "scope-6",
+          "split": "development",
+          "family": "grouping",
+          "question": "А по категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": "scope-5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "manual",
+      "split": "development",
+      "turns": [
+        {
+          "id": "manual-1",
+          "split": "development",
+          "family": "new",
+          "question": "Сумма расходов за сентябрь 2026 года.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "manual-2",
+          "split": "development",
+          "family": "manual-touch",
+          "question": "А по категориям?",
+          "global": {
+            "revision": 1,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30"
+            },
+            "touched": {
+              "period": 1
+            }
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "manual-1"
+          }
+        },
+        {
+          "id": "manual-3",
+          "split": "development",
+          "family": "manual-touch",
+          "question": "А итог одной суммой?",
+          "global": {
+            "revision": 2,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {
+              "period": 2
+            }
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "17000",
+            "parentTurnId": "manual-2"
+          }
+        },
+        {
+          "id": "manual-4",
+          "split": "development",
+          "family": "period",
+          "question": "А за сентябрь 2026 года?",
+          "global": {
+            "revision": 2,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {
+              "period": 2
+            }
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "manual-3"
+          }
+        },
+        {
+          "id": "manual-5",
+          "split": "development",
+          "family": "format",
+          "question": "А отдельные операции?",
+          "global": {
+            "revision": 2,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {
+              "period": 2
+            }
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "operation",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "manual-4"
+          }
+        },
+        {
+          "id": "manual-6",
+          "split": "development",
+          "family": "new-reset",
+          "question": "Сколько заработал?",
+          "global": {
+            "revision": 2,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {
+              "period": 2
+            }
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "branch",
+      "split": "development",
+      "turns": [
+        {
+          "id": "branch-1",
+          "split": "development",
+          "family": "new",
+          "question": "Сравни расходы за сентябрь 2026 года с предыдущим таким же периодом.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "previous_same",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "branch-2",
+          "split": "development",
+          "family": "new-reset",
+          "question": "Покажи доходы за октябрь 2026 года.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "branch-3",
+          "split": "development",
+          "family": "reference",
+          "question": "Вернись к первому результату и покажи его по категориям.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "previous_same",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "branch-1"
+          }
+        },
+        {
+          "id": "branch-4",
+          "split": "development",
+          "family": "clear-comparison",
+          "question": "А без сравнения?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "branch-3"
+          }
+        },
+        {
+          "id": "branch-5",
+          "split": "development",
+          "family": "category",
+          "question": "А только на такси?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ],
+                "subcategoryIds": [
+                  "50000000-0000-4000-8000-000000000012"
+                ]
+              }
+            },
+            "totalMinor": "35000",
+            "parentTurnId": "branch-4"
+          }
+        },
+        {
+          "id": "branch-6",
+          "split": "development",
+          "family": "clear-category",
+          "question": "А теперь без ограничения по категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "branch-5"
+          }
+        }
+      ]
+    },
+    {
+      "id": "preserve",
+      "split": "development",
+      "turns": [
+        {
+          "id": "preserve-1",
+          "split": "development",
+          "family": "new",
+          "question": "Сумма расходов на продукты в сентябре 2026 года.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000010"
+                ]
+              }
+            },
+            "totalMinor": "160000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "preserve-2",
+          "split": "development",
+          "family": "unrelated",
+          "question": "Какая погода завтра?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "unrelated",
+            "status": "redirect"
+          }
+        },
+        {
+          "id": "preserve-3",
+          "split": "development",
+          "family": "unknown-name",
+          "question": "А по категории Единороги?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "clarification"
+          }
+        },
+        {
+          "id": "preserve-4",
+          "split": "development",
+          "family": "continue",
+          "question": "А по категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000010"
+                ]
+              }
+            },
+            "totalMinor": "160000",
+            "parentTurnId": "preserve-1"
+          }
+        },
+        {
+          "id": "preserve-5",
+          "split": "development",
+          "family": "unsupported",
+          "question": "Удали эти операции.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "unsupported"
+          }
+        },
+        {
+          "id": "preserve-6",
+          "split": "development",
+          "family": "continue",
+          "question": "А отдельные операции?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "operation",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000010"
+                ]
+              }
+            },
+            "totalMinor": "160000",
+            "parentTurnId": "preserve-4"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fixed",
+      "split": "development",
+      "turns": [
+        {
+          "id": "fixed-1",
+          "split": "development",
+          "family": "fixed",
+          "question": "Сумма расходов.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30",
+              "operationIds": [
+                "50000000-0000-4000-8000-000000000030"
+              ]
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "operationIds": [
+                  "50000000-0000-4000-8000-000000000030"
+                ]
+              }
+            },
+            "totalMinor": "120000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "fixed-2",
+          "split": "development",
+          "family": "category",
+          "question": "А только продукты?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30",
+              "operationIds": [
+                "50000000-0000-4000-8000-000000000030"
+              ]
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000010"
+                ],
+                "operationIds": [
+                  "50000000-0000-4000-8000-000000000030"
+                ]
+              }
+            },
+            "totalMinor": "120000",
+            "parentTurnId": "fixed-1"
+          }
+        },
+        {
+          "id": "fixed-3",
+          "split": "development",
+          "family": "clear-category",
+          "question": "А без ограничения по категории?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30",
+              "operationIds": [
+                "50000000-0000-4000-8000-000000000030"
+              ]
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "operationIds": [
+                  "50000000-0000-4000-8000-000000000030"
+                ]
+              }
+            },
+            "totalMinor": "120000",
+            "parentTurnId": "fixed-2"
+          }
+        },
+        {
+          "id": "fixed-4",
+          "split": "development",
+          "family": "grouping",
+          "question": "А по категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30",
+              "operationIds": [
+                "50000000-0000-4000-8000-000000000030"
+              ]
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "operationIds": [
+                  "50000000-0000-4000-8000-000000000030"
+                ]
+              }
+            },
+            "totalMinor": "120000",
+            "parentTurnId": "fixed-3"
+          }
+        },
+        {
+          "id": "fixed-5",
+          "split": "development",
+          "family": "period",
+          "question": "А за октябрь 2026 года?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30",
+              "operationIds": [
+                "50000000-0000-4000-8000-000000000030"
+              ]
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31",
+                "operationIds": [
+                  "50000000-0000-4000-8000-000000000030"
+                ]
+              }
+            },
+            "totalMinor": "0",
+            "parentTurnId": "fixed-4"
+          }
+        },
+        {
+          "id": "fixed-6",
+          "split": "development",
+          "family": "new-fixed",
+          "question": "Общая сумма доходов.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-09-01",
+              "through": "2026-09-30",
+              "operationIds": [
+                "50000000-0000-4000-8000-000000000030"
+              ]
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "operationIds": [
+                  "50000000-0000-4000-8000-000000000030"
+                ]
+              }
+            },
+            "totalMinor": "0",
+            "parentTurnId": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "money",
+      "split": "development",
+      "turns": [
+        {
+          "id": "money-1",
+          "split": "development",
+          "family": "money",
+          "question": "Сумма доходов по операциям от 1000 до 2500 рублей включительно.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31",
+                "amountFrom": "100000",
+                "amountThrough": "250000",
+                "amountBasis": "absolute_operation"
+              }
+            },
+            "totalMinor": "100000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "money-2",
+          "split": "development",
+          "family": "grouping",
+          "question": "А по категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31",
+                "amountFrom": "100000",
+                "amountThrough": "250000",
+                "amountBasis": "absolute_operation"
+              }
+            },
+            "totalMinor": "100000",
+            "parentTurnId": "money-1"
+          }
+        },
+        {
+          "id": "money-3",
+          "split": "development",
+          "family": "format",
+          "question": "А отдельные операции?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "operation",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31",
+                "amountFrom": "100000",
+                "amountThrough": "250000",
+                "amountBasis": "absolute_operation"
+              }
+            },
+            "totalMinor": "100000",
+            "parentTurnId": "money-2"
+          }
+        },
+        {
+          "id": "money-4",
+          "split": "development",
+          "family": "clear-money",
+          "question": "А без ограничения по сумме?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "operation",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": "money-3"
+          }
+        },
+        {
+          "id": "money-5",
+          "split": "development",
+          "family": "format",
+          "question": "А теперь общий итог?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": "money-4"
+          }
+        },
+        {
+          "id": "money-6",
+          "split": "development",
+          "family": "new-reset",
+          "question": "Общая сумма расходов за сентябрь 2026 года.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "parent",
+      "split": "holdout",
+      "turns": [
+        {
+          "id": "parent-1",
+          "split": "holdout",
+          "family": "new",
+          "question": "Расходы на Такси в сентябре 2026 года одной суммой.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ],
+                "subcategoryIds": [
+                  "50000000-0000-4000-8000-000000000012"
+                ]
+              }
+            },
+            "totalMinor": "35000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "parent-2",
+          "split": "holdout",
+          "family": "parent",
+          "question": "А теперь вся категория Поездки.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ]
+              }
+            },
+            "totalMinor": "35000",
+            "parentTurnId": "parent-1"
+          }
+        },
+        {
+          "id": "parent-3",
+          "split": "holdout",
+          "family": "grouping",
+          "question": "Представь тот результат по категориям.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ]
+              }
+            },
+            "totalMinor": "35000",
+            "parentTurnId": "parent-2"
+          }
+        },
+        {
+          "id": "parent-4",
+          "split": "holdout",
+          "family": "period",
+          "question": "А за предыдущий месяц?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30",
+                "categoryIds": [
+                  "50000000-0000-4000-8000-000000000011"
+                ]
+              }
+            },
+            "totalMinor": "35000",
+            "parentTurnId": "parent-3"
+          }
+        },
+        {
+          "id": "parent-5",
+          "split": "holdout",
+          "family": "clear-category",
+          "question": "А расходы по всем категориям?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "parent-4"
+          }
+        },
+        {
+          "id": "parent-6",
+          "split": "holdout",
+          "family": "new-reset",
+          "question": "Общая сумма доходов в выбранном периоде.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": null
+          }
+        }
+      ]
+    },
+    {
+      "id": "return",
+      "split": "holdout",
+      "turns": [
+        {
+          "id": "return-1",
+          "split": "holdout",
+          "family": "new",
+          "question": "Расходы за сентябрь 2026 года по категориям.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "category",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "return-2",
+          "split": "holdout",
+          "family": "new-reset",
+          "question": "Сумма доходов в октябре 2026 года.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "income",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-10-01",
+                "through": "2026-10-31"
+              }
+            },
+            "totalMinor": "2100000",
+            "parentTurnId": null
+          }
+        },
+        {
+          "id": "return-3",
+          "split": "holdout",
+          "family": "reference",
+          "question": "Покажи первый результат отдельными операциями.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "operation",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "return-1"
+          }
+        },
+        {
+          "id": "return-4",
+          "split": "holdout",
+          "family": "comparison",
+          "question": "Сопоставь его с предыдущим таким же периодом.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "operation",
+              "comparison": "previous_same",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "return-3"
+          }
+        },
+        {
+          "id": "return-5",
+          "split": "holdout",
+          "family": "format",
+          "question": "А итог одной суммой?",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "previous_same",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "return-4"
+          }
+        },
+        {
+          "id": "return-6",
+          "split": "holdout",
+          "family": "clear-comparison",
+          "question": "Оставь последний итог без сопоставления с другим периодом.",
+          "global": {
+            "revision": 0,
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            },
+            "touched": {}
+          },
+          "expected": {
+            "relevance": "financial",
+            "status": "query",
+            "query": {
+              "name": "query_finances",
+              "metric": "expenses",
+              "grouping": "none",
+              "comparison": "none",
+              "filter": {
+                "from": "2026-09-01",
+                "through": "2026-09-30"
+              }
+            },
+            "totalMinor": "195000",
+            "parentTurnId": "return-5"
+          }
+        }
+      ]
+    }
+  ],
+  "repetitions": [
+    {
+      "caseId": "single-01",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-02",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-03",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-05",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-06",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-07",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-10",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-16",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-17",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-20",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-24",
+      "additionalIndependentCopies": 2
+    },
+    {
+      "caseId": "single-28",
+      "additionalIndependentCopies": 2
+    }
+  ]
+}

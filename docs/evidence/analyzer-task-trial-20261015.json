@@ -1,0 +1,52 @@
+{
+  "version": "cashneuro-task-trial-preparation/1",
+  "date": "2026-10-15",
+  "status": "offline_corpus_and_get_preflight_implemented_paid_blocked",
+  "document": "docs/architecture/analyzer-task-trial.md",
+  "corpus": "apps/api/test/fixtures/task-trial-corpus-v1.json",
+  "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+  "counts": {
+    "standaloneQuestions": 48,
+    "dialogs": 8,
+    "turnsPerDialog": 6,
+    "baseTurns": 96,
+    "development": 68,
+    "holdout": 28,
+    "additionalIndependentRepeats": 24,
+    "maximumTurns": 120,
+    "maximumModelCalls": 240
+  },
+  "currentLanguageAccuracyMeasured": false,
+  "modelAcceptanceExecuted": false,
+  "paidCalls": 0,
+  "scope": "Pilot of current read-only task query protocol; not the 420-turn full-product acceptance or the 96 historical regressions.",
+  "budgetPolicy": {
+    "existingGlobalCapAtoms": "45000000000",
+    "plannedIncrementalCapAtoms": "20000000000",
+    "historicalKnownCostAtoms": "13372140620",
+    "historicalHeldAtoms": "7516800640",
+    "historicalUpperBoundAtoms": "20888941260",
+    "holdsReleased": false,
+    "paidRunnerImplemented": false
+  },
+  "providerVerification": {
+    "api": "GET https://foundation-models.api.cloud.ru/v1/models",
+    "preflightExecutedOnVps": false,
+    "immutableModelVersionVerified": false,
+    "currentTariffConfirmed": false,
+    "noCompletionEndpoint": true,
+    "noLedgerMutation": true
+  },
+  "localValidation": {
+    "newUnitTestsPassed": 12,
+    "apiUnitTestsPassed": 131,
+    "apiTypes": "passed",
+    "sourceIntegrity": "passed",
+    "ci": "pending"
+  },
+  "remaining": [
+    "Operator GET-only catalog preflight and applicable tariff/model revision evidence",
+    "Controlled paid runner with cumulative/incremental budget, reserve/replay/failure/phase gates",
+    "Fixed development and repetitions, then unopened holdout; full-product acceptance remains separate"
+  ]
+}
