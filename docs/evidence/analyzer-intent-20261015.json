@@ -1,0 +1,72 @@
+{
+  "evidence": "cashneuro-intent-implementation/1",
+  "sourceCommit": "50cd3caf392ce29bbc746dfe6b98fdc5ca7780e4",
+  "ci": {
+    "runId": 38782020448,
+    "jobId": 116584389428,
+    "attempt": 1,
+    "conclusion": "success",
+    "api": 218,
+    "core": 246,
+    "web": 82,
+    "postgres": 164,
+    "browser": 4,
+    "total": 714,
+    "failed": 0,
+    "skipped": 0
+  },
+  "protocol": "analyzer-task-intent/1",
+  "onePaidExtractionPerTurn": true,
+  "modelChoosesTaskBinding": false,
+  "modelInputFields": [
+    "question",
+    "hasFinancialTasks"
+  ],
+  "localValidation": {
+    "literalIntentSlots": 92,
+    "literalSlotsPassed": 92,
+    "conditionInvariantCases": 126,
+    "holdoutUsedForPromptEdits": false,
+    "independentModelAccuracyMeasured": false,
+    "originalObservedScoreReproduced": "52/92",
+    "publishedBlobsMatched": 16,
+    "boundSourceBlobsMatched": 51,
+    "isolatedTypecheckPassed": true,
+    "isolatedBindingMatched": true
+  },
+  "trialBindingSha256": "0167d21fd279fa1df5cac60df29fa86f6966a164f270dff5e636cf6cb0e1e4fa",
+  "sourceSha256": "fa3f6464cb721eaa1bc79c4da752856654a19162726aded174ab59086da4efdf",
+  "promptsSha256": "b2e524eb100728bc8b3e89cd10152d90d747d6e13b287d0c33966daf5808b2be",
+  "paidExperiment": {
+    "executed": false,
+    "maximumTurns": 120,
+    "maximumModelCalls": 120,
+    "development": 68,
+    "independentRepeatSlots": 24,
+    "holdout": 28,
+    "holdoutGate": "92/92 exact development and repeat slots",
+    "autoRetry": false,
+    "repeatCommandIsFreeSavedReport": true
+  },
+  "baseline": {
+    "records": 665,
+    "ledgerHeadSha256": "5d5271f31c34cf41ac47712fff2718f666c85744b9df11618010968c7d4d05fb",
+    "spentAtoms": "22627111860",
+    "heldAtoms": "11820804480",
+    "budgetBaselineUpperAtoms": "20888941260",
+    "originalIncrementalCapAtoms": "20000000000",
+    "remainingAtoms": "6441024920",
+    "maximumReservationAtoms": "2152001920",
+    "holdsReleased": false,
+    "budgetIncreased": false,
+    "fullBatchFitsRemainingBudgetVerified": false
+  },
+  "modelAccepted": false,
+  "immutableModelVersionVerified": false,
+  "runtimeAiEnabled": false,
+  "migrationApplied": false,
+  "deployed": false,
+  "merged": false,
+  "modelTrainingPerformed": false,
+  "newPaidCallsByAssistant": 0
+}

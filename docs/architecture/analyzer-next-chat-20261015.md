@@ -5,6 +5,13 @@
 описание: [analyzer-intent-20261015.md](analyzer-intent-20261015.md).
 Ниже сохранена предшествующая точка аудита и VPS baseline. Фразы «ещё не
 реализован» ниже относятся к историческому состоянию до этого обновления.
+Новый executable source: `50cd3caf392ce29bbc746dfe6b98fdc5ca7780e4`.
+CI 38782020448: 714/714 software tests, включая single-intent PostgreSQL
+и desktop/mobile browser. Операторская команда — run-intent-trial-20261015.sh.
+Новый checkout /home/finance-admin/cashneuro-intent-trial-50cd3caf; новые
+root artifacts task-intent-trial-v1.json, task-intent-trial-v1-cache,
+task-intent-trial-v1.lock. Binding:
+0167d21fd279fa1df5cac60df29fa86f6966a164f270dff5e636cf6cb0e1e4fa.
 Языковой результат нового пути пока НЕ измерен; старый 52/92 неизменен.
 
 Последнее указание владельца 15.10.2026 20:27 Moscow: работа идёт слишком

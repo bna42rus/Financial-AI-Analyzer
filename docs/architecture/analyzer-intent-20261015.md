@@ -68,7 +68,15 @@ literal intentions, 126 комбинаций metric/presentation/comparison/из
 Исторический реальный результат остаётся 52/92; offline audit воспроизводит его.
 PostgreSQL tests дополнительно проверяют single-call HTTP, сохранение amount
 scope, restart replay, billing rejected payload и отсутствие финансового чтения
-после unrelated. Полный CI фиксируется отдельно по завершении.
+после unrelated.
+
+Полный CI executable source `50cd3caf392ce29bbc746dfe6b98fdc5ca7780e4`: **714/714** —
+218 API, 246 core, 82 web, 164 PostgreSQL 18.4, 4 Chromium desktop/mobile.
+Types/builds/privacy/REST/source checks проходят.
+Run: https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38782020448
+Job 116584389428, attempt 1. Все 16 опубликованных source/doc blobs совпали
+с локально проверенными файлами. Отдельная копия с прежними dependencies
+проходит types и даёт тот же binding. Evidence: analyzer-intent-20261015.json.
 
 ## Один новый операторский batch
 
@@ -106,3 +114,7 @@ provider revision не подтверждена. Даже успешный batch
 Новая схема уменьшает обязанности модели, но не доказывает универсальную
 языковую точность. Новые парафразы, пропущенные/неверные mentions и отказ модели
 измеряются реальным независимым запуском. Дообучение не выполнялось.
+
+Операторская команда сохранена в `run-intent-trial-20261015.sh` рядом с этим
+документом; она использует отдельный checkout source 50cd3caf и проверяет binding
+`0167d21fd279fa1df5cac60df29fa86f6966a164f270dff5e636cf6cb0e1e4fa` до sudo/ключа/платного POST.
