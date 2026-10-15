@@ -24,7 +24,7 @@ export async function taskTransaction<T>(pool: Pool, userId: string, action: (db
 }
 export type ProviderTask = { userId: string; id: string; binding: unknown; anchorAt: string; periodStart: string; question: string };
 export type CloudTaskProvider = {
-  pool: Pool; environment: 'test'; model: string; binding: unknown;
+  pool: Pool; environment: 'test'; model: string; binding: unknown; billingPhase: 'gate' | 'plan';
   forTask(task: ProviderTask, guard: (db: PoolClient) => Promise<void>): TaskModel;
 };
 const providers = new WeakSet<object>();
@@ -44,10 +44,10 @@ function testCloudProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostP
   const transport = createBenchmarkTransport('cloud-oss', { apiKey: 'synthetic-task-provider-key-for-tests-only' }, fetcher, 'empty-tools', intent ? intentRequestBody : benchmarkRequestBody);
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
   const binding = { ...taskWorkflowBinding, transport: 'cloud-task-http/1', responseContract: correctedResponseContractVersion,
-    ...(intent ? { intent: taskIntentVersion, intentWire: intentWireVersion } : {}), model: transport.bound.modelVersion, bound: transport.bound, price: cost.price,
+    ...(intent ? { intent: taskIntentVersion, intentWire: intentWireVersion, billingPhase: 'gate' } : {}), model: transport.bound.modelVersion, bound: transport.bound, price: cost.price,
     project: { id: cost.projectId, start: cost.projectPeriodStart, end: cost.projectPeriodEnd, limit: cost.projectLimitRub } };
   const service: CloudTaskProvider = {
-    pool, environment: 'test', model: transport.bound.modelVersion, binding,
+    pool, environment: 'test', model: transport.bound.modelVersion, binding, billingPhase: intent ? 'gate' : 'plan',
     forTask(task, guard) {
       async function call(step: 'gate' | 'plan', prompt: string, input: unknown, schema: unknown, parse: (value: unknown) => unknown) {
         // Exact bytes include all prompt/input/schema/transport and price versions.

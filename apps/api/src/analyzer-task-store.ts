@@ -139,7 +139,7 @@ export async function executeAnalyzerTask(pool: Pool, userId: string, value: unk
       const billed = await db.query(`INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version)
         SELECT user_id,request_id,anchor_at,period_start,1,(SELECT sum(input_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),
         (SELECT sum(output_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),provider,model,model_version
-        FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan' AND state='received' AND usage_state='reported'`, [userId, id]);
+        FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state='received' AND usage_state='reported'`, [userId, id, provider.billingPhase]);
       if (billed.rowCount !== 1) throw new HttpError(409, 'AI_STATE_CHANGED');
     }
     await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND state='received'", [userId, id]);

@@ -162,3 +162,11 @@ test('a repeated metric in a connected follow-up preserves its compatible task; 
   assert.deepEqual(compileTaskIntent(intent, 'Сколько потратил?', '2026-10-15', ['expenses']).binding, { kind: 'new' });
   assert.deepEqual(compileTaskIntent(income('доходы'), 'А доходы?', '2026-10-15', ['expenses']).binding, { kind: 'new' });
 });
+
+test('ordinary paraphrases supply evidence without tying income/expenses/review to one benchmark wording', () => {
+  for (const [metric, question, quote] of [
+    ['income', 'Сколько денег получил?', 'получил'], ['income', 'Какие поступления за месяц?', 'поступления'],
+    ['expenses', 'Сколько заплатил за покупки?', 'заплатил'], ['expenses', 'Сумма списаний.', 'списаний'],
+    ['attention', 'Покажи подозрительные операции.', 'подозрительные'],
+  ]) assert.doesNotThrow(() => parseTaskIntent(read({ metric: m(metric!, quote!) }), question!));
+});

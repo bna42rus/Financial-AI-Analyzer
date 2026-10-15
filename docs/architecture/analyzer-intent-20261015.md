@@ -50,6 +50,11 @@ default действует только при отсутствии предыд
   HTTP/PostgreSQL guards, commercial receipts/cache и atomic commit.
 - task-intent-trial.ts / task-intent-trial-main.ts — отдельный frozen batch.
 
+Commercial customer unit сохраняется по фактически оплаченной phase:
+gate у single-intent provider, plan у прежнего двухшагового provider. Phase
+задаёт доверенная server factory, а не пользователь/модель. Отсутствие второго
+completion не отменяет успешный ответ и не создаёт вторую оплату.
+
 Компактная schema использует общий vocabulary значений edits; ОБЯЗАТЕЛЬНЫЙ
 прежний field-specific parser дополнительно проверяет все типы, имена, цитаты
 и запрещённые комбинации до cache/catalog. Ни generic schema, ни модель

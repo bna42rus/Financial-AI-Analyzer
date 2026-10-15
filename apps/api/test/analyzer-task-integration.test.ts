@@ -86,7 +86,7 @@ test('single intent HTTP path preserves amount scope through follow-up, persists
     assert.equal(stored.nodes[1].parent, stored.nodes[0].messageId); assert.equal(stored.nodes[1].query.filter.amountFrom, '10000');
     assert.equal(stored.nodes[1].query.filter.amountThrough, '20000'); assert.equal(stored.nodes[1].query.grouping, 'category');
     const commercial = (await pg.owner.query('SELECT step,state,usage_state FROM commerce.analyzer_request ORDER BY created_at')).rows;
-    assert.equal(commercial.length, 2); assert.ok(commercial.every(row => row.step === 'gate' && row.state === 'received' && row.usage_state === 'reported'));
+    assert.equal(commercial.length, 2); assert.ok(commercial.every(row => row.step === 'gate' && row.state === 'completed' && row.usage_state === 'reported'));
     for (const payload of outgoing) assert.deepEqual(Object.keys(payload as object).sort(), ['hasFinancialTasks', 'question']);
     const restarted = await createServer({ ...config, taskProvider: makeIntentProvider() });
     try { const replay = await request('/finance/analyzer-task', nextBody, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), next.json()); assert.equal(calls, 2); } finally { await restarted.close(); }

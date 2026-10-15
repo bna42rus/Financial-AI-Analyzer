@@ -40,9 +40,9 @@ const fold = (s: string) => s.normalize('NFKC').toLocaleLowerCase('ru-RU').repla
 // These checks validate a model's claimed evidence. They never change relevance
 // or manufacture a missing mention from a financial-looking user question.
 const metricEvidence: Record<string, RegExp> = {
-  expenses: /(?:расход|трат|трач|spen|expense)/u,
-  income: /(?:доход|заработ|поступлен|income|earn)/u,
-  attention: /(?:внимани|провер|сомнитель|attention|review)/u,
+  expenses: /(?:расход|трат|трач|издерж|покуп|списан|заплат|уплат|spen|expense|paid)/u,
+  income: /(?:доход|заработ|поступ|получ|пришл|выруч|прибыл|income|earn|receiv)/u,
+  attention: /(?:внимани|провер|сомнитель|подозрит|неразобран|attention|review)/u,
 };
 const groupingEvidence: Record<string, RegExp> = {
   none: /(?:итог|сумм|одн\S* (?:числ|цифр)|всего|total)/u,
