@@ -139,16 +139,16 @@ hashes corpus, source files, prompts/schema, versions, sampling, budget и IDs.
 Pilot имеет currentTariffConfirmed=true и immutableModelVersionVerified=false;
 ordinary preflight manifest сам по себе по-прежнему не разрешает оплату.
 
-## Проверка подготовленного кода
+## Предыдущая проверка подготовки без платного runner
 
 На commit `20af685e30836981080e983c54218d09d15c8f19` полный CI
 [38738230119](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38738230119)
 успешен: **625/625** (246 core, 132 API unit, 82 web, 161 PostgreSQL 18.4,
 4 Chromium browser tests desktop/mobile). Включены 13 новых проверок
 корпуса, оценки, отсутствия повторного dispatch и GET-only preflight.
-Все model responses синтетические; платных вызовов ноль. Команда оператора
-должна использовать этот точный проверенный source commit. Следующий
-evidence-only commit не меняет исполняемые файлы.
+Все model responses синтетические; платных вызовов ноль. Этот commit
+проверял только подготовку и GET-only preflight. Для нового --live-pilot
+используется следующий проверенный исполняемый artifact.
 
 ## Реализованный операторский запуск и отчёт
 
@@ -225,3 +225,22 @@ Source identity включает static relative import/re-export closure, в т
 helpers, а также package/lock files. Порядок ключей hash map не зависит от
 локали. Изменение этих правил требует нового binding и не переиспользует
 старые оплаченные request IDs.
+
+## Проверка исполняемого pilot artifact
+
+На commit `745d41275822c30f83bda4944095da015e3142ae` полный CI
+[38743441583](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38743441583)
+успешен: **647/647** — 246 core, 154 API unit, 82 web, 161 PostgreSQL 18.4
+и 4 настоящих Chromium browser tests desktop/mobile. Types, Finance/Control
+builds, REST/privacy checks проходят. Включены 22 новых pilot tests;
+реальных model POST в CI не было. Эти числа подтверждают программные
+инварианты, а не языковую точность GPT-OSS.
+
+Source SHA256:
+`30fca54575fc31a25556e08c4a73129f52c7e96870d23849d70272e818858787`.
+Полный pilot binding SHA256:
+`0afd24fe2c7394be7ee74e5000fb1996e21f4f885c0db38adf977bb14797f691`.
+Corpus/prompt hashes оператора сохранены. Следующий evidence-only commit
+не меняет executable code; команда на VPS фиксирует именно указанный
+проверенный code commit. Платный pilot ещё не выполнен; model acceptance
+и runtime AI остаются выключены.

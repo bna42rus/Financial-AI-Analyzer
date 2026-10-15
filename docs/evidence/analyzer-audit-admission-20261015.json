@@ -179,6 +179,10 @@
     "immutableModelVersionVerified": false,
     "currentTariffConfirmed": true,
     "reasonForLimitedAdmission": "GET catalog supplied by the operator confirms the exact observed alias/context but exposes no immutable revision. A provisional evaluation of that service is useful and within the already approved test budget; it does not satisfy model acceptance or enable runtime AI. Exact current internal-model rates independently verified in current-version tariff 261015 rows 271/272.",
-    "evidence": "docs/evidence/analyzer-task-pilot-20261015.json"
+    "evidence": "docs/evidence/analyzer-task-pilot-20261015.json",
+    "testedCodeCommit": "745d41275822c30f83bda4944095da015e3142ae",
+    "ciRunId": 38743441583,
+    "softwareTestsPassed": 647,
+    "realModelTrialExecuted": false
   }
 }

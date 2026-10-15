@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-task-pilot-implementation/1",
   "date": "2026-10-15",
-  "status": "controlled_provisional_service_pilot_implemented_ci_pending",
+  "status": "controlled_provisional_service_pilot_ci_verified_not_executed",
   "newPaidCallsByAssistant": 0,
   "realModelAccuracyMeasured": false,
   "modelAccepted": false,
@@ -74,8 +74,35 @@
     "newPilotTestsPassed": 22,
     "trialAndPilotTestsPassed": 35,
     "apiTypes": "passed",
-    "ci": "pending",
+    "ci": "passed",
     "apiUnitTestsPassed": 154
+  },
+  "testedArtifact": {
+    "codeCommit": "745d41275822c30f83bda4944095da015e3142ae",
+    "sourceSha256": "30fca54575fc31a25556e08c4a73129f52c7e96870d23849d70272e818858787",
+    "pilotBindingSha256": "0afd24fe2c7394be7ee74e5000fb1996e21f4f885c0db38adf977bb14797f691",
+    "corpusAndPromptHashesUnchangedFromOperatorPreflight": true,
+    "codeCommitRequiredForOperatorCommand": true
+  },
+  "fullCi": {
+    "commit": "745d41275822c30f83bda4944095da015e3142ae",
+    "runId": 38743441583,
+    "jobId": 116450757912,
+    "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38743441583",
+    "conclusion": "success",
+    "core": 246,
+    "apiUnit": 154,
+    "web": 82,
+    "postgres18": 161,
+    "browser": 4,
+    "total": 647,
+    "passed": 647,
+    "failed": 0,
+    "typesBuildsAndPrivacyChecks": "passed",
+    "postgresVersion": "18.4",
+    "desktopAndMobileChromium": true,
+    "syntheticModelResponsesOnly": true,
+    "paidModelCalls": 0
   },
   "invariants": [
     "Unknown delivery/usage keeps a full reserve and stops all new dispatch",
