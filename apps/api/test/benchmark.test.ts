@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createBenchmarkTransport, replayOnlyBenchmarkTransport, candidates, BenchmarkFailure } from '../src/benchmark-transport.ts';
 import { BenchmarkLedger, benchmarkDigest } from '../src/benchmark-ledger.ts';
-import { benchmarkPromptVersion, runSmoke, runComparison, runExplicitTrial, runLiteralRegression, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
+import { benchmarkPromptVersion, runSmoke, runComparison, runExplicitTrial, runLiteralRegression, runContextRegression, runTransfer, smokeCostReport, inspectBenchmark } from '../src/benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios, syntheticCatalog, october } from '../src/benchmark-fixtures.ts';
 import { gatePrompt, gateSchema } from '../../../packages/analyzer/src/yandex-contract.ts';
 import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
@@ -18,6 +18,7 @@ import { transferScenarios, transferFixtureVersion } from '../src/benchmark-tran
 import { parseExplicitPlan, explicitPlanPrompt, explicitPlanSchema } from '../src/benchmark-explicit-plan.ts';
 import { parseMoneyLiteral, parseQuotedMoney } from '../src/benchmark-money.ts';
 import { parseLiteralPlan, literalGatePrompt, literalPlanPrompt, literalPlanSchema } from '../src/benchmark-literal-plan.ts';
+import { contextGatePrompt, contextPlanPrompt, contextDecisionTemplate } from '../src/benchmark-context-prompts.ts';
 import { queryOperations } from '../../../packages/finance-core/src/operations.ts';
 import type { OperationRow } from '../../../packages/finance-core/src/operations.ts';
 import { facet } from '../../../packages/finance-core/src/model.ts';
@@ -1162,4 +1163,89 @@ test('completed regression reports both subsets and their combined cost and repe
   const source = await readFile(join(dir, 'ledger.jsonl'));
   const replay = await runLiteralRegression(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), ledger);
   assert.equal(replay.passed, result.passed); assert.equal(calls, 118); assert.deepEqual(await readFile(join(dir, 'ledger.jsonl')), source);
+}));
+
+
+// Scripted provider responses exercise server state and scoring, not model IQ.
+function contextFixtureClient(bad = false, revision: 'literal' | 'context' = 'context', inspect: (input: any, gate: boolean) => void = () => {}) {
+  const turns = smokeScenarios.flatMap(s => s.turns); let turnIndex = 0;
+  return createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    const body = JSON.parse(String(options!.body)), input = JSON.parse(body.messages[1].content);
+    const isGate = body.messages[0].content === (revision === 'context' ? contextGatePrompt : literalGatePrompt);
+    const turn = turns[isGate ? turnIndex++ : turnIndex - 1]!;
+    assert.equal(input.question, turn.question);
+    inspect(input, isGate);
+    if (isGate) {
+      if (bad && turn.id === 'selected') return response({ relevance: 'ambiguous', followUp: false });
+      if (bad && ['scope-5', 'global-6'].includes(turn.id)) return response({ relevance: 'financial', followUp: true });
+      return response(turn.expectedGate);
+    }
+    assert.equal(body.messages[0].content, revision === 'context' ? contextPlanPrompt : literalPlanPrompt);
+    assert.deepEqual(body.response_format.json_schema.schema, literalPlanSchema);
+    const delta = scriptedDeltas[turn.id] as Record<string, unknown> ?? {};
+    return response(literalDecision(bad && turn.id === 'scope-3' ? { ...delta, grouping: 'none' } : delta,
+      'inherit', 'inherit', turn.id === 'write' ? 'unsupported' : 'query'));
+  }) as typeof fetch, 'empty-tools');
+}
+test('context input marks new tasks and continuations without leaking filters or changing historical prompts', async () => sandbox(async (_, ledger) => {
+  const inputs = new Map<string, any>();
+  const result = await runSmoke(contextFixtureClient(false, 'context', (input, gate) => {
+    assert.doesNotMatch(JSON.stringify(input), /11111111|22222222|33333333|categoryIds|subcategoryIds|expectedPlan/);
+    if (!gate) { inputs.set(input.question, input); assert.deepEqual(input.decisionTemplate, contextDecisionTemplate); }
+  }), ledger, 'task', 'after-funding', true, 'context');
+  assert.equal(result.passed, 24); assert.equal(result.benchmarkPromptVersion, 'cashneuro-smoke-prompt/7');
+  const byId = (id: string) => inputs.get(smokeScenarios.flatMap(s => s.turns).find(t => t.id === id)!.question);
+  assert.equal(byId('scope-3').taskRelation, 'continue'); assert.equal(byId('scope-3').previousTask.grouping, 'category');
+  assert.equal(byId('scope-5').taskRelation, 'new'); assert.equal(byId('scope-5').previousTask, null);
+  assert.equal(byId('selected').taskRelation, 'new');
+  assert.deepEqual(result.checks.find(c => c.id === 'scope-5')?.diagnostics?.actualPlan?.query?.filter, october);
+  assert.equal(result.checks.find(c => c.id === 'scope-4')?.diagnostics?.actualPlan?.query?.grouping, 'category');
+  assert.notEqual(contextPlanPrompt, literalPlanPrompt); assert.notEqual(contextGatePrompt, literalGatePrompt);
+  for (const turn of [...smokeScenarios, ...transferScenarios].flatMap(s => s.turns)) {
+    assert.equal(contextPlanPrompt.includes(turn.question), false); assert.equal(contextGatePrompt.includes(turn.question), false);
+  }
+}));
+test('wrong context decisions keep the six observed failures including cascades; no server patch awards a pass', async () => sandbox(async (_, ledger) => {
+  const result = await runSmoke(contextFixtureClient(true), ledger, 'task', 'after-funding', true, 'context');
+  assert.equal(result.passed, 18);
+  assert.deepEqual(result.checks.filter(c => !c.gate || c.plan === false).map(c => c.id), ['selected', 'scope-3', 'scope-4', 'scope-5', 'scope-6', 'global-6']);
+  assert.equal(result.checks.reduce((n, c) => n + c.calls, 0), 45);
+  assert.equal(result.checks.find(c => c.id === 'scope-3')?.diagnostics?.decisions?.grouping, 'none');
+  assert.equal(result.checks.find(c => c.id === 'scope-6')?.diagnostics?.actualPlan?.query?.filter.subcategoryIds?.length, 1);
+}));
+test('context trial requires every historical batch, leaves failed prompt6 intact, stops before transfer and replays freely', async () => sandbox(async (dir, ledger) => {
+  await seedGigaRejection(ledger); await ledger.allowOssContinuation(); const held = ledger.totals().held;
+  await runSmoke(explicitFixtureClient(), ledger, 'task', 'after-funding', false, 'explicit');
+  const oldTransfer = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => response({ relevance: 'unrelated', followUp: false })) as typeof fetch, 'empty-tools');
+  await runSmoke(oldTransfer, ledger, 'task', 'after-funding', false, 'explicit', 'transfer');
+  let paid = 0;
+  const client = contextFixtureClient(true, 'context', () => { paid++; });
+  const path = join(dir, 'ledger.jsonl'), missing = await readFile(path);
+  await assert.rejects(runContextRegression(client, ledger), /BENCH_REPLAY_ONLY/); assert.equal(paid, 0);
+  assert.deepEqual(await readFile(path), missing);
+  const previous = await runSmoke(contextFixtureClient(true, 'literal'), ledger, 'task', 'after-funding', true, 'literal');
+  assert.equal(previous.passed, 18); const source = await readFile(path, 'utf8');
+  const result = await runContextRegression(client, ledger); assert.equal(result.passed, 18); assert.equal(result.regression, 'smoke-only/1');
+  assert.equal(result.turns, 24); assert.equal(paid, 45); assert.equal(ledger.totals().held, held);
+  assert.ok((await readFile(path, 'utf8')).startsWith(source));
+  const final = await readFile(path), readonly = await BenchmarkLedger.load(path, { readOnly: true });
+  try {
+    const replay = await runContextRegression(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), readonly);
+    assert.deepEqual(replay.checks.map(c => c.diagnostics), result.checks.map(c => c.diagnostics));
+    assert.equal(replay.checks.reduce((n, c) => n + c.replayCalls, 0), 45);
+    const old = await runSmoke(replayOnlyBenchmarkTransport('cloud-oss', 'empty-tools'), readonly, 'task', 'after-funding', true, 'literal');
+    assert.equal(old.passed, 18); assert.deepEqual(old.checks.map(c => c.diagnostics), previous.checks.map(c => c.diagnostics));
+  } finally { await readonly.close(); }
+  assert.equal(paid, 45); assert.deepEqual(await readFile(path), final);
+}));
+test('context contract stops at a missing mandatory field rather than spending on subsequent turns', async () => sandbox(async (_, ledger) => {
+  let calls = 0;
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const body = JSON.parse(String(options!.body));
+    return response(body.messages[0].content === contextGatePrompt ? { relevance: 'financial', followUp: false } : { status: 'query' });
+  }) as typeof fetch, 'empty-tools');
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'context'), /BENCH_CAPABILITY_FAILURE/);
+  assert.equal(calls, 2);
+  await assert.rejects(runSmoke(client, ledger, 'task', 'after-funding', true, 'context'), /BENCH_CAPABILITY_FAILURE/);
+  assert.equal(calls, 2);
 }));

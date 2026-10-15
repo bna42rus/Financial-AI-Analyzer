@@ -7,7 +7,7 @@ import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import { candidates, createBenchmarkTransport, replayOnlyBenchmarkTransport, BenchmarkFailure } from './benchmark-transport.ts';
 import type { Candidate } from './benchmark-transport.ts';
 import { BenchmarkLedger } from './benchmark-ledger.ts';
-import { runSmoke, runComparison, runExplicitTrial, runLiteralRegression, runTransfer, smokeCostReport, inspectBenchmark } from './benchmark-engine.ts';
+import { runSmoke, runComparison, runExplicitTrial, runLiteralRegression, runContextRegression, runTransfer, smokeCostReport, inspectBenchmark } from './benchmark-engine.ts';
 import type { ContextMode } from './benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
 import { assertInactiveOperator, archiveRejectedGigaLock, probeRequestId, runProbe, formatProbeRequestId, runFormatProbe } from './benchmark-probe.ts';
@@ -16,7 +16,8 @@ const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
   const inspection = action === '--inspect';
-  const regression = action === '--live-regression' || action === '--report-regression';
+  const context = action === '--live-context' || action === '--report-context';
+  const regression = context || action === '--live-regression' || action === '--report-regression';
   const delta = action === '--live-delta' || action === '--report-delta';
   const explicit = ['--live-explicit', '--report-explicit', '--live-transfer-explicit', '--report-transfer-explicit'].includes(action ?? '');
   const transfer = ['--live-transfer', '--report-transfer', '--live-transfer-explicit', '--report-transfer-explicit'].includes(action ?? '');
@@ -25,10 +26,10 @@ async function main() {
   const diagnostic = action === '--probe' || action === '--probe-after-funding' || formatProbe;
   const comparison = action === '--compare' || action === '--compare-fixed';
   const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison || compatible;
-  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || action === '--report-delta' || action === '--report-transfer' || action === '--report-explicit' || action === '--report-transfer-explicit' || action === '--report-regression' || inspection;
+  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || action === '--report-delta' || action === '--report-transfer' || action === '--report-explicit' || action === '--report-transfer-explicit' || action === '--report-regression' || action === '--report-context' || inspection;
   const revised = action === '--live-revised' || action === '--report-revised';
   const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved || delta || transfer || explicit || regression;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect', '--live-delta', '--report-delta', '--live-transfer', '--report-transfer', '--live-explicit', '--report-explicit', '--live-transfer-explicit', '--report-transfer-explicit', '--live-regression', '--report-regression'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga' || (delta || transfer || explicit || regression) && (candidate !== 'cloud-oss' || mode !== 'task')) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect', '--live-delta', '--report-delta', '--live-transfer', '--report-transfer', '--live-explicit', '--report-explicit', '--live-transfer-explicit', '--report-transfer-explicit', '--live-regression', '--report-regression', '--live-context', '--report-context'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga' || (delta || transfer || explicit || regression) && (candidate !== 'cloud-oss' || mode !== 'task')) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -80,7 +81,7 @@ async function main() {
     // A revised paid trial requires a completed baseline for the same model/mode.
     if (revised && !report) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding');
     if (resolved && !report && !comparison) await runSmoke(replayOnlyBenchmarkTransport(candidate as Candidate), ledger, mode as ContextMode, 'after-funding', false, 'revised');
-    const result = regression ? await runLiteralRegression(transport, ledger) : transfer ? await runTransfer(transport, ledger, explicit ? 'explicit' : 'delta') : explicit && !report ? await runExplicitTrial(transport, ledger) : formatProbe ? await runFormatProbe(transport, ledger) : diagnostic ? await runProbe(transport, ledger, probePhase) : comparison ? await runComparison(transport, ledger, mode as ContextMode) :
+    const result = context ? await runContextRegression(transport, ledger) : regression ? await runLiteralRegression(transport, ledger) : transfer ? await runTransfer(transport, ledger, explicit ? 'explicit' : 'delta') : explicit && !report ? await runExplicitTrial(transport, ledger) : formatProbe ? await runFormatProbe(transport, ledger) : diagnostic ? await runProbe(transport, ledger, probePhase) : comparison ? await runComparison(transport, ledger, mode as ContextMode) :
       await runSmoke(transport, ledger, mode as ContextMode, fundedSmoke || report || revised || resolved || delta || explicit ? 'after-funding' : 'initial', report || revised || resolved || delta || explicit, explicit ? 'explicit' : delta ? 'delta' : resolved ? 'resolved' : revised ? 'revised' : 'original');
     console.log(JSON.stringify({ ...result, ...((report || revised || resolved || delta || transfer || explicit || regression) && 'checks' in result ? { checks: result.checks.filter(c => !c.gate || c.plan === false) } : {}),
       ...(report ? { report: 'saved-smoke/1', paidCalls: 0 } : {}), cost: smokeCostReport(ledger) }));

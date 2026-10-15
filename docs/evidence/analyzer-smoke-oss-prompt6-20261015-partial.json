@@ -1,0 +1,144 @@
+{
+  "evidenceVersion": "cashneuro-operator-extract/1",
+  "receivedDateEuropeMoscow": "2026-10-15",
+  "source": "Operator pasted terminal output in the project conversation; the initial header was truncated.",
+  "completeness": "partial_extract_not_raw_full_report",
+  "commandContext": {
+    "action": "--live-regression",
+    "candidate": "cloud-oss",
+    "benchmarkPromptVersion": "cashneuro-smoke-prompt/6",
+    "provenance": "Correlated with the previously supplied pinned command; these leading header fields were not visible in the pasted fragment."
+  },
+  "observed": {
+    "responseContract": "cashneuro-response/2",
+    "mode": "task",
+    "runPhase": "after-funding",
+    "turns": 24,
+    "passed": 18,
+    "costPerTurnAtoms": {
+      "meanCeil": "62604605",
+      "median": "66039820",
+      "p95": "84949820",
+      "maximum": "85206020",
+      "perCorrectTurnCeil": "83472807"
+    },
+    "regression": "smoke-only/1",
+    "failures": [
+      {
+        "id": "selected",
+        "gate": false,
+        "plan": false,
+        "calls": 1,
+        "actualGate": {
+          "relevance": "ambiguous",
+          "followUp": false
+        },
+        "actualPlan": null
+      },
+      {
+        "id": "scope-3",
+        "gate": true,
+        "plan": false,
+        "calls": 2,
+        "actualGate": {
+          "relevance": "financial",
+          "followUp": true
+        },
+        "actualGrouping": "none",
+        "groupingDecision": "none",
+        "actualCategoryIds": [
+          "22222222-2222-4222-8222-222222222222"
+        ],
+        "actualSubcategoryIds": [
+          "33333333-3333-4333-8333-333333333333"
+        ]
+      },
+      {
+        "id": "scope-4",
+        "gate": true,
+        "plan": false,
+        "calls": 2,
+        "actualGate": {
+          "relevance": "financial",
+          "followUp": true
+        },
+        "actualGrouping": "none",
+        "groupingDecision": "inherit",
+        "actualFrom": "2026-10-01",
+        "actualThrough": "2026-10-31"
+      },
+      {
+        "id": "scope-5",
+        "gate": false,
+        "plan": false,
+        "calls": 2,
+        "actualGate": {
+          "relevance": "financial",
+          "followUp": true
+        },
+        "actualMetric": "income",
+        "actualCategoryIds": [
+          "22222222-2222-4222-8222-222222222222"
+        ],
+        "actualSubcategoryIds": [
+          "33333333-3333-4333-8333-333333333333"
+        ]
+      },
+      {
+        "id": "scope-6",
+        "gate": true,
+        "plan": false,
+        "calls": 2,
+        "actualGate": {
+          "relevance": "financial",
+          "followUp": true
+        },
+        "actualMetric": "income",
+        "actualGrouping": "category",
+        "actualCategoryIds": [
+          "22222222-2222-4222-8222-222222222222"
+        ],
+        "actualSubcategoryIds": [
+          "33333333-3333-4333-8333-333333333333"
+        ]
+      },
+      {
+        "id": "global-6",
+        "gate": false,
+        "plan": true,
+        "calls": 2,
+        "actualGate": {
+          "relevance": "financial",
+          "followUp": true
+        },
+        "actualMetric": "income"
+      }
+    ],
+    "cost": {
+      "calls": 447,
+      "reportedCalls": 444,
+      "failedCalls": 30,
+      "inputTokens": 300918,
+      "outputTokens": 118081,
+      "spentAtoms": "11824192420",
+      "heldAtoms": "7516800640",
+      "budgetUsedUpperBoundAtoms": "19340993060",
+      "requiresReconciliation": true,
+      "latencyP95Ms": 1914,
+      "immutableModelVersionVerified": false
+    }
+  },
+  "derivedDeltaFromPreviousOperatorReport": {
+    "calls": 45,
+    "reportedCalls": 45,
+    "inputTokens": 42032,
+    "outputTokens": 13703,
+    "spentAtoms": "1502510520",
+    "newUnknownReservations": 0
+  },
+  "limitations": [
+    "Failure diagnostics are summarized, not a complete copy of every field.",
+    "No transfer result exists for this revision because smoke stopped admission.",
+    "No immutable model pin, reconciled provider invoice or runtime acceptance is established."
+  ]
+}
