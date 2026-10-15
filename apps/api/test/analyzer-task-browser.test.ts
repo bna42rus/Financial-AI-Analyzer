@@ -49,12 +49,14 @@ async function within<T>(fn: (db: PoolClient) => Promise<T>) {
   catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
 }
 async function screen(page: Page, name: string) {
-  await page.getByRole('button', { name: 'Открыть экраны приложения' }).click();
-  await page.getByRole('link', { name, exact: true }).click();
+  const opener = page.getByRole('button', { name: 'Открыть экраны приложения' }), link = page.getByRole('link', { name, exact: true });
+  await expect(opener.or(link).first()).toBeVisible();
+  if (await opener.isVisible()) await opener.click();
+  await link.click();
 }
 for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK, cross-tab CAS, reload/cancel and confirmed deletion (${mobile ? 'mobile' : 'desktop'})`, { timeout: 180000 }, async () => {
   calls = 0; blockNext = false;
-  await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,finance.workspace,commerce.ai_project_budget CASCADE');
+  await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,finance.workspace,commerce.access_cycle,commerce.ai_project_budget CASCADE');
   await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('task-browser','Synthetic task browser','task-browser@example.test',true,now(),now())");
   await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('task-browser',true)");
   await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('task-browser-account','task-browser','task-browser','credential',$1,now(),now())", [await hashPassword(password)]);
@@ -100,7 +102,7 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
     // recovered request can be cancelled without completing or charging a unit.
     blockNext = true; barrier = deferred(); reached = deferred(); await send('Итог?'); await reached.promise;
     await page.reload(); await screen(page, 'Анализатор'); await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Отменить вопрос', exact: true }).click(); barrier.resolve(); await idle();
+    await page.getByRole('button', { name: 'Отменить вопрос', exact: true }).click(); await expect(page.getByRole('button', { name: 'Отменить вопрос', exact: true })).toHaveCount(0); await idle(); barrier.resolve();
     await expect.poll(async () => (await pg.owner.query("SELECT count(*) AS n FROM commerce.ai_cost_reservation WHERE state='reserved'")).rows[0].n).toBe('0'); assert.equal((await messages()).length, 4);
 
     // Deletion must require confirmation and discard a recovered pending UI
@@ -110,7 +112,7 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
     if (mobile) await page.getByRole('button', { name: 'Диалоги', exact: true }).click();
     await page.getByRole('button', { name: /^Настроить диалог:/ }).filter({ visible: true }).click(); const management = page.getByRole('dialog', { name: 'Настройки диалога' });
     await management.getByRole('button', { name: 'Удалить диалог', exact: true }).click(); assert.equal((await messages()).length, 4);
-    await management.getByRole('button', { name: 'Подтвердить удаление диалога', exact: true }).click(); barrier.resolve(); await idle();
+    await management.getByRole('button', { name: 'Подтвердить удаление диалога', exact: true }).click(); await expect(management).toHaveCount(0); await idle(); barrier.resolve();
     await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Отменить вопрос', exact: true })).toHaveCount(0);
     assert.equal((await messages()).length, 0); await page.getByLabel('Ваш финансовый вопрос', { exact: true }).fill('Новый вопрос'); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeEnabled();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); assert.deepEqual(errors, []);
