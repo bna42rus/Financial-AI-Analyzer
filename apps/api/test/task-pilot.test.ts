@@ -342,8 +342,10 @@ test('stopped HTTP 400 checkpoint reads the original two receipts/cache without 
   await assert.rejects(inspectTaskPilot(journal, f.corpus, 'b'.repeat(64)), /READ_ONLY_REQUIRED/);
 }));
 
-test('new read-only inspector and prepared wire profile leave the already-paid v1 source/binding identity unchanged', async () => {
+test('source changes create a new identity and cannot silently reuse the already-paid archived v1 binding', async () => {
   const artifact = await pilotBinding();
-  assert.equal(artifact.sha256, '0afd24fe2c7394be7ee74e5000fb1996e21f4f885c0db38adf977bb14797f691');
-  assert.equal(artifact.binding.manifest.sourceSha256, '30fca54575fc31a25556e08c4a73129f52c7e96870d23849d70272e818858787');
+  assert.notEqual(artifact.sha256, '0afd24fe2c7394be7ee74e5000fb1996e21f4f885c0db38adf977bb14797f691');
+  assert.notEqual(artifact.binding.manifest.sourceSha256, '30fca54575fc31a25556e08c4a73129f52c7e96870d23849d70272e818858787');
+  // Operators keep inspector commit 1fe4454 in its existing checkout; the new
+  // schema probe uses its own checkout/artifact and references the old IDs.
 });

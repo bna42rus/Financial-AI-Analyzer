@@ -1,0 +1,66 @@
+{
+  "version": "cashneuro-schema-probe-admission/1",
+  "date": "2026-10-15",
+  "status": "implemented_ci_pending_operator_not_executed",
+  "operatorCheckpoint": {
+    "checkpointSha256": "2f3012fc7cca47ee5abc6a3eea0276aea975a0681fb236c35193f95272734671",
+    "ledgerHeadSha256": "8ad850c2aa9ab4953bdef29ea612db90bdf2752fdff8d833c317787b79f856ec",
+    "frozenSha256": "11f6fafcd90671ce9d1283e6bc18f4c79d105131f71d25cff176d49fb6cdd991",
+    "baselineRecordsSha256": "cd3dbecfbd712a9959c692fdbd32aeb9f88a9cfbb480d6b828ba3b0e98a0fab2",
+    "gateCacheVerifiedFinancial": true,
+    "gateInputTokens": 570,
+    "gateOutputTokens": 132,
+    "originalCalls": 494,
+    "originalUpperBoundAtoms": "23058035380",
+    "originalPilotIncrementalUpperAtoms": "2169094120",
+    "remainingOriginal20RubHeadroomAtoms": "17830905880"
+  },
+  "scope": {
+    "cli": "src/task-schema-probe-main.ts --live",
+    "reportCli": "src/task-schema-probe-main.ts --report",
+    "maximumNewCompletionCalls": 1,
+    "maximumNewReservationAtoms": "2152001920",
+    "incrementalBaselineUpperAtoms": "20888941260",
+    "sameOriginalIncrementalCapAtoms": "20000000000",
+    "sameOriginalGlobalCapAtoms": "45000000000",
+    "allOldHoldsPreserved": true,
+    "oldLedgerBlockedFlagRemainsTrue": true,
+    "fullPilotAutomaticallyResumed": false,
+    "modelAccepted": false,
+    "runtimeAiEnabled": false
+  },
+  "request": {
+    "case": "single-01",
+    "gate": "Verified existing cache, no new gate dispatch or payment",
+    "proposal": "Exact reconstructed old prompt/input/model/sampling/output bound; only decoder schema uniqueItems is projected out",
+    "serverValidation": "Original full closed schema, quote guards, duplicate-name checks and shared finance calculation remain authoritative",
+    "rootCauseClaim": "No claim that Cloud's decoder or exact prior HTTP 400 cause is known; the single probe measures actual acceptance and captures fixed-vocabulary error diagnostics"
+  },
+  "persistence": {
+    "sameOriginalLedger": true,
+    "legacyEventShapesOnly": true,
+    "reserveFsyncBeforeHttp": true,
+    "receiptFsyncBeforeParserAndCache": true,
+    "frozenArtifact": "task-schema-probe-v1.json",
+    "privateResult": "task-schema-probe-v1-result.json",
+    "newExclusiveLock": "task-schema-probe-v1.lock",
+    "oldLocksModifiedOrRemoved": false,
+    "unknownUsageAndDeliveryRetainFullReserve": true,
+    "completedFailedAndPendingReplayNeverRepay": true,
+    "artifactCacheAndLockModes": "0600 files inside existing 0700 root directory",
+    "newCheckoutRequired": true,
+    "archivedV1InspectorCommit": "1fe44540196e8ad5167e2229daa2fb4c956c2fb5"
+  },
+  "validation": {
+    "newTestsPassed": 14,
+    "apiUnitTestsPassed": 174,
+    "apiTypes": "passed",
+    "fullCi": "pending"
+  },
+  "assistantPaidCalls": 0,
+  "operatorSchemaProbeExecuted": false,
+  "remaining": [
+    "Operator runs the one-shot schema probe on the exact tested artifact",
+    "After actual successful schema acceptance, freeze a broader continuation within the remaining original budget"
+  ]
+}

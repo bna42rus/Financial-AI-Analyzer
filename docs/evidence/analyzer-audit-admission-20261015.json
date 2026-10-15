@@ -186,7 +186,14 @@
     "realModelTrialExecuted": true,
     "completedRealModelTurns": 0,
     "currentStatus": "stopped_http400_no_unknown_hold_released",
-    "nextAction": "Read-only task-pilot-inspect-main.ts checkpoint; no new completion POST",
-    "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json"
+    "nextAction": "One separately frozen schema proposal probe after the supplied verified read-only checkpoint; no automatic full pilot resume",
+    "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json",
+    "oneShotSchemaProbe": {
+      "maximumCalls": 1,
+      "remainingOriginalCapAtoms": "17830905880",
+      "oldHoldsReleased": false,
+      "ledgerBlockedFlagCleared": false,
+      "admissionEvidence": "docs/evidence/analyzer-schema-probe-20261015.json"
+    }
   }
 }

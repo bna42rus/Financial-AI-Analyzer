@@ -13,6 +13,8 @@ type Receipt = { type: 'receipt'; id: string; usage: Usage | null; atoms: string
 type FundedContinuation = { type: 'continue_with_held_rejections'; id: string; rejectionIds: string[]; proofId: string };
 type RetiredCandidate = { type: 'retain_rejected_candidate'; id: string; rejectionId: string; proofId: string; modelVersion: string };
 type Event = Reservation | Receipt | FundedContinuation | RetiredCandidate;
+export type HeldSchemaProbePermit = { bindingSha256: string; ledgerHeadSha256: string; rejectionId: string; gateId: string;
+  gateWireSha256: string; rejectedWireSha256: string; expectedCalls: number; expectedUpperAtoms: string; incrementalBaselineUpperAtoms: string; incrementalCapAtoms: string };
 export const benchmarkBudget = { project: 1000n * rubAtoms, smoke: 45n * rubAtoms };
 export const benchmarkDigest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 /** Caller holds the one process lock for the entire live run. All reservations
@@ -152,6 +154,32 @@ export class BenchmarkLedger {
     for (const old of this.records.values()) if (old.reserve.bound.modelVersion === bound.modelVersion && benchmarkDigest(old.reserve.price) !== benchmarkDigest(price)) throw new BenchmarkFailure('BENCH_PRICE_CHANGED');
     if (total.spent + total.held + amount > benchmarkBudget.smoke || total.spent + total.held + amount > benchmarkBudget.project) throw new BenchmarkFailure('BENCH_BUDGET_EXHAUSTED');
     await this.append({ type: 'reserve', id, atoms: amount.toString(), price, bound });
+    });
+  }
+  /** One separately frozen operator format probe after a known HTTP 400.
+   * The exact checkpoint must still be the ledger head. No rejection is
+   * reconciled/exempted and totals().blocked remains true. Plain legacy event
+   * shapes preserve read compatibility with the archived v1 operator tools. */
+  async reserveHeldSchemaProbe(id: string, price: TokenPrice, bound: DispatchBound, permit: HeldSchemaProbePermit) {
+    return this.exclusive(async () => {
+      const deny = (): never => { throw new BenchmarkFailure('BENCH_SCHEMA_PROBE_NOT_ALLOWED'); };
+      const hashes = [permit.bindingSha256, permit.ledgerHeadSha256, permit.rejectionId, permit.gateId, permit.gateWireSha256, permit.rejectedWireSha256];
+      if (hashes.some(v => typeof v !== 'string' || !/^[a-f0-9]{64}$/.test(v)) || this.previous !== permit.ledgerHeadSha256 || this.records.size !== permit.expectedCalls ||
+          !Number.isSafeInteger(permit.expectedCalls) || permit.expectedCalls < 2 || permit.expectedCalls > 1000 || this.records.has(id) ||
+          id !== benchmarkDigest({ purpose: 'held-task-schema-probe/1', bindingSha256: permit.bindingSha256 }) ||
+          ![permit.expectedUpperAtoms, permit.incrementalBaselineUpperAtoms].every(v => /^\d{1,16}$/.test(v)) || permit.incrementalCapAtoms !== '20000000000') return deny();
+      const entries = [...this.records.entries()], gate = this.records.get(permit.gateId), rejected = this.records.get(permit.rejectionId), spec = candidates['cloud-oss'];
+      if (entries.at(-1)?.[0] !== permit.rejectionId || entries.at(-2)?.[0] !== permit.gateId || !gate || !rejected ||
+          rejected.receipt?.code !== 'BENCH_PROVIDER_FAILURE_HTTP_400' || rejected.receipt.usage !== null ||
+          gate.receipt?.code !== null || !gate.receipt.usage ||
+          (gate.receipt.value as { wireSha256?: unknown } | null)?.wireSha256 !== permit.gateWireSha256 ||
+          (rejected.receipt.value as { wireSha256?: unknown } | null)?.wireSha256 !== permit.rejectedWireSha256 ||
+          benchmarkDigest(price) !== benchmarkDigest(spec.price) || benchmarkDigest(bound) !== benchmarkDigest({ inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model }) ||
+          [gate, rejected].some(r => r.reserve.purpose !== undefined || benchmarkDigest(r.reserve.price) !== benchmarkDigest(price) || benchmarkDigest(r.reserve.bound) !== benchmarkDigest(bound))) return deny();
+      const total = this.calculateTotals(permit.rejectionId), amount = tokenCost(price, bound.inputTokens, bound.outputTokens), baseline = BigInt(permit.incrementalBaselineUpperAtoms);
+      if (total.blocked || total.spent + total.held !== BigInt(permit.expectedUpperAtoms) || baseline > total.spent + total.held) return deny();
+      if (total.spent + total.held + amount - baseline > BigInt(permit.incrementalCapAtoms) || total.spent + total.held + amount > benchmarkBudget.smoke || total.spent + total.held + amount > benchmarkBudget.project) throw new BenchmarkFailure('BENCH_BUDGET_EXHAUSTED');
+      await this.append({ type: 'reserve', id, atoms: amount.toString(), price, bound });
     });
   }
   private assertProbeAllowed(price: TokenPrice, bound: DispatchBound, purpose: ProbePurpose = 'operator_probe') {

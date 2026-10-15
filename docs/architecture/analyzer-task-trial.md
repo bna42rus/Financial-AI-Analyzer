@@ -285,3 +285,45 @@ predicate из upstream vLLM v0.10.2: gate=false, plan=true, projected=false
 для признака unsupported. Это не full grammar compilation и не вызов Cloud.
 Операторская команда фиксирует именно этот tested inspector commit;
 следующий evidence-only commit не меняет программы.
+
+## Один оплачиваемый schema probe после verified checkpoint
+
+Операторский checkpoint `2f3012fc7cca47ee5abc6a3eea0276aea975a0681fb236c35193f95272734671`
+подтвердил gate cache financial, точный plan HTTP 400 и остаток исходных
+20 ₽: 17,830905880 ₽. Новый `task-schema-probe-main.ts --live` отправляет
+**один** proposal; сохранённый gate не оплачивается снова. Сначала
+реконструируется исходный workflow input и сверяется его wire SHA с отказом;
+в новом wire меняется только decoder schema. Авторитетный серверный parser
+и все правила расчётов прежние. Ошибка Cloud теперь получает безопасные
+reason/decoder/keyword/parameter tags, без raw error body или отражённых keys.
+
+Новый ledger method допускает одну durable plain reserve только при точном
+исходном head/call count/cost, последней известной HTTP 400 и предыдущей
+учтённой gate-квитанции. Игнорирование отказа для этой проверки не меняет
+heldRejections, не снимает hold и не очищает blocked. Применяются исходные
+20 ₽ cumulative incremental и 45 ₽ global; новый maximum reserve 2,152001920 ₽
+входит в исходный остаток. Любой следующий reserve с тем же или новым
+binding теряет head/count admission. Новые форматы ledger events не вводятся;
+архивный reader продолжает читать журнал с blocked=true.
+
+Probe имеет отдельные frozen artifact/result/one-shot lock 0600, с wx и fsync.
+Старые operator/diagnostic locks только проверяются на неактивный PID, не
+снимаются и не переименовываются. Receipt fsync precedes parse/cache.
+Unknown usage/delivery оставляет полный новый reserve. Known malformed JSON
+или closed-parser failure сохраняет расход и измеренную ошибку. Missing
+cache/receipt-fsync failure не могут запустить повторную оплату. Повтор
+--live при существующей записи работает как --report, до ключа, GET и date
+guard. Report не имеет сетевого transport; свежий POST разрешён только в
+дату тарифной проверки, 15.10.2026 Moscow.
+
+Ledger source изменился, поэтому operator сохраняет прежний bench checkout
+на inspector commit `1fe4454` и разворачивает probe в **отдельный checkout**.
+В новом source manifest новая identity; старый frozen binding не выдается
+за новый и не переписывается. Новый artifact дополнительно хеширует все
+четыре probe/schema source files. Старый frozen artifact и исходный ledger
+prefix подтверждаются наблюдёнными SHA; после probe допустим только его
+один reserve и, если получена, одна receipt. Результат отдельно показывает
+HTTP acceptance, closed payload validity и реальный first-turn finance score.
+Один успех не включает runtime AI и не означает приемку всего корпуса.
+
+Evidence: `docs/evidence/analyzer-schema-probe-20261015.json`.
