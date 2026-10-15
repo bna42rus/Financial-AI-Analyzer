@@ -712,3 +712,15 @@ prompt/6 baseline, free replay всех предыдущих ошибочных 
 failed без доступных step/log diagnostics; причину установить не удалось.
 Новый CI фиксируется отдельно в PR. Runtime AI, deployment и training не
 включаются; независимая приёмка на новом corpus по-прежнему впереди.
+
+## Дополнение 15.10.2026: контролируемый service pilot
+
+Пауза всех прежних paid flags сохраняется. Отдельный `task-trial-main.ts
+--live-pilot` реализован для зафиксированного provisional испытания сервиса
+Cloud.ru, с 20 ₽ cumulative incremental cap внутри старых 45 ₽. Никаких
+unknown holds не освобождает. Это документированное ограниченное допущение
+для измерения наблюдаемого alias без immutable revision; оно не закрывает
+model acceptance и не включает ИИ на сайте. Corpus, prompts/schema, тариф,
+source identity, provider snapshot, budget/replay/failure/holdout gates
+описаны в `analyzer-task-trial.md`. Существующие инструкции исторических
+smoke/live режимов этим не становятся доступными.

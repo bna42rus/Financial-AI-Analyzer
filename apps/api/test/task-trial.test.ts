@@ -146,9 +146,9 @@ test('a changed or empty ledger blocks preflight admission; it never receives a 
   finally { await ledger.close(); await rm(dir, { recursive: true, force: true }); }
 });
 
-test('manifest stays explicitly unpaid and unpinned, budgets retain old holds, and CLI has no paid flag or environment bypass', async () => {
+test('ordinary manifest stays explicitly unpaid and unpinned, old live flags/environment cannot bypass the dedicated bounded pilot', async () => {
   const manifest = await taskTrialManifest(); assert.equal(manifest.counts.maximumTurns, 120); assert.equal(manifest.counts.maximumNewModelCalls, 240);
-  assert.equal(manifest.gates.paidRunnerImplemented, false); assert.equal(manifest.gates.paidDispatchEnabled, false); assert.equal(manifest.gates.immutableModelVersionVerified, false);
+  assert.equal(manifest.gates.paidRunnerImplemented, true); assert.equal(manifest.gates.paidDispatchEnabled, false); assert.equal(manifest.gates.immutableModelVersionVerified, false);
   assert.equal(manifest.budget.incrementalCapAtoms, '20000000000'); assert.ok(20888941260n + BigInt(manifest.budget.incrementalCapAtoms) < BigInt(manifest.budget.existingGlobalCapAtoms));
   assert.equal(manifest.budget.maximumReservationAtoms, '2152001920'); assert.equal(manifest.fullProductAcceptanceExecuted, false);
   const run = promisify(execFile), cwd = new URL('..', import.meta.url);

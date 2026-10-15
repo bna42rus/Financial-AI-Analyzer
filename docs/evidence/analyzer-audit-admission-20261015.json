@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-audit-admission/1",
-  "status": "blocked",
-  "paidDispatchEnabled": false,
+  "status": "controlled_provisional_service_pilot_only",
+  "paidDispatchEnabled": true,
   "latestObserved": {
     "promptVersion": "cashneuro-smoke-prompt/7",
     "strictPassed": 23,
@@ -162,5 +162,23 @@
       "failed": 0,
       "paidCalls": 0
     }
+  },
+  "paidDispatchScope": [
+    "src/task-trial-main.ts --live-pilot only; fixed corpus and 20 RUB cumulative incremental ceiling"
+  ],
+  "legacyPaidActionsPaused": true,
+  "immutableModelAcceptanceBlocked": true,
+  "runtimeAiEnabled": false,
+  "controlledPilot": {
+    "version": "cashneuro-cloud-service-pilot/1",
+    "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+    "promptsSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8",
+    "providerMetadataSha256": "b27d11d11429899c431d95d974e69a5dfb7e56797fe127584992a2782432db68",
+    "incrementalCapAtoms": "20000000000",
+    "maximumCalls": 240,
+    "immutableModelVersionVerified": false,
+    "currentTariffConfirmed": true,
+    "reasonForLimitedAdmission": "GET catalog supplied by the operator confirms the exact observed alias/context but exposes no immutable revision. A provisional evaluation of that service is useful and within the already approved test budget; it does not satisfy model acceptance or enable runtime AI. Exact current internal-model rates independently verified in current-version tariff 261015 rows 271/272.",
+    "evidence": "docs/evidence/analyzer-task-pilot-20261015.json"
   }
 }

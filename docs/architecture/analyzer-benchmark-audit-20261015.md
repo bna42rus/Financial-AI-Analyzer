@@ -318,3 +318,15 @@ job logs возвращали BlobNotFound. Причина не подтверж
 не утверждаем, что требуется strict:true, другой reasoning_effort или что
 их изменение исправит понимание. Изменения формата/параметров — отдельная
 контролируемая проверка после сверки документации, не догадка в live trial.
+
+## Дополнение 15.10.2026: контролируемый service pilot
+
+Пауза всех прежних paid flags сохраняется. Отдельный `task-trial-main.ts
+--live-pilot` реализован для зафиксированного provisional испытания сервиса
+Cloud.ru, с 20 ₽ cumulative incremental cap внутри старых 45 ₽. Никаких
+unknown holds не освобождает. Это документированное ограниченное допущение
+для измерения наблюдаемого alias без immutable revision; оно не закрывает
+model acceptance и не включает ИИ на сайте. Corpus, prompts/schema, тариф,
+source identity, provider snapshot, budget/replay/failure/holdout gates
+описаны в `analyzer-task-trial.md`. Существующие инструкции исторических
+smoke/live режимов этим не становятся доступными.

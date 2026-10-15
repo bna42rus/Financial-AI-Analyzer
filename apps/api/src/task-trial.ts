@@ -102,7 +102,7 @@ export async function loadTrialCorpus() {
 
 /** The same workflow/shared core runs on synthetic rows. Wrong earlier answers
  * remain visible as cascade risk; the evaluator never replaces them with goldens. */
-export async function evaluateTrialScenario(turns: TrialTurn[], modelForTurn: (turn: TrialTurn, occurrence: number) => TaskModel, occurrence = 0) {
+export async function evaluateTrialScenario(turns: TrialTurn[], modelForTurn: (turn: TrialTurn, occurrence: number) => TaskModel, occurrence = 0, onTurn?: (score: TrialScore) => Promise<void>) {
   const scope = { ownerId: 'synthetic-trial-owner', chatId: trialId(1000 + occurrence), generation: trialId(2), chatEpoch: trialId(3) };
   let book = emptyTaskBook(scope), earlierFailure = false;
   const messages = new Map(turns.map((turn, i) => [turn.id, trialId(100 + i)])), results: TrialScore[] = [];
@@ -134,12 +134,13 @@ export async function evaluateTrialScenario(turns: TrialTurn[], modelForTurn: (t
     results.push({ id: turn.id, occurrence, split: turn.split, family: turn.family, passed, earlierFailure, relevanceCorrect, statusCorrect, queryCorrect, bindingCorrect, totalCorrect, privacyCorrect, planFields, actualStatus: outcome.status,
       ...(outcome.status === 'query' ? { actualQuery: outcome.query, actualTotalMinor: outcome.result.totals[outcome.query.metric] } : { reason: outcome.reason }) });
     earlierFailure ||= !passed;
+    await onTurn?.(results.at(-1)!);
   }
   return results;
 }
 
 const fingerprintPaths = [
-  'src/task-trial.ts', 'src/task-trial-main.ts', 'test/fixtures/task-trial-corpus-v1.json', 'src/analyzer-task-workflow.ts', 'src/benchmark-transport.ts',
+  'src/task-trial.ts', 'src/task-trial-main.ts', 'src/task-pilot-journal.ts', 'src/task-pilot-runner.ts', 'test/fixtures/task-trial-corpus-v1.json', 'src/analyzer-task-workflow.ts', 'src/benchmark-transport.ts',
   '../../../packages/analyzer/src/task-protocol.ts', '../../../packages/analyzer/src/task-context.ts', '../../../packages/analyzer/src/task-literals.ts',
   '../../../packages/analyzer/src/money-literals.ts', '../../../packages/analyzer/src/closed-schema.ts', '../../../packages/analyzer/src/registry.ts',
   '../../../packages/analyzer/src/cost.ts', '../../../packages/finance-core/src/operations.ts', '../../../packages/finance-core/src/overview.ts', '../../../packages/finance-core/src/model.ts',
@@ -155,7 +156,7 @@ export async function taskTrialManifest() {
     requestIdentity: 'SHA256(experiment, manifestSha256, caseId, phase, occurrence); occurrence=0 base, 1/2 independent repeat; stable replay is not a new repeat',
     counts: { baseTurns: 96, development: 68, holdout: 28, independentRepeatTurns: 24, maximumTurns: 120, maximumNewModelCalls: 240 },
     budget: { existingGlobalCapAtoms: '45000000000', incrementalCapAtoms: '20000000000', maximumReservationAtoms: tokenCost(spec.price, bound.inputTokens, bound.outputTokens).toString() },
-    gates: { paidRunnerImplemented: false, paidDispatchEnabled: false, immutableModelVersionVerified: false, currentTariffConfirmed: false },
+    gates: { paidRunnerImplemented: true, paidDispatchEnabled: false, immutableModelVersionVerified: false, currentTariffConfirmed: false },
     fullProductAcceptanceTurns: 420, fullProductAcceptanceExecuted: false, previouslySeenRegressionTurns: 96, previouslySeenRegressionsExecutedUnderNewProtocol: false };
 }
 

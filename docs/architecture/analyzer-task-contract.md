@@ -289,3 +289,15 @@ read-only и делает только GET каталога Cloud с сущес�
 не меняет receipts. Paid runner пока отсутствует, тариф/model revision не
 подтверждены, старый CLI остаётся paused. Корпус не заменяет полную программу
 420 реплик и не объявляет новую точность модели.
+
+### 7.4. Ограниченный pilot наблюдаемого сервиса
+
+После полученного GET-only preflight добавлен отдельный `--live-pilot`.
+Он не включает runtime provider и не разблокирует прежние paid actions.
+Нынешний тариф проверен в current-version PDF 261015, строки 271/272.
+Каталог Cloud не даёт immutable revision, поэтому этот запуск допускается
+только как provisional оценка наблюдаемого сервиса, без model acceptance.
+Corpus/prompts/schema не менялись после получения preflight; 20 ₽ нового
+cost+holds учитываются в исходном ledger внутри 45 ₽ вместе со старыми
+резервами. Полный контракт и fault/replay/budget gates — в
+`analyzer-task-trial.md`, evidence — `analyzer-task-pilot-20261015.json`.

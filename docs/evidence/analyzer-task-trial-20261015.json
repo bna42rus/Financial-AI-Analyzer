@@ -69,5 +69,6 @@
     "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
     "selectedSourceSha256": "abc98f631bff5e739f95792a98ffccd22e7fa022b824784421ffc347d740be0e",
     "promptsAndSchemasSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8"
-  }
+  },
+  "supersededBy": "docs/evidence/analyzer-task-pilot-20261015.json"
 }

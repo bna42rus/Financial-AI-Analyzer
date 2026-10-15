@@ -93,12 +93,14 @@ Development и повторы выполняются до holdout. При их �
 блокирует принятие независимо от среднего процента. Незавершённый набор
 никогда не получает статус passed.
 
-**Эти правила пока зафиксированы как manifest/policy, paid runner ещё не
-реализован и платные actions не разблокированы.** Не добавлять скрытый live
-flag или env bypass в бесплатный preflight. Требуются подтверждённый тариф,
-проверяемая версия/ограничения модели и отдельный законченный paid runner с
-fault/replay/budget tests. Alias/fingerprint сам по себе не является immutable
-версией модели.
+**Эти правила реализованы в отдельном `--live-pilot` и проверены fault/replay/
+budget тестами.** Прежние paid flags остаются paused; preflight не начинает
+генерацию и не имеет env bypass. Тариф и окно подтверждены; immutable revision
+Cloud.ru не выдаёт. Поэтому разрешён только ограниченный provisional pilot
+наблюдаемого сервиса, внутри уже утверждённого бюджета. Он не является
+приёмкой неизменяемой модели и не разблокирует runtime/staging/release.
+Alias/fingerprint не объявляются immutable версией. Это явное ограниченное
+допущение после preflight, а не замалчивание прежнего условия допуска.
 
 ## Одна бесплатная команда оператора
 
@@ -128,10 +130,14 @@ hashes corpus, source files, prompts/schema, versions, sampling, budget и IDs.
 - https://cloud.ru/docs/foundation-models/ug/topics/guides__llm-prompt-request
 - https://cloud.ru/docs/foundation-models/ug/topics/guides__activity
 
-Тарифные PDF current-version и future-version дают разные версии НДС/ставок;
-не подменять ими применимый текущий тариф без проверки даты действия. Старые
-расходы не пересчитываются новым прайсом. Manifest явно сохраняет
-currentTariffConfirmed=false и immutableModelVersionVerified=false.
+Новый прямой просмотр **current-version PDF версии 261015**, стр. 8,
+строки 271/272, подтвердил тариф внутреннего gpt-oss-120b: 15,86 ₽ вход /
+61 ₽ выход за миллион, с НДС. Отдельные partner-model строки 193/194 не
+подставляются вместо них. Числовые ставки прежние, legacy price version
+сохранён ради совместимости квитанций; свежая authority/version 261015
+отдельно связана с pilot artifact. Предыдущие расходы не пересчитываются.
+Pilot имеет currentTariffConfirmed=true и immutableModelVersionVerified=false;
+ordinary preflight manifest сам по себе по-прежнему не разрешает оплату.
 
 ## Проверка подготовленного кода
 
@@ -143,3 +149,73 @@ currentTariffConfirmed=false и immutableModelVersionVerified=false.
 Все model responses синтетические; платных вызовов ноль. Команда оператора
 должна использовать этот точный проверенный source commit. Следующий
 evidence-only commit не меняет исполняемые файлы.
+
+## Реализованный операторский запуск и отчёт
+
+`sudo /usr/bin/node --import tsx src/task-trial-main.ts --live-pilot` — явно
+платный операторский режим. Никакого production/staging flag нет. Он действует
+только 15.10.2026 по Moscow, дате свежей проверки тарифа; перед каждым новым
+POST дата проверяется снова. На другой день нужны актуальная проверка тарифа
+и новый проверенный artifact. Сохранённый отчёт доступен независимо от даты.
+
+CLI проверяет private state directories, неактивность прежнего operator PID
+и эксклюзивно берёт общий diagnostic.lock. До ключей/сети проверяется ledger
+и неизменность frozen state. Первый запуск требует ровно проверенный baseline
+492 records /13,372140620 ₽ known /7,516800640 ₽ holds. Private artifact
+`task-pilot-v1.json` содержит hash полного code/prompt/schema/corpus/price/
+provider binding, digest всех прежних reserve/receipt, их IDs и исходный
+upper bound, allowlist новых 240 request IDs и cap. Создаётся только `wx`,
+0600 + fsync file/directory; никогда не заменяется. Его отсутствие после
+новой оплаченной записи не позволяет снова выдать начальные 20 ₽.
+
+На каждом live-вызове один GET каталога заново сверяет snapshot
+`b27d11d11429899c431d95d974e69a5dfb7e56797fe127584992a2782432db68` и оба
+context limits 131072 с операторским preflight. Это detection gate, не
+доказательство неизменности весов. Provider model, bounds и fingerprint
+каждой квитанции проверяет прежний ledger; drift останавливает новые POST.
+
+Перед POST fsync reserve в исходном smoke-ledger, с сериализованной проверкой
+20 ₽ incremental cost+holds и старых 45 ₽ global. После HTTP usage fsync-ится
+в исходный ledger **до** closed parser и cache. Ledger value содержит только
+wire SHA, без сырого provider text. Закрытый payload после этого сохраняется
+в private 0700 cache, каждый файл 0600 + fsync. Invalid payload получает
+фиксированный код и null cache, сохраняя стоимость. Отражённый ключ также
+отклоняется в payload/fingerprint. Отсутствующий/повреждённый cache после
+квитанции — явная остановка, никакой повторной оплаты.
+
+Неизвестная доставка/usage оставляет полный reserve и lock. Receipt fsync
+failure не повторяет запись/dispatch. При обычной известной ошибке private
+cache или semantic failure lock можно освободить: дальнейший повтор всё
+равно упирается в существующую квитанцию/отсутствующий cache. Никакие прежние
+unknown receipts или operator evidence locks не снимаются/не исправляются.
+
+Порядок: 68 development →24 independent repetitions → только после всех
+**92 точных успешных slots** — 28 holdout. На semantic failure выполняется
+полная доступная development/repetition часть для общего разбора, но holdout
+не открывается. Unknown usage, budget, drift, cache/ledger faults прерывают
+дальнейшие вызовы сразу. Неполный набор не проходит; даже **120/120** означает
+лишь `provisional_pilot_passed`, с `modelAccepted=false`,
+`immutableModelVersionVerified=false`, `runtimeAiEnabled=false`.
+
+Прогресс печатается после каждых шести завершённых реплик. Итог содержит
+stop/phase, завершённые/успешные реплики, отдельные field metrics, failed
+rows, technical error codes, paid attempts/replays, incremental и общий cost.
+`paidCallsThisRun` считает новые попытки отправки; фактический расход отдельно
+подтверждают receipts, а unknown удерживает reserve.
+
+После запуска бесплатный разбор:
+
+```sh
+sudo /usr/bin/node --import tsx src/task-trial-main.ts --report-pilot
+```
+
+Он не читает keys, не вызывает даже GET, не создаёт lock/cache/receipt и
+восстанавливает тот же actual context из сохранённых payload. Запись, которой
+нет, остаётся пропуском с `BENCH_REPLAY_ONLY`; completed prefix остаётся
+видимым. Прежний `--preflight` проверял baseline до оплаты; после новых
+records используется именно `--report-pilot`, а не новый сброс baseline.
+
+Software positive scheduler test использует один синтетический вопрос во
+всех 120 slots: это проверка фаз, стоимости, replay и критериев завершения,
+не замена языкового испытания настоящего фиксированного корпуса. Другие
+fault tests проверяют реальные shared workflow/HTTP/parser/finance paths.

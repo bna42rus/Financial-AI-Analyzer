@@ -1,0 +1,91 @@
+{
+  "version": "cashneuro-task-pilot-implementation/1",
+  "date": "2026-10-15",
+  "status": "controlled_provisional_service_pilot_implemented_ci_pending",
+  "newPaidCallsByAssistant": 0,
+  "realModelAccuracyMeasured": false,
+  "modelAccepted": false,
+  "runtimeAiEnabled": false,
+  "stagingMigrationApplied": false,
+  "preflight": {
+    "operatorSupplied": true,
+    "testedSource": "20af685e30836981080e983c54218d09d15c8f19",
+    "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+    "sourceSha256": "abc98f631bff5e739f95792a98ffccd22e7fa022b824784421ffc347d740be0e",
+    "promptsSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8",
+    "providerMetadataSha256": "b27d11d11429899c431d95d974e69a5dfb7e56797fe127584992a2782432db68",
+    "contextLength": 131072,
+    "maxModelLen": 131072,
+    "catalogHttpCalls": 1,
+    "paidCalls": 0,
+    "ledgerModified": false
+  },
+  "tariff": {
+    "url": "https://cdn.cloud.ru/docs/legal/tariffs/evolution/current-version/foundation-models.pdf",
+    "version": "261015",
+    "page": 8,
+    "rows": [
+      271,
+      272
+    ],
+    "modelKind": "internal gpt-oss-120b; not the separate partner-model rows",
+    "inputRubPerMillion": "15.86",
+    "outputRubPerMillion": "61",
+    "taxIncluded": true,
+    "checkedOn": "2026-10-15",
+    "legacyPriceVersionRetained": "cloud-internal-261002-oss120; identical numerical rates, historical receipts not rewritten"
+  },
+  "scope": {
+    "turns": 120,
+    "development": 68,
+    "independentRepeats": 24,
+    "holdout": 28,
+    "maximumModelCalls": 240,
+    "corpusUnchanged": true,
+    "promptsAndSchemasUnchanged": true,
+    "immutableModelVersionVerified": false,
+    "interpretation": "Provisional evaluation of the observed Cloud.ru service alias; no claim of immutable model acceptance or universal future accuracy.",
+    "fullProductAcceptance420Executed": false
+  },
+  "limits": {
+    "incrementalCostAndHoldsCapAtoms": "20000000000",
+    "existingGlobalCapAtoms": "45000000000",
+    "historicalKnownCostAtoms": "13372140620",
+    "historicalHeldAtoms": "7516800640",
+    "historicalUpperBoundAtoms": "20888941260",
+    "sameOriginalLedger": true,
+    "holdsReleased": false,
+    "priceAndSourceBoundToFrozenArtifact": true,
+    "lastFreshnessDateMoscow": "2026-10-15"
+  },
+  "persistence": {
+    "frozenArtifact": "/var/lib/cashneuro/analyzer-benchmark/task-pilot-v1.json",
+    "cacheDirectory": "/var/lib/cashneuro/analyzer-benchmark/task-pilot-v1-cache",
+    "sharedLock": "diagnostic.lock",
+    "fileMode": "0600",
+    "directoryMode": "0700",
+    "exclusiveCreateAndFsync": true,
+    "reserveBeforePost": true,
+    "usageBeforeParseAndCache": true,
+    "missingCacheNeverRepays": true,
+    "reportReadsNoKeysAndMakesNoNetworkCalls": true
+  },
+  "localValidation": {
+    "newPilotTestsPassed": 21,
+    "trialAndPilotTestsPassed": 34,
+    "apiTypes": "passed",
+    "ci": "pending"
+  },
+  "invariants": [
+    "Unknown delivery/usage keeps a full reserve and stops all new dispatch",
+    "Same ID/body replays receipts/cache; occurrence 1/2 uses separate stable IDs",
+    "Both original global budget and cumulative 20 RUB incremental cap precede POST",
+    "Original baseline receipt/reserve payloads and unknown holds remain unchanged",
+    "Partial/error/parse/receipt-fsync/cache-loss states never become zero cost or a hidden retry",
+    "Current date guard applies before every fresh dispatch, not saved reports",
+    "Exact provider metadata snapshot checked on every operator live invocation; receipt model/bounds/fingerprint drift stops dispatch",
+    "Credential reflection never enters persisted payload or fingerprint",
+    "Holdout requires all 92 exact passing development/repeat slots; budget/unknown/semantic failures keep it unopened",
+    "All 120 exact slots required even for provisional_pilot_passed; modelAccepted and runtimeAiEnabled always false"
+  ]
+}
