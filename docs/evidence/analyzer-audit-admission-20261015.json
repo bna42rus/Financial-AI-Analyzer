@@ -62,18 +62,17 @@
     "evidence": "docs/evidence/analyzer-saved-review-20261015.json"
   },
   "taskContractImplementation": {
-    "status": "connected_test_only_postgresql18_verified",
+    "status": "test_http_postgresql18_browser_verified_paid_blocked",
     "registry": "analyzer/3",
     "context": "analyzer-task-context/1",
     "protocol": "analyzer-task-protocol/2",
     "literals": "analyzer-task-literals/1",
     "workflow": "analyzer-task-workflow/1",
     "document": "docs/architecture/analyzer-task-contract.md",
-    "newSoftwareTests": 47,
+    "newSoftwareTests": 49,
     "modelAcceptanceExecuted": false,
     "paidCalls": 0,
     "remaining": [
-      "Browser acceptance of opt-in UI filter stamps, cancellation and restart recovery",
       "Frozen development/holdout/repeat IDs/budget/stop rules and controlled real-model trial adapter",
       "Provider immutable model verification and actual GPT-OSS semantic acceptance"
     ],
@@ -102,6 +101,29 @@
           "runId": 38709689304,
           "attempt": 2
         }
+      },
+      "fullCi": {
+        "commit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+        "runId": 38727206822,
+        "attempt": 1,
+        "jobId": 116395916413,
+        "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38727206822",
+        "completedAt": "2026-10-15T11:28:04Z",
+        "core": 246,
+        "apiUnit": 119,
+        "web": 82,
+        "postgres18": 161,
+        "browser": 4,
+        "total": 612,
+        "passed": 612,
+        "failed": 0,
+        "paidModelCalls": 0
+      },
+      "browserAcceptance": {
+        "passed": 4,
+        "failed": 0,
+        "desktopAndMobile": true,
+        "syntheticProvider": true
       }
     },
     "integrationEvidence": "docs/evidence/analyzer-task-integration-20261015.json"

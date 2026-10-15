@@ -53,7 +53,29 @@
         "desktop",
         "mobile"
       ],
-      "status": "added_to_ci_not_yet_verified"
+      "status": "passed",
+      "commit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+      "passed": 4,
+      "failed": 0,
+      "runId": 38727206822,
+      "engine": "pinned Playwright Chromium on PostgreSQL 18.4"
+    },
+    "fullCi": {
+      "commit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+      "runId": 38727206822,
+      "attempt": 1,
+      "jobId": 116395916413,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38727206822",
+      "completedAt": "2026-10-15T11:28:04Z",
+      "core": 246,
+      "apiUnit": 119,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 612,
+      "passed": 612,
+      "failed": 0,
+      "paidModelCalls": 0
     }
   },
   "paidCalls": 0,
@@ -74,7 +96,8 @@
     "Exact and legacy millisecond period keys cannot reset quota or create a second user cost bucket",
     "Partial deletion preserves unrelated completed task definitions; full reset clears all chats",
     "Deleted UI reference blocks rather than widens scope; manual stamps and independent filters survive",
-    "UI queue survives workspace navigation and exact retry ACK; cross-tab conflict does not auto-overwrite"
+    "UI queue survives workspace navigation and exact retry ACK; cross-tab conflict does not auto-overwrite",
+    "Actual desktop/mobile browser confirms A->B->A across routes, lost ACK same request ID, cross-tab CAS, pending recovery/cancel, confirmed deletion and unlocked composer"
   ],
   "migrationAndRecovery": {
     "appliedOnVps": false,
@@ -87,7 +110,6 @@
     "rollback": "Leave additive tables/index/epoch in place and keep taskProvider unset; revert application routing only if necessary. Do not delete commercial receipts, price quotes, actual spend or unknown holds. Forward-fix partial migration errors transactionally; no automatic data reconciliation."
   },
   "remaining": [
-    "Browser acceptance of opt-in route",
     "Frozen dev/holdout/regression/repetition manifest and budget/stop rules",
     "Controlled real GPT-OSS trial and model pinning; no accuracy inference from scripted decisions"
   ]

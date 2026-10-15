@@ -229,7 +229,7 @@ legacy quota/budget aliases, partial deletion и invalidated UI reference.
 даёт побайтно тот же review JSON, исходный SHA-256 сохранён. Paid calls=0,
 13.372140620 RUB reported tariff cost и 7.516800640 RUB historical holds прежние.
 
-До paid trial остаются browser acceptance нового пути; замороженные development/holdout и независимые repeat IDs с budget /
+До paid trial остаются замороженные development/holdout и независимые repeat IDs с budget /
 stop rules; контролируемый реальный trial adapter и проверяемая model version.
 Новая factory не может включить Cloud на сайте. Существующие goldens и результаты
 не переоцениваются новым parser; 24/24 прошлой версии не объявляется качеством
@@ -239,6 +239,32 @@ stop rules; контролируемый реальный trial adapter и пр�
 A → B → A между экранами; потерянный ACK с тем же ID/body; CAS conflict другого
 клиента; reload во время provider wait и отмена; подтверждение удаления диалога
 и снятие pending UI; отсутствие горизонтального переполнения и browser errors.
-Для неё используется подставной HTTP provider, не реальная модель. До успешного
-CI этих browser cases пункт не объявляется пройденным. Старый browser flow
+Для неё используется подставной HTTP provider, не реальная модель. На commit `ddbb4a3a74884a9d9ce89339eda1181e32a2798a` в CI run
+**38727206822** все четыре browser tests прошли (два новых и два прежних,
+оба viewport). Общий результат этого CI — **612/612**, PostgreSQL 18.4.
+Браузерный этап закрыт для synthetic-provider конфигурации. Старый browser flow
 с History/Undo и подтверждёнными правками включён рядом как compatibility check.
+
+### 7.1. Исправление состояния ожидания в UI
+
+При удалении диалога, к которому относился восстановленный pending request,
+UI теперь снимает pending/retry и отсекает старый execution counter. Такая же
+проверка выполняется при загрузке списка чатов, если chat исчез или epoch уже
+другой. Иначе composer мог оставаться заблокированным после правильного server
+cascade. Desktop/mobile browser подтверждают исчезновение кнопок ожидания,
+отсутствие воскресшего ответа и доступность нового вопроса после удаления.
+
+Новый browser fixture явно очищает commerce.access_cycle между viewport cases,
+поскольку canonical paid clock намеренно не FK-cascade от auth_user; навигация
+различает экран доступа и внутренние ссылки приложения. Cancellation/deletion
+сначала подтверждаются сервером, затем освобождается задержанный synthetic
+provider: проверяется именно поздний ответ, а не случайная гонка самого теста.
+
+### 7.2. Следующий шаг оператора: только бесплатная сверка
+
+На изолированном benchmark build можно выполнить `--inspect cloud-oss task`
+из проверенного commit `ddbb4a3a74884a9d9ce89339eda1181e32a2798a`.
+Этот режим читает protected ledger read-only, не открывает provider keys,
+не создаёт process locks, не снимает unknown holds и не вызывает модель.
+Нужны current cost/unresolved из VPS, прежде чем фиксировать следующий trial.
+Старые `--live*` по-прежнему отклоняются до ключей/locks/reservations.
