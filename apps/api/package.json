@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx src/main.ts",
-    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts test/task-trial.test.ts test/task-pilot.test.ts test/task-schema-probe.test.ts test/task-json-trial.test.ts",
+    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts test/task-trial.test.ts test/task-pilot.test.ts test/task-schema-probe.test.ts test/task-json-trial.test.ts test/task-json-cache-audit.test.ts test/task-prepared-contract.test.ts",
     "benchmark": "node --import tsx src/benchmark-main.ts",
     "benchmark:audit-review": "node --import tsx src/benchmark-audit-review-main.ts",
     "kms:init": "node --import tsx src/kms-init.ts",

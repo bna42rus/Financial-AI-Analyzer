@@ -435,3 +435,47 @@ cache и целостный offline audit. Новый платный запус�
 подгонка prompt до такого разбора не выполняются.
 
 Evidence: docs/evidence/analyzer-task-json-trial-result-20261015.json.
+
+
+## Полный read-only аудит 170 сохранённых решений
+
+Оператор передал cache export SHA
+17ba8bd3edb17fd11b558573ba121c1b5e56630c3d4b97c1de197a0a173e398b.
+Новый offline audit воспроизводит все 170 wire identities и все 92 scores:
+36/68 development + 16/24 independent repeats = 52/92. Ни golden parents,
+ни похожий запрос не подставляются вместо ошибочного сохранённого состояния.
+28 holdout остаются закрыты. Шесть групп одинаковых repeated wires имеют
+разные semantic outcomes; free replay не объявляется независимым повтором.
+
+Аудит включает успешные шаги и отдельно отмечает избыточные scalar edits с
+неподходящей цитатой. Два attention query имеют те же текущие totals/points,
+но иной operationCount и сохранённый filter. Их долгосрочная эквивалентность
+не доказана: strict score остаётся прежним, эти ошибки не превращены в успех.
+
+Диагностика новых closed-parser failures теперь получает исходное JSON value
+в private sink только после fsync usage receipt и invalid cache. Sink немедленно
+шифрует до 16384 bytes; safe report содержит фиксированный validation code.
+Ни JSON value, ни отражённый credential не попадают в обычный cache/лог/отчёт.
+Sink failure сохраняет settled cost/cache и останавливает отправку; replay
+повторно не вызывает sink и POST. Изменение не восстанавливает 14 старых
+потерянных payloads. Это не захват скрытого reasoning или всех HTTP bodies.
+
+Подготовлен отдельно versioned task-prepared-contract/1: ясные server-owned
+defaults, new/nearest/ordinal/reference/unique, наследование условий,
+формат/сравнение, roles имён и unsupported. Авторитетный parser/схема не
+ослаблены. Повторяющиеся части схемы вынесены в локальные $defs только в
+тексте prompt; exact expansion совпадает с оригиналом. Независимый
+Draft202012Validator сравнил 325 observed/mutated payloads без расхождений.
+Capabilities не дублируются во входном user message; descriptors проверяются
+по закрытым полям, totals/filters/UUID не отправляются. 170 реконструированных
+body занимают 1 783 454 вместо 2 015 945 bytes. Это bytes, не доказанная
+экономия tokens/рублей и не измерение новой языковой точности.
+
+Новый candidate НЕ подключён к paid runner/runtime. Новый полный эксперимент
+должен отдельно заморозить этот source/prompt и получить budget admission.
+Остаток старых 20 ₽ — 6,441024920 ₽; прошлый development/repeat run стоил
+9,237879040 ₽. Budget не увеличен, holds не сняты. CLI offline audit:
+node --import tsx src/task-json-cache-audit-main.ts test/fixtures/task-json-observed-20261015.json
+
+Human review: docs/architecture/analyzer-task-json-review-20261015.md.
+Machine evidence: docs/evidence/analyzer-task-json-cache-review-20261015.json.

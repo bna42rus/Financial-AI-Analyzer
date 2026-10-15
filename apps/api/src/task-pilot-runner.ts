@@ -37,9 +37,11 @@ export function pilotStagePassed(corpus: TrialCorpus, rows: TrialScore[], includ
   return rows.length === slots.length && new Set(actual).size === slots.length && actual.every(id => expected.has(id)) && rows.every(row => row.passed);
 }
 type Diagnostics = { paidCalls: number; replayCalls: number; errors: { id: string; code: string }[] };
+export type RejectedTaskPayload = { id: string; wireSha256: string; phase: 'gate' | 'plan'; value: unknown; validationCode: string };
+export type RejectedTaskSink = (payload: RejectedTaskPayload) => Promise<void>;
 /** Technical usage is durably settled before closed parsing/private-cache work.
  * Missing cache after an actual receipt is an explicit stop, never repayment. */
-export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string, turn: TrialTurn, occurrence: number, diagnostics: Diagnostics, secrets: string[] = [], beforeDispatch?: () => void, reusedInitialGate?: { turnId: string; value: unknown }): TaskModel {
+export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string, turn: TrialTurn, occurrence: number, diagnostics: Diagnostics, secrets: string[] = [], beforeDispatch?: () => void, reusedInitialGate?: { turnId: string; value: unknown }, onRejectedPayload?: RejectedTaskSink): TaskModel {
   const reflected = (value: string | null | undefined) => !!value && secrets.some(secret => secret.length > 0 && value.includes(secret));
   async function call(phase: 'gate' | 'plan', input: unknown) {
     const prompt = phase === 'gate' ? taskRelevancePrompt : taskProposalPrompt, schema = phase === 'gate' ? taskRelevanceSchema : taskProposalSchema;
@@ -74,16 +76,25 @@ export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal,
     await journal.ledger.receipt({ id, usage: completed.usage, value: { wireSha256 }, code: unsafeFingerprint ? 'TASK_PILOT_PROVIDER_INVALID' : null, fingerprint: unsafeFingerprint ? null : completed.fingerprint,
       latencyMs: Math.ceil(performance.now() - started), cachedTokens: completed.cachedTokens, reasoningTokens: completed.reasoningTokens });
     if (unsafeFingerprint || journal.verify().cost.blocked) throw new BenchmarkFailure('TASK_PILOT_PROVIDER_DRIFT');
-    let value: unknown, code: string | null = null;
-    try { value = parse(completed.value); } catch { value = null; code = 'TASK_PILOT_PAYLOAD_INVALID'; diagnostics.errors.push({ id, code }); }
+    let value: unknown, code: string | null = null, validationCode = 'closed_contract';
+    try { value = parse(completed.value); } catch (error) {
+      value = null; code = 'TASK_PILOT_PAYLOAD_INVALID'; diagnostics.errors.push({ id, code });
+      // Only public fixed codes enter diagnostics; provider text never does.
+      const message = error instanceof Error ? error.message : '';
+      if (['TASK_WIRE_INVALID', 'TASK_NAMES_INVALID', 'TASK_EVIDENCE_MISSING', 'TASK_DUPLICATE_EDIT', 'TASK_EMPTY_SET', 'REFLECTED_CREDENTIAL_DENIED'].includes(message)) validationCode = message;
+    }
     await journal.cache(id, wireSha256, value, code);
+    // The private sink is reached only AFTER settled receipt and invalid-cache
+    // fsync. Replay cannot dispatch, recache or call it again. A sink fault
+    // preserves billing/cache and stops rather than silently losing evidence.
+    if (code) await onRejectedPayload?.({ id, wireSha256, phase, value: completed.value, validationCode });
     return code ? {} : value;
   }
   return { relevance: input => call('gate', input), proposal: input => call('plan', input) };
 }
 export type PilotProgress = { phase: string; completedTurns: number; passedTurns: number; paidCallsThisRun: number; replayCalls: number; incrementalUpperAtoms: string };
 export async function runPilot(corpus: TrialCorpus, transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string,
-    options: { secrets?: string[]; progress?: (row: PilotProgress) => void; beforeDispatch?: () => void; reusedInitialGate?: { turnId: string; value: unknown } } = {}) {
+    options: { secrets?: string[]; progress?: (row: PilotProgress) => void; beforeDispatch?: () => void; reusedInitialGate?: { turnId: string; value: unknown }; onRejectedPayload?: RejectedTaskSink } = {}) {
   const diagnostics: Diagnostics = { paidCalls: 0, replayCalls: 0, errors: [] }, rows: TrialScore[] = [];
   let phase = 'development', stop: string | null = null, holdoutOpened = false;
   const onTurn = async (row: TrialScore) => {
@@ -91,7 +102,7 @@ export async function runPilot(corpus: TrialCorpus, transport: BenchmarkTranspor
     if (rows.length % 6 === 0) options.progress?.({ phase, completedTurns: rows.length, passedTurns: rows.filter(r => r.passed).length,
       paidCallsThisRun: diagnostics.paidCalls, replayCalls: diagnostics.replayCalls, incrementalUpperAtoms: journal.verify().incrementalUpperAtoms });
   };
-  const evaluate = async (turns: TrialTurn[], occurrence = 0) => evaluateTrialScenario(turns, turn => pilotModel(transport, journal, bindingSha256, turn, occurrence, diagnostics, options.secrets, options.beforeDispatch, options.reusedInitialGate), occurrence, onTurn);
+  const evaluate = async (turns: TrialTurn[], occurrence = 0) => evaluateTrialScenario(turns, turn => pilotModel(transport, journal, bindingSha256, turn, occurrence, diagnostics, options.secrets, options.beforeDispatch, options.reusedInitialGate, options.onRejectedPayload), occurrence, onTurn);
   try {
     for (const turn of corpus.singles.filter(t => t.split === 'development')) await evaluate([turn]);
     for (const dialog of corpus.dialogs.filter(d => d.split === 'development')) await evaluate(dialog.turns);

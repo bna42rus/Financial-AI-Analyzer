@@ -13,7 +13,7 @@ import type { TaskModel } from '../src/analyzer-task-workflow.ts';
 import type { TrialCorpus } from '../src/task-trial.ts';
 import { schemaProbeCheckpoint, schemaProbeId, schemaProbeRequest } from '../src/task-schema-probe.ts';
 import { jsonTrialBinding, jsonTrialAdmission, priorSchemaProbe, reusedFinancialGate, assertJsonTrialStart } from '../src/task-json-trial.ts';
-import { taskJsonRequestBody, jsonSystemPrompt, createTaskJsonTransport, replayOnlyTaskJsonTransport, redactProviderError, persistProviderError, readSafeProviderError } from '../src/task-json-transport.ts';
+import { taskJsonRequestBody, jsonSystemPrompt, createTaskJsonTransport, replayOnlyTaskJsonTransport, redactProviderError, persistProviderError, readSafeProviderError, rejectedTaskPayloadCapture } from '../src/task-json-transport.ts';
 import { taskRelevancePrompt, taskProposalPrompt, taskRelevanceSchema, taskProposalSchema } from '../../../packages/analyzer/src/task-protocol.ts';
 
 const spec = candidates['cloud-oss'], bound = { inputTokens: 131072, outputTokens: 1200, modelVersion: spec.model };
@@ -151,6 +151,31 @@ test('JSON syntax alone cannot pass the authoritative duplicate, quote, closed-p
     assert.equal((await readFile(f.ledgerPath, 'utf8')).includes(key), false);
   });
 });
+
+test('a rejected HTTP-200 payload is encrypted immediately after durable usage/cache, with only safe diagnostics and no repeat sink on replay', async () => fixture(async f => {
+  const invalid = { ...valid, unexpected: key }, bundle = createTaskJsonTransport({ apiKey: key }, (async () => reply(invalid)) as typeof fetch);
+  const d = diagnostics(); let sinks = 0, safe: Awaited<ReturnType<typeof persistProviderError>> | undefined;
+  const model = pilotModel(bundle.transport, f.journal, binding, f.corpus.singles[0]!, 0, d, [key], undefined, reusedFinancialGate, async payload => {
+    sinks++; const durable = await BenchmarkLedger.load(f.ledgerPath, { readOnly: true });
+    try { assert.ok(durable.records.get(payload.id)?.receipt?.usage); } finally { await durable.close(); }
+    const cache = await readPilotJson(join(f.cache, payload.id + '.json')) as any; assert.equal(cache.payload.value, null); assert.equal(cache.payload.code, 'TASK_PILOT_PAYLOAD_INVALID');
+    safe = await persistProviderError(f.dir, payload.id, rejectedTaskPayloadCapture(payload));
+  });
+  assert.deepEqual(await model.proposal(f.input), {}); assert.deepEqual(await model.proposal(f.input), {}); assert.equal(sinks, 1); assert.equal(d.paidCalls, 1);
+  assert.equal(safe!.kind, 'payload_rejection'); assert.equal(safe!.httpStatus, 200); assert.equal(safe!.safeMessage.includes(key), false);
+  const id = trialRequestId(binding, 'single-01', 'plan', 0), wrapper = await readPilotJson(join(f.dir, 'task-json-error-' + id + '.json')) as any;
+  const encryptionKey = (await readPilotJson(join(f.dir, 'task-json-error-key.json')) as any).key, cap = wrapper.payload;
+  const decipher = createDecipheriv('aes-256-gcm', Buffer.from(encryptionKey, 'base64'), Buffer.from(cap.nonce, 'base64')); decipher.setAuthTag(Buffer.from(cap.tag, 'base64'));
+  assert.deepEqual(JSON.parse(Buffer.concat([decipher.update(Buffer.from(cap.encrypted, 'base64')), decipher.final()]).toString()), invalid);
+  assert.equal(JSON.stringify(wrapper).includes(key), false); assert.deepEqual(await readSafeProviderError(f.dir, id), safe);
+}));
+
+test('private evidence persistence failure preserves the settled invalid cache and stops without another dispatch or sink', async () => fixture(async f => {
+  let calls = 0, sinks = 0; const bundle = createTaskJsonTransport({ apiKey: key }, (async () => { calls++; return reply({ ...valid, unexpected: true }); }) as typeof fetch);
+  const model = pilotModel(bundle.transport, f.journal, binding, f.corpus.singles[0]!, 0, diagnostics(), [], undefined, reusedFinancialGate, async () => { sinks++; throw new BenchmarkFailure('TASK_JSON_CAPTURE_INVALID'); });
+  await assert.rejects(model.proposal(f.input), /TASK_JSON_CAPTURE_INVALID/); assert.deepEqual(await model.proposal(f.input), {});
+  assert.equal(calls, 1); assert.equal(sinks, 1); assert.equal(f.ledger.totals().held, 4304003840n);
+}));
 
 test('changed model, fingerprint, bound or reflected fingerprint settles once and blocks further dispatch', async () => {
   for (const patch of [{ model: 'other' }, { system_fingerprint: 'changed' }, { system_fingerprint: key }, { usage: { prompt_tokens: 100, completion_tokens: 1201, total_tokens: 1301 } }]) await fixture(async f => {

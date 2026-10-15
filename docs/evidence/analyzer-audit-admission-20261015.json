@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-audit-admission/1",
-  "status": "controlled_provisional_service_pilot_only",
-  "paidDispatchEnabled": true,
+  "status": "json_run_audited_new_candidate_not_admitted",
+  "paidDispatchEnabled": false,
   "latestObserved": {
     "promptVersion": "cashneuro-smoke-prompt/7",
     "strictPassed": 23,
@@ -186,8 +186,8 @@
     "softwareTestsPassed": 647,
     "realModelTrialExecuted": true,
     "completedRealModelTurns": 0,
-    "currentStatus": "json_object_transport_worked_development_failed_52_of_92",
-    "nextAction": "Read-only export and complete offline audit of cached decisions; no further paid run or single-example prompt patch",
+    "currentStatus": "complete_offline_cache_audit_52_of_92_unchanged",
+    "nextAction": "Prepared contract requires a new frozen experiment and explicit budget admission; no new paid command is enabled by this audit",
     "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json",
     "oneShotSchemaProbe": {
       "maximumCalls": 1,
@@ -215,6 +215,21 @@
       "holdoutOpened": false,
       "paidCallsThisRun": 170,
       "resultEvidence": "docs/evidence/analyzer-task-json-trial-result-20261015.json"
+    },
+    "cacheAudit": {
+      "evidence": "docs/evidence/analyzer-task-json-cache-review-20261015.json",
+      "recordsConsumed": 170,
+      "turns": 92,
+      "passed": 52,
+      "developmentPassed": 36,
+      "developmentTurns": 68,
+      "repeatPassed": 16,
+      "repeatTurns": 24,
+      "semanticVariationGroups": 6,
+      "lostRejectedPayloads": 14,
+      "newPaidCalls": 0,
+      "historicalScoresRewritten": false,
+      "preparedPaidDispatchEnabled": false
     }
   }
 }

@@ -9,7 +9,7 @@ import { PilotJournal, readPilotJson, ensurePilotCache } from './task-pilot-jour
 import { loadTrialCorpus, inspectCloudTaskModel } from './task-trial.ts';
 import { assertInactiveOperator } from './benchmark-probe.ts';
 import { assertPilotFreshness, pilotProviderSnapshot, pilotRequestIds, runPilot } from './task-pilot-runner.ts';
-import { createTaskJsonTransport, replayOnlyTaskJsonTransport, persistProviderError, readSafeProviderError } from './task-json-transport.ts';
+import { createTaskJsonTransport, replayOnlyTaskJsonTransport, persistProviderError, readSafeProviderError, rejectedTaskPayloadCapture } from './task-json-transport.ts';
 import type { ProviderErrorCapture } from './task-json-transport.ts';
 import { jsonTrialBinding, assertJsonTrialStart, jsonTrialAdmission, reusedFinancialGate } from './task-json-trial.ts';
 import { smokeCostReport } from './benchmark-engine.ts';
@@ -28,6 +28,7 @@ async function main() {
   const report = action === '--report' || exists;
   let ledger = await BenchmarkLedger.load(join(directory, 'smoke-ledger.jsonl'), { readOnly: true }), lock;
   let captures: ProviderErrorCapture[] = [], capturesFlushed = false;
+  const payloadEvidence: unknown[] = [];
   const flush = async () => {
     if (report || capturesFlushed) return [];
     capturesFlushed = true;
@@ -62,16 +63,17 @@ async function main() {
     }
     const cacheStat = await lstat(cache); if (!cacheStat.isDirectory() || cacheStat.uid !== 0 || (cacheStat.mode & 0o777) !== 0o700 || await realpath(cache) !== cache) throw new BenchmarkFailure('BENCH_STATE_DIRECTORY_INVALID');
     const result = await runPilot(corpus, transport, journal, artifact.sha256, { secrets, reusedInitialGate: reusedFinancialGate,
+      onRejectedPayload: report ? undefined : async payload => { payloadEvidence.push(await persistProviderError(directory, payload.id, rejectedTaskPayloadCapture(payload))); },
       beforeDispatch: report ? undefined : () => assertPilotFreshness(), progress: report ? undefined : row => console.log(JSON.stringify({ progress: 'cashneuro-json-trial/1', ...row })) });
-    const errors: unknown[] = await flush();
-    if (report) for (const id of journal.frozen.requestIds) if (ledger.records.get(id)?.receipt?.code) {
+    const errors: unknown[] = [...payloadEvidence, ...await flush()];
+    if (report) for (const id of journal.frozen.requestIds) if (ledger.records.get(id)?.receipt) {
       try { errors.push(await readSafeProviderError(directory, id)); } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     }
     console.log(JSON.stringify({ ...result, experiment: 'cashneuro-task-json-trial/1', wireMode: 'json_object', reusedGateReceiptId: artifact.binding.reusedGate.sourceReceiptId,
       providerErrors: errors, report, ledgerHeadSha256: ledger.previous, frozenSha256: benchmarkDigest(journal.frozen), cost: smokeCostReport(ledger) }));
   } catch (error) {
-    let providerErrors: unknown[] = [];
-    try { providerErrors = await flush(); } catch { /* Accounting remains durable even if diagnostic persistence fails. */ }
+    let providerErrors: unknown[] = [...payloadEvidence];
+    try { providerErrors.push(...await flush()); } catch { /* Accounting remains durable even if diagnostic persistence fails. */ }
     console.log(JSON.stringify({ experiment: 'cashneuro-task-json-trial/1', error: error instanceof BenchmarkFailure ? error.code : 'TASK_JSON_TRIAL_FAILED', providerErrors,
       ledgerHeadSha256: ledger.previous, cost: smokeCostReport(ledger), modelAccepted: false, runtimeAiEnabled: false }));
     throw error;
