@@ -42,11 +42,32 @@
     "apiUnitTestsPassed": 132,
     "apiTypes": "passed",
     "sourceIntegrity": "passed",
-    "ci": "pending"
+    "ci": "passed"
   },
   "remaining": [
     "Operator GET-only catalog preflight and applicable tariff/model revision evidence",
     "Controlled paid runner with cumulative/incremental budget, reserve/replay/failure/phase gates",
     "Fixed development and repetitions, then unopened holdout; full-product acceptance remains separate"
-  ]
+  ],
+  "fullCi": {
+    "commit": "20af685e30836981080e983c54218d09d15c8f19",
+    "runId": 38738230119,
+    "jobId": 116432905923,
+    "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38738230119",
+    "engine": "PostgreSQL 18.4 and pinned Playwright Chromium",
+    "core": 246,
+    "apiUnit": 132,
+    "web": 82,
+    "postgres18": 161,
+    "browser": 4,
+    "total": 625,
+    "passed": 625,
+    "failed": 0,
+    "paidModelCalls": 0
+  },
+  "frozenArtifactHashes": {
+    "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+    "selectedSourceSha256": "abc98f631bff5e739f95792a98ffccd22e7fa022b824784421ffc347d740be0e",
+    "promptsAndSchemasSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8"
+  }
 }

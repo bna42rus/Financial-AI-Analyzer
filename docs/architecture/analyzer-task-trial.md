@@ -132,3 +132,14 @@ hashes corpus, source files, prompts/schema, versions, sampling, budget и IDs.
 не подменять ими применимый текущий тариф без проверки даты действия. Старые
 расходы не пересчитываются новым прайсом. Manifest явно сохраняет
 currentTariffConfirmed=false и immutableModelVersionVerified=false.
+
+## Проверка подготовленного кода
+
+На commit `20af685e30836981080e983c54218d09d15c8f19` полный CI
+[38738230119](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38738230119)
+успешен: **625/625** (246 core, 132 API unit, 82 web, 161 PostgreSQL 18.4,
+4 Chromium browser tests desktop/mobile). Включены 13 новых проверок
+корпуса, оценки, отсутствия повторного dispatch и GET-only preflight.
+Все model responses синтетические; платных вызовов ноль. Команда оператора
+должна использовать этот точный проверенный source commit. Следующий
+evidence-only commit не меняет исполняемые файлы.

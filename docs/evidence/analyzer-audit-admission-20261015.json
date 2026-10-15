@@ -138,7 +138,15 @@
     "paidCalls": 0,
     "billingReconciled": false,
     "holdsReleased": false,
-    "evidence": "docs/evidence/analyzer-vps-inspection-20261015.json"
+    "evidence": "docs/evidence/analyzer-vps-inspection-20261015.json",
+    "aggregateProviderComparison": {
+      "status": "matches_displayed_totals",
+      "reportedCalls": 489,
+      "reportedTokens": 474989,
+      "providerDisplayedTokensRounded": "475000",
+      "knownCostRoundedKopecks": 1337,
+      "individualUnknownReceiptsReconciled": false
+    }
   },
   "taskTrialPreparation": {
     "status": "offline_corpus_and_get_preflight_implemented_paid_blocked",
@@ -146,6 +154,13 @@
     "baseTurns": 96,
     "independentRepeatTurns": 24,
     "newUnitTestsPassed": 13,
-    "evidence": "docs/evidence/analyzer-task-trial-20261015.json"
+    "evidence": "docs/evidence/analyzer-task-trial-20261015.json",
+    "validation": {
+      "commit": "20af685e30836981080e983c54218d09d15c8f19",
+      "runId": 38738230119,
+      "passed": 625,
+      "failed": 0,
+      "paidCalls": 0
+    }
   }
 }
