@@ -229,7 +229,10 @@
       "lostRejectedPayloads": 14,
       "newPaidCalls": 0,
       "historicalScoresRewritten": false,
-      "preparedPaidDispatchEnabled": false
+      "preparedPaidDispatchEnabled": false,
+      "testedCodeCommit": "5a46d450c10080ac233a8bee8301e66e391671a0",
+      "ciRunId": 38776922177,
+      "softwareTestsPassed": 697
     }
   }
 }

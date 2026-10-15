@@ -86,3 +86,17 @@ CLI остаётся бесплатным отчётом архивного sour
 96 исторических regression turns под новым протоколом остаются отдельными.
 
 Machine evidence: `docs/evidence/analyzer-task-json-cache-review-20261015.json`.
+
+
+## Проверка реализации аудита и диагностики
+
+Executable commit: `5a46d450c10080ac233a8bee8301e66e391671a0`.
+[CI 38776922177](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38776922177),
+attempt 1: **697/697** — 204 API, 246 core, 82 web, 161 PostgreSQL 18.4,
+4 Chromium desktop/mobile. Types/builds/privacy/source проверки проходят.
+12 новых software tests включают точный replay реальных ответов на synthetic
+corpus, защиту от подмены, ошибочный scope, lossless schema, privacy input и
+private sink faults. Независимый schema validator сравнил 325 values.
+15 опубликованных file blobs совпали с локальными tested files.
+Новых оплачиваемых model calls: 0. Это не новая языковая точность GPT-OSS.
+Следующий documentation-only commit не изменяет executable code.
