@@ -40,7 +40,10 @@ const same = (a: OperationsFilter, b: OperationsFilter, field: Condition) => con
 const revision = (value: unknown) => { if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) return invalid(); return value; };
 function scope(value: unknown): TaskScope {
   const r = object(value, ['ownerId', 'chatId', 'chatEpoch', 'generation']);
-  return { ownerId: uuid(r.ownerId), chatId: uuid(r.chatId), chatEpoch: uuid(r.chatEpoch), generation: uuid(r.generation) };
+  // Better Auth IDs are opaque text, not finance UUIDs. Authority still comes
+  // from the authenticated server session, never this serialized value.
+  if (typeof r.ownerId !== 'string' || !r.ownerId.length || r.ownerId.length > 256 || /[\x00-\x1f\x7f]/.test(r.ownerId)) return invalid();
+  return { ownerId: r.ownerId, chatId: uuid(r.chatId), chatEpoch: uuid(r.chatEpoch), generation: uuid(r.generation) };
 }
 export function globalSnapshot(value: unknown): GlobalSnapshot {
   const r = object(value, ['revision', 'filter', 'touched']), current = revision(r.revision), filter = parseOperationsFilter(r.filter);

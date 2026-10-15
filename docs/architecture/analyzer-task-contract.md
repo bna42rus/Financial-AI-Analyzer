@@ -7,24 +7,24 @@ analyzer-design-audit.md F03–F08, F16, F22–F23; полный разбор с
 
 ## Статус
 
-Реализованы отдельно версионированные task-context/1, task-protocol/1,
-task-literals/1 и task-workflow/1. Новый workflow принимает результаты
-классификатора/планировщика, разрешает условия на сервере, вызывает авторизацию,
-свежее финансовое ядро и атомарное сохранение через обязательный service
-контракт. В тестах выполнен весь путь до calculateWidget/queryOperations.
+Реализованы task-context/1, task-protocol/2, task-literals/1 и task-workflow/1.
+Новый workflow подключён к PostgreSQL, HTTP и адаптеру Cloud через **явно
+заданную тестовую конфигурацию**. Он считает через то же calculateAnalyzerQuery /
+calculateWidget / queryOperations, что прежний путь; отдельной финансовой
+арифметики нет. Миграция 0026 добавляет private TaskBook, globals/stamps,
+идемпотентные claims/cache/cancellation и server chatEpoch.
 
-**Runtime routes и provider adapters пока используют прежний путь.** Новый
-workflow не подключён к HTTP, платному CLI или ключам. Реальная реализация
-хранилища TaskBook/CAS, UI revision stamps и provider accounting/binding
-нужна перед интеграцией. Тестовые services проверяют этот контракт, не заменяют
-PostgreSQL-приёмку. Платная пауза сохраняется; обучение/вызовы модели/деплой
-не выполнялись. Новый prompt/8 к старому runner не добавлен.
+Runtime без taskProvider сохраняет прежний путь. Новый provider factory
+принимает обязательный подставной fetch, использует синтетический ключ и
+допускается сервером только в environment=test. Реальный default network,
+loader Cloud-ключа или staging enable switch не добавлен. Платный CLI остаётся
+заблокирован. Новая языковая точность GPT-OSS ещё не измерена; обучение, платные
+вызовы, применение миграции на VPS и деплой не выполнялись.
 
-Shared OperationsFilter получил **добавочное** поле amountBasis; его прежний
-смысл без этого поля сохранён. Поэтому Registry повышен до analyzer/3,
-query_finances — до версии 2; новые runtime bindings отличимы от прежних.
-Остальные действия/permissions не расширены. БД-миграции не требуются для
-этого optional JSON filter, но persistence новой TaskBook ещё не реализован.
+OperationsFilter имеет additive amountBasis; его прежний signed смысл без поля
+сохранён. Registry — analyzer/3, query_finances — версия 2. Другие инструменты
+и permissions не расширены. Полная проверка provider payload теперь происходит
+до кеширования и до раннего выхода по отсутствующей задаче/категории.
 
 ## 1. Две разные задачи модели
 
@@ -102,7 +102,12 @@ GlobalSnapshot содержит revision и touched stamps групп. При п
 тому же значению между двумя репликами; сравнения одного JSON недостаточно.
 Перестановка множества IDs сама по себе изменением не считается. Старые и
 невозможные revisions отклоняются. Runtime/UI обязаны сохранять эти stamps;
-неподключённая UI без них пока не получает эту гарантию.
+UI накапливает touched группы в ServerFinance, включая A → B → A при переходах
+между экранами, и фиксирует snapshot перед отправкой вопроса. После сетевой
+ошибки повторяется тот же write ID/body; CAS conflict показывается без
+автоматического overwrite. Очередь до ACK находится в памяти текущего workspace;
+после ACK revision/stamps сохраняются на сервере. Полная browser acceptance
+нового opt-in пути остаётся отдельным условием допуска.
 
 Fixed operation IDs хранятся отдельно. Модель не имеет соответствующего edit.
 Новый UI selection может сузить исходную границу; чужие/другие IDs не попадают
@@ -151,18 +156,73 @@ chat lifetime, cancellation, data/global revision и book head. После им�
 guard; commit получает ожидаемые owner/chat/generation/revisions/head/count
 и должен атомарно сохранить ответ+книгу. Ошибка catalog/auth/storage не
 маскируется под языковое уточнение. Повтор messageId останавливается до модели.
-Нет default network/model/retry. Adapter обязан отдельно учесть provider usage,
-в том числе parser failure; этот service сейчас не подключён к оплате.
+Нет default network/model/retry. Adapter отдельно учитывает provider usage, в том числе parser failure.
+Синтетический HTTP проверяет этот же учёт без реального платного dispatch.
 
-Локальные software checks: **246 core +119 API +79 web**, types и сборки
-Finance/Control проходят. Новые 28 тестов проверяют цепочки, totals/drilldown,
-privacy outbound, ambiguity, callbacks/CAS, invalidation и money/calendar
-границы. Это scripted model decisions, не 28/28 реальных ответов GPT-OSS.
-Полная прежняя выгрузка 492 записей/268 ходов повторно даёт побайтно тот же
-review JSON. Paid calls=0; прежние unknown holds не менялись.
+## 6. Реальное хранение, HTTP и учёт провайдера
 
-До платного trial остаются: реальное server persistence/CAS и UI stamps;
-adapter с новым полным version binding/учётом денег; замороженные development/
-holdout, независимые repeat IDs, бюджет и stop rules. Старые paid CLI actions
-по-прежнему запрещены. Исторический максимум 24/24 не объявляется качеством
-нового протокола. Дообучение по этим software tests не проводится.
+`analyzer-task-store.ts` берёт owner только из заново проверяемой серверной
+сессии. Auth IDs — bounded opaque text, финансовые объекты и lifetime — UUID.
+Claim до модели фиксирует question, TaskBook, global/data revisions, currentDate
+Moscow и точные quota timestamps. Повтор после перезапуска использует сохранённый
+claim; ID с другим input/provider binding отклоняется. Во время сети нет общей
+auth/workspace блокировки и занятого финансового соединения. Короткие транзакции
+снова проверяют session/access, generation/epoch, cancellation, data/global
+revision, quota period и head/count. Answer + dependencies + book + customer unit
++ completed claim сохраняются одной транзакцией. Исторический answer остаётся
+snapshot; новый вопрос заново считает текущую БД.
+
+Cancellation имеет tombstone даже если обогнала создание claim. Поздний gate
+не запускает plan; поздний plan не создаёт ответ. Chat deletion удаляет private
+claim/cache/book; повторное создание того же chat UUID даёт новый epoch.
+Изменение generation при **частичном удалении** отменяет pending claims, но не
+удаляет посторонние диалоги: зависимые чаты убирают существующие reference/
+dependency triggers, surviving completed books явно rebind к новой generation.
+При полном reset с ротацией key_version удаляются все чаты и globals. Удалённая
+UI reference помечает globals invalidated: dispatch закрыт до валидного явного
+snapshot; прочие условия и монотонные stamps не стираются.
+
+`analyzer-task-provider.ts` связывает точные HTTP body bytes, prompt/schema/input,
+все protocol/resolver/transport/response versions, model/bound, цену и project
+budget с immutable commercial request fingerprint. Он использует исправленный
+аудированный Cloud response parser (empty tools допустимы, function calls нет).
+Полный context-window reserve фиксируется до HTTP; usage сохраняется и стоимость
+settle **до** разбора смысла/записи private cache. Известный расход не исчезает при
+parser failure, cancellation, deletion или rollback. Receipt без cache не
+повторяется платно. Received gate/cache переживает restart, отправляется только
+отсутствующий plan. Unknown usage сохраняет полный hold и закрывает новые
+обращения пользователя; сетевого retry/fallback нет. Customer unit списывается
+только за успешно сохранённый финансовый ответ, отдельно от technical cost.
+
+Старый runtime использовал JS Date для period_start и терял микросекунды.
+Теперь новые записи используют точные DB timestamps, quota читает также старый
+millisecond alias, а cost reservation переиспользует прежний budget bucket.
+Unique index исключает второй bucket одного периода при overlap старого/нового
+кода. Найденные до миграции duplicate aliases блокируют её для явной сверки;
+исторические квитанции, цены, balances и holds автоматически не переписываются.
+
+## 7. Проверки и оставшиеся ворота
+
+Локально проходят **246 core +119 API unit +82 web tests**, API/Finance/Control
+types, обе сборки и проверка source integrity. В реальной disposable
+**PostgreSQL 16.15** применены все 26 миграций и выполнены **161** проверки:
+**160 прошли**, единственная ошибка — существующий строгий assert целевой
+версии PostgreSQL 18. Он не ослаблен/не пропущен. Все **16 новых HTTP/PostgreSQL**
+сценариев проходят, включая restart/cache loss, cancel-before-claim,
+in-flight cancel/delete/recreation, revision/access changes, RLS/role isolation,
+legacy quota/budget aliases, partial deletion и invalidated UI reference.
+Локальный контейнер предоставляет только mapped root; запуск PostgreSQL
+использовал временный process UID shim, не менявший SQL/RLS или product code.
+Это PostgreSQL-проверки реального хранилища, но **не** приёмка целевой версии 18.
+
+Три новые UI queue проверки добавлены к прежним 79. Model responses в software
+тестах синтетические. Полная прежняя выгрузка 492 записей /268 ходов повторно
+даёт побайтно тот же review JSON, исходный SHA-256 сохранён. Paid calls=0,
+13.372140620 RUB reported tariff cost и 7.516800640 RUB historical holds прежние.
+
+До paid trial нужны PostgreSQL 18 / успешный полный CI; browser acceptance
+нового пути; замороженные development/holdout и независимые repeat IDs с budget /
+stop rules; контролируемый реальный trial adapter и проверяемая model version.
+Новая factory не может включить Cloud на сайте. Существующие goldens и результаты
+не переоцениваются новым parser; 24/24 прошлой версии не объявляется качеством
+этого протокола. Миграция/rollback указаны в integration evidence.

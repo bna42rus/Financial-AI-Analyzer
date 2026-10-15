@@ -18,7 +18,8 @@
     "dev:mail": "node --import tsx src/mail-main.ts",
     "dev:imports": "node --import tsx src/import-main.ts",
     "test:integration:base": "node --import tsx --test --test-concurrency=1 test/security.test.ts test/mail.test.ts test/finance.test.ts test/finance-structure.test.ts test/finance-entities.test.ts test/finance-history.test.ts test/finance-reset.test.ts test/finance-chains.test.ts test/import-validation.test.ts test/import-ingestion.test.ts test/operations.test.ts test/budgets.test.ts",
-    "test:browser:base": "node --import tsx --test --test-concurrency=1 test/browser.test.ts test/review-browser.test.ts test/operations-browser.test.ts test/budgets-browser.test.ts"
+    "test:browser:base": "node --import tsx --test --test-concurrency=1 test/browser.test.ts test/review-browser.test.ts test/operations-browser.test.ts test/budgets-browser.test.ts",
+    "test:analyzer-tasks": "node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts"
   },
   "dependencies": {
     "@better-auth/drizzle-adapter": "1.7.7",

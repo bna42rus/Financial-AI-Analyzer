@@ -8,8 +8,9 @@ import type { TaskBook, TaskScope, TaskDecision, ScalarEdit, Condition, GlobalSn
 import type { Query, Relevance } from './registry.ts';
 import { registryVersion } from './registry.ts';
 import { periodLiteral, amountLiteral, questionQuote } from './task-literals.ts';
+import { assertClosedSchema } from './closed-schema.ts';
 
-export const taskProtocolVersion = 'analyzer-task-protocol/1';
+export const taskProtocolVersion = 'analyzer-task-protocol/2';
 const conditions = Object.keys(conditionFields) as Condition[];
 const closed = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object', additionalProperties: false, properties, required });
 const enumString = (values: readonly string[]) => ({ type: 'string', enum: values });
@@ -73,6 +74,7 @@ export const taskProposalPrompt = [
 ].join('\n');
 
 export function parseTaskRelevance(value: unknown): { relevance: Relevance } {
+  assertClosedSchema(value, taskRelevanceSchema);
   const r = object(value, ['relevance']); return { relevance: choice(r.relevance, ['financial', 'adjacent', 'ambiguous', 'unrelated']) };
 }
 const folded = (s: string) => s.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/\s+/gu, ' ').trim();
@@ -95,8 +97,39 @@ function resolveNames(names: string[], kind: 'categories' | 'accounts' | 'counte
   });
 }
 export type PreparedProposal = { status: 'query'; decision: TaskDecision } | { status: 'clarification' | 'unsupported'; reason: string };
+/** Validate the WHOLE provider payload before caching, even when an early
+ * missing task/name would stop local resolution. No catalog or finance read. */
+export function parseTaskProposalWire(value: unknown, question: string): Record<string, unknown> {
+  if (JSON.stringify(value)?.length > 32768) throw new TypeError('TASK_WIRE_INVALID');
+  assertClosedSchema(value, taskProposalSchema);
+  const r = value as Record<string, unknown>, edits = r.edits as Record<string, unknown>[];
+  for (const key of ['metric', 'grouping', 'comparison']) {
+    const scalar = r[key] as Record<string, unknown>;
+    if (scalar.op === 'set') questionQuote(scalar.quote, question);
+  }
+  const seen = new Set();
+  for (const e of edits) {
+    if (seen.has(e.field)) throw new TypeError('TASK_DUPLICATE_EDIT'); seen.add(e.field);
+    if (e.op === 'keep') continue;
+    const quote = questionQuote(e.quote, question);
+    if (e.op !== 'set') continue;
+    if (['period', 'postedPeriod'].includes(String(e.field)) && e.value !== quote) throw new TypeError('TASK_EVIDENCE_MISSING');
+    if (e.field === 'amount' && (e.value as Record<string, unknown>).expression !== quote) throw new TypeError('TASK_EVIDENCE_MISSING');
+    if (e.field === 'accounts') quotedNames(e.value, quote);
+    if (['categories', 'counterparties'].includes(String(e.field))) {
+      const names = e.value as Record<string, unknown>;
+      if (!Object.keys(names).length) throw new TypeError('TASK_EMPTY_SET');
+      for (const key of ['names', 'excludedNames']) if (key in names) quotedNames(names[key], quote);
+    }
+    if (e.field === 'merchant') quotedNames([(e.value as Record<string, unknown>).name], quote);
+  }
+  if (r.status !== 'query' && (r.binding !== null || edits.length || ['metric', 'grouping', 'comparison'].some(k => (r[k] as Record<string, unknown>).op !== 'keep'))) throw new TypeError('TASK_WIRE_INVALID');
+  if (r.status === 'query' && r.binding === null) throw new TypeError('TASK_WIRE_INVALID');
+  return structuredClone(r);
+}
 /** Closed parser and local ownership resolver. No catalog is sent to a model. */
 export function prepareTaskProposal(value: unknown, question: string, book: TaskBook, scope: TaskScope, global: GlobalSnapshot, messageId: string, currentDate: string, catalog: Catalog): PreparedProposal {
+  parseTaskProposalWire(value, question);
   if (!safeText(question, 2000)) throw new TypeError('EMPTY_QUERY');
   const r = object(value, ['status', 'binding', 'metric', 'grouping', 'comparison', 'edits']);
   if (Object.keys(r).length !== 6) throw new TypeError('TASK_PROPOSAL_INVALID');

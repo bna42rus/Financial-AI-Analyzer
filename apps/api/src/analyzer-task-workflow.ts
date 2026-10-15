@@ -29,8 +29,8 @@ export type TaskServices<Result> = {
 };
 export type TaskOutcome<Result> = { status: 'query'; query: Query; result: Result; book: TaskBook; inheritedFrom: string | null } |
   { status: 'clarification' | 'unsupported' | 'redirect' | 'failed'; reason: string; book: TaskBook };
-/** New offline-tested workflow. It is not registered in runtime routes, paid
- * CLI or provider adapters; release requires persistence and real-model gates.
+/** Connected only to explicitly configured test HTTP/provider services.
+ * Paid CLI/staging release still requires the independent real-model gates.
  * No default model, network or retry exists. Accounting belongs in the adapter. */
 export async function runAnalyzerTask<Result>(input: TaskInput, model: TaskModel, services: TaskServices<Result>): Promise<TaskOutcome<Result>> {
   const book = parseTaskBook(input.book, input.scope), global = globalSnapshot(input.global), messageId = uuid(input.messageId), question = safeQuestion(input.question);

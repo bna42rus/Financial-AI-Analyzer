@@ -14,8 +14,10 @@ import { makeAuth, current, requireAdmin, recordAuthResult } from './auth.ts';
 import { resetRequest, resetPassword, recoverAdmin } from './security.ts';
 import { realm, HttpError, fields, string, email, event, outbox } from './types.ts';
 import type { Config } from './types.ts';
+import { isCloudTaskProvider } from './analyzer-task-provider.ts';
 
 export async function createServer(config: Config) {
+  if (config.taskProvider && (config.profile !== 'finance' || config.environment !== 'test' || !isCloudTaskProvider(config.taskProvider) || config.taskProvider.pool !== config.pool)) throw new Error('Task provider requires isolated test acceptance');
   if (!['development', 'test', 'staging'].includes(config.environment)) throw new Error('Production requires separate security and release acceptance');
   if (config.environment === 'staging' && !isKmsKey(config.kmsKey, 'staging/' + config.profile, config.wrappingKey)) throw new Error('Staging requires its own KMS key');
   try {
@@ -44,6 +46,7 @@ export async function createServer(config: Config) {
     await config.yandexAnalyzer.pool.query('SELECT 1 FROM commerce.analyzer_request LIMIT 0');
   }
   const analyzer = config.profile === 'finance' ? await import('./analyzer.ts') : null;
+  const tasks = config.profile === 'finance' && config.taskProvider ? await import('./analyzer-task-store.ts') : null;
   const overview = config.profile === 'finance' ? await import('./overview.ts') : null;
   const budgets = config.profile === 'finance' ? await import('./budgets.ts') : null;
   const operations = config.profile === 'finance' ? await import('./operations.ts') : null;
@@ -69,7 +72,7 @@ export async function createServer(config: Config) {
     if (result.rows[0].hits>5) throw new HttpError(429,'RATE_LIMITED');
   }
   const financeReads=new Set(['/finance/analyzer-state','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/operation','/finance/summary','/finance/history-query','/finance/imports','/finance/import-status','/finance/review-sessions']);
-  const financeWrites=new Set(['/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/review-command']);
+  const financeWrites=new Set(['/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/review-command']);
   async function rate(request: FastifyRequest) {
     if (request.method !== 'POST') return;
     const route = request.url.split('?')[0]!;
@@ -203,12 +206,24 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/analyzer-state','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/review-sessions','/finance/review-command'].includes(path)) {
+      } else if (finance && ['/finance/analyzer-state','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/review-sessions','/finance/review-command'].includes(path)) {
         const methodAllowed=path==='/finance/imports'?['GET','POST'].includes(request.method):['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method==='GET':request.method==='POST';
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
-        if(path==='/finance/analyzer-state')result=await analyzer!.analyzerState(db,s.user.id,request.body,!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!config.yandexAnalyzer);
+        if(tasks&&path==='/finance/analyzer-task'){
+          // Release the outer global/auth/workspace transaction before ANY network.
+          await db.query('COMMIT');db.release();db=undefined;
+          const result=await tasks.executeAnalyzerTask(config.pool,s.user.id,request.body,config.taskProvider!,async connection=>{
+            const session=await current(makeAuth(config,connection,seal),request);
+            if(!session||!session.user.emailVerified||session.user.id!==s.user.id)throw new HttpError(401,'AUTH_REQUIRED');
+          });
+          return reply.send(result);
+        }
+        if(tasks&&path==='/finance/analyzer-context')result=await tasks.analyzerTaskContext(db,s.user.id,request.body);
+        else if(tasks&&path==='/finance/analyzer-task-cancel')result=await tasks.cancelAnalyzerTask(db,s.user.id,request.body);
+        else if(['/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel'].includes(path))throw new HttpError(503,'AI_UNAVAILABLE');
+        else if(path==='/finance/analyzer-state')result={taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
         else if(path==='/finance/analyzer-chat')result=await analyzer!.analyzerChat(db,s.user.id,request.body);
         else if(path==='/finance/analyzer-query')result=await analyzer!.analyzerQuery(db,s.user.id,request.body,config.analyzerAdapter,config.yandexAnalyzer,s.user.email);
         else if(path==='/finance/analyzer-propose')result=await analyzer!.analyzerPropose(db,s.user.id,request.body);
@@ -285,7 +300,7 @@ export async function createServer(config: Config) {
   // Isolated normalized-contract budget; password/auth routes retain the 8 KiB default.
   // A closed 1000-row profile with instants and all HMAC fields exceeds 512 KiB.
   // Keep this allowance scoped to imports; schema limits still bound every field.
-  if(finance)for(const url of ['/finance/analyzer-query','/finance/overview','/finance/operations-page','/finance/operations-selection'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:256*1024,handler:requestHandler});
+  if(finance)for(const url of ['/finance/analyzer-context','/finance/analyzer-query','/finance/overview','/finance/operations-page','/finance/operations-selection'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:256*1024,handler:requestHandler});
   if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:1024*1024,handler:requestHandler});
   if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:1024*1024,handler:requestHandler});
   await app.init();

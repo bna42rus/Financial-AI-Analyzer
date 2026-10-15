@@ -62,31 +62,41 @@
     "evidence": "docs/evidence/analyzer-saved-review-20261015.json"
   },
   "taskContractImplementation": {
-    "status": "implemented_offline_not_runtime_integrated",
+    "status": "connected_test_only_postgresql16_verified",
     "registry": "analyzer/3",
     "context": "analyzer-task-context/1",
-    "protocol": "analyzer-task-protocol/1",
+    "protocol": "analyzer-task-protocol/2",
     "literals": "analyzer-task-literals/1",
     "workflow": "analyzer-task-workflow/1",
     "document": "docs/architecture/analyzer-task-contract.md",
-    "newSoftwareTests": 28,
+    "newSoftwareTests": 47,
     "modelAcceptanceExecuted": false,
     "paidCalls": 0,
     "remaining": [
-      "PostgreSQL task persistence and atomic answer/book CAS",
-      "Persisted UI global revision/touched stamps",
-      "Provider adapter/accounting/version binding for the new workflow",
-      "Frozen development/holdout/repeat IDs/budget/stop rules and real model acceptance"
+      "PostgreSQL 18/full CI (local PostgreSQL 16: strict target-version check fails as expected)",
+      "Browser acceptance of opt-in UI filter stamps, cancellation and restart recovery",
+      "Frozen development/holdout/repeat IDs/budget/stop rules and controlled real-model trial adapter",
+      "Provider immutable model verification and actual GPT-OSS semantic acceptance"
     ],
     "validation": {
       "coreTests": 246,
       "apiTests": 119,
-      "webTests": 79,
+      "webTests": 82,
       "financeTypesAndBuild": "passed",
       "controlTypesAndBuild": "passed",
       "sourceIntegrity": "passed",
       "historicalFullReviewByteIdentical": true,
-      "postgresPersistenceIntegration": "not_executed_new_flow_not_registered"
-    }
+      "postgresPersistenceIntegration": {
+        "engine": "PostgreSQL 16.15",
+        "total": 161,
+        "passed": 160,
+        "failed": 1,
+        "onlyFailure": "existing strict PostgreSQL 18 version assertion",
+        "newTaskIntegrationTestsPassed": 16,
+        "syntheticProvider": true,
+        "targetPostgresql18Acceptance": false
+      }
+    },
+    "integrationEvidence": "docs/evidence/analyzer-task-integration-20261015.json"
   }
 }

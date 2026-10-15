@@ -19,24 +19,28 @@ import {gatePrompt,gateSchema,parseGate,planPrompt,planSchema,parseModelPlan,mod
 import type {ModelPlan} from '../../../packages/analyzer/src/yandex-contract.ts';
 import {resolveScope,contextVersion} from '../../../packages/analyzer/src/context.ts';
 
-export async function analyzerQuota(db:PoolClient,userId:string,journal=false):Promise<Quota>{
- const c=(await db.query(`WITH cycle AS (SELECT *,clock_timestamp() AS now FROM commerce.access_cycle WHERE user_id=$1),
+export async function analyzerCycle(db:PoolClient,userId:string){
+ return (await db.query(`WITH cycle AS (SELECT *,clock_timestamp() AS now FROM commerce.access_cycle WHERE user_id=$1),
  grid AS (SELECT *, greatest(0,(extract(year FROM now AT TIME ZONE timezone)::int-extract(year FROM anchor_at AT TIME ZONE timezone)::int)*12+extract(month FROM now AT TIME ZONE timezone)::int-extract(month FROM anchor_at AT TIME ZONE timezone)::int) AS n FROM cycle),
  slot AS (SELECT *,n-CASE WHEN ((anchor_at AT TIME ZONE timezone)+make_interval(months=>n)) AT TIME ZONE timezone>now THEN 1 ELSE 0 END AS k FROM grid)
  SELECT anchor_at,quota_policy,((anchor_at AT TIME ZONE timezone)+make_interval(months=>k)) AT TIME ZONE timezone AS start,
- ((anchor_at AT TIME ZONE timezone)+make_interval(months=>k+1)) AT TIME ZONE timezone AS finish FROM slot`,[userId])).rows[0];
+ ((anchor_at AT TIME ZONE timezone)+make_interval(months=>k+1)) AT TIME ZONE timezone AS finish,
+ anchor_at::text AS "anchorExact",(((anchor_at AT TIME ZONE timezone)+make_interval(months=>k)) AT TIME ZONE timezone)::text AS "startExact" FROM slot`,[userId])).rows[0];
+}
+export async function analyzerQuota(db:PoolClient,userId:string,journal=false):Promise<Quota>{
+ const c=await analyzerCycle(db,userId);
  if(!c||!Number.isSafeInteger(c.quota_policy?.limit)||c.quota_policy.limit<0)return {available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null};
  // Preserve the canonical database timestamp: pg Date serialization truncates microseconds.
- const used=Number((await db.query('SELECT COALESCE(sum(units),0) AS n FROM commerce.analyzer_usage WHERE user_id=$1 AND anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND period_start=$2',[userId,c.start])).rows[0].n),limit=c.quota_policy.limit;
+ const used=Number((await db.query("SELECT COALESCE(sum(units),0) AS n FROM commerce.analyzer_usage WHERE user_id=$1 AND anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND period_start IN ($2::timestamptz,date_trunc('milliseconds',$2::timestamptz))",[userId,c.startExact])).rows[0].n),limit=c.quota_policy.limit;
  const reserved=journal?Number((await db.query(`SELECT count(*) AS n FROM commerce.analyzer_request r WHERE r.user_id=$1 AND r.step='plan'
-   AND r.state IN ('sent','received','unknown') AND r.anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND r.period_start=$2
-   AND NOT EXISTS(SELECT 1 FROM commerce.analyzer_usage u WHERE u.user_id=r.user_id AND u.request_id=r.request_id)`,[userId,c.start])).rows[0].n):0;
+   AND r.state IN ('sent','received','unknown') AND r.anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND r.period_start IN ($2::timestamptz,date_trunc('milliseconds',$2::timestamptz))
+   AND NOT EXISTS(SELECT 1 FROM commerce.analyzer_usage u WHERE u.user_id=r.user_id AND u.request_id=r.request_id)`,[userId,c.startExact])).rows[0].n):0;
  const occupied=used+reserved,warning=occupied>=limit?100:occupied*100>=limit*95?95:occupied*100>=limit*80?80:null;
  return {available:true,limit,used,remaining:Math.max(0,limit-occupied),periodStart:c.start.toISOString(),resetAt:c.finish.toISOString(),warning,...(journal?{reserved}:{})};
 }
 export async function analyzerState(db:PoolClient,userId:string,value:unknown,providerAvailable=false,journal=false){
  const r=object(value??{},['chatId','search']);const search=r.search===undefined?'':safeText(r.search,200);const selectedId=r.chatId===undefined?null:uuid(r.chatId);
- const chats=(await db.query(`SELECT c.id,c.title,c.pinned,c.created_at AS "createdAt",c.modified_at AS "modifiedAt",($2='' OR strpos(lower(c.title),lower($2))>0 OR EXISTS(SELECT 1 FROM finance.analyzer_message m WHERE (m.user_id,m.chat_id)=(c.user_id,c.id) AND strpos(lower(m.question),lower($2))>0)) AS matches FROM finance.analyzer_chat c WHERE c.user_id=$1 ORDER BY c.pinned DESC,c.modified_at DESC,c.id`,[userId,search])).rows;
+ const chats=(await db.query(`SELECT c.id,c.epoch AS "chatEpoch",c.title,c.pinned,c.created_at AS "createdAt",c.modified_at AS "modifiedAt",($2='' OR strpos(lower(c.title),lower($2))>0 OR EXISTS(SELECT 1 FROM finance.analyzer_message m WHERE (m.user_id,m.chat_id)=(c.user_id,c.id) AND strpos(lower(m.question),lower($2))>0)) AS matches FROM finance.analyzer_chat c WHERE c.user_id=$1 ORDER BY c.pinned DESC,c.modified_at DESC,c.id`,[userId,search])).rows;
  const messages=(await db.query(`SELECT m.id,m.chat_id,m.question,m.answer,m.created_at AS "createdAt",m.action_id AS "actionId",CASE WHEN a.id IS NULL THEN NULL ELSE jsonb_build_object('status',a.status,'undone',a.undone,'tool',a.intent->'analyzer'->'tool','confirmation',a.intent->'analyzer'->'confirmation','result',CASE WHEN a.status='committed' THEN jsonb_build_object('status',a.result->>'status','actionId',a.id) ELSE NULL END) END AS outcome
  FROM finance.analyzer_message m LEFT JOIN finance.action a ON (a.user_id,a.id)=(m.user_id,m.action_id) WHERE m.user_id=$1 AND m.chat_id=$2 ORDER BY m.created_at,m.id`,[userId,selectedId??chats[0]?.id??null])).rows;
  if(selectedId&&!chats.some(c=>c.id===selectedId))throw new HttpError(404,'NOT_FOUND');
@@ -45,7 +49,7 @@ export async function analyzerState(db:PoolClient,userId:string,value:unknown,pr
 export async function analyzerChat(db:PoolClient,userId:string,value:unknown){
  const r=object(value,['id','create','title','pinned','delete']),id=uuid(r.id);
  if(r.delete===true){object(value,['id','delete']);await db.query('DELETE FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,id]);return {id,deleted:true};}
- if(r.create===true){object(value,['id','create']);if((await db.query('SELECT id FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,id])).rowCount)return {id};if(Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_chat WHERE user_id=$1',[userId])).rows[0].n)>=100)throw new HttpError(409,'CHAT_LIMIT');await db.query('INSERT INTO finance.analyzer_chat(user_id,id) VALUES($1,$2) ON CONFLICT DO NOTHING',[userId,id]);return {id};}
+ if(r.create===true){object(value,['id','create']);const old=(await db.query('SELECT epoch FROM finance.analyzer_chat WHERE user_id=$1 AND id=$2',[userId,id])).rows[0];if(old)return {id,chatEpoch:old.epoch};if(Number((await db.query('SELECT count(*) AS n FROM finance.analyzer_chat WHERE user_id=$1',[userId])).rows[0].n)>=100)throw new HttpError(409,'CHAT_LIMIT');const created=(await db.query('INSERT INTO finance.analyzer_chat(user_id,id) VALUES($1,$2) RETURNING epoch',[userId,id])).rows[0];return {id,chatEpoch:created.epoch};}
  object(value,['id','title','pinned']);if(r.title===undefined&&r.pinned===undefined||r.pinned!==undefined&&typeof r.pinned!=='boolean')throw new TypeError('INVALID_CHAT');
  const title=r.title===undefined?null:safeText(r.title,100);if(title==='')throw new TypeError('EMPTY_TITLE');
  if(!(await db.query('UPDATE finance.analyzer_chat SET title=COALESCE($3,title),pinned=COALESCE($4,pinned),modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2 RETURNING id',[userId,id,title,r.pinned??null])).rowCount)throw new HttpError(404,'NOT_FOUND');return {id};
@@ -70,9 +74,10 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
   const workspace=(await db.query('SELECT generation,revision FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
   const binding={request,context,registryVersion,yandexContractVersion,contextVersion,generation:workspace.generation,revision:workspace.revision};
   const costQuota=yandex.cost?await analyzerQuota(db,userId,true):undefined;
+  const costCycle=yandex.cost?await analyzerCycle(db,userId):undefined;
   const costAnchor=yandex.cost?(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0]?.anchor:undefined;
   if(yandex.cost&&(!costQuota?.periodStart||!costAnchor))throw new HttpError(409,'AI_BUDGET_PERIOD_REQUIRED');
-  const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema,...(yandex.cost?{periodStart:costQuota!.periodStart!,anchorAt:costAnchor}:{})},v=>parseGate(v));
+  const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema,...(yandex.cost?{periodStart:costCycle!.startExact,anchorAt:costAnchor}:{})},v=>parseGate(v));
   if(['financial','adjacent'].includes(gate.value.relevance)){
    const quota=await analyzerQuota(db,userId,true);
    // Existing receipts and terminal outcomes are resolved without a new dispatch.
@@ -81,7 +86,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
    const base=resolveScope(filter,gate.value.followUp&&context?context.filter:undefined,previousGlobal).filter;await assertReferences(db,userId,base);
    const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
    const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;
-   const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,currentDate),schema:planSchema,periodStart:quota.periodStart!,anchorAt},(v,cached):ModelPlan=>{
+   const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,currentDate),schema:planSchema,periodStart:(await analyzerCycle(db,userId)).startExact,anchorAt},(v,cached):ModelPlan=>{
     if(!cached)return parseModelPlan(v,base,catalog);
     const saved=object(v,['status','query']);
     if(saved.status!=='query')return parseModelPlan(saved,base);
@@ -108,20 +113,11 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
   if(stableJSON(tool)!==stableJSON(query))throw new HttpError(400,'AI_SCOPE_CHANGED');query=tool;usage={inputTokens:tokenUsage(plan.inputTokens),outputTokens:tokenUsage(plan.outputTokens)};
  }
  let dependencyIds:string[]=[];
- if(query){await assertReferences(db,userId,query.filter);const {state,operations}=await operationsDataset(db,userId);
-  const widget=parseWidget({id:randomUUID(),name:query.metric==='income'?'Доходы':query.metric==='attention'?'Требуют внимания':'Расходы',metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:{kind:query.comparison},chart:'table',topN:query.grouping==='operation'?3:10});
-  const result=calculateWidget(widget,operations,state,{},now,'Europe/Moscow');
-  const selected=queryOperations(operations,state,{filter:query.filter,sort:'date',direction:'asc',group:'none'}).operations;
-  dependencyIds=selected.map(o=>o.id);if(result.comparisonFilter)dependencyIds=[...new Set([...dependencyIds,...queryOperations(operations,state,{filter:result.comparisonFilter,sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)])];
-  // Linked source facts outside the visible period contribute to terminal allocations.
-  const links=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1',[userId])).rows;
-  const connected=new Set(dependencyIds);let grew=true;while(grew){grew=false;for(const link of links)if(connected.has(link.source_id)||connected.has(link.target_id))for(const linked of [link.source_id,link.target_id])if(!connected.has(linked)){connected.add(linked);grew=true;}}dependencyIds=[...connected];
-  answer={text:result.operationCount?'Расчёт по вашим сохранённым операциям.':'По этим условиям операций нет.',mode:external?'ai':adapter?'test_adapter':'deterministic',registryVersion,query,result,widget,generation:state.generation,revision:state.revision,accountCount:new Set(selected.map(o=>o.accountId)).size,actionOperationCount:queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).total,computedAt:now.toISOString(),periodFromQuestion:intent.periodFromQuestion,followUp:intent.followUp,...(external?{provider:external}:adapter?{provider:{id:adapter.id,model:adapter.model,version:adapter.version}}:{})};
- }
+ if(query)({answer,dependencyIds}=await calculateAnalyzerQuery(db,userId,query,now,{mode:external?'ai':adapter?'test_adapter':'deterministic',periodFromQuestion:intent.periodFromQuestion,followUp:intent.followUp,provider:external??(adapter?{id:adapter.id,model:adapter.model,version:adapter.version}:undefined)}));
  await db.query('INSERT INTO finance.analyzer_message(user_id,id,chat_id,question,answer,context,request) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,chatId,text,JSON.stringify(answer),query?JSON.stringify(query):null,JSON.stringify(request)]);
  if(dependencyIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[])',[userId,id,dependencyIds]);
  await db.query("UPDATE finance.analyzer_chat SET title=CASE WHEN title='Новый диалог' AND $3 THEN $4 ELSE title END,modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2",[userId,chatId,!!query,text.slice(0,100)]);
- if(usage&&adapter){const quota=await analyzerQuota(db,userId);await db.query('INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version) SELECT user_id,$2,anchor_at,$3,1,$4,$5,$6,$7,$8 FROM commerce.access_cycle WHERE user_id=$1',[userId,id,quota.periodStart,usage.inputTokens,usage.outputTokens,adapter.id,adapter.model,adapter.version]);}
+ if(usage&&adapter){const cycle=await analyzerCycle(db,userId);await db.query('INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version) SELECT user_id,$2,anchor_at,$3,1,$4,$5,$6,$7,$8 FROM commerce.access_cycle WHERE user_id=$1',[userId,id,cycle.startExact,usage.inputTokens,usage.outputTokens,adapter.id,adapter.model,adapter.version]);}
  if(usage&&external){const billed=await db.query("INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version) SELECT user_id,request_id,anchor_at,period_start,1,$3,$4,$5,$6,$7 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan' AND state='received'",[userId,id,usage.inputTokens,usage.outputTokens,external.id,external.model,external.version]);if(billed.rowCount!==1)throw new HttpError(409,'AI_STATE_CHANGED');await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND state='received'",[userId,id]);}
  return {id,answer,quota:await analyzerQuota(db,userId,!!yandex)};
 }
@@ -163,4 +159,18 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  if(preview.impact.affectedOperationIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING',[userId,tool.answerId,preview.impact.affectedOperationIds]);
  await db.query('UPDATE finance.analyzer_message SET action_id=$3 WHERE user_id=$1 AND id=$2',[userId,tool.answerId,actionId]);
  return {...preview,generation:state.generation,requiresConfirmation:confirmation};
+}
+
+/** Shared exact financial execution for both HTTP contracts. No model arithmetic. */
+export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;provider?:Answer['provider']}){
+ await assertReferences(db,userId,query.filter);const {state,operations}=await operationsDataset(db,userId);
+  const widget=parseWidget({id:randomUUID(),name:query.metric==='income'?'Доходы':query.metric==='attention'?'Требуют внимания':'Расходы',metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:{kind:query.comparison},chart:'table',topN:query.grouping==='operation'?3:10});
+  const result=calculateWidget(widget,operations,state,{},now,'Europe/Moscow');
+  const selected=queryOperations(operations,state,{filter:query.filter,sort:'date',direction:'asc',group:'none'}).operations;
+  let dependencyIds=selected.map(o=>o.id);if(result.comparisonFilter)dependencyIds=[...new Set([...dependencyIds,...queryOperations(operations,state,{filter:result.comparisonFilter,sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)])];
+  // Linked source facts outside the visible period contribute to terminal allocations.
+  const links=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1',[userId])).rows;
+  const connected=new Set(dependencyIds);let grew=true;while(grew){grew=false;for(const link of links)if(connected.has(link.source_id)||connected.has(link.target_id))for(const linked of [link.source_id,link.target_id])if(!connected.has(linked)){connected.add(linked);grew=true;}}dependencyIds=[...connected];
+  const answer:Answer={text:result.operationCount?'Расчёт по вашим сохранённым операциям.':'По этим условиям операций нет.',mode:options.mode,registryVersion,query,result,widget,generation:state.generation,revision:state.revision,accountCount:new Set(selected.map(o=>o.accountId)).size,actionOperationCount:queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).total,computedAt:now.toISOString(),periodFromQuestion:options.periodFromQuestion,followUp:options.followUp,...(options.provider?{provider:options.provider}:{})};
+ return {answer,dependencyIds};
 }

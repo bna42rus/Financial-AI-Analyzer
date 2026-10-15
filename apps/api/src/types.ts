@@ -2,7 +2,7 @@ import type { PoolClient, Pool } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import type { envelope } from './crypto.ts';
 export type Profile = 'finance' | 'control';
-export type Config = { profile: Profile; pool: Pool; baseURL: string; origin: string; authSecret: string; wrappingKey: Buffer; environment: 'development' | 'test' | 'staging'; kmsKey?: import('./kms.ts').UnlockedKmsKey; analyzerAdapter?: import('../../../packages/analyzer/src/registry.ts').AnalyzerAdapter; yandexAnalyzer?: import('./yandex-runtime.ts').YandexAnalyzer };
+export type Config = { profile: Profile; pool: Pool; baseURL: string; origin: string; authSecret: string; wrappingKey: Buffer; environment: 'development' | 'test' | 'staging'; kmsKey?: import('./kms.ts').UnlockedKmsKey; analyzerAdapter?: import('../../../packages/analyzer/src/registry.ts').AnalyzerAdapter; yandexAnalyzer?: import('./yandex-runtime.ts').YandexAnalyzer; taskProvider?: import('./analyzer-task-provider.ts').CloudTaskProvider };
 export type Sealer = ReturnType<typeof envelope>;
 export type DB = Pick<PoolClient, 'query'>;
 export class HttpError extends Error { constructor(public status: number, public code: string) { super(code); } }
