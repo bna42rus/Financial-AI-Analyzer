@@ -203,6 +203,15 @@ Unique index исключает второй bucket одного периода 
 
 ## 7. Проверки и оставшиеся ворота
 
+Повторный GitHub Actions run **38709689304 /attempt 2** на commit
+`8cf5e34b514c38fda809d6c196fe4fab62636dd2` завершился успешно: **161/161**
+на целевой **PostgreSQL 18.4**, плюс все unit/core/web/types/build/spec этапы.
+Первый attempt не запускал job из-за исчерпанной квоты; после самостоятельного
+перевода репозитория владельцем в public обычный GitHub runner смог выполнить
+проверку. Платные вызовы модели не запускались. Ниже сохранён отдельный локальный
+результат PostgreSQL 16, он не подменяет успешно выполненный target CI.
+
+
 Локально проходят **246 core +119 API unit +82 web tests**, API/Finance/Control
 types, обе сборки и проверка source integrity. В реальной disposable
 **PostgreSQL 16.15** применены все 26 миграций и выполнены **161** проверки:
@@ -220,9 +229,16 @@ legacy quota/budget aliases, partial deletion и invalidated UI reference.
 даёт побайтно тот же review JSON, исходный SHA-256 сохранён. Paid calls=0,
 13.372140620 RUB reported tariff cost и 7.516800640 RUB historical holds прежние.
 
-До paid trial нужны PostgreSQL 18 / успешный полный CI; browser acceptance
-нового пути; замороженные development/holdout и независимые repeat IDs с budget /
+До paid trial остаются browser acceptance нового пути; замороженные development/holdout и независимые repeat IDs с budget /
 stop rules; контролируемый реальный trial adapter и проверяемая model version.
 Новая factory не может включить Cloud на сайте. Существующие goldens и результаты
 не переоцениваются новым parser; 24/24 прошлой версии не объявляется качеством
 этого протокола. Миграция/rollback указаны в integration evidence.
+
+Браузерная проверка нового пути добавлена в CI отдельно для desktop/mobile:
+A → B → A между экранами; потерянный ACK с тем же ID/body; CAS conflict другого
+клиента; reload во время provider wait и отмена; подтверждение удаления диалога
+и снятие pending UI; отсутствие горизонтального переполнения и browser errors.
+Для неё используется подставной HTTP provider, не реальная модель. До успешного
+CI этих browser cases пункт не объявляется пройденным. Старый browser flow
+с History/Undo и подтверждёнными правками включён рядом как compatibility check.

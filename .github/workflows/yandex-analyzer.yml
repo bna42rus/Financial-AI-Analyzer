@@ -5,6 +5,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: analyzer-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   analyzer-checks:
     runs-on: ubuntu-latest
@@ -45,3 +48,9 @@ jobs:
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts test/analyzer-cost.test.ts test/yandex-integration.test.ts test/analyzer.test.ts test/security.test.ts test/mail.test.ts test/owner-bootstrap.test.ts
+      - name: Install pinned Chromium for browser acceptance
+        run: pnpm --filter @finance/api exec playwright install --with-deps chromium
+      - name: Check real Analyzer browser flows on desktop and mobile
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-browser.test.ts test/analyzer-browser.test.ts

@@ -62,7 +62,7 @@
     "evidence": "docs/evidence/analyzer-saved-review-20261015.json"
   },
   "taskContractImplementation": {
-    "status": "connected_test_only_postgresql16_verified",
+    "status": "connected_test_only_postgresql18_verified",
     "registry": "analyzer/3",
     "context": "analyzer-task-context/1",
     "protocol": "analyzer-task-protocol/2",
@@ -73,7 +73,6 @@
     "modelAcceptanceExecuted": false,
     "paidCalls": 0,
     "remaining": [
-      "PostgreSQL 18/full CI (local PostgreSQL 16: strict target-version check fails as expected)",
       "Browser acceptance of opt-in UI filter stamps, cancellation and restart recovery",
       "Frozen development/holdout/repeat IDs/budget/stop rules and controlled real-model trial adapter",
       "Provider immutable model verification and actual GPT-OSS semantic acceptance"
@@ -94,7 +93,15 @@
         "onlyFailure": "existing strict PostgreSQL 18 version assertion",
         "newTaskIntegrationTestsPassed": 16,
         "syntheticProvider": true,
-        "targetPostgresql18Acceptance": false
+        "targetPostgresql18Acceptance": true,
+        "targetCi": {
+          "commit": "8cf5e34b514c38fda809d6c196fe4fab62636dd2",
+          "engine": "PostgreSQL 18.4",
+          "passed": 161,
+          "failed": 0,
+          "runId": 38709689304,
+          "attempt": 2
+        }
       }
     },
     "integrationEvidence": "docs/evidence/analyzer-task-integration-20261015.json"
