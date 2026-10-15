@@ -60,5 +60,33 @@
     "repeatedWireBodyGroups": 41,
     "divergentGateWireGroups": 1,
     "evidence": "docs/evidence/analyzer-saved-review-20261015.json"
+  },
+  "taskContractImplementation": {
+    "status": "implemented_offline_not_runtime_integrated",
+    "registry": "analyzer/3",
+    "context": "analyzer-task-context/1",
+    "protocol": "analyzer-task-protocol/1",
+    "literals": "analyzer-task-literals/1",
+    "workflow": "analyzer-task-workflow/1",
+    "document": "docs/architecture/analyzer-task-contract.md",
+    "newSoftwareTests": 28,
+    "modelAcceptanceExecuted": false,
+    "paidCalls": 0,
+    "remaining": [
+      "PostgreSQL task persistence and atomic answer/book CAS",
+      "Persisted UI global revision/touched stamps",
+      "Provider adapter/accounting/version binding for the new workflow",
+      "Frozen development/holdout/repeat IDs/budget/stop rules and real model acceptance"
+    ],
+    "validation": {
+      "coreTests": 246,
+      "apiTests": 119,
+      "webTests": 79,
+      "financeTypesAndBuild": "passed",
+      "controlTypesAndBuild": "passed",
+      "sourceIntegrity": "passed",
+      "historicalFullReviewByteIdentical": true,
+      "postgresPersistenceIntegration": "not_executed_new_flow_not_registered"
+    }
   }
 }

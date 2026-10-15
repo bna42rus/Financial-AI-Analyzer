@@ -6,9 +6,9 @@ import type {ActionTool} from './actions.ts';
 import {safeText} from '../../privacy/src/text.ts';
 import {resolveScope} from './context.ts';
 
-export const registryVersion='analyzer/2';
+export const registryVersion='analyzer/3';
 export const registry=[
- {name:'query_finances',version:1,principal:'owner',access:'active_entitlement',scope:'filtered_current_finances',confirmation:'none'},
+ {name:'query_finances',version:2,principal:'owner',access:'active_entitlement',scope:'filtered_current_finances',confirmation:'none'},
  {name:'set_inclusion',version:1,principal:'owner',access:'active_entitlement',scope:'fixed_answer_operations',confirmation:'preview_then_explicit_commit'},
  {name:'edit_operations',version:1,principal:'owner',access:'active_entitlement',scope:'fixed_answer_operations',confirmation:'backend_policy'},
  {name:'finance_action',version:1,principal:'owner',access:'active_entitlement',scope:'closed_backend_intents',confirmation:'backend_policy'},
