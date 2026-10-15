@@ -16,7 +16,7 @@ export function assertBenchmarkActionAllowed(action: string) {
 }
 
 type Batch = { candidate: Candidate; revision: SmokeRevision; contract: ResponseContract; phase: 'initial' | 'after-funding'; corpus: 'smoke' | 'transfer' };
-const batches: Batch[] = [
+export const historicalAuditBatches: readonly Batch[] = [
   { candidate: 'cloud-oss', revision: 'original', contract: 'legacy', phase: 'initial', corpus: 'smoke' },
   ...(['original', 'revised', 'resolved'] as const).map(revision => ({ candidate: 'cloud-oss' as const, revision, contract: 'legacy' as const, phase: 'after-funding' as const, corpus: 'smoke' as const })),
   ...(['delta', 'explicit', 'literal', 'context'] as const).flatMap(revision => (['smoke', 'transfer'] as const).map(corpus =>
@@ -87,7 +87,7 @@ export async function auditSavedBenchmark(ledger: BenchmarkLedger) {
       fingerprintHash: record.receipt?.fingerprint ? digest(record.receipt.fingerprint) : null,
       cachedTokens: record.receipt?.cachedTokens ?? null, reasoningTokens: record.receipt?.reasoningTokens ?? null };
   };
-  for (const batch of batches) {
+  for (const batch of historicalAuditBatches) {
     const rows: { check: SmokeCheck; scenarioId: string }[] = [];
     const requests: { id: string; turnId: string; step: 'gate' | 'plan' }[] = [];
     let result: Awaited<ReturnType<typeof runSmoke>> | undefined, stoppedBy: string | null = null;

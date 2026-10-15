@@ -5,10 +5,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { createHash } from 'node:crypto';
 import { BenchmarkLedger } from '../src/benchmark-ledger.ts';
 import { createBenchmarkTransport, candidates } from '../src/benchmark-transport.ts';
 import { runSmoke } from '../src/benchmark-engine.ts';
 import { auditSavedBenchmark, analyzeSavedChecks, assertBenchmarkActionAllowed } from '../src/benchmark-audit.ts';
+import { reviewSavedAudit } from '../src/benchmark-audit-review.ts';
 import { contextGatePrompt, contextDecisionTemplate } from '../src/benchmark-context-prompts.ts';
 import { parseLiteralPlan } from '../src/benchmark-literal-plan.ts';
 import { october, syntheticCatalog } from '../src/benchmark-fixtures.ts';
@@ -48,6 +50,10 @@ test('audit exports successful and failed parsed responses with exact ledger cov
     assert.equal(JSON.stringify(result).includes(key), false); assert.equal(JSON.stringify(result).includes('[TEXT_REDACTED]'), true);
     assert.ok(batch.requests.every(r => r.fingerprintHash?.length === 64));
     assert.equal(JSON.stringify(result).includes('fixture-audit'), false);
+    const reviewed = await reviewSavedAudit(result);
+    assert.equal(reviewed.verified.reconstructedRequests, 48);
+    assert.equal(reviewed.verified.unknownCalls, 1);
+    assert.equal(reviewed.verified.exactHistoricalScoresAndGoldens, true);
     assert.equal(result.batches.find(b => b.revision === 'literal' && b.corpus === 'transfer')?.status, 'not_started');
     assert.deepEqual(readonly.totals(), totals);
   } finally { globalThis.fetch = savedFetch; await readonly.close(); }
@@ -69,6 +75,9 @@ test('partial audit retains complete prefix and the unknown final reservation wi
     assert.equal(batch.costPerTurnAtoms, null); assert.equal(batch.stoppedBy, 'BENCH_RECONCILIATION_REQUIRED');
     assert.equal(batch.requests.at(-1)!.usage, null); assert.equal(batch.requests.at(-1)!.code, 'BENCH_DELIVERY_UNKNOWN');
     assert.equal(result.coverage.matchedRecords, 3); assert.equal(result.cost.requiresReconciliation, true);
+    const reviewed = await reviewSavedAudit(result);
+    assert.equal(reviewed.verified.evaluatedTurns, 1);
+    assert.equal(reviewed.batches.find(b => b.revision === 'context' && b.corpus === 'smoke')?.status, 'incomplete');
   } finally { await readonly.close(); }
   assert.deepEqual(await readFile(path), before); assert.equal(calls, 3);
 }));
@@ -80,6 +89,44 @@ test('audit hooks cannot attach to a dispatch-capable run or release a reserve',
   assert.equal(calls, 0); assert.equal(ledger.records.size, 0);
   const output = await auditSavedBenchmark(ledger); assert.equal(output.coverage.ledgerRecords, 0);
   assert.ok(output.batches.every(b => b.status === 'not_started' && b.metrics.evaluatedTurns === 0));
+  assert.equal((await reviewSavedAudit(output)).verified.evaluatedTurns, 0);
+}));
+
+test('offline review verifies actual wire bodies, detects divergent identical gates, and rejects inconsistent exports without network or source mutation', async () => sandbox(async (_, ledger) => {
+  let calls = 0, revision = 'revised';
+  const bodies = new Map<string, unknown[]>();
+  const client = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async (_, options) => {
+    calls++; const raw = String(options!.body), body = JSON.parse(raw), input = JSON.parse(body.messages[1].content);
+    const gate = { relevance: input.question === 'А это?' && revision === 'revised' ? 'ambiguous' : 'unrelated', followUp: false };
+    const wireHash = createHash('sha256').update(raw).digest('hex');
+    bodies.set(wireHash, [...bodies.get(wireHash) ?? [], gate]);
+    return response(gate);
+  }) as typeof fetch);
+  await runSmoke(client, ledger, 'task', 'after-funding', true, 'revised');
+  revision = 'resolved'; await runSmoke(client, ledger, 'task', 'after-funding', true, 'resolved');
+  assert.equal(calls, 48);
+  const audit = await auditSavedBenchmark(ledger), before = JSON.stringify(audit), savedFetch = globalThis.fetch;
+  globalThis.fetch = (async () => { throw new Error('REVIEW_MUST_NOT_USE_NETWORK'); }) as typeof fetch;
+  try {
+    const reviewed = await reviewSavedAudit(audit);
+    assert.equal(reviewed.verified.evaluatedTurns, 48);
+    assert.equal(reviewed.divergentGateWireGroups.length, 1);
+    const group = reviewed.divergentGateWireGroups[0]!;
+    assert.deepEqual(group.observations.map(r => r.gate), bodies.get(group.wireBodyHash));
+    assert.deepEqual(group.observations.map(r => r.turnId), ['ambiguous', 'ambiguous']);
+    assert.equal(new Set(group.observations.map(r => r.id)).size, 2);
+    const variants = [
+      (a: any) => { a.batches.pop(); },
+      (a: any) => { a.cost.spentAtoms = '0'; },
+      (a: any) => { a.batches[2].requests[0].id = 'a'.repeat(64); },
+      (a: any) => { a.batches[2].turns[0].diagnostics.expectedGate.followUp = true; },
+      (a: any) => { a.batches[2].metrics.strictPassed++; },
+      (a: any) => { a.batches[2].costPerTurnAtoms.maximum = '0'; },
+      (a: any) => { a.batches[2].requests[0].reasoningTokens = 1000; },
+    ];
+    for (const mutate of variants) { const altered = structuredClone(audit); mutate(altered); await assert.rejects(reviewSavedAudit(altered), /BENCH_AUDIT_EXPORT_INCONSISTENT/); }
+  } finally { globalThis.fetch = savedFetch; }
+  assert.equal(JSON.stringify(audit), before); assert.equal(calls, 48);
 }));
 
 test('audit distinguishes relevance, task binding and plan differences without changing strict historical scores', () => {

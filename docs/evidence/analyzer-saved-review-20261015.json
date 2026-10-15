@@ -1,0 +1,3324 @@
+{
+  "review": "cashneuro-saved-review/1",
+  "paidCalls": 0,
+  "verified": {
+    "ledgerRecords": 492,
+    "reconstructedRequests": 489,
+    "unmatchedRecords": 3,
+    "reportedCalls": 489,
+    "failedCalls": 30,
+    "unknownCalls": 3,
+    "inputTokens": 342288,
+    "outputTokens": 132701,
+    "spentAtoms": "13372140620",
+    "heldAtoms": "7516800640",
+    "upperBoundAtoms": "20888941260",
+    "billingReconciled": false,
+    "immutableModelVersionVerified": false,
+    "evaluatedTurns": 268,
+    "exactHistoricalScoresAndGoldens": true,
+    "exactRecordedCosts": true
+  },
+  "batches": [
+    {
+      "candidate": "cloud-oss",
+      "revision": "original",
+      "corpus": "smoke",
+      "contract": "legacy",
+      "phase": "initial",
+      "status": "incomplete",
+      "reconstructedRequests": 1,
+      "evaluatedTurns": 0,
+      "strictPassed": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "reasoningTokens": 0,
+      "cachedTokens": 0,
+      "spentAtoms": "0",
+      "gateRequests": 1,
+      "plannerRequests": 0,
+      "turns": []
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "original",
+      "corpus": "smoke",
+      "contract": "legacy",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 44,
+      "evaluatedTurns": 24,
+      "strictPassed": 14,
+      "inputTokens": 14207,
+      "outputTokens": 11624,
+      "reasoningTokens": 9535,
+      "cachedTokens": 10656,
+      "spentAtoms": "934387020",
+      "gateRequests": 24,
+      "plannerRequests": 20,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "status",
+            "query_presence"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "plan",
+              "code": "BENCH_PLAN_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": false,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "revised",
+      "corpus": "smoke",
+      "contract": "legacy",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 45,
+      "evaluatedTurns": 24,
+      "strictPassed": 21,
+      "inputTokens": 19189,
+      "outputTokens": 10761,
+      "reasoningTokens": 8574,
+      "cachedTokens": 14624,
+      "spentAtoms": "960758540",
+      "gateRequests": 24,
+      "plannerRequests": 21,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "status",
+            "query_presence"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "status",
+            "query_presence"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "resolved",
+      "corpus": "smoke",
+      "contract": "legacy",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 46,
+      "evaluatedTurns": 24,
+      "strictPassed": 19,
+      "inputTokens": 21347,
+      "outputTokens": 11999,
+      "reasoningTokens": 9693,
+      "cachedTokens": 18176,
+      "spentAtoms": "1070502420",
+      "gateRequests": 24,
+      "plannerRequests": 22,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.amountFrom",
+            "filter.categoryIds",
+            "filter.role"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.amountFrom",
+            "filter.categoryIds",
+            "filter.role"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping",
+            "filter.amountFrom",
+            "filter.role"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "plan",
+              "code": "BENCH_PLAN_INVALID_TOOL"
+            }
+          ]
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "delta",
+      "corpus": "smoke",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 46,
+      "evaluatedTurns": 24,
+      "strictPassed": 17,
+      "inputTokens": 19554,
+      "outputTokens": 11762,
+      "reasoningTokens": 10050,
+      "cachedTokens": 15344,
+      "spentAtoms": "1027608440",
+      "gateRequests": 24,
+      "plannerRequests": 22,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "comparison"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.from",
+            "filter.through"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.categoryIds",
+            "filter.from",
+            "filter.through"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.categoryIds",
+            "filter.from",
+            "filter.through"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping",
+            "filter.from",
+            "filter.through"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "delta",
+      "corpus": "transfer",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "not_started",
+      "reconstructedRequests": 0,
+      "evaluatedTurns": 0,
+      "strictPassed": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "reasoningTokens": 0,
+      "cachedTokens": 0,
+      "spentAtoms": "0",
+      "gateRequests": 0,
+      "plannerRequests": 0,
+      "turns": []
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "explicit",
+      "corpus": "smoke",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 46,
+      "evaluatedTurns": 24,
+      "strictPassed": 24,
+      "inputTokens": 35988,
+      "outputTokens": 13930,
+      "reasoningTokens": 11570,
+      "cachedTokens": 29536,
+      "spentAtoms": "1420499680",
+      "gateRequests": 24,
+      "plannerRequests": 22,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "explicit",
+      "corpus": "transfer",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 141,
+      "evaluatedTurns": 72,
+      "strictPassed": 68,
+      "inputTokens": 112328,
+      "outputTokens": 43714,
+      "reasoningTokens": 36114,
+      "cachedTokens": 104640,
+      "spentAtoms": "4448076080",
+      "gateRequests": 72,
+      "plannerRequests": 69,
+      "turns": [
+        {
+          "id": "transfer-01",
+          "scenarioId": "transfer-01",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-02",
+          "scenarioId": "transfer-02",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-03",
+          "scenarioId": "transfer-03",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-04",
+          "scenarioId": "transfer-04",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-05",
+          "scenarioId": "transfer-05",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.attention"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-06",
+          "scenarioId": "transfer-06",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-07",
+          "scenarioId": "transfer-07",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-08",
+          "scenarioId": "transfer-08",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-09",
+          "scenarioId": "transfer-09",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-10",
+          "scenarioId": "transfer-10",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-11",
+          "scenarioId": "transfer-11",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-12",
+          "scenarioId": "transfer-12",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-13",
+          "scenarioId": "transfer-13",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-14",
+          "scenarioId": "transfer-14",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-15",
+          "scenarioId": "transfer-15",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-16",
+          "scenarioId": "transfer-16",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-17",
+          "scenarioId": "transfer-17",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-18",
+          "scenarioId": "transfer-18",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-19",
+          "scenarioId": "transfer-19",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-20",
+          "scenarioId": "transfer-20",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-21",
+          "scenarioId": "transfer-21",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-22",
+          "scenarioId": "transfer-22",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-23",
+          "scenarioId": "transfer-23",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-24",
+          "scenarioId": "transfer-24",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.amountFrom",
+            "filter.amountThrough"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-25",
+          "scenarioId": "transfer-25",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-26",
+          "scenarioId": "transfer-26",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-27",
+          "scenarioId": "transfer-27",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-28",
+          "scenarioId": "transfer-28",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-29",
+          "scenarioId": "transfer-29",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-30",
+          "scenarioId": "transfer-30",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-31",
+          "scenarioId": "transfer-31",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-32",
+          "scenarioId": "transfer-32",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-33",
+          "scenarioId": "transfer-33",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-34",
+          "scenarioId": "transfer-34",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-35",
+          "scenarioId": "transfer-35",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "transfer-36",
+          "scenarioId": "transfer-36",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ti-1",
+          "scenarioId": "transfer-income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ti-2",
+          "scenarioId": "transfer-income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ti-3",
+          "scenarioId": "transfer-income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ti-4",
+          "scenarioId": "transfer-income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ti-5",
+          "scenarioId": "transfer-income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ti-6",
+          "scenarioId": "transfer-income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tl-1",
+          "scenarioId": "transfer-leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tl-2",
+          "scenarioId": "transfer-leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tl-3",
+          "scenarioId": "transfer-leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tl-4",
+          "scenarioId": "transfer-leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tl-5",
+          "scenarioId": "transfer-leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tl-6",
+          "scenarioId": "transfer-leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tg-1",
+          "scenarioId": "transfer-globals",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tg-2",
+          "scenarioId": "transfer-globals",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tg-3",
+          "scenarioId": "transfer-globals",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tg-4",
+          "scenarioId": "transfer-globals",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tg-5",
+          "scenarioId": "transfer-globals",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tg-6",
+          "scenarioId": "transfer-globals",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tx-1",
+          "scenarioId": "transfer-interruption",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tx-2",
+          "scenarioId": "transfer-interruption",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tx-3",
+          "scenarioId": "transfer-interruption",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tx-4",
+          "scenarioId": "transfer-interruption",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tx-5",
+          "scenarioId": "transfer-interruption",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tx-6",
+          "scenarioId": "transfer-interruption",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tc-1",
+          "scenarioId": "transfer-comparison",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tc-2",
+          "scenarioId": "transfer-comparison",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tc-3",
+          "scenarioId": "transfer-comparison",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tc-4",
+          "scenarioId": "transfer-comparison",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tc-5",
+          "scenarioId": "transfer-comparison",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tc-6",
+          "scenarioId": "transfer-comparison",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tr-1",
+          "scenarioId": "transfer-scope-removal",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tr-2",
+          "scenarioId": "transfer-scope-removal",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tr-3",
+          "scenarioId": "transfer-scope-removal",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tr-4",
+          "scenarioId": "transfer-scope-removal",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tr-5",
+          "scenarioId": "transfer-scope-removal",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "tr-6",
+          "scenarioId": "transfer-scope-removal",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "literal",
+      "corpus": "smoke",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 45,
+      "evaluatedTurns": 24,
+      "strictPassed": 18,
+      "inputTokens": 42032,
+      "outputTokens": 13703,
+      "reasoningTokens": 11033,
+      "cachedTokens": 32672,
+      "spentAtoms": "1502510520",
+      "gateRequests": 24,
+      "plannerRequests": 21,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "grouping"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "filter.categoryIds",
+            "filter.subcategoryIds"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "filter.categoryIds",
+            "filter.subcategoryIds"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": true,
+          "followUpCorrect": false,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "literal",
+      "corpus": "transfer",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "not_started",
+      "reconstructedRequests": 0,
+      "evaluatedTurns": 0,
+      "strictPassed": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "reasoningTokens": 0,
+      "cachedTokens": 0,
+      "spentAtoms": "0",
+      "gateRequests": 0,
+      "plannerRequests": 0,
+      "turns": []
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "context",
+      "corpus": "smoke",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 45,
+      "evaluatedTurns": 24,
+      "strictPassed": 23,
+      "inputTokens": 41370,
+      "outputTokens": 14620,
+      "reasoningTokens": 11941,
+      "cachedTokens": 31408,
+      "spentAtoms": "1547948200",
+      "gateRequests": 24,
+      "plannerRequests": 21,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": true,
+          "relevanceCorrect": true,
+          "followUpCorrect": true,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-oss",
+      "revision": "context",
+      "corpus": "transfer",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "not_started",
+      "reconstructedRequests": 0,
+      "evaluatedTurns": 0,
+      "strictPassed": 0,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "reasoningTokens": 0,
+      "cachedTokens": 0,
+      "spentAtoms": "0",
+      "gateRequests": 0,
+      "plannerRequests": 0,
+      "turns": []
+    },
+    {
+      "candidate": "cloud-giga",
+      "revision": "resolved",
+      "corpus": "smoke",
+      "contract": "legacy",
+      "phase": "after-funding",
+      "status": "complete",
+      "reconstructedRequests": 24,
+      "evaluatedTurns": 24,
+      "strictPassed": 0,
+      "inputTokens": 28847,
+      "outputTokens": 318,
+      "reasoningTokens": 0,
+      "cachedTokens": 0,
+      "spentAtoms": "355813000",
+      "gateRequests": 24,
+      "plannerRequests": 0,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "compare",
+          "scenarioId": "compare",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "date",
+          "scenarioId": "date",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "category",
+          "scenarioId": "category",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "selected",
+          "scenarioId": "selected",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "leaf",
+          "scenarioId": "leaf",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "write",
+          "scenarioId": "write",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "unrelated",
+          "scenarioId": "unrelated",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "ambiguous",
+          "scenarioId": "ambiguous",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "scope-1",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "scope-2",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "scope-3",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "scope-4",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "scope-5",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "scope-6",
+          "scenarioId": "dialog-scope",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "global-1",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "global-2",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "global-3",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "global-4",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "global-5",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        },
+        {
+          "id": "global-6",
+          "scenarioId": "dialog-global",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": false,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": true,
+          "errors": [
+            {
+              "step": "gate",
+              "code": "BENCH_RESPONSE_INVALID"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "candidate": "cloud-giga",
+      "revision": "resolved",
+      "corpus": "smoke",
+      "contract": "empty-tools",
+      "phase": "after-funding",
+      "status": "incomplete",
+      "reconstructedRequests": 6,
+      "evaluatedTurns": 4,
+      "strictPassed": 0,
+      "inputTokens": 6011,
+      "outputTokens": 65,
+      "reasoningTokens": 0,
+      "cachedTokens": 5888,
+      "spentAtoms": "74127200",
+      "gateRequests": 5,
+      "plannerRequests": 1,
+      "turns": [
+        {
+          "id": "total",
+          "scenarioId": "total",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "income",
+          "scenarioId": "income",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "groups",
+          "scenarioId": "groups",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        },
+        {
+          "id": "attention",
+          "scenarioId": "attention",
+          "strictPassed": false,
+          "relevanceCorrect": false,
+          "followUpCorrect": true,
+          "planDifferences": [
+            "missing_plan"
+          ],
+          "earlierFailureInScenario": false,
+          "errors": []
+        }
+      ]
+    }
+  ],
+  "repeatedWireBodies": 41,
+  "repeatedGateWireBodies": 34,
+  "repeatedPlannerWireBodies": 7,
+  "divergentGateWireGroups": [
+    {
+      "wireBodyHash": "99e251b0e8bce93a417ba0d71881c4f4d5fe0c2f801cc30e49f2a5dbad023baa",
+      "observations": [
+        {
+          "candidate": "cloud-oss",
+          "revision": "revised",
+          "corpus": "smoke",
+          "phase": "after-funding",
+          "contract": "legacy",
+          "turnId": "ambiguous",
+          "step": "gate",
+          "id": "a0fe393b8ce104cdbf6a42affce006ecdb0caf341dae4622d4bca3585ea8ce77",
+          "code": null,
+          "fingerprintHash": "b3f9f98c5e5f7d14c21b323b1b817ee256140c5bf6d8fd559fc8408efc6b2b95",
+          "gate": {
+            "relevance": "ambiguous",
+            "followUp": false
+          }
+        },
+        {
+          "candidate": "cloud-oss",
+          "revision": "resolved",
+          "corpus": "smoke",
+          "phase": "after-funding",
+          "contract": "legacy",
+          "turnId": "ambiguous",
+          "step": "gate",
+          "id": "feb07c7023efbd12049c32f9a8f5f72f0880adb121e108898c7570ee2cd72e9d",
+          "code": null,
+          "fingerprintHash": "b3f9f98c5e5f7d14c21b323b1b817ee256140c5bf6d8fd559fc8408efc6b2b95",
+          "gate": {
+            "relevance": "unrelated",
+            "followUp": false
+          }
+        },
+        {
+          "candidate": "cloud-oss",
+          "revision": "delta",
+          "corpus": "smoke",
+          "phase": "after-funding",
+          "contract": "empty-tools",
+          "turnId": "ambiguous",
+          "step": "gate",
+          "id": "e95cb718375628fde0606dd24cdcf7c961c74bdb307a7ceb983323074a8e85d5",
+          "code": null,
+          "fingerprintHash": "b3f9f98c5e5f7d14c21b323b1b817ee256140c5bf6d8fd559fc8408efc6b2b95",
+          "gate": {
+            "relevance": "ambiguous",
+            "followUp": false
+          }
+        },
+        {
+          "candidate": "cloud-oss",
+          "revision": "explicit",
+          "corpus": "smoke",
+          "phase": "after-funding",
+          "contract": "empty-tools",
+          "turnId": "ambiguous",
+          "step": "gate",
+          "id": "efc0081a6b6201d74a4ec0bec01ff76426fc2a9106faaa15d927304f9e4bd01e",
+          "code": null,
+          "fingerprintHash": "b3f9f98c5e5f7d14c21b323b1b817ee256140c5bf6d8fd559fc8408efc6b2b95",
+          "gate": {
+            "relevance": "ambiguous",
+            "followUp": false
+          }
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Wire bodies reconstructed from frozen source and checked against recorded request IDs; headers/provider hidden state were not captured.",
+    "Gate values are compared before any server merge. Final planner objects are not used as proof of model variability.",
+    "Incidental repeats are not randomized independent trials and do not estimate a production error rate.",
+    "This verifies consistency of the supplied export, not a signature or provider invoice."
+  ],
+  "sourceSha256": "2dc58de78c642dbc8e308708388240bf1be441466b05b862cc56842faa3307a6"
+}

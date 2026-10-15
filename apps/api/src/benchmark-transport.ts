@@ -47,6 +47,15 @@ export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: strin
 export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound; replayOnly?: boolean; responseContract?: typeof correctedResponseContractVersion;
   complete(prompt: string, input: unknown, schema: unknown, reserve: () => Promise<void>): Promise<BenchmarkResult> };
 
+/** Exact request body, shared with offline forensic reconstruction.
+ * Credentials belong only in transport headers and are never part of it. */
+export function benchmarkRequestBody(candidate: Candidate, bound: DispatchBound, prompt: string, input: unknown, schema: unknown) {
+  return JSON.stringify({ model: bound.modelVersion, messages: [{ role: 'system', content: prompt }, { role: 'user', content: JSON.stringify(input) }],
+    temperature: 0, stream: false, n: 1,
+    ...(candidates[candidate].provider === 'cloud' ? { max_completion_tokens: bound.outputTokens } : { max_tokens: bound.outputTokens }),
+    response_format: { type: 'json_schema', json_schema: { name: 'cashneuro_benchmark', schema } } });
+}
+
 // No credentials, fetch or reservation callback: a missing cached request fails.
 export function replayOnlyBenchmarkTransport(candidate: Candidate, contract: ResponseContract = 'legacy'): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
@@ -70,10 +79,7 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
   const bound = { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: model };
   return { candidate, price: spec.price, bound, ...contractFields(contract),
     async complete(prompt, input, schema, reserve) {
-      const body = JSON.stringify({ model, messages: [{ role: 'system', content: prompt }, { role: 'user', content: JSON.stringify(input) }],
-        temperature: 0, stream: false, n: 1,
-        ...(spec.provider === 'cloud' ? { max_completion_tokens: bound.outputTokens } : { max_tokens: bound.outputTokens }),
-        response_format: { type: 'json_schema', json_schema: { name: 'cashneuro_benchmark', schema } } });
+      const body = benchmarkRequestBody(candidate, bound, prompt, input, schema);
       if (Buffer.byteLength(body) > 65536) throw new BenchmarkFailure('BENCH_CONTEXT_LIMIT');
       await reserve(); // durable reservation must precede every possible dispatch
       let response: Response;

@@ -2,7 +2,6 @@
   "version": "cashneuro-audit-admission/1",
   "status": "blocked",
   "paidDispatchEnabled": false,
-  "currentImmutableSource": "a10be832a225c692087239680ded41de8da37e45",
   "latestObserved": {
     "promptVersion": "cashneuro-smoke-prompt/7",
     "strictPassed": 23,
@@ -12,7 +11,7 @@
     "upperBoundAtoms": "20888941260"
   },
   "requirementsBeforeAnyNewPaidVersion": [
-    "Review the all-turn saved audit export, including successes, partial batches and unmatched receipts.",
+    "Use the completed all-turn audit findings: remove contract gaps and distinguish primary errors, inherited bad state, valid-plan binding errors and successful-query edit/provenance risks.",
     "Freeze relevance ontology and task binding separately; define keep/set/clear/use_current semantics and unsupported cases.",
     "Document signed-operation versus absolute-metric amount semantics, inclusive/exclusive thresholds and mixed-operation treatment.",
     "Freeze code/prompt/schema/resolver/price versions and the provider-supported sampling configuration; do not infer pinning from an alias.",
@@ -40,10 +39,26 @@
     "Any new unknown usage retains its full reserve and stops dispatch.",
     "Any critical ownership/scope/money error blocks model acceptance.",
     "A failed fixed experiment triggers root-cause review, not another prompt tweak against the last failing question.",
-    "Completed replay is never counted as an independent model repeat."
+    "Completed replay is never counted as an independent model repeat.",
+    "Identical temperature=0 request bodies already produced different valid gate values; one passing model run cannot establish stability."
   ],
   "limitations": [
     "This file is an audit checklist, not an implemented paid experiment or a claim of model accuracy.",
     "The CLI currently rejects all paid historical actions before keys, state or locks are accessed."
-  ]
+  ],
+  "auditedHistoricalSource": "a10be832a225c692087239680ded41de8da37e45",
+  "savedExportSource": "0a043fb3708086b45c72482204ca6f4f83e8ba6f",
+  "completedAudit": {
+    "status": "complete_for_supplied_saved_decisions",
+    "sourceSha256": "2dc58de78c642dbc8e308708388240bf1be441466b05b862cc56842faa3307a6",
+    "ledgerRecords": 492,
+    "reconstructedRequests": 489,
+    "unmatchedRecords": 3,
+    "evaluatedTurns": 268,
+    "exactHistoricalScoresAndGoldens": true,
+    "paidCalls": 0,
+    "repeatedWireBodyGroups": 41,
+    "divergentGateWireGroups": 1,
+    "evidence": "docs/evidence/analyzer-saved-review-20261015.json"
+  }
 }
