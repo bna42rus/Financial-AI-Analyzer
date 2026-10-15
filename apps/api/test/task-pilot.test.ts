@@ -10,6 +10,9 @@ import { PilotJournal, ensurePilotCache } from '../src/task-pilot-journal.ts';
 import { pilotBinding, pilotRequestIds, pilotModel, pilotStagePassed, assertPilotFreshness, runPilot } from '../src/task-pilot-runner.ts';
 import { loadTrialCorpus, trialRequestId, evaluateTrialScenario } from '../src/task-trial.ts';
 import type { TrialCorpus, TrialScore } from '../src/task-trial.ts';
+import { auditTaskWireSchema, projectTaskWireSchema, classifyTaskProviderError } from '../src/task-provider-schema.ts';
+import { inspectTaskPilot } from '../src/task-pilot-inspection.ts';
+import { taskRelevanceSchema, taskProposalSchema, parseTaskProposalWire } from '../../../packages/analyzer/src/task-protocol.ts';
 
 const key = 'synthetic-pilot-secret-for-fault-tests', manifestHash = 'a'.repeat(64), spec = candidates['cloud-oss'];
 const bound = { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model };
@@ -281,4 +284,66 @@ test('historical unknown holds and failed receipts remain byte-identical and cou
     assert.equal(ledger.totals().held, held); assert.equal(held, 4304003840n); assert.equal(JSON.stringify([ledger.records.get(first), ledger.records.get(probe)]), before);
     assert.equal(journal.verify().incrementalUpperAtoms, '2196000');
   } finally { await ledger.close(); await rm(dir, { recursive: true, force: true }); }
+});
+
+test('both actual provider schemas are audited offline: simple gate passes and all proposal risks are uniqueItems', () => {
+  assert.deepEqual(auditTaskWireSchema(taskRelevanceSchema), []);
+  const issues = auditTaskWireSchema(taskProposalSchema);
+  assert.ok(issues.length > 0); assert.ok(issues.every(i => i.keyword === 'uniqueItems'));
+  assert.ok(issues.some(i => i.path.includes('/edits/')));
+  assert.deepEqual(auditTaskWireSchema(projectTaskWireSchema(taskProposalSchema)), []);
+});
+
+test('decoder projection changes only uniqueItems while the unchanged local parser still rejects duplicate names', () => {
+  const before = JSON.stringify(taskProposalSchema), projected = projectTaskWireSchema(taskProposalSchema);
+  const independent = JSON.parse(before, (key, value) => key === 'uniqueItems' ? undefined : value);
+  assert.deepEqual(projected, independent); assert.equal(JSON.stringify(taskProposalSchema), before);
+  assert.equal(JSON.stringify(projected).includes('"additionalProperties":false'), true);
+  assert.equal(JSON.stringify(projected).includes('"maxLength":2000'), true);
+  const question = 'Сколько потрачено на продукты?', value = p({ binding: { kind: 'new' }, metric: { op: 'set', value: 'expenses', quote: 'потрачено' },
+    edits: [{ field: 'categories', op: 'set', quote: 'продукты', value: { names: ['продукты'] } }] });
+  assert.doesNotThrow(() => parseTaskProposalWire(value, question));
+  const duplicate = { ...value, edits: [{ field: 'categories', op: 'set', quote: 'продукты', value: { names: ['продукты', 'продукты'] } }] };
+  assert.throws(() => parseTaskProposalWire(duplicate, question));
+});
+
+test('schema profile fails closed on other unsupported or new constraints and treats property names as data', () => {
+  for (const schema of [{ type: 'string', format: 'date' }, { type: 'integer', multipleOf: 5 }, { type: 'array', contains: { type: 'string' } },
+    { type: 'object', patternProperties: {} }, { type: 'object', allOf: [] }, null]) {
+    assert.ok(auditTaskWireSchema(schema).length); assert.throws(() => projectTaskWireSchema(schema), /TASK_WIRE_SCHEMA_UNSUPPORTED/);
+  }
+  assert.deepEqual(auditTaskWireSchema({ type: 'object', properties: { uniqueItems: { type: 'string' } }, required: ['uniqueItems'], additionalProperties: false }), []);
+});
+
+test('safe provider error vocabulary exposes no raw provider text or reflected credential and bounds oversized input', () => {
+  const classified = classifyTaskProviderError(JSON.stringify({ error: { message: key + ' xgrammar response_format json_schema uniqueItems not supported', code: key, param: key } }));
+  assert.equal(classified.reason, 'schema_unsupported'); assert.equal(classified.decoder, 'xgrammar');
+  assert.deepEqual(classified.referencedSchemaKeywords, ['uniqueItems']); assert.equal(JSON.stringify(classified).includes(key), false);
+  assert.equal(classifyTaskProviderError(key).reason, 'unclassified');
+  assert.deepEqual(classifyTaskProviderError('xgrammar uniqueItems'.repeat(2000)), classifyTaskProviderError(''));
+});
+
+test('stopped HTTP 400 checkpoint reads the original two receipts/cache without HTTP, writes, retries or released holds', async () => sandbox(async f => {
+  const turn = f.corpus.singles[0]!, d = diagnostics(); let calls = 0;
+  const transport = createBenchmarkTransport('cloud-oss', { apiKey: key }, (async () => ++calls === 1 ? response({ relevance: 'financial' }) : new Response('uniqueItems ' + key, { status: 400 })) as typeof fetch, 'empty-tools');
+  await assert.rejects(evaluateTrialScenario([turn], () => pilotModel(transport, f.journal, manifestHash, turn, 0, d, [key])), /BENCH_RECONCILIATION_REQUIRED/);
+  const gateId = trialRequestId(manifestHash, turn.id, 'gate', 0), files = [f.path, join(f.dir, 'ledger.jsonl'), join(f.cache, gateId + '.json')];
+  const before = await Promise.all(files.map(p => readFile(p, 'utf8'))), totals = f.ledger.totals();
+  const journal = await PilotJournal.load({ path: f.path, cacheDirectory: f.cache, ledger: f.ledger, bindingSha256: manifestHash, requestIds: pilotRequestIds(f.corpus, manifestHash),
+    incrementalCapAtoms: '20000000000', maximumCalls: 240, readOnly: true, assertInitial() { assert.fail(); } });
+  const a = await inspectTaskPilot(journal, f.corpus, manifestHash), b = await inspectTaskPilot(journal, f.corpus, manifestHash);
+  assert.deepEqual(a, b); assert.equal(a.records.length, 2); assert.equal(a.records[0]!.relevance, 'financial'); assert.equal(a.records[0]!.cacheStatus, 'verified');
+  assert.equal(a.records[1]!.phase, 'plan'); assert.equal(a.records[1]!.error, 'BENCH_PROVIDER_FAILURE_HTTP_400'); assert.equal(a.records[1]!.usage, null);
+  assert.equal(a.records[1]!.heldAtoms, '2152001920'); assert.equal(a.blocked, true); assert.equal(a.httpCalls, 0); assert.equal(calls, 2);
+  assert.equal(a.holdsReleased, false); assert.equal(a.schemaAudit.provider400CauseConfirmed, false); assert.equal(a.schemaAudit.originalProviderErrorRecoverable, false);
+  assert.equal(BigInt(a.remainingIncrementalHeadroomAtoms) + BigInt(a.incrementalUpperAtoms), 20_000_000_000n);
+  assert.deepEqual(f.ledger.totals(), totals); assert.deepEqual(await Promise.all(files.map(p => readFile(p, 'utf8'))), before); assert.equal(JSON.stringify(a).includes(key), false);
+  await assert.rejects(inspectTaskPilot(f.journal, f.corpus, manifestHash), /READ_ONLY_REQUIRED/);
+  await assert.rejects(inspectTaskPilot(journal, f.corpus, 'b'.repeat(64)), /READ_ONLY_REQUIRED/);
+}));
+
+test('new read-only inspector and prepared wire profile leave the already-paid v1 source/binding identity unchanged', async () => {
+  const artifact = await pilotBinding();
+  assert.equal(artifact.sha256, '0afd24fe2c7394be7ee74e5000fb1996e21f4f885c0db38adf977bb14797f691');
+  assert.equal(artifact.binding.manifest.sourceSha256, '30fca54575fc31a25556e08c4a73129f52c7e96870d23849d70272e818858787');
 });

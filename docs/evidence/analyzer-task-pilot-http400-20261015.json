@@ -1,0 +1,75 @@
+{
+  "version": "cashneuro-pilot-http400-review/1",
+  "date": "2026-10-15",
+  "status": "read_only_checkpoint_implemented_provider_cause_unconfirmed",
+  "operatorObserved": {
+    "bindingSha256": "0afd24fe2c7394be7ee74e5000fb1996e21f4f885c0db38adf977bb14797f691",
+    "caseId": "single-01",
+    "question": "Сколько потрачено за выбранный период?",
+    "gateId": "e45fc0f622016dcb6d5cc1bcd6369123d8e79d9faad989155fcff1972173ba03",
+    "rejectedPlanId": "fa60ae8109ffd7c8a49c9f51d3f3206e4dc1ab41aacc247a1ebc44f532721ab4",
+    "paidAttempts": 2,
+    "completedTurns": 0,
+    "stop": "BENCH_RECONCILIATION_REQUIRED",
+    "providerError": "BENCH_PROVIDER_FAILURE_HTTP_400",
+    "globalCalls": 494,
+    "reportedCalls": 490,
+    "inputTokens": 342858,
+    "outputTokens": 132833,
+    "knownCostAtoms": "13389232820",
+    "heldAtoms": "9668802560",
+    "upperBoundAtoms": "23058035380",
+    "incrementalKnownCostAtoms": "17092200",
+    "incrementalUnknownHeldAtoms": "2152001920",
+    "incrementalUpperAtoms": "2169094120",
+    "remainingOriginal20RubHeadroomAtoms": "17830905880"
+  },
+  "offlineFinding": {
+    "gateUnsupportedKeywords": 0,
+    "planUniqueItemsOccurrences": 4,
+    "upstreamPredicate": "vLLM v0.10.2 vllm/v1/structured_output/backend_xgrammar.py lines 204-245",
+    "upstreamUrl": "https://github.com/vllm-project/vllm/blob/v0.10.2/vllm/v1/structured_output/backend_xgrammar.py#L204-L245",
+    "upstreamDocumentation": "https://docs.vllm.ai/en/v0.10.2/api/vllm/v1/structured_output/backend_xgrammar.html",
+    "cloudDecoderVersionVerified": false,
+    "provider400CauseConfirmed": false,
+    "originalErrorBodyRecoverable": false,
+    "interpretation": "Concrete decoder compatibility risk consistent with gate success and plan rejection. Cloud backend and original error text are unavailable; this is not proof of that particular HTTP 400."
+  },
+  "preparedChange": {
+    "profile": "cashneuro-task-wire-xgrammar/1",
+    "projection": "Only uniqueItems is removed from a cloned provider decoding schema; every other current constraint remains identical.",
+    "serverParser": "Unchanged authoritative closed schema and quotedNames still reject duplicates.",
+    "otherUnsupportedKeywords": "Rejected rather than silently stripped",
+    "frozenPilotV1Modified": false,
+    "newPaidDispatchEnabled": false,
+    "newErrorClassifier": "Fixed reason/decoder/public-parameter vocabulary only, no raw provider body or credential reflection; prepared for a future adapter, not inserted into the frozen transport."
+  },
+  "checkpoint": {
+    "cli": "sudo /usr/bin/node --import tsx src/task-pilot-inspect-main.ts",
+    "requiresPrivateRootFiles": true,
+    "paidCalls": 0,
+    "httpCalls": 0,
+    "readsProviderKey": false,
+    "ledgerModified": false,
+    "createsOrRemovesLock": false,
+    "frozenArtifactAndCacheModified": false,
+    "holdsReleased": false,
+    "sameOriginalBinding": true,
+    "purpose": "Verify the cached gate, rejected plan, frozen artifact and ledger head before designing a bounded continuation; do not reset budget, overwrite receipts, alter old hashes or retry the rejection."
+  },
+  "validation": {
+    "apiTypes": "passed",
+    "apiUnitPassed": 160,
+    "newTestsPassed": 6,
+    "oldBindingAndSourceHashUnchanged": true,
+    "fullCi": "pending"
+  },
+  "assistantPaidCalls": 0,
+  "modelAccepted": false,
+  "runtimeAiEnabled": false,
+  "remaining": [
+    "Operator read-only checkpoint of the actual frozen pilot and cache",
+    "Explicitly frozen compatible-wire continuation or single format probe retaining original holds and remaining original budget",
+    "Actual provider acceptance and language accuracy; no repeated paid attempt while the current run is blocked"
+  ]
+}

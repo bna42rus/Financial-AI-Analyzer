@@ -183,6 +183,10 @@
     "testedCodeCommit": "745d41275822c30f83bda4944095da015e3142ae",
     "ciRunId": 38743441583,
     "softwareTestsPassed": 647,
-    "realModelTrialExecuted": false
+    "realModelTrialExecuted": true,
+    "completedRealModelTurns": 0,
+    "currentStatus": "stopped_http400_no_unknown_hold_released",
+    "nextAction": "Read-only task-pilot-inspect-main.ts checkpoint; no new completion POST",
+    "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json"
   }
 }

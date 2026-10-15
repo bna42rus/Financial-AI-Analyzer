@@ -244,3 +244,34 @@ Corpus/prompt hashes оператора сохранены. Следующий e
 не меняет executable code; команда на VPS фиксирует именно указанный
 проверенный code commit. Платный pilot ещё не выполнен; model acceptance
 и runtime AI остаются выключены.
+
+## Операторский HTTP 400 и бесплатный checkpoint
+
+Первый реальный pilot остановился: gate первого single-01 получил usage,
+proposal вернул HTTP 400 без usage; завершённых реплик 0. Изменение known
+cost — 0,017092200 ₽, новый полный hold — 2,152001920 ₽. Это техническая
+остановка, не оценка качества языка. Все прежние расходы и holds сохранены.
+Исходный provider error body не сохранялся и восстановлению не подлежит.
+
+Offline audit обнаружил четыре uniqueItems в proposal schema, ни одного
+в gate. Upstream vLLM v0.10.2 backend_xgrammar.py:204–245 отвергает этот
+keyword. Версия decoder в Cloud неизвестна: это конкретная совместимая
+гипотеза, не подтверждённая причина именно данного HTTP 400. Подготовлен
+отдельный wire profile: clone schema без uniqueItems, остальные текущие
+ограничения тождественны. Серверный closed parser и проверка повторов имён
+сохранены. Другие неподдержанные/неизвестные keywords не удаляются молча.
+Профиль и безопасный classifier ошибок пока не подключены к frozen v1;
+старые request IDs и binding не переписываются и не запускаются снова.
+
+Новый `src/task-pilot-inspect-main.ts` только читает private state и
+печатает checkpoint SHA: ledger head, frozen artifact digest, исходный
+baseline digest, точные case/phase IDs, проверенную relevance из gate cache,
+usage/error/holds, оставшийся исходный лимит и audit обеих schemas. Он
+не читает keys, не делает GET/POST, не создаёт/снимает locks, не меняет
+ledger/artifact/cache и не снимает unknown holds. Binding/source hash v1
+остаются прежними; это покрыто тестом. Следующий шаг — сверить этот
+checkpoint VPS перед отдельным bounded continuation с исходным остатком
+бюджета. Нельзя удалять lock/artifact/receipt или объявлять HTTP 400 бесплатным
+для повторного запуска. Полный приёмочный прогон пока не выполнен.
+
+Evidence: `docs/evidence/analyzer-task-pilot-http400-20261015.json`.
