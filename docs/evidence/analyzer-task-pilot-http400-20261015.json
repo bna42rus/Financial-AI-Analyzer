@@ -30,6 +30,14 @@
     "upstreamPredicate": "vLLM v0.10.2 vllm/v1/structured_output/backend_xgrammar.py lines 204-245",
     "upstreamUrl": "https://github.com/vllm-project/vllm/blob/v0.10.2/vllm/v1/structured_output/backend_xgrammar.py#L204-L245",
     "upstreamDocumentation": "https://docs.vllm.ai/en/v0.10.2/api/vllm/v1/structured_output/backend_xgrammar.html",
+    "upstreamFileBlobSha": "5e00f63804162b7f14b3d8a687bcbabfc211c79f",
+    "executedUpstreamFeaturePredicate": {
+      "gateUnsupported": false,
+      "originalPlanUnsupported": true,
+      "projectedPlanUnsupported": false,
+      "gpuOrModelRequired": false,
+      "fullGrammarCompilationOrCloudAcceptanceProven": false
+    },
     "cloudDecoderVersionVerified": false,
     "provider400CauseConfirmed": false,
     "originalErrorBodyRecoverable": false,
@@ -62,7 +70,24 @@
     "apiUnitPassed": 160,
     "newTestsPassed": 6,
     "oldBindingAndSourceHashUnchanged": true,
-    "fullCi": "pending"
+    "fullCi": {
+      "commit": "1fe44540196e8ad5167e2229daa2fb4c956c2fb5",
+      "runId": 38745897504,
+      "jobId": 116459332344,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38745897504",
+      "conclusion": "success",
+      "apiUnit": 160,
+      "core": 246,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 653,
+      "passed": 653,
+      "failed": 0,
+      "postgresVersion": "18.4",
+      "typesBuildsAndPrivacyChecks": "passed",
+      "paidModelCalls": 0
+    }
   },
   "assistantPaidCalls": 0,
   "modelAccepted": false,

@@ -275,3 +275,13 @@ checkpoint VPS перед отдельным bounded continuation с исход�
 для повторного запуска. Полный приёмочный прогон пока не выполнен.
 
 Evidence: `docs/evidence/analyzer-task-pilot-http400-20261015.json`.
+
+Inspector artifact `1fe44540196e8ad5167e2229daa2fb4c956c2fb5` прошёл полный
+CI [38745897504](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38745897504):
+**653/653** (160 API, 246 core, 82 web, 161 PostgreSQL 18.4, 4 Chromium).
+Это включает шесть новых проверок схем, повторов, safe error vocabulary и
+read-only checkpoint с HTTP 400. Дополнительно выполнен точный feature
+predicate из upstream vLLM v0.10.2: gate=false, plan=true, projected=false
+для признака unsupported. Это не full grammar compilation и не вызов Cloud.
+Операторская команда фиксирует именно этот tested inspector commit;
+следующий evidence-only commit не меняет программы.
