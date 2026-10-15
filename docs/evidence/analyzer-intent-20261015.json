@@ -38,7 +38,7 @@
   "sourceSha256": "fa3f6464cb721eaa1bc79c4da752856654a19162726aded174ab59086da4efdf",
   "promptsSha256": "b2e524eb100728bc8b3e89cd10152d90d747d6e13b287d0c33966daf5808b2be",
   "paidExperiment": {
-    "executed": false,
+    "executed": true,
     "maximumTurns": 120,
     "maximumModelCalls": 120,
     "development": 68,
@@ -46,7 +46,19 @@
     "holdout": 28,
     "holdoutGate": "92/92 exact development and repeat slots",
     "autoRetry": false,
-    "repeatCommandIsFreeSavedReport": true
+    "repeatCommandIsFreeSavedReport": true,
+    "completedTurns": 88,
+    "passedTurns": 46,
+    "developmentCompleted": 68,
+    "developmentPassed": 35,
+    "independentRepeatsCompleted": 20,
+    "independentRepeatsPassed": 11,
+    "holdoutOpened": false,
+    "stop": "TASK_PILOT_INCREMENTAL_BUDGET_EXHAUSTED",
+    "newPaidCalls": 88,
+    "newReportedUsageCalls": 88,
+    "newUnknownUsageCalls": 0,
+    "knownRunCostAtoms": "4333490020"
   },
   "baseline": {
     "records": 665,
@@ -68,5 +80,47 @@
   "deployed": false,
   "merged": false,
   "modelTrainingPerformed": false,
-  "newPaidCallsByAssistant": 0
+  "newPaidCallsByAssistant": 0,
+  "observedModelRun": {
+    "source": "Operator pasted the full run report on 2026-10-15 Europe/Moscow",
+    "ledgerHeadSha256": "9af593b96f72a742b2117ab34c403da8d62bbd601fe6ad65c6009fb042b8a568",
+    "frozenSha256": "767ac28da3b8811a700d5844de6ddb48b8814045434dc52f4bff482711896e34",
+    "calls": 753,
+    "reportedCalls": 748,
+    "failedCalls": 32,
+    "inputTokens": 879029,
+    "outputTokens": 215910,
+    "spentAtoms": "26960601880",
+    "heldAtoms": "11820804480",
+    "budgetUsedUpperBoundAtoms": "38781406360",
+    "incrementalUpperAtoms": "17892465100",
+    "remainingOriginalIncrementalCapAtoms": "2107534900",
+    "failures": 42,
+    "payloadRejected": 23,
+    "rejectionEvidenceMissing": 12,
+    "rejectionClosedContract": 11,
+    "taskMissing": 8,
+    "ambiguous": 3,
+    "otherFailures": 8,
+    "relevanceCorrect": 60,
+    "statusCorrect": 52,
+    "queryCorrect": 51,
+    "bindingCorrect": 54,
+    "totalCorrect": 54,
+    "syntheticPrivacyCorrect": 88,
+    "rawRejectedValuesAvailableInEncryptedCapsules": true,
+    "exactRawCauseAuditCompleted": false,
+    "rawExportPaidCalls": 0,
+    "sameDevelopmentSetComparison": {
+      "previous": {
+        "passed": 36,
+        "turns": 68
+      },
+      "new": {
+        "passed": 35,
+        "turns": 68
+      },
+      "improvementDemonstrated": false
+    }
+  }
 }

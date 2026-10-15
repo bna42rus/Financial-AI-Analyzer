@@ -118,3 +118,30 @@ provider revision не подтверждена. Даже успешный batch
 Операторская команда сохранена в `run-intent-trial-20261015.sh` рядом с этим
 документом; она использует отдельный checkout source 50cd3caf и проверяет binding
 `0167d21fd279fa1df5cac60df29fa86f6966a164f270dff5e636cf6cb0e1e4fa` до sudo/ключа/платного POST.
+
+## Реальный операторский прогон: 46/88, остановка по бюджету
+
+15.10.2026 владелец выполнил source 50cd3caf. 88 completion calls получили
+usage; новых unknown holds/HTTP failures нет. Known cost нового run
+4.333490020 RUB. Успешны 46/88: development 35/68 и independent repeats
+11/20. Четыре повтора и 28 holdout не выполнялись. На одинаковом development
+наборе прежний JSON-вариант имел 36/68: улучшение НЕ подтверждено.
+
+23 response values отвергнуты parser: 12 TASK_EVIDENCE_MISSING и 11
+closed_contract. Report reason invalid_relevance объединяет эти ошибки
+полного payload, а не доказывает ошибочную topic classification во всех них.
+Все 23 сырых значения теперь сохранены encrypted без truncation; точный
+raw cause пока неизвестен. Другие failures включают пропущенные периоды,
+категории, неправильный amount basis и cascade task_missing. Исправлять
+prompt/parser без чтения этих values и проверок успешных ответов не следует.
+
+Ledger теперь 753 calls, reported 748, failed 32; spent 26.960601880 RUB,
+held прежние 11.820804480 RUB. В исходных 20 RUB incremental остаётся
+2.107534900 RUB — меньше неизменённого per-POST reserve 2.152001920 RUB.
+Не сбрасывать лимит/holds и не пытаться новый paid run. Следующий шаг —
+read-only export всех 88 synthetic values, включая 23 decrypted rejections,
+через export-intent-audit-20261015.js. Он не вызывает сеть, не меняет ledger,
+проверяет exact observed head/frozen/IDs, запрещает вывод отражённых ключей
+и отдаёт один gzip/base64 блок. Exporter проверен на synthetic round-trip:
+88 values, 23 decrypted rejects, 0 paid calls; secret guard отказывает без
+вывода payload. После получения блока нужен единый offline audit всей пачки.

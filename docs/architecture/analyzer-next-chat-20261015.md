@@ -12,7 +12,16 @@ CI 38782020448: 714/714 software tests, включая single-intent PostgreSQL
 root artifacts task-intent-trial-v1.json, task-intent-trial-v1-cache,
 task-intent-trial-v1.lock. Binding:
 0167d21fd279fa1df5cac60df29fa86f6966a164f270dff5e636cf6cb0e1e4fa.
-Языковой результат нового пути пока НЕ измерен; старый 52/92 неизменен.
+НОВЫЙ ФАКТ: владелец выполнил run. Результат 46/88 (35/68 development,
+11/20 repeats), stop=TASK_PILOT_INCREMENTAL_BUDGET_EXHAUSTED. Осталось
+2.107534900 RUB, что меньше next reserve 2.152001920 RUB. Все 88 usage известны,
+старые holds неизменны. Ledger 753/head
+9af593b96f72a742b2117ab34c403da8d62bbd601fe6ad65c6009fb042b8a568;
+new frozen 767ac28da3b8811a700d5844de6ddb48b8814045434dc52f4bff482711896e34.
+23 rejected raw JSON находятся encrypted, данные НЕ утрачены. Нужен бесплатный
+export-intent-audit-20261015.js и offline audit всей пачки до новых изменений.
+Новый paid run не подготовлен и в текущий остаток не помещается.
+Старый результат 52/92 относится к прежнему JSON-протоколу.
 
 Последнее указание владельца 15.10.2026 20:27 Moscow: работа идёт слишком
 медленно, нужна другая схема; владелец хотел последний прогон и перенос чата.
