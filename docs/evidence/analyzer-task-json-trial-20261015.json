@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-task-json-trial-admission/1",
   "date": "2026-10-15",
-  "status": "implemented_full_ci_verified_operator_not_executed",
+  "status": "operator_executed_development_failed",
   "operatorBaseline": {
     "records": 495,
     "spentAtoms": "13389232820",
@@ -62,12 +62,17 @@
     "maximumNewPaidCalls": 239,
     "initialGate": "Only observed verified single-01 base gate is reused for free; independent repeats use new IDs and actual calls.",
     "automaticContinuation": true,
-    "operatorExecuted": false,
+    "operatorExecuted": true,
     "assistantPaidCalls": 0,
     "runtimeAiEnabled": false,
     "modelAccepted": false,
     "immutableModelVersionVerified": false,
-    "notFullProductAcceptance": true
+    "notFullProductAcceptance": true,
+    "completedTurns": 92,
+    "passedTurns": 52,
+    "paidCallsThisRun": 170,
+    "holdoutOpened": false,
+    "stop": "TASK_PILOT_DEVELOPMENT_FAILED"
   },
   "persistence": {
     "sameOriginalLedger": true,
@@ -132,5 +137,7 @@
     "wirePromptsSha256": "cf50c09ce9ea7faf3d8f67213cd30eb8e3643c8c966379ce2762f47294d7bf1d",
     "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
     "basePromptsSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8"
-  }
+  },
+  "operatorResultEvidence": "docs/evidence/analyzer-task-json-trial-result-20261015.json",
+  "currentRemainingOriginal20RubHeadroomAtoms": "6441024920"
 }

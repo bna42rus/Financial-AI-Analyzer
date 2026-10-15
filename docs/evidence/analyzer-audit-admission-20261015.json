@@ -186,8 +186,8 @@
     "softwareTestsPassed": 647,
     "realModelTrialExecuted": true,
     "completedRealModelTurns": 0,
-    "currentStatus": "two_operator_http400s_no_unknown_hold_released",
-    "nextAction": "Separate frozen json_object batch, automatic development/repeats/holdout within ORIGINAL cumulative 20 RUB cap; repeated command is read-only report",
+    "currentStatus": "json_object_transport_worked_development_failed_52_of_92",
+    "nextAction": "Read-only export and complete offline audit of cached decisions; no further paid run or single-example prompt patch",
     "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json",
     "oneShotSchemaProbe": {
       "maximumCalls": 1,
@@ -203,13 +203,18 @@
       "maximumTurns": 120,
       "maximumNewCalls": 239,
       "originalBudgetBaselineUpperAtoms": "20888941260",
-      "remainingOriginalCapAtoms": "15678903960",
-      "operatorExecuted": false,
+      "remainingOriginalCapAtoms": "6441024920",
+      "operatorExecuted": true,
       "allHoldsPreserved": true,
       "testedCodeCommit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
       "ciRunId": 38770789164,
       "softwareTestsPassed": 685,
-      "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b"
+      "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b",
+      "evaluatedTurns": 92,
+      "passedTurns": 52,
+      "holdoutOpened": false,
+      "paidCallsThisRun": 170,
+      "resultEvidence": "docs/evidence/analyzer-task-json-trial-result-20261015.json"
     }
   }
 }

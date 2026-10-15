@@ -408,3 +408,30 @@ Actual wire prompts SHA:
 cf50c09ce9ea7faf3d8f67213cd30eb8e3643c8c966379ce2762f47294d7bf1d.
 Следующий evidence-only commit не меняет executable source. Оператор ещё
 не выполнял новый JSON batch; реальная точность пока не установлена.
+
+
+## Наблюдённый результат JSON batch: 52/92
+
+Оператор выполнил artifact 8105e713. Все 170 новых completion calls
+получили usage; новых provider/HTTP failures и unknown holds нет.
+Выполнены 68 development и 24 independent repeats: 52/92 точных успеха.
+Holdout 28 не открывался. Прогон стоил 9,237879040 ₽; cumulative
+incremental cost+holds 13,558975080 ₽, остаток исходных 20 ₽
+6,441024920 ₽. Старые holds 11,820804480 ₽ сохранены.
+
+40 неуспешных шагов: 26 без предшествующего failed шага и 14 с таким
+признаком. earlierFailure указывает на контекст, но не доказывает, что
+все ошибки последующего шага вызваны только родителем. Reasons: 14
+invalid_proposal, 7 model_clarification, 4 metric_required, 13
+query_or_binding, по одному unrelated и ambiguous. Relevance 90/92;
+privacy checks 92/92 относятся только к этому synthetic corpus.
+
+Текущий parser сохраняет отвергнутый payload как null с общим кодом
+TASK_PILOT_PAYLOAD_INVALID. Для 14 таких ответов точный исходный
+payload/path не восстановим по сохранённому отчёту/cache. Это пробел
+диагностики, а не основание объявлять причину известной. Следующий шаг
+— бесплатная read-only выгрузка имеющихся validated gate/proposal
+cache и целостный offline audit. Новый платный запуск и точечная
+подгонка prompt до такого разбора не выполняются.
+
+Evidence: docs/evidence/analyzer-task-json-trial-result-20261015.json.

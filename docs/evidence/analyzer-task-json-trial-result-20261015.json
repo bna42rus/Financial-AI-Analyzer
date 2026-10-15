@@ -1,0 +1,1070 @@
+{
+  "version": "cashneuro-task-json-trial-result/1",
+  "date": "2026-10-15",
+  "provenance": {
+    "source": "operator console output supplied as an attachment",
+    "attachmentSha256": "203dd5b14b744e8ccfccb608713994217cf9cece9c6741735b8425e0a904a17f",
+    "codeCommit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+    "modelAnswersAvailableLocally": false
+  },
+  "summary": {
+    "providerTransport": "All 170 new paid calls had usage; no new HTTP/provider failures or unknown holds",
+    "passed": 52,
+    "evaluated": 92,
+    "failed": 40,
+    "primaryFailed": 26,
+    "failedWithEarlierFailure": 14,
+    "reasons": {
+      "model_clarification": 7,
+      "invalid_proposal": 14,
+      "query_or_binding": 13,
+      "metric_required": 4,
+      "unrelated": 1,
+      "ambiguous": 1
+    },
+    "runSpentAtoms": "9237879040",
+    "remainingOriginal20RubHeadroomAtoms": "6441024920",
+    "holdoutOpened": false,
+    "privacyChecksPassed": 92,
+    "privacyScope": "Only measured synthetic corpus privacy checks; not a general production guarantee"
+  },
+  "diagnosticLimitations": [
+    "The current runner records only TASK_PILOT_PAYLOAD_INVALID and caches null when authoritative parsing rejects a proposal. Exact raw rejected proposals and schema paths were not retained.",
+    "This report alone cannot identify why each of the 14 rejected payloads failed, or reconstruct all saved valid model decisions.",
+    "Twenty-six failed turns have earlierFailure=false; fourteen have earlierFailure=true. The latter flag indicates a preceding failure in the same scenario, not proof that each has no independent error."
+  ],
+  "nextAction": "Read-only export and offline audit of the existing private validated cache; no further paid dispatch or prompt tuning yet.",
+  "assistantPaidCalls": 0,
+  "modelAccepted": false,
+  "runtimeAiEnabled": false,
+  "report": {
+    "pilot": "cashneuro-cloud-service-pilot/1",
+    "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b",
+    "status": "stopped",
+    "stop": "TASK_PILOT_DEVELOPMENT_FAILED",
+    "phase": "independent-repetitions",
+    "completedTurns": 92,
+    "passedTurns": 52,
+    "maximumTurns": 120,
+    "holdoutOpened": false,
+    "paidCallsThisRun": 170,
+    "replayCalls": 1,
+    "totalPilotCalls": 170,
+    "incrementalUpperAtoms": "13558975080",
+    "immutableModelVersionVerified": false,
+    "modelAccepted": false,
+    "runtimeAiEnabled": false,
+    "fieldAccuracy": {
+      "relevanceCorrect": 90,
+      "statusCorrect": 64,
+      "queryCorrect": 54,
+      "bindingCorrect": 62,
+      "totalCorrect": 61,
+      "privacyCorrect": 92
+    },
+    "failures": [
+      {
+        "id": "single-01",
+        "occurrence": 0,
+        "split": "development",
+        "family": "total",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "single-03",
+        "occurrence": 0,
+        "split": "development",
+        "family": "attention",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-04",
+        "occurrence": 0,
+        "split": "development",
+        "family": "category-period",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-05",
+        "occurrence": 0,
+        "split": "development",
+        "family": "leaf",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.categoryIds": false,
+          "filter.subcategoryIds": false,
+          "filter.merchant": false,
+          "filter.merchantExact": false
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "merchant": "такси",
+            "merchantExact": false
+          }
+        },
+        "actualTotalMinor": "0"
+      },
+      {
+        "id": "single-06",
+        "occurrence": 0,
+        "split": "development",
+        "family": "grouping",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "metric_required"
+      },
+      {
+        "id": "single-10",
+        "occurrence": 0,
+        "split": "development",
+        "family": "relative-period",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-15",
+        "occurrence": 0,
+        "split": "development",
+        "family": "attention",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-18",
+        "occurrence": 0,
+        "split": "development",
+        "family": "money-strict",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-20",
+        "occurrence": 0,
+        "split": "development",
+        "family": "money-signed",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-30",
+        "occurrence": 0,
+        "split": "development",
+        "family": "financial-adjacent",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "single-31",
+        "occurrence": 0,
+        "split": "development",
+        "family": "unsupported-grouping",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "actualTotalMinor": "17000"
+      },
+      {
+        "id": "single-32",
+        "occurrence": 0,
+        "split": "development",
+        "family": "unsupported-web",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": false,
+        "statusCorrect": false,
+        "queryCorrect": true,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "redirect",
+        "reason": "unrelated"
+      },
+      {
+        "id": "scope-1",
+        "occurrence": 0,
+        "split": "development",
+        "family": "new",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "scope-2",
+        "occurrence": 0,
+        "split": "development",
+        "family": "grouping",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "scope-3",
+        "occurrence": 0,
+        "split": "development",
+        "family": "leaf",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": false,
+          "comparison": true,
+          "filter.from": false,
+          "filter.through": false,
+          "filter.categoryIds": true,
+          "filter.subcategoryIds": true
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000011"
+            ],
+            "subcategoryIds": [
+              "50000000-0000-4000-8000-000000000012"
+            ]
+          }
+        },
+        "actualTotalMinor": "17000"
+      },
+      {
+        "id": "scope-4",
+        "occurrence": 0,
+        "split": "development",
+        "family": "period",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": false,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.categoryIds": true,
+          "filter.subcategoryIds": true
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "categoryIds": [
+              "50000000-0000-4000-8000-000000000011"
+            ],
+            "subcategoryIds": [
+              "50000000-0000-4000-8000-000000000012"
+            ]
+          }
+        },
+        "actualTotalMinor": "17000"
+      },
+      {
+        "id": "scope-6",
+        "occurrence": 0,
+        "split": "development",
+        "family": "grouping",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "manual-3",
+        "occurrence": 0,
+        "split": "development",
+        "family": "manual-touch",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": false,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "category",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "actualTotalMinor": "17000"
+      },
+      {
+        "id": "manual-4",
+        "occurrence": 0,
+        "split": "development",
+        "family": "period",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": false,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "category",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30"
+          }
+        },
+        "actualTotalMinor": "195000"
+      },
+      {
+        "id": "branch-2",
+        "occurrence": 0,
+        "split": "development",
+        "family": "new-reset",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "branch-4",
+        "occurrence": 0,
+        "split": "development",
+        "family": "clear-comparison",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "branch-5",
+        "occurrence": 0,
+        "split": "development",
+        "family": "category",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": false,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "ambiguous"
+      },
+      {
+        "id": "branch-6",
+        "occurrence": 0,
+        "split": "development",
+        "family": "clear-category",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": false,
+          "filter.from": true,
+          "filter.through": true
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "category",
+          "comparison": "previous_same",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30"
+          }
+        },
+        "actualTotalMinor": "195000"
+      },
+      {
+        "id": "preserve-1",
+        "occurrence": 0,
+        "split": "development",
+        "family": "new",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "preserve-4",
+        "occurrence": 0,
+        "split": "development",
+        "family": "continue",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "preserve-6",
+        "occurrence": 0,
+        "split": "development",
+        "family": "continue",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "metric_required"
+      },
+      {
+        "id": "fixed-2",
+        "occurrence": 0,
+        "split": "development",
+        "family": "category",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "metric_required"
+      },
+      {
+        "id": "fixed-3",
+        "occurrence": 0,
+        "split": "development",
+        "family": "clear-category",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": true,
+        "bindingCorrect": false,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.operationIds": true
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-09-01",
+            "through": "2026-09-30",
+            "operationIds": [
+              "50000000-0000-4000-8000-000000000030"
+            ]
+          }
+        },
+        "actualTotalMinor": "120000"
+      },
+      {
+        "id": "money-2",
+        "occurrence": 0,
+        "split": "development",
+        "family": "grouping",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.amountFrom": false,
+          "filter.amountThrough": false,
+          "filter.amountBasis": false
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "category",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "actualTotalMinor": "2100000"
+      },
+      {
+        "id": "money-3",
+        "occurrence": 0,
+        "split": "development",
+        "family": "format",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.amountFrom": false,
+          "filter.amountThrough": false,
+          "filter.amountBasis": false
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "income",
+          "grouping": "operation",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31"
+          }
+        },
+        "actualTotalMinor": "2100000"
+      },
+      {
+        "id": "money-5",
+        "occurrence": 0,
+        "split": "development",
+        "family": "format",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "metric_required"
+      },
+      {
+        "id": "money-6",
+        "occurrence": 0,
+        "split": "development",
+        "family": "new-reset",
+        "passed": false,
+        "earlierFailure": true,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-01",
+        "occurrence": 1,
+        "split": "development",
+        "family": "total",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "single-01",
+        "occurrence": 2,
+        "split": "development",
+        "family": "total",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "clarification",
+        "reason": "model_clarification"
+      },
+      {
+        "id": "single-03",
+        "occurrence": 1,
+        "split": "development",
+        "family": "attention",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.attention": false
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "attention",
+          "grouping": "operation",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "attention": true
+          }
+        },
+        "actualTotalMinor": "0"
+      },
+      {
+        "id": "single-03",
+        "occurrence": 2,
+        "split": "development",
+        "family": "attention",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": true,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.attention": false
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "attention",
+          "grouping": "operation",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "attention": true
+          }
+        },
+        "actualTotalMinor": "0"
+      },
+      {
+        "id": "single-05",
+        "occurrence": 1,
+        "split": "development",
+        "family": "leaf",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": true,
+        "queryCorrect": false,
+        "bindingCorrect": true,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {
+          "metric": true,
+          "grouping": true,
+          "comparison": true,
+          "filter.from": true,
+          "filter.through": true,
+          "filter.categoryIds": false,
+          "filter.subcategoryIds": false,
+          "filter.merchant": false,
+          "filter.merchantExact": false
+        },
+        "actualStatus": "query",
+        "actualQuery": {
+          "name": "query_finances",
+          "metric": "expenses",
+          "grouping": "none",
+          "comparison": "none",
+          "filter": {
+            "from": "2026-10-01",
+            "through": "2026-10-31",
+            "merchant": "такси",
+            "merchantExact": false
+          }
+        },
+        "actualTotalMinor": "0"
+      },
+      {
+        "id": "single-07",
+        "occurrence": 2,
+        "split": "development",
+        "family": "comparison",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-10",
+        "occurrence": 2,
+        "split": "development",
+        "family": "relative-period",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      },
+      {
+        "id": "single-20",
+        "occurrence": 2,
+        "split": "development",
+        "family": "money-signed",
+        "passed": false,
+        "earlierFailure": false,
+        "relevanceCorrect": true,
+        "statusCorrect": false,
+        "queryCorrect": false,
+        "bindingCorrect": false,
+        "totalCorrect": false,
+        "privacyCorrect": true,
+        "planFields": {},
+        "actualStatus": "failed",
+        "reason": "invalid_proposal"
+      }
+    ],
+    "technicalErrors": [
+      {
+        "id": "237132107068217872887ab1919e869cae301eb0075ed7f585635275c0c8ccb6",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "ee4a6114d703d4b22d0bfd62dca66e331bc6420fc308bd2d5193299d585171d0",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "c9bc159aa8e7383402d03adb17891093258974f6c872e4f0ac9087234f3a0993",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "86655d6940f27545ae0e6912ca772e5106987e7fafe85b9fb1a17dea16fcc2ac",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "9c022562d421ba69f08ce2f209049bb99e2d1943867ba9dcc2e3af837487f5b8",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "670b4941c697e2d822d3fec08277fa486aa6eb6ab703f9c9a7cef3f660d35105",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "50ffbb75321946f93a9689043b6303b8a27439e3bbbe8a1bd2be53e54754b4ae",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "895483a7a03a6368c7696c0a11e20454b2ee9634d9a61366fb845b5986f20c8f",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "033519d84d39225240b65132e8753dd46f7d0f655ab1f2eea201718e679a47df",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "51ac8f80cbd9976e43243e278c00f2e1eb636a73a30913cdc1e6ff1b39e1c727",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "c497bf1559166ecdc3ed66c751a91f219f65c533d0a0e3a083d64f8673f2eabb",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "4f532875683296029bfc4b3ff3f974377f85a68db43406b78c440e555d1f30bd",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "c9ea29cf12216bb546872dc574ac378720904eee542d443adb29d7d2996e1665",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      },
+      {
+        "id": "972bb16bb66a743bdd3d567b29688451ccf0ef7b5983cd8a8596622acc0d18ff",
+        "code": "TASK_PILOT_PAYLOAD_INVALID"
+      }
+    ],
+    "experiment": "cashneuro-task-json-trial/1",
+    "wireMode": "json_object",
+    "reusedGateReceiptId": "e45fc0f622016dcb6d5cc1bcd6369123d8e79d9faad989155fcff1972173ba03",
+    "providerErrors": [],
+    "report": false,
+    "ledgerHeadSha256": "5d5271f31c34cf41ac47712fff2718f666c85744b9df11618010968c7d4d05fb",
+    "frozenSha256": "e3a80d6cc2696b376e043fee6ccf318481796be0c2ee0246168453165e945379",
+    "cost": {
+      "calls": 665,
+      "reportedCalls": 660,
+      "failedCalls": 32,
+      "inputTokens": 726622,
+      "outputTokens": 184495,
+      "spentAtoms": "22627111860",
+      "heldAtoms": "11820804480",
+      "budgetUsedUpperBoundAtoms": "34447916340",
+      "requiresReconciliation": true,
+      "latencyP95Ms": 2777,
+      "immutableModelVersionVerified": false
+    }
+  }
+}
