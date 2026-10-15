@@ -394,3 +394,17 @@ modelAccepted=false и runtimeAiEnabled=false; полный 420-turn product
 acceptance и исторические 96 regressions остаются отдельными.
 
 Evidence: docs/evidence/analyzer-task-json-trial-20261015.json.
+
+JSON batch executable commit: 8105e713d9045bae0182dbb7aabeeb8dcf354fec.
+[CI 38770789164](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38770789164),
+attempt 1: **685/685** (192 API, 246 core, 82 web, 161 PostgreSQL 18.4,
+4 Chromium desktop/mobile). Types/builds/source/privacy проходят. 18 новых
+fault tests используют synthetic HTTP; платных model calls в CI не было.
+49 опубликованных source blobs совпали с локально проверенными; отдельный
+checkout с повторным использованием dependencies прошёл types и получил
+тот же frozen binding:
+852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b.
+Actual wire prompts SHA:
+cf50c09ce9ea7faf3d8f67213cd30eb8e3643c8c966379ce2762f47294d7bf1d.
+Следующий evidence-only commit не меняет executable source. Оператор ещё
+не выполнял новый JSON batch; реальная точность пока не установлена.

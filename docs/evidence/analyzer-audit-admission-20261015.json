@@ -205,7 +205,11 @@
       "originalBudgetBaselineUpperAtoms": "20888941260",
       "remainingOriginalCapAtoms": "15678903960",
       "operatorExecuted": false,
-      "allHoldsPreserved": true
+      "allHoldsPreserved": true,
+      "testedCodeCommit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+      "ciRunId": 38770789164,
+      "softwareTestsPassed": 685,
+      "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b"
     }
   }
 }

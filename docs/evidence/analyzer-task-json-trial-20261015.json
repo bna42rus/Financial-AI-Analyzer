@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-task-json-trial-admission/1",
   "date": "2026-10-15",
-  "status": "implemented_pending_full_ci",
+  "status": "implemented_full_ci_verified_operator_not_executed",
   "operatorBaseline": {
     "records": 495,
     "spentAtoms": "13389232820",
@@ -91,13 +91,46 @@
   "softwareValidation": {
     "newTests": 18,
     "apiUnitTests": 192,
-    "status": "pending_full_ci",
-    "syntheticResponsesOnly": true
+    "status": "passed",
+    "syntheticResponsesOnly": true,
+    "apiTypes": "passed",
+    "isolatedCheckoutTypes": "passed",
+    "isolatedCheckoutBindingByteIdentical": true,
+    "publishedSourceBlobsVerified": 49,
+    "sourceBlobMismatches": 0,
+    "consoleBlockBashSyntax": "passed",
+    "fullCi": {
+      "commit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+      "runId": 38770789164,
+      "jobId": 116545738638,
+      "attempt": 1,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38770789164",
+      "conclusion": "success",
+      "core": 246,
+      "apiUnit": 192,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 685,
+      "passed": 685,
+      "failed": 0,
+      "postgresVersion": "18.4",
+      "typesBuildsAndPrivacyChecks": "passed",
+      "paidModelCalls": 0
+    }
   },
   "limitations": [
     "JSON mode constrains JSON syntax; full server parser remains authoritative.",
     "Software tests do not establish actual GPT-OSS language accuracy.",
     "The immutable model revision is unavailable; even a successful pilot remains provisional.",
     "Full 420-turn product acceptance and 96 historical regression turns under the new protocol remain separate."
-  ]
+  ],
+  "testedArtifact": {
+    "codeCommit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+    "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b",
+    "sourceSha256": "1d1c8a8107a8bd044337fda7b701182cf205d9dde6e6bb0479c1d5f637df5958",
+    "wirePromptsSha256": "cf50c09ce9ea7faf3d8f67213cd30eb8e3643c8c966379ce2762f47294d7bf1d",
+    "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+    "basePromptsSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8"
+  }
 }
