@@ -11,11 +11,13 @@ import { runSmoke, runComparison, runExplicitTrial, runLiteralRegression, runCon
 import type { ContextMode } from './benchmark-engine.ts';
 import { fixtureVersion, smokeScenarios } from './benchmark-fixtures.ts';
 import { assertInactiveOperator, archiveRejectedGigaLock, probeRequestId, runProbe, formatProbeRequestId, runFormatProbe } from './benchmark-probe.ts';
+import { assertBenchmarkActionAllowed, auditSavedBenchmark } from './benchmark-audit.ts';
 
 const stateDirectory = '/var/lib/cashneuro/analyzer-benchmark';
 async function main() {
   const [action, candidate, mode = 'task', ...extra] = process.argv.slice(2);
   const inspection = action === '--inspect';
+  const savedAudit = action === '--audit-saved';
   const context = action === '--live-context' || action === '--report-context';
   const regression = context || action === '--live-regression' || action === '--report-regression';
   const delta = action === '--live-delta' || action === '--report-delta';
@@ -26,10 +28,11 @@ async function main() {
   const diagnostic = action === '--probe' || action === '--probe-after-funding' || formatProbe;
   const comparison = action === '--compare' || action === '--compare-fixed';
   const resolved = action === '--live-resolved' || action === '--report-resolved' || comparison || compatible;
-  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || action === '--report-delta' || action === '--report-transfer' || action === '--report-explicit' || action === '--report-transfer-explicit' || action === '--report-regression' || action === '--report-context' || inspection;
+  const report = action === '--report' || action === '--report-revised' || action === '--report-resolved' || action === '--report-fixed' || action === '--report-delta' || action === '--report-transfer' || action === '--report-explicit' || action === '--report-transfer-explicit' || action === '--report-regression' || action === '--report-context' || inspection || savedAudit;
   const revised = action === '--live-revised' || action === '--report-revised';
   const fundedSmoke = action === '--live-after-funding', recovery = diagnostic || fundedSmoke || report || revised || resolved || delta || transfer || explicit || regression;
-  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect', '--live-delta', '--report-delta', '--live-transfer', '--report-transfer', '--live-explicit', '--report-explicit', '--live-transfer-explicit', '--report-transfer-explicit', '--live-regression', '--report-regression', '--live-context', '--report-context'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga' || (delta || transfer || explicit || regression) && (candidate !== 'cloud-oss' || mode !== 'task')) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  if (extra.length || !['--dry-run', '--live', '--probe', '--probe-after-funding', '--live-after-funding', '--report', '--live-revised', '--report-revised', '--live-resolved', '--report-resolved', '--compare', '--probe-format', '--compare-fixed', '--report-fixed', '--inspect', '--audit-saved', '--live-delta', '--report-delta', '--live-transfer', '--report-transfer', '--live-explicit', '--report-explicit', '--live-transfer-explicit', '--report-transfer-explicit', '--live-regression', '--report-regression', '--live-context', '--report-context'].includes(action ?? '') || !Object.hasOwn(candidates, candidate ?? '') || !['task', 'window', 'transcript'].includes(mode) || diagnostic && mode !== 'task' || (comparison || formatProbe || compatible) && candidate !== 'cloud-giga' || (delta || transfer || explicit || regression || savedAudit) && (candidate !== 'cloud-oss' || mode !== 'task')) throw new BenchmarkFailure('BENCH_ARGUMENTS_INVALID');
+  assertBenchmarkActionAllowed(action!);
   const probePhase = action === '--probe-after-funding' ? 'after-funding' : 'initial';
   const selected = candidates[candidate as Candidate];
   if (action === '--dry-run') {
@@ -48,9 +51,9 @@ async function main() {
     const directory = await open(path, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW);
     try { await directory.sync(); } finally { await directory.close(); }
   }
-  if (inspection) {
+  if (inspection || savedAudit) {
     const saved = await BenchmarkLedger.load(join(stateDirectory, 'smoke-ledger.jsonl'), { readOnly: true });
-    try { console.log(JSON.stringify(inspectBenchmark(saved, candidate as Candidate))); } finally { await saved.close(); }
+    try { console.log(JSON.stringify(savedAudit ? await auditSavedBenchmark(saved) : inspectBenchmark(saved, candidate as Candidate))); } finally { await saved.close(); }
     return;
   }
   // Exclusive process lock. If the process dies, keep the lock: reconcile the

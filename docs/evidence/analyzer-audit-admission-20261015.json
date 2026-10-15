@@ -1,0 +1,49 @@
+{
+  "version": "cashneuro-audit-admission/1",
+  "status": "blocked",
+  "paidDispatchEnabled": false,
+  "currentImmutableSource": "a10be832a225c692087239680ded41de8da37e45",
+  "latestObserved": {
+    "promptVersion": "cashneuro-smoke-prompt/7",
+    "strictPassed": 23,
+    "turns": 24,
+    "spentAtoms": "13372140620",
+    "heldAtoms": "7516800640",
+    "upperBoundAtoms": "20888941260"
+  },
+  "requirementsBeforeAnyNewPaidVersion": [
+    "Review the all-turn saved audit export, including successes, partial batches and unmatched receipts.",
+    "Freeze relevance ontology and task binding separately; define keep/set/clear/use_current semantics and unsupported cases.",
+    "Document signed-operation versus absolute-metric amount semantics, inclusive/exclusive thresholds and mixed-operation treatment.",
+    "Freeze code/prompt/schema/resolver/price versions and the provider-supported sampling configuration; do not infer pinning from an alias.",
+    "Specify independent repetition IDs, a cumulative incremental budget within the existing 45 RUB cap, and stop rules before dispatch.",
+    "Run backend interaction and privacy invariants, then the same frozen development matrix across the candidate configuration.",
+    "Evaluate the existing 96 seen regression turns and a fresh held-out acceptance split with no intervening prompt edits.",
+    "Report relevance, task binding, plan field accuracy, clarification coverage, end-to-end finance/answer correctness, tokens and latency separately."
+  ],
+  "existingApprovedAcceptance": {
+    "standalone": 180,
+    "dialogs": 40,
+    "turnsPerDialog": 6,
+    "totalTurns": 420,
+    "development": {
+      "standalone": 120,
+      "dialogs": 30
+    },
+    "holdout": {
+      "standalone": 60,
+      "dialogs": 10
+    },
+    "status": "specified_not_executed"
+  },
+  "stopPolicy": [
+    "Any new unknown usage retains its full reserve and stops dispatch.",
+    "Any critical ownership/scope/money error blocks model acceptance.",
+    "A failed fixed experiment triggers root-cause review, not another prompt tweak against the last failing question.",
+    "Completed replay is never counted as an independent model repeat."
+  ],
+  "limitations": [
+    "This file is an audit checklist, not an implemented paid experiment or a claim of model accuracy.",
+    "The CLI currently rejects all paid historical actions before keys, state or locks are accessed."
+  ]
+}

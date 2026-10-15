@@ -1,7 +1,7 @@
 import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 import type { OperationsFilter } from '../../finance-core/src/operations.ts';
 
-export const contextVersion = 'analyzer-context/1';
+export const contextVersion = 'analyzer-context/2';
 export type FilterSource = 'global' | 'task' | 'message';
 export type ResolvedScope = { filter: OperationsFilter; sources: Partial<Record<keyof OperationsFilter, FilterSource>> };
 const canonical = (value: unknown): string => Array.isArray(value) ? JSON.stringify([...value].sort()) : JSON.stringify(value) ?? 'undefined';
@@ -26,7 +26,10 @@ export function resolveScope(current: OperationsFilter, task?: OperationsFilter,
       if (global[key] !== undefined) { result[key] = structuredClone(global[key]); sources[key] = 'global'; }
     }
   }
-  if (explicit.categoryIds && !explicit.subcategoryIds && canonical(explicit.categoryIds) !== canonical(result.categoryIds)) { delete result.subcategoryIds; delete sources.subcategoryIds; }
+  // An explicit parent-category selection replaces the classification scope,
+  // even when its parent IDs happen to equal those of the previous leaf.
+  // Without this, asking for the whole parent silently keeps the old leaf.
+  if (explicit.categoryIds && !explicit.subcategoryIds) { delete result.subcategoryIds; delete sources.subcategoryIds; }
   for (const key of Object.keys(explicit) as (keyof OperationsFilter)[]) { result[key] = structuredClone(explicit[key]); sources[key] = 'message'; }
   return { filter: parseOperationsFilter(result), sources };
 }
