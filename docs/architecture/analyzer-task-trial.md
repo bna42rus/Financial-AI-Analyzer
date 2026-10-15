@@ -339,3 +339,58 @@ request ID `35a00c586c7cf8b13b5c8aaf198fde7abad80d605886ee7e39ff7995da71bba4`,
 new wire SHA `5978cbddbbe4207dfa89adce37ce73b2e98be5364a6cc04dfefbba0b7ead3016`.
 Платных вызовов ассистентом/CI не было. Следующий evidence-only commit
 сохраняет эти результаты и не меняет проверенный executable artifact.
+
+
+## JSON mode и автоматический прогон после двух HTTP 400
+
+Оператор выполнил probe 7417c388: ещё один HTTP 400, usage отсутствует.
+Суммарный журнал содержит 495 запросов: known cost 13,389232820 ₽,
+полные holds 11,820804480 ₽. В исходных 20 ₽ нового эксперимента уже
+занято 4,321096040 ₽; остаётся 15,678903960 ₽. Это остаток прежнего
+лимита, а не новый бюджет. Старые квитанции, holds и blocked сохраняются.
+
+Опубликованная Cloud OpenAPI спецификация перечисляет response_format.type
+как text/json_object. Старые gate/plan с json_schema не проходят её enum;
+новые точные JSON requests проходят полную offline OpenAPI validation.
+Это подтверждённое расхождение с документацией, но не доказательство причины
+конкретного 400: старый малый gate фактически принимался провайдером.
+Новый adapter использует json_object, а полная исходная авторитетная схема
+добавляется к неизменённой task-инструкции в system prompt. Actual wire
+prompt имеет отдельный frozen SHA. Closed parser, uniqueItems, quotes,
+local ownership/reference resolution и finance core остаются обязательными.
+JSON syntax сама по себе не считается корректным финансовым ответом.
+
+Отдельный root-only task-json-trial-main.ts --live автоматически запускает
+68 development + 24 independent repeats; только после точного успеха всех
+92 слотов открывает 28 holdout. Сохранённый single-01 gate проверяется по
+оригинальным artifact/cache/receipt SHA и бесплатно используется только в
+base occurrence. Оба независимых повтора делают настоящие новые gate calls.
+Максимум 239 новых completion calls и 120 шагов; новый неизвестный расход,
+provider/model/fingerprint drift или лимит прекращает отправку. Controlled
+admission исключает только два конкретных наблюдённых HTTP 400 при исходном
+495-record prefix; все их holds входят в старые 20/45 ₽ потолки. Каждый новый
+request принадлежит frozen allowlist; baseline hash и cumulative бюджет
+проверяются внутри сериализованного reserve перед POST. Нет general unlock.
+
+Новый checkout сохраняет прежние inspector/probe программы. Новый frozen
+artifact/cache/lock создаётся отдельно. Повтор --live всегда становится
+read-only report существующего префикса: без ключа, GET, POST или доплаты.
+Успешная квитанция с потерянным cache не запускается повторно. Fresh POST
+проверяет дату тарифа 15.10.2026 Moscow; сохранённые отчёты бессрочны.
+
+При новом HTTP error сохраняется до 16384 исходных байтов в AES-256-GCM
+капсуле с отдельным root-private ключом, 0600 внутри 0700. Сначала fsync
+квитанции, затем шифрование и fsync evidence. В консоль попадает ограниченное
+сообщение с удалёнными credentials, Bearer, URL и token-like строками.
+Исходные bytes/ключ не логируются и не коммитятся. Read-only report читает
+только safe metadata, без дешифрования. Итог уже включает ledger head и
+frozen SHA: дополнительный ручной checkpoint не требуется.
+
+Новые software fault tests проверяют полный scheduler/replay, original caps,
+retained holds, parser rejection, receipt/cache faults, concurrency, drift и
+encrypted diagnostics. Они используют synthetic responses и не утверждают
+фактическую языковую точность GPT-OSS. Даже 120/120 реальных шагов оставляют
+modelAccepted=false и runtimeAiEnabled=false; полный 420-turn product
+acceptance и исторические 96 regressions остаются отдельными.
+
+Evidence: docs/evidence/analyzer-task-json-trial-20261015.json.

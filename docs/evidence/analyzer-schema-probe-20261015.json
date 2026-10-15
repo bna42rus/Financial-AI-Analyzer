@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-schema-probe-admission/1",
   "date": "2026-10-15",
-  "status": "implemented_full_ci_verified_operator_not_executed",
+  "status": "operator_executed_stopped_http400_usage_unknown",
   "operatorCheckpoint": {
     "checkpointSha256": "2f3012fc7cca47ee5abc6a3eea0276aea975a0681fb236c35193f95272734671",
     "ledgerHeadSha256": "8ad850c2aa9ab4953bdef29ea612db90bdf2752fdff8d833c317787b79f856ec",
@@ -87,9 +87,22 @@
     "inputSha256": "40ae33cefe24c6592fcfda55dfa6e5c759c9af861aba5279de3867bfd2af1093"
   },
   "assistantPaidCalls": 0,
-  "operatorSchemaProbeExecuted": false,
+  "operatorSchemaProbeExecuted": true,
   "remaining": [
-    "Operator runs the one-shot schema probe on the exact tested artifact",
-    "After actual successful schema acceptance, freeze a broader continuation within the remaining original budget"
-  ]
+    "Documented json_object format and automatic bounded continuation are described in analyzer-task-json-trial-20261015.json"
+  ],
+  "operatorResult": {
+    "error": "BENCH_PROVIDER_FAILURE_HTTP_400",
+    "providerAcceptedRequest": false,
+    "usage": null,
+    "callsThisRun": 1,
+    "reason": "unclassified",
+    "allHoldsPreserved": true,
+    "calls": 495,
+    "spentAtoms": "13389232820",
+    "heldAtoms": "11820804480",
+    "upperBoundAtoms": "25210037300",
+    "incrementalUpperAtoms": "4321096040",
+    "remainingOriginal20RubHeadroomAtoms": "15678903960"
+  }
 }

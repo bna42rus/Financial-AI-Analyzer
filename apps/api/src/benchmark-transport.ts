@@ -45,6 +45,7 @@ export class BenchmarkFailure extends Error {
 }
 export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: string | null; cachedTokens: number | null; reasoningTokens: number | null; responseShape?: ResponseShape };
 export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound; replayOnly?: boolean; responseContract?: typeof correctedResponseContractVersion;
+  requestBody?(prompt: string, input: unknown, schema: unknown): string;
   complete(prompt: string, input: unknown, schema: unknown, reserve: () => Promise<void>): Promise<BenchmarkResult> };
 
 /** Exact request body, shared with offline forensic reconstruction.
@@ -64,7 +65,7 @@ export function replayOnlyBenchmarkTransport(candidate: Candidate, contract: Res
     async complete() { throw new BenchmarkFailure('BENCH_REPLAY_ONLY'); } };
 }
 
-export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy'): BenchmarkTransport {
+export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy', bodyBuilder: typeof benchmarkRequestBody = benchmarkRequestBody): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];
   const r = object(credentials, ['apiKey', 'folderId']);
@@ -77,9 +78,10 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
   // No unverified bytes/4 estimate: reserve the complete documented context
   // window. In particular Qwen cannot fit the 45 RUB smoke-phase reservation.
   const bound = { inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: model };
-  return { candidate, price: spec.price, bound, ...contractFields(contract),
+  const requestBody = (prompt: string, input: unknown, schema: unknown) => bodyBuilder(candidate, bound, prompt, input, schema);
+  return { candidate, price: spec.price, bound, ...contractFields(contract), requestBody,
     async complete(prompt, input, schema, reserve) {
-      const body = benchmarkRequestBody(candidate, bound, prompt, input, schema);
+      const body = requestBody(prompt, input, schema);
       if (Buffer.byteLength(body) > 65536) throw new BenchmarkFailure('BENCH_CONTEXT_LIMIT');
       await reserve(); // durable reservation must precede every possible dispatch
       let response: Response;

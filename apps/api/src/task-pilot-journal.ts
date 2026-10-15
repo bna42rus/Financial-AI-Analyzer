@@ -7,7 +7,7 @@ import { tokenCost } from '../../../packages/analyzer/src/cost.ts';
 import type { DispatchBound, TokenPrice } from '../../../packages/analyzer/src/cost.ts';
 import { object } from '../../../packages/finance-core/src/model.ts';
 
-type Frozen = { version: 'cashneuro-pilot-journal/1'; bindingSha256: string; baselineIds: string[]; baselineRecordsSha256: string; baselineUpperAtoms: string; requestIds: string[]; incrementalCapAtoms: string; maximumCalls: number };
+type Frozen = { version: 'cashneuro-pilot-journal/1'; bindingSha256: string; baselineIds: string[]; baselineRecordsSha256: string; baselineUpperAtoms: string; requestIds: string[]; incrementalCapAtoms: string; maximumCalls: number; retainedHttp400s?: string[]; budgetBaselineUpperAtoms?: string };
 const fail = (code = 'TASK_PILOT_JOURNAL_INVALID'): never => { throw new BenchmarkFailure(code); };
 const baselineDigest = (ledger: BenchmarkLedger, ids: string[]) => benchmarkDigest(ids.map(id => [id, ledger.records.get(id)]));
 async function syncParent(path: string) { const dir = await open(dirname(path), constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await dir.sync(); } finally { await dir.close(); } }
@@ -41,26 +41,29 @@ export async function ensurePilotCache(path: string) {
 export class PilotJournal {
   private reserveQueue: Promise<unknown> = Promise.resolve();
   private constructor(readonly ledger: BenchmarkLedger, readonly frozen: Frozen, readonly cacheDirectory: string, readonly readOnly: boolean) {}
-  static async load(options: { path: string; cacheDirectory: string; ledger: BenchmarkLedger; bindingSha256: string; requestIds: string[]; incrementalCapAtoms: string; maximumCalls: number; readOnly: boolean; assertInitial: (ledger: BenchmarkLedger) => void }) {
+  static async load(options: { path: string; cacheDirectory: string; ledger: BenchmarkLedger; bindingSha256: string; requestIds: string[]; incrementalCapAtoms: string; maximumCalls: number; readOnly: boolean; assertInitial: (ledger: BenchmarkLedger) => void; retainedHttp400s?: string[]; budgetBaselineUpperAtoms?: string }) {
     const { ledger } = options;
     if (!/^[a-f0-9]{64}$/.test(options.bindingSha256) || !/^\d{1,16}$/.test(options.incrementalCapAtoms) || BigInt(options.incrementalCapAtoms) <= 0n || BigInt(options.incrementalCapAtoms) > 20_000_000_000n ||
         options.maximumCalls !== options.requestIds.length || options.maximumCalls < 1 || options.maximumCalls > 240 || new Set(options.requestIds).size !== options.requestIds.length || options.requestIds.some(id => !/^[a-f0-9]{64}$/.test(id))) return fail();
     let frozen: Frozen;
+    if ((options.retainedHttp400s === undefined) !== (options.budgetBaselineUpperAtoms === undefined) || options.budgetBaselineUpperAtoms !== undefined && !/^\d{1,16}$/.test(options.budgetBaselineUpperAtoms)) return fail();
     try {
       const raw = object(await readPilotJson(options.path), ['hash', 'payload']);
       if (raw.hash !== benchmarkDigest(raw.payload)) return fail();
-      frozen = object(raw.payload, ['version', 'bindingSha256', 'baselineIds', 'baselineRecordsSha256', 'baselineUpperAtoms', 'requestIds', 'incrementalCapAtoms', 'maximumCalls']) as Frozen;
+      frozen = object(raw.payload, ['version', 'bindingSha256', 'baselineIds', 'baselineRecordsSha256', 'baselineUpperAtoms', 'requestIds', 'incrementalCapAtoms', 'maximumCalls', 'retainedHttp400s', 'budgetBaselineUpperAtoms']) as Frozen;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
       if (options.readOnly) return fail('TASK_PILOT_NOT_STARTED');
       options.assertInitial(ledger);
       const baselineIds = [...ledger.records.keys()].sort();
       if (baselineIds.length > 1000 || options.requestIds.some(id => ledger.records.has(id))) return fail();
-      const cost = ledger.totals(); if (cost.blocked) return fail('BENCH_RECONCILIATION_REQUIRED');
+      const cost = options.retainedHttp400s ? ledger.totalsWithHeldHttp400s(options.retainedHttp400s) : ledger.totals(); if (cost.blocked) return fail('BENCH_RECONCILIATION_REQUIRED');
       frozen = { version: 'cashneuro-pilot-journal/1', bindingSha256: options.bindingSha256, baselineIds, baselineRecordsSha256: baselineDigest(ledger, baselineIds), baselineUpperAtoms: (cost.spent + cost.held).toString(),
-        requestIds: options.requestIds, incrementalCapAtoms: options.incrementalCapAtoms, maximumCalls: options.maximumCalls };
+        requestIds: options.requestIds, incrementalCapAtoms: options.incrementalCapAtoms, maximumCalls: options.maximumCalls,
+        ...(options.retainedHttp400s ? { retainedHttp400s: options.retainedHttp400s, budgetBaselineUpperAtoms: options.budgetBaselineUpperAtoms } : {}) };
       await writePilotJson(options.path, { payload: frozen, hash: benchmarkDigest(frozen) });
     }
+    if (benchmarkDigest(frozen.retainedHttp400s ?? null) !== benchmarkDigest(options.retainedHttp400s ?? null) || frozen.budgetBaselineUpperAtoms !== options.budgetBaselineUpperAtoms) return fail('TASK_PILOT_FROZEN_ARTIFACT_CHANGED');
     if (frozen.version !== 'cashneuro-pilot-journal/1' || frozen.bindingSha256 !== options.bindingSha256 || frozen.incrementalCapAtoms !== options.incrementalCapAtoms || frozen.maximumCalls !== options.maximumCalls ||
         benchmarkDigest(frozen.requestIds) !== benchmarkDigest(options.requestIds) || !Array.isArray(frozen.baselineIds) || frozen.baselineIds.length > 1000 || new Set(frozen.baselineIds).size !== frozen.baselineIds.length || frozen.baselineIds.some(id => !/^[a-f0-9]{64}$/.test(id)) ||
         !/^[a-f0-9]{64}$/.test(frozen.baselineRecordsSha256) || !/^\d{1,16}$/.test(frozen.baselineUpperAtoms)) return fail('TASK_PILOT_FROZEN_ARTIFACT_CHANGED');
@@ -72,9 +75,10 @@ export class PilotJournal {
     if (f.baselineIds.some(id => !this.ledger.records.has(id)) || baselineDigest(this.ledger, f.baselineIds) !== f.baselineRecordsSha256) return fail('TASK_PILOT_BASELINE_CHANGED');
     const allowed = new Set([...f.baselineIds, ...f.requestIds]);
     if ([...this.ledger.records.keys()].some(id => !allowed.has(id))) return fail('TASK_PILOT_FOREIGN_REQUEST');
-    const cost = this.ledger.totals(), delta = cost.spent + cost.held - BigInt(f.baselineUpperAtoms);
+    const cost = f.retainedHttp400s ? this.ledger.totalsWithHeldHttp400s(f.retainedHttp400s) : this.ledger.totals(), delta = cost.spent + cost.held - BigInt(f.budgetBaselineUpperAtoms ?? f.baselineUpperAtoms);
     const baselineUpper = f.baselineIds.reduce((sum, id) => { const r = this.ledger.records.get(id)!; return sum + BigInt(r.receipt?.usage ? r.receipt.atoms! : r.reserve.atoms); }, 0n);
     if (baselineUpper !== BigInt(f.baselineUpperAtoms)) return fail('TASK_PILOT_BASELINE_CHANGED');
+    if (f.budgetBaselineUpperAtoms !== undefined && BigInt(f.budgetBaselineUpperAtoms) > baselineUpper) return fail('TASK_PILOT_COST_CONTRACT_CHANGED');
     if (delta < 0n || delta > BigInt(f.incrementalCapAtoms)) return fail('TASK_PILOT_COST_CONTRACT_CHANGED');
     if (this.frozen.requestIds.filter(id => this.ledger.records.has(id)).length > f.maximumCalls) return fail('TASK_PILOT_CALL_LIMIT');
     return { cost, incrementalUpperAtoms: delta.toString(), calls: this.frozen.requestIds.filter(id => this.ledger.records.has(id)).length };
@@ -90,7 +94,8 @@ export class PilotJournal {
     const reserve = tokenCost(price, bound.inputTokens, bound.outputTokens);
     if (BigInt(current.incrementalUpperAtoms) + reserve > BigInt(this.frozen.incrementalCapAtoms)) return fail('TASK_PILOT_INCREMENTAL_BUDGET_EXHAUSTED');
     // The original ledger enforces its original global/project caps as well.
-    await this.ledger.reserve(id, price, bound);
+    if (this.frozen.retainedHttp400s) await this.ledger.reserveHeldFormatTrial(id, price, bound, { ...this.frozen, retainedHttp400s: this.frozen.retainedHttp400s, budgetBaselineUpperAtoms: this.frozen.budgetBaselineUpperAtoms! });
+    else await this.ledger.reserve(id, price, bound);
     });
     this.reserveQueue = action.catch(() => undefined); return action;
   }

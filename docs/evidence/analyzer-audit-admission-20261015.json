@@ -164,7 +164,8 @@
     }
   },
   "paidDispatchScope": [
-    "src/task-trial-main.ts --live-pilot only; fixed corpus and 20 RUB cumulative incremental ceiling"
+    "src/task-trial-main.ts --live-pilot only; fixed corpus and 20 RUB cumulative incremental ceiling",
+    "src/task-json-trial-main.ts --live only; exact verified 495-record prefix, same original 20 RUB cumulative incremental ceiling"
   ],
   "legacyPaidActionsPaused": true,
   "immutableModelAcceptanceBlocked": true,
@@ -185,15 +186,26 @@
     "softwareTestsPassed": 647,
     "realModelTrialExecuted": true,
     "completedRealModelTurns": 0,
-    "currentStatus": "stopped_http400_no_unknown_hold_released",
-    "nextAction": "One separately frozen schema proposal probe after the supplied verified read-only checkpoint; no automatic full pilot resume",
+    "currentStatus": "two_operator_http400s_no_unknown_hold_released",
+    "nextAction": "Separate frozen json_object batch, automatic development/repeats/holdout within ORIGINAL cumulative 20 RUB cap; repeated command is read-only report",
     "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json",
     "oneShotSchemaProbe": {
       "maximumCalls": 1,
-      "remainingOriginalCapAtoms": "17830905880",
+      "remainingOriginalCapAtoms": "15678903960",
       "oldHoldsReleased": false,
       "ledgerBlockedFlagCleared": false,
-      "admissionEvidence": "docs/evidence/analyzer-schema-probe-20261015.json"
+      "admissionEvidence": "docs/evidence/analyzer-schema-probe-20261015.json",
+      "executed": true,
+      "result": "BENCH_PROVIDER_FAILURE_HTTP_400"
+    },
+    "jsonObjectContinuation": {
+      "evidence": "docs/evidence/analyzer-task-json-trial-20261015.json",
+      "maximumTurns": 120,
+      "maximumNewCalls": 239,
+      "originalBudgetBaselineUpperAtoms": "20888941260",
+      "remainingOriginalCapAtoms": "15678903960",
+      "operatorExecuted": false,
+      "allHoldsPreserved": true
     }
   }
 }

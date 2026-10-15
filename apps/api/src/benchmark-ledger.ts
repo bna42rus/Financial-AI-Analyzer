@@ -15,6 +15,7 @@ type RetiredCandidate = { type: 'retain_rejected_candidate'; id: string; rejecti
 type Event = Reservation | Receipt | FundedContinuation | RetiredCandidate;
 export type HeldSchemaProbePermit = { bindingSha256: string; ledgerHeadSha256: string; rejectionId: string; gateId: string;
   gateWireSha256: string; rejectedWireSha256: string; expectedCalls: number; expectedUpperAtoms: string; incrementalBaselineUpperAtoms: string; incrementalCapAtoms: string };
+export type HeldFormatTrialPermit = { baselineIds: string[]; baselineRecordsSha256: string; requestIds: string[]; retainedHttp400s: string[]; budgetBaselineUpperAtoms: string; incrementalCapAtoms: string; maximumCalls: number };
 export const benchmarkBudget = { project: 1000n * rubAtoms, smoke: 45n * rubAtoms };
 export const benchmarkDigest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 /** Caller holds the one process lock for the entire live run. All reservations
@@ -73,17 +74,44 @@ export class BenchmarkLedger {
     } else throw new Error();
   }
   totals() { return this.calculateTotals(); }
-  private calculateTotals(allowedRejection?: string) {
+  private calculateTotals(allowedRejection?: string | readonly string[]) {
+    const allowed = new Set(typeof allowedRejection === 'string' ? [allowedRejection] : allowedRejection ?? []);
     let spent = 0n, held = 0n; let blocked = this.poisoned;
     const fingerprints = new Map<string, string | null>();
     for (const [id, { reserve, receipt }] of this.records) {
-      if (!receipt?.usage) { held += BigInt(reserve.atoms); if (!this.heldRejections.has(id) && id !== allowedRejection) blocked = true; }
+      if (!receipt?.usage) { held += BigInt(reserve.atoms); if (!this.heldRejections.has(id) && !allowed.has(id)) blocked = true; }
       else { spent += BigInt(receipt.atoms!);
         if (receipt.usage.inputTokens > reserve.bound.inputTokens || receipt.usage.outputTokens > reserve.bound.outputTokens || receipt.usage.modelVersion !== reserve.bound.modelVersion) blocked = true;
         if (fingerprints.has(reserve.bound.modelVersion) && fingerprints.get(reserve.bound.modelVersion) !== receipt.fingerprint) blocked = true;
         fingerprints.set(reserve.bound.modelVersion, receipt.fingerprint); }
     }
     return { spent, held, blocked };
+  }
+  /** Admission view only: never changes global blocked/holds or reconciliation.
+   * Every exempted receipt must be a known HTTP 400, not a lost delivery. */
+  totalsWithHeldHttp400s(ids: readonly string[]) {
+    if (ids.length !== 2 || new Set(ids).size !== 2 || ids.some(id => !/^[a-f0-9]{64}$/.test(id) || this.records.get(id)?.receipt?.code !== 'BENCH_PROVIDER_FAILURE_HTTP_400' || this.records.get(id)?.receipt?.usage !== null || this.records.get(id)?.reserve.bound.modelVersion !== candidates['cloud-oss'].model)) throw new BenchmarkFailure('BENCH_FORMAT_ADMISSION_INVALID');
+    return this.calculateTotals(ids);
+  }
+  async reserveHeldFormatTrial(id: string, price: TokenPrice, bound: DispatchBound, permit: HeldFormatTrialPermit) {
+    return this.exclusive(async () => {
+      const deny = (): never => { throw new BenchmarkFailure('BENCH_FORMAT_ADMISSION_INVALID'); };
+      if (permit.incrementalCapAtoms !== '20000000000' || !/^\d{1,16}$/.test(permit.budgetBaselineUpperAtoms) ||
+          permit.maximumCalls !== permit.requestIds.length || permit.maximumCalls < 1 || permit.maximumCalls > 240 || new Set(permit.requestIds).size !== permit.requestIds.length ||
+          !permit.requestIds.includes(id) || this.records.has(id) || permit.baselineIds.length > 1000 || new Set(permit.baselineIds).size !== permit.baselineIds.length ||
+          [...permit.baselineIds, ...permit.requestIds].some(v => !/^[a-f0-9]{64}$/.test(v)) || permit.retainedHttp400s.some(v => !permit.baselineIds.includes(v)) ||
+          permit.baselineIds.some(v => !this.records.has(v) || permit.requestIds.includes(v)) ||
+          benchmarkDigest(permit.baselineIds.map(v => [v, this.records.get(v)])) !== permit.baselineRecordsSha256) return deny();
+      const allowed = new Set([...permit.baselineIds, ...permit.requestIds]);
+      if ([...this.records.keys()].some(v => !allowed.has(v)) || permit.requestIds.filter(v => this.records.has(v)).length >= permit.maximumCalls) return deny();
+      const spec = candidates['cloud-oss'];
+      if (benchmarkDigest(price) !== benchmarkDigest(spec.price) || benchmarkDigest(bound) !== benchmarkDigest({ inputTokens: spec.contextTokens, outputTokens: 1200, modelVersion: spec.model })) return deny();
+      const total = this.totalsWithHeldHttp400s(permit.retainedHttp400s), amount = tokenCost(price, bound.inputTokens, bound.outputTokens), baseline = BigInt(permit.budgetBaselineUpperAtoms);
+      if (total.blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
+      if (baseline > total.spent + total.held) return deny();
+      if (total.spent + total.held + amount - baseline > BigInt(permit.incrementalCapAtoms) || total.spent + total.held + amount > benchmarkBudget.smoke || total.spent + total.held + amount > benchmarkBudget.project) throw new BenchmarkFailure('BENCH_BUDGET_EXHAUSTED');
+      await this.append({ type: 'reserve', id, atoms: amount.toString(), price, bound });
+    });
   }
   private ossContinuation(): RetiredCandidate {
     const pending = [...this.records.entries()].filter(([id, r]) => !r.receipt?.usage && !this.heldRejections.has(id));

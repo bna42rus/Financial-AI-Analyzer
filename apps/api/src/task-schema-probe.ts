@@ -57,7 +57,7 @@ export type SchemaProbeArtifact = Awaited<ReturnType<typeof schemaProbeArtifact>
 
 /** Validate the original hash-chain prefix even after the one new plain
  * reserve/receipt. Nothing is removed from a Map, file, cache or old lock. */
-export async function verifySchemaProbeCheckpoint(ledger: BenchmarkLedger, directory: string, artifact: SchemaProbeArtifact) {
+export async function verifySchemaProbeCheckpoint(ledger: BenchmarkLedger, directory: string, artifact: Pick<SchemaProbeArtifact, 'id'>) {
   const c = schemaProbeCheckpoint, old = object(await readPilotJson(join(directory, 'task-pilot-v1.json')), ['hash', 'payload']);
   if (old.hash !== c.frozenSha256 || benchmarkDigest(old.payload) !== c.frozenSha256) return fail();
   const frozen = old.payload as Record<string, unknown>;

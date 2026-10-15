@@ -39,16 +39,17 @@ export function pilotStagePassed(corpus: TrialCorpus, rows: TrialScore[], includ
 type Diagnostics = { paidCalls: number; replayCalls: number; errors: { id: string; code: string }[] };
 /** Technical usage is durably settled before closed parsing/private-cache work.
  * Missing cache after an actual receipt is an explicit stop, never repayment. */
-export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string, turn: TrialTurn, occurrence: number, diagnostics: Diagnostics, secrets: string[] = [], beforeDispatch?: () => void): TaskModel {
+export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string, turn: TrialTurn, occurrence: number, diagnostics: Diagnostics, secrets: string[] = [], beforeDispatch?: () => void, reusedInitialGate?: { turnId: string; value: unknown }): TaskModel {
   const reflected = (value: string | null | undefined) => !!value && secrets.some(secret => secret.length > 0 && value.includes(secret));
   async function call(phase: 'gate' | 'plan', input: unknown) {
     const prompt = phase === 'gate' ? taskRelevancePrompt : taskProposalPrompt, schema = phase === 'gate' ? taskRelevanceSchema : taskProposalSchema;
-    const wireSha256 = benchmarkDigest(benchmarkRequestBody('cloud-oss', transport.bound, prompt, input, schema)), id = trialRequestId(bindingSha256, turn.id, phase, occurrence);
+    const wireSha256 = benchmarkDigest(transport.requestBody?.(prompt, input, schema) ?? benchmarkRequestBody('cloud-oss', transport.bound, prompt, input, schema)), id = trialRequestId(bindingSha256, turn.id, phase, occurrence);
     const parse = (value: unknown) => {
       const checked = phase === 'gate' ? parseTaskRelevance(value) : parseTaskProposalWire(value, turn.question);
       if (secrets.some(secret => secret.length > 0 && JSON.stringify(checked).includes(secret))) throw new Error('REFLECTED_CREDENTIAL_DENIED');
       return checked;
     };
+    if (phase === 'gate' && occurrence === 0 && reusedInitialGate?.turnId === turn.id) { diagnostics.replayCalls++; return parse(reusedInitialGate.value); }
     const old = journal.ledger.records.get(id);
     if (old) {
       const cached = await journal.cached(id, wireSha256); diagnostics.replayCalls++;
@@ -66,13 +67,13 @@ export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal,
       await journal.ledger.receipt({ id, usage: failure.usage ?? null, value: { wireSha256 }, code: failure.code, fingerprint: reflected(failure.fingerprint) ? null : failure.fingerprint ?? null,
         latencyMs: Math.ceil(performance.now() - started), cachedTokens: null, reasoningTokens: null });
       diagnostics.errors.push({ id, code: failure.code });
-      if (!failure.usage || journal.ledger.totals().blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
+      if (!failure.usage || journal.verify().cost.blocked) throw new BenchmarkFailure('BENCH_RECONCILIATION_REQUIRED');
       return {};
     }
     const unsafeFingerprint = reflected(completed.fingerprint);
     await journal.ledger.receipt({ id, usage: completed.usage, value: { wireSha256 }, code: unsafeFingerprint ? 'TASK_PILOT_PROVIDER_INVALID' : null, fingerprint: unsafeFingerprint ? null : completed.fingerprint,
       latencyMs: Math.ceil(performance.now() - started), cachedTokens: completed.cachedTokens, reasoningTokens: completed.reasoningTokens });
-    if (unsafeFingerprint || journal.ledger.totals().blocked) throw new BenchmarkFailure('TASK_PILOT_PROVIDER_DRIFT');
+    if (unsafeFingerprint || journal.verify().cost.blocked) throw new BenchmarkFailure('TASK_PILOT_PROVIDER_DRIFT');
     let value: unknown, code: string | null = null;
     try { value = parse(completed.value); } catch { value = null; code = 'TASK_PILOT_PAYLOAD_INVALID'; diagnostics.errors.push({ id, code }); }
     await journal.cache(id, wireSha256, value, code);
@@ -82,7 +83,7 @@ export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal,
 }
 export type PilotProgress = { phase: string; completedTurns: number; passedTurns: number; paidCallsThisRun: number; replayCalls: number; incrementalUpperAtoms: string };
 export async function runPilot(corpus: TrialCorpus, transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string,
-    options: { secrets?: string[]; progress?: (row: PilotProgress) => void; beforeDispatch?: () => void } = {}) {
+    options: { secrets?: string[]; progress?: (row: PilotProgress) => void; beforeDispatch?: () => void; reusedInitialGate?: { turnId: string; value: unknown } } = {}) {
   const diagnostics: Diagnostics = { paidCalls: 0, replayCalls: 0, errors: [] }, rows: TrialScore[] = [];
   let phase = 'development', stop: string | null = null, holdoutOpened = false;
   const onTurn = async (row: TrialScore) => {
@@ -90,7 +91,7 @@ export async function runPilot(corpus: TrialCorpus, transport: BenchmarkTranspor
     if (rows.length % 6 === 0) options.progress?.({ phase, completedTurns: rows.length, passedTurns: rows.filter(r => r.passed).length,
       paidCallsThisRun: diagnostics.paidCalls, replayCalls: diagnostics.replayCalls, incrementalUpperAtoms: journal.verify().incrementalUpperAtoms });
   };
-  const evaluate = async (turns: TrialTurn[], occurrence = 0) => evaluateTrialScenario(turns, turn => pilotModel(transport, journal, bindingSha256, turn, occurrence, diagnostics, options.secrets, options.beforeDispatch), occurrence, onTurn);
+  const evaluate = async (turns: TrialTurn[], occurrence = 0) => evaluateTrialScenario(turns, turn => pilotModel(transport, journal, bindingSha256, turn, occurrence, diagnostics, options.secrets, options.beforeDispatch, options.reusedInitialGate), occurrence, onTurn);
   try {
     for (const turn of corpus.singles.filter(t => t.split === 'development')) await evaluate([turn]);
     for (const dialog of corpus.dialogs.filter(d => d.split === 'development')) await evaluate(dialog.turns);
