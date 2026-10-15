@@ -327,3 +327,15 @@ HTTP acceptance, closed payload validity и реальный first-turn finance 
 Один успех не включает runtime AI и не означает приемку всего корпуса.
 
 Evidence: `docs/evidence/analyzer-schema-probe-20261015.json`.
+
+Проверенный probe source: `7417c3882cf963a1d48b1f7a0b986cddd6e663a4`.
+[CI 38748805796](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38748805796),
+attempt 2: **667/667** (174 API, 246 core, 82 web, 161 PostgreSQL 18.4,
+4 browser). Первый attempt не дошёл до checkout из-за ECR data limit;
+повтор того же source прошёл. Дополнительно types и binding совпали в
+отдельном checkout с symlink только на существующие node_modules.
+Probe binding `b1068b151b89dc861b630430500cb162ec0259addc6e0ca03f94a333922a53ef`,
+request ID `35a00c586c7cf8b13b5c8aaf198fde7abad80d605886ee7e39ff7995da71bba4`,
+new wire SHA `5978cbddbbe4207dfa89adce37ce73b2e98be5364a6cc04dfefbba0b7ead3016`.
+Платных вызовов ассистентом/CI не было. Следующий evidence-only commit
+сохраняет эти результаты и не меняет проверенный executable artifact.

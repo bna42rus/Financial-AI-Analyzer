@@ -1,7 +1,7 @@
 {
   "version": "cashneuro-schema-probe-admission/1",
   "date": "2026-10-15",
-  "status": "implemented_ci_pending_operator_not_executed",
+  "status": "implemented_full_ci_verified_operator_not_executed",
   "operatorCheckpoint": {
     "checkpointSha256": "2f3012fc7cca47ee5abc6a3eea0276aea975a0681fb236c35193f95272734671",
     "ledgerHeadSha256": "8ad850c2aa9ab4953bdef29ea612db90bdf2752fdff8d833c317787b79f856ec",
@@ -55,7 +55,36 @@
     "newTestsPassed": 14,
     "apiUnitTestsPassed": 174,
     "apiTypes": "passed",
-    "fullCi": "pending"
+    "fullCi": {
+      "commit": "7417c3882cf963a1d48b1f7a0b986cddd6e663a4",
+      "runId": 38748805796,
+      "jobId": 116470096707,
+      "attempt": 2,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38748805796",
+      "conclusion": "success",
+      "core": 246,
+      "apiUnit": 174,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 667,
+      "passed": 667,
+      "failed": 0,
+      "postgresVersion": "18.4",
+      "typesBuildsAndPrivacyChecks": "passed",
+      "paidModelCalls": 0,
+      "firstAttempt": "Public ECR image download data limit before checkout; same-source rerun succeeded."
+    },
+    "isolatedCheckoutTypes": "passed",
+    "isolatedCheckoutBindingByteIdentical": true
+  },
+  "testedArtifact": {
+    "codeCommit": "7417c3882cf963a1d48b1f7a0b986cddd6e663a4",
+    "bindingSha256": "b1068b151b89dc861b630430500cb162ec0259addc6e0ca03f94a333922a53ef",
+    "requestId": "35a00c586c7cf8b13b5c8aaf198fde7abad80d605886ee7e39ff7995da71bba4",
+    "wireSha256": "5978cbddbbe4207dfa89adce37ce73b2e98be5364a6cc04dfefbba0b7ead3016",
+    "sourceSha256": "71c31eb389b644301371d6ce4b46169c114a2b04af4e0cc0d6e1467023e08be4",
+    "inputSha256": "40ae33cefe24c6592fcfda55dfa6e5c759c9af861aba5279de3867bfd2af1093"
   },
   "assistantPaidCalls": 0,
   "operatorSchemaProbeExecuted": false,
