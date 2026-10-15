@@ -10,6 +10,9 @@ import type { Usage } from '../../../packages/analyzer/src/cost.ts';
 import { CostError } from '../../../packages/analyzer/src/cost.ts';
 import { stableJSON } from './finance-history.ts';
 import { HttpError } from './types.ts';
+import { intentTaskModel } from './analyzer-intent-model.ts';
+import { intentRequestBody, intentWireVersion } from './task-intent-transport.ts';
+import { taskIntentPrompt, taskIntentSchema, parseTaskIntent, taskIntentVersion } from '../../../packages/analyzer/src/task-intent.ts';
 
 export async function taskTransaction<T>(pool: Pool, userId: string, action: (db: PoolClient) => Promise<T>): Promise<T> {
   const db = await pool.connect();
@@ -31,11 +34,17 @@ export const isCloudTaskProvider = (value: unknown): value is CloudTaskProvider 
  * No default fetch, environment key loader or runtime enable switch exists.
  * Reuses the exact audited closed Cloud HTTP/usage parser; no automatic retry. */
 export function createTestCloudTaskProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>): CloudTaskProvider {
+  return testCloudProvider(pool, fetcher, policy, false);
+}
+export function createTestCloudIntentProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>): CloudTaskProvider {
+  return testCloudProvider(pool, fetcher, policy, true);
+}
+function testCloudProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>, intent: boolean): CloudTaskProvider {
   if (typeof fetcher !== 'function') throw new Error('TASK_PROVIDER_CONFIGURATION_DENIED');
-  const transport = createBenchmarkTransport('cloud-oss', { apiKey: 'synthetic-task-provider-key-for-tests-only' }, fetcher, 'empty-tools');
+  const transport = createBenchmarkTransport('cloud-oss', { apiKey: 'synthetic-task-provider-key-for-tests-only' }, fetcher, 'empty-tools', intent ? intentRequestBody : benchmarkRequestBody);
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
   const binding = { ...taskWorkflowBinding, transport: 'cloud-task-http/1', responseContract: correctedResponseContractVersion,
-    model: transport.bound.modelVersion, bound: transport.bound, price: cost.price,
+    ...(intent ? { intent: taskIntentVersion, intentWire: intentWireVersion } : {}), model: transport.bound.modelVersion, bound: transport.bound, price: cost.price,
     project: { id: cost.projectId, start: cost.projectPeriodStart, end: cost.projectPeriodEnd, limit: cost.projectLimitRub } };
   const service: CloudTaskProvider = {
     pool, environment: 'test', model: transport.bound.modelVersion, binding,
@@ -43,7 +52,7 @@ export function createTestCloudTaskProvider(pool: Pool, fetcher: typeof fetch, p
       async function call(step: 'gate' | 'plan', prompt: string, input: unknown, schema: unknown, parse: (value: unknown) => unknown) {
         // Exact bytes include all prompt/input/schema/transport and price versions.
         // No credential, catalog, raw finance row or provider free text is bound.
-        const body = benchmarkRequestBody('cloud-oss', transport.bound, prompt, input, schema);
+        const body = transport.requestBody!(prompt, input, schema);
         const fingerprint = createHash('sha256').update(stableJSON({ binding, claim: task.binding, userId: task.userId, step, body })).digest('hex');
         const read = async (db: PoolClient) => {
           await guard(db);
@@ -103,6 +112,7 @@ export function createTestCloudTaskProvider(pool: Pool, fetcher: typeof fetch, p
           throw new HttpError(error instanceof HttpError ? error.status : receipt ? 502 : 409, code);
         }
       }
+      if (intent) return intentTaskModel(input => call('gate', taskIntentPrompt, input, taskIntentSchema, value => parseTaskIntent(value, task.question)));
       return {
         relevance: input => call('gate', taskRelevancePrompt, input, taskRelevanceSchema, parseTaskRelevance),
         proposal: input => call('plan', taskProposalPrompt, input, taskProposalSchema, value => parseTaskProposalWire(value, task.question)),

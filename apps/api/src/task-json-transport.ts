@@ -44,7 +44,7 @@ export function rejectedTaskPayloadCapture(payload: RejectedTaskPayload): Provid
   return { kind: 'payload_rejection', httpStatus: 200, wireSha256: payload.wireSha256, bodySha256: createHash('sha256').update(raw).digest('hex'),
     bodyBytesCaptured: raw.length, truncated: bytes.length > raw.length, safeMessage: 'TASK_PILOT_PAYLOAD_INVALID/' + payload.phase + '/' + code, raw };
 }
-export function createTaskJsonTransport(credentials: unknown, fetcher: typeof fetch = fetch) {
+export function createTaskJsonTransport(credentials: unknown, fetcher: typeof fetch = fetch, bodyBuilder: typeof benchmarkRequestBody = taskJsonRequestBody) {
   const apiKey = String(object(credentials, ['apiKey']).apiKey), captures: ProviderErrorCapture[] = [];
   const wrapped: typeof fetch = async (url, options) => {
     const response = await fetcher(url, options);
@@ -64,7 +64,7 @@ export function createTaskJsonTransport(credentials: unknown, fetcher: typeof fe
     // bytes stay in memory until encrypted persistence AFTER receipt fsync.
     return new Response(JSON.stringify({ message: capture.safeMessage }), { status: response.status });
   };
-  return { transport: createBenchmarkTransport('cloud-oss', credentials, wrapped, 'empty-tools', taskJsonRequestBody), captures };
+  return { transport: createBenchmarkTransport('cloud-oss', credentials, wrapped, 'empty-tools', bodyBuilder), captures };
 }
 export async function persistProviderError(directory: string, id: string, capture: ProviderErrorCapture) {
   if (!/^[a-f0-9]{64}$/.test(id)) throw new BenchmarkFailure('TASK_JSON_CAPTURE_INVALID');

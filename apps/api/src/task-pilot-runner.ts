@@ -7,6 +7,8 @@ import type { TrialCorpus, TrialTurn, TrialScore } from './task-trial.ts';
 import type { TaskModel } from './analyzer-task-workflow.ts';
 import { taskRelevancePrompt, taskProposalPrompt, taskRelevanceSchema, taskProposalSchema, parseTaskRelevance, parseTaskProposalWire } from '../../../packages/analyzer/src/task-protocol.ts';
 import { PilotJournal } from './task-pilot-journal.ts';
+import { intentTaskModel } from './analyzer-intent-model.ts';
+import { taskIntentPrompt, taskIntentSchema, parseTaskIntent } from '../../../packages/analyzer/src/task-intent.ts';
 
 export const pilotVersion = 'cashneuro-cloud-service-pilot/1';
 export const pilotProviderSnapshot = 'b27d11d11429899c431d95d974e69a5dfb7e56797fe127584992a2782432db68';
@@ -41,17 +43,18 @@ export type RejectedTaskPayload = { id: string; wireSha256: string; phase: 'gate
 export type RejectedTaskSink = (payload: RejectedTaskPayload) => Promise<void>;
 /** Technical usage is durably settled before closed parsing/private-cache work.
  * Missing cache after an actual receipt is an explicit stop, never repayment. */
-export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string, turn: TrialTurn, occurrence: number, diagnostics: Diagnostics, secrets: string[] = [], beforeDispatch?: () => void, reusedInitialGate?: { turnId: string; value: unknown }, onRejectedPayload?: RejectedTaskSink): TaskModel {
+export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string, turn: TrialTurn, occurrence: number, diagnostics: Diagnostics, secrets: string[] = [], beforeDispatch?: () => void, reusedInitialGate?: { turnId: string; value: unknown }, onRejectedPayload?: RejectedTaskSink, intent = false): TaskModel {
   const reflected = (value: string | null | undefined) => !!value && secrets.some(secret => secret.length > 0 && value.includes(secret));
   async function call(phase: 'gate' | 'plan', input: unknown) {
-    const prompt = phase === 'gate' ? taskRelevancePrompt : taskProposalPrompt, schema = phase === 'gate' ? taskRelevanceSchema : taskProposalSchema;
+    if (intent && phase !== 'gate') throw new BenchmarkFailure('TASK_INTENT_SECOND_CALL_DENIED');
+    const prompt = intent ? taskIntentPrompt : phase === 'gate' ? taskRelevancePrompt : taskProposalPrompt, schema = intent ? taskIntentSchema : phase === 'gate' ? taskRelevanceSchema : taskProposalSchema;
     const wireSha256 = benchmarkDigest(transport.requestBody?.(prompt, input, schema) ?? benchmarkRequestBody('cloud-oss', transport.bound, prompt, input, schema)), id = trialRequestId(bindingSha256, turn.id, phase, occurrence);
     const parse = (value: unknown) => {
-      const checked = phase === 'gate' ? parseTaskRelevance(value) : parseTaskProposalWire(value, turn.question);
+      const checked = intent ? parseTaskIntent(value, turn.question) : phase === 'gate' ? parseTaskRelevance(value) : parseTaskProposalWire(value, turn.question);
       if (secrets.some(secret => secret.length > 0 && JSON.stringify(checked).includes(secret))) throw new Error('REFLECTED_CREDENTIAL_DENIED');
       return checked;
     };
-    if (phase === 'gate' && occurrence === 0 && reusedInitialGate?.turnId === turn.id) { diagnostics.replayCalls++; return parse(reusedInitialGate.value); }
+    if (!intent && phase === 'gate' && occurrence === 0 && reusedInitialGate?.turnId === turn.id) { diagnostics.replayCalls++; return parse(reusedInitialGate.value); }
     const old = journal.ledger.records.get(id);
     if (old) {
       const cached = await journal.cached(id, wireSha256); diagnostics.replayCalls++;
@@ -90,11 +93,11 @@ export function pilotModel(transport: BenchmarkTransport, journal: PilotJournal,
     if (code) await onRejectedPayload?.({ id, wireSha256, phase, value: completed.value, validationCode });
     return code ? {} : value;
   }
-  return { relevance: input => call('gate', input), proposal: input => call('plan', input) };
+  return intent ? intentTaskModel(input => call('gate', input)) : { relevance: input => call('gate', input), proposal: input => call('plan', input) };
 }
 export type PilotProgress = { phase: string; completedTurns: number; passedTurns: number; paidCallsThisRun: number; replayCalls: number; incrementalUpperAtoms: string };
 export async function runPilot(corpus: TrialCorpus, transport: BenchmarkTransport, journal: PilotJournal, bindingSha256: string,
-    options: { secrets?: string[]; progress?: (row: PilotProgress) => void; beforeDispatch?: () => void; reusedInitialGate?: { turnId: string; value: unknown }; onRejectedPayload?: RejectedTaskSink } = {}) {
+    options: { secrets?: string[]; progress?: (row: PilotProgress) => void; beforeDispatch?: () => void; reusedInitialGate?: { turnId: string; value: unknown }; onRejectedPayload?: RejectedTaskSink; intent?: boolean } = {}) {
   const diagnostics: Diagnostics = { paidCalls: 0, replayCalls: 0, errors: [] }, rows: TrialScore[] = [];
   let phase = 'development', stop: string | null = null, holdoutOpened = false;
   const onTurn = async (row: TrialScore) => {
@@ -102,7 +105,7 @@ export async function runPilot(corpus: TrialCorpus, transport: BenchmarkTranspor
     if (rows.length % 6 === 0) options.progress?.({ phase, completedTurns: rows.length, passedTurns: rows.filter(r => r.passed).length,
       paidCallsThisRun: diagnostics.paidCalls, replayCalls: diagnostics.replayCalls, incrementalUpperAtoms: journal.verify().incrementalUpperAtoms });
   };
-  const evaluate = async (turns: TrialTurn[], occurrence = 0) => evaluateTrialScenario(turns, turn => pilotModel(transport, journal, bindingSha256, turn, occurrence, diagnostics, options.secrets, options.beforeDispatch, options.reusedInitialGate, options.onRejectedPayload), occurrence, onTurn);
+  const evaluate = async (turns: TrialTurn[], occurrence = 0) => evaluateTrialScenario(turns, turn => pilotModel(transport, journal, bindingSha256, turn, occurrence, diagnostics, options.secrets, options.beforeDispatch, options.reusedInitialGate, options.onRejectedPayload, options.intent), occurrence, onTurn);
   try {
     for (const turn of corpus.singles.filter(t => t.split === 'development')) await evaluate([turn]);
     for (const dialog of corpus.dialogs.filter(d => d.split === 'development')) await evaluate(dialog.turns);

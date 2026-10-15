@@ -8,7 +8,7 @@ import { createServer } from '../src/server.ts';
 import type { Config } from '../src/types.ts';
 import { token, hashPassword } from '../src/crypto.ts';
 import { prepareFinance, financeView, acceptAccount, importEpoch } from '../src/finance.ts';
-import { createTestCloudTaskProvider } from '../src/analyzer-task-provider.ts';
+import { createTestCloudTaskProvider, createTestCloudIntentProvider } from '../src/analyzer-task-provider.ts';
 import { taskWorkflowBinding } from '../src/analyzer-task-workflow.ts';
 import { parseTaskProposalWire, taskCapabilities } from '../../../packages/analyzer/src/task-protocol.ts';
 import { emptyTaskBook, parseTaskBook } from '../../../packages/analyzer/src/task-context.ts';
@@ -21,6 +21,7 @@ let operationIds: string[] = [];
 const password = 'Synthetic Task password 123!';
 const keep = { op: 'keep' };
 let proposal: Record<string, unknown>;
+let intentValue: unknown;
 const baseProposal = () => ({ status: 'query', binding: { kind: 'new' }, metric: { op: 'set', value: 'expenses', quote: 'расходов' }, grouping: keep, comparison: keep, edits: [] });
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; }
 let barrier: ReturnType<typeof deferred> | undefined, dispatched: ReturnType<typeof deferred> | undefined;
@@ -29,12 +30,13 @@ const fetcher = (async (_url, options) => {
   outgoing.push(input); calls++;
   if (behavior === 'block') { dispatched!.resolve(); await barrier!.promise; }
   if (behavior === 'timeout') throw new Error('synthetic-network-private-error');
-  const value = input.hasFinancialTasks === undefined ? proposal : { relevance: gate };
+  const value = intentValue ?? (input.hasFinancialTasks === undefined ? proposal : { relevance: gate });
   return new Response(JSON.stringify({ model: 'openai/gpt-oss-120b',
     ...(behavior === 'missing-usage' ? {} : { usage: { prompt_tokens: 500, completion_tokens: 50, total_tokens: 550 } }),
     choices: [{ finish_reason: 'stop', message: { role: 'assistant', tool_calls: [], content: JSON.stringify(value) } }] }));
 }) as typeof fetch;
 const makeProvider = () => createTestCloudTaskProvider(pg.finance, fetcher, { projectId: 'test/task-integration', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' });
+const makeIntentProvider = () => createTestCloudIntentProvider(pg.finance, fetcher, { projectId: 'test/task-integration', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' });
 before(async () => {
   pg = await postgresFixture();
   config = { profile: 'finance', pool: pg.finance, baseURL: 'https://api.example.test', origin: 'https://app.example.test', authSecret: token(), wrappingKey: randomBytes(32), environment: 'test', taskProvider: makeProvider() };
@@ -51,6 +53,7 @@ async function request(path: string, payload: unknown = {}, target = server) {
 }
 beforeEach(async () => {
   behavior = 'normal'; calls = 0; gate = 'financial'; outgoing = []; proposal = baseProposal(); barrier = undefined; dispatched = undefined;
+  intentValue = undefined;
   await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,finance.workspace,commerce.access_cycle,commerce.ai_project_budget CASCADE');
   for (const user of ['first', 'second']) {
     await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Synthetic user',$2,true,now(),now())", [user, user + '@example.test']);
@@ -69,6 +72,52 @@ async function body() {
   const context = await request('/finance/analyzer-context', { generation }); assert.equal(context.statusCode, 200, context.body);
   return { id: randomUUID(), chatId: created.json().id as string, chatEpoch: created.json().chatEpoch as string, generation, globalRevision: context.json().revision as number, text: 'Сумма расходов' };
 }
+test('single intent HTTP path preserves amount scope through follow-up, persists one paid phase, and restart replay costs nothing', async () => {
+  const target = await createServer({ ...config, taskProvider: makeIntentProvider() });
+  try {
+    const b = { ...await body(), text: 'Сумма расходов по операциям от 100 до 200 рублей включительно.' };
+    intentValue = { relevance: 'financial', action: 'read', metric: { value: 'expenses', quote: 'расходов' }, edits: [{ field: 'amount', op: 'set', value: { basis: 'absolute_operation', expression: 'от 100 до 200 рублей включительно' }, quote: 'от 100 до 200 рублей включительно' }] };
+    const first = await request('/finance/analyzer-task', b, target); assert.equal(first.statusCode, 200, first.body); assert.equal(calls, 1);
+    assert.equal(first.json().answer.result.totals.expenses, '24690');
+    intentValue = { relevance: 'financial', action: 'read', grouping: { value: 'category', quote: 'по категориям' } };
+    const nextBody = { ...b, id: randomUUID(), text: 'А по категориям?' }, next = await request('/finance/analyzer-task', nextBody, target);
+    assert.equal(next.statusCode, 200, next.body); assert.equal(calls, 2); assert.equal(next.json().answer.result.totals.expenses, '24690');
+    const stored = (await pg.owner.query('SELECT book FROM finance.analyzer_task_book')).rows[0].book;
+    assert.equal(stored.nodes[1].parent, stored.nodes[0].messageId); assert.equal(stored.nodes[1].query.filter.amountFrom, '10000');
+    assert.equal(stored.nodes[1].query.filter.amountThrough, '20000'); assert.equal(stored.nodes[1].query.grouping, 'category');
+    const commercial = (await pg.owner.query('SELECT step,state,usage_state FROM commerce.analyzer_request ORDER BY created_at')).rows;
+    assert.equal(commercial.length, 2); assert.ok(commercial.every(row => row.step === 'gate' && row.state === 'received' && row.usage_state === 'reported'));
+    for (const payload of outgoing) assert.deepEqual(Object.keys(payload as object).sort(), ['hasFinancialTasks', 'question']);
+    const restarted = await createServer({ ...config, taskProvider: makeIntentProvider() });
+    try { const replay = await request('/finance/analyzer-task', nextBody, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), next.json()); assert.equal(calls, 2); } finally { await restarted.close(); }
+  } finally { await target.close(); }
+});
+
+test('single intent rejection settles known usage before validation and cannot be paid again after restart', async () => {
+  const target = await createServer({ ...config, taskProvider: makeIntentProvider() });
+  try {
+    const b = await body(); intentValue = { relevance: 'financial', action: 'read', binding: { kind: 'new' } };
+    const failed = await request('/finance/analyzer-task', b, target); assert.equal(failed.statusCode, 502, failed.body); assert.equal(calls, 1);
+    const receipt = (await pg.owner.query('SELECT usage_state,state FROM commerce.analyzer_request')).rows[0];
+    assert.equal(receipt.usage_state, 'reported'); assert.equal(receipt.state, 'failed');
+    assert.equal((await pg.owner.query('SELECT * FROM finance.analyzer_task_book')).rowCount, 0);
+    const restart = await createServer({ ...config, taskProvider: makeIntentProvider() });
+    try { const retry = await request('/finance/analyzer-task', b, restart); assert.notEqual(retry.statusCode, 200); assert.equal(calls, 1); } finally { await restart.close(); }
+  } finally { await target.close(); }
+});
+
+test('single intent nonfinancial outcome does not read transaction data or create a financial task', async () => {
+  const target = await createServer({ ...config, taskProvider: makeIntentProvider() });
+  try {
+    const b = { ...await body(), text: 'Какие медицинские операции требуют внимания?' };
+    intentValue = { relevance: 'unrelated', action: 'clarification' };
+    await pg.owner.query('ALTER TABLE finance.transaction RENAME TO transaction_intent_canary');
+    try { const result = await request('/finance/analyzer-task', b, target); assert.equal(result.statusCode, 200, result.body); assert.equal(calls, 1); }
+    finally { await pg.owner.query('ALTER TABLE finance.transaction_intent_canary RENAME TO transaction'); }
+    assert.equal((await pg.owner.query('SELECT * FROM finance.analyzer_task_book')).rowCount, 0);
+    assert.equal((await pg.owner.query('SELECT * FROM commerce.analyzer_usage')).rowCount, 0);
+  } finally { await target.close(); }
+});
 test('HTTP persists exact core result, opaque owner, task book and exact-microsecond quota across restart; retry is free', async () => {
   const b = await body(), first = await request('/finance/analyzer-task', b); assert.equal(first.statusCode, 200, first.body);
   assert.equal(first.json().answer.result.totals.expenses, '24690'); assert.equal(first.json().quota.used, 1); assert.equal(calls, 2);

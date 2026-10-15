@@ -160,7 +160,9 @@ export function resolveTaskDecision(rawBook: TaskBook, currentScope: TaskScope, 
   };
   if (!previous && rawDecision.metric.op === 'keep') return { status: 'clarification', reason: 'metric_required' };
   const metric = scalar(rawDecision.metric, ['expenses', 'income', 'attention'], previous?.query.metric ?? 'expenses');
-  const grouping = scalar(rawDecision.grouping, ['none', 'category', 'operation'], metric === 'attention' ? 'operation' : previous?.query.grouping ?? 'none');
+  // An existing presentation wins over a metric's INITIAL default. Otherwise
+  // changing only a date would reset an attention total/table to operations.
+  const grouping = scalar(rawDecision.grouping, ['none', 'category', 'operation'], previous?.query.grouping ?? (metric === 'attention' ? 'operation' : 'none'));
   const comparison = scalar(rawDecision.comparison, ['none', 'previous_same'], previous?.query.comparison ?? 'none');
   let query: Query;
   try { query = parseTool({ name: 'query_finances', metric, grouping, comparison, filter: parseOperationsFilter(filter) }) as Query; }
