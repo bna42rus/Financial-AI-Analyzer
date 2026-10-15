@@ -127,5 +127,17 @@
       }
     },
     "integrationEvidence": "docs/evidence/analyzer-task-integration-20261015.json"
+  },
+  "operatorVpsInspection": {
+    "status": "matches_reviewed_historical_export",
+    "date": "2026-10-15",
+    "codeCommit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+    "candidate": "cloud-oss",
+    "recordedCandidateCalls": 461,
+    "globalLedgerRecords": 492,
+    "paidCalls": 0,
+    "billingReconciled": false,
+    "holdsReleased": false,
+    "evidence": "docs/evidence/analyzer-vps-inspection-20261015.json"
   }
 }
