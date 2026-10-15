@@ -145,7 +145,7 @@
     "paidDispatchEnabled": false,
     "baseTurns": 96,
     "independentRepeatTurns": 24,
-    "newUnitTestsPassed": 12,
+    "newUnitTestsPassed": 13,
     "evidence": "docs/evidence/analyzer-task-trial-20261015.json"
   }
 }

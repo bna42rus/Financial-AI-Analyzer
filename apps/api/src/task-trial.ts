@@ -122,7 +122,8 @@ export async function evaluateTrialScenario(turns: TrialTurn[], modelForTurn: (t
     const queryCorrect = e.status === 'query' ? outcome.status === 'query' && isDeepStrictEqual(outcome.query, e.query) : outcome.status !== 'query';
     const bindingCorrect = e.status !== 'query' || outcome.status === 'query' && outcome.inheritedFrom === (e.parentTurnId === null ? null : messages.get(e.parentTurnId!));
     const totalCorrect = e.status !== 'query' || outcome.status === 'query' && outcome.result.totals[outcome.query.metric] === e.totalMinor;
-    const privacyCorrect = !['ambiguous', 'unrelated'].includes(String(actualRelevance)) || catalogs === 0 && calculations === 0;
+    const nonfinancialExpected = ['ambiguous', 'unrelated'].includes(e.relevance), nonfinancialActual = ['ambiguous', 'unrelated'].includes(String(actualRelevance));
+    const privacyCorrect = !(nonfinancialExpected || nonfinancialActual) || catalogs === 0 && calculations === 0;
     const passed = relevanceCorrect && statusCorrect && queryCorrect && bindingCorrect && totalCorrect && privacyCorrect;
     const planFields: Record<string, boolean> = {};
     if (e.query && outcome.status === 'query') {

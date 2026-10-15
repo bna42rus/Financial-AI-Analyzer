@@ -96,6 +96,15 @@ test('unrelated and ambiguous evaluation never invokes a proposal or financial c
   }
 });
 
+test('a wrong financial gate followed by a calculation on a known unrelated question is a privacy failure, even when the total itself is arithmetically correct', async () => {
+  const { corpus } = await loadTrialCorpus(); const turn = corpus.singles.find(t => t.id === 'single-23')!;
+  const rows = await evaluateTrialScenario([turn], () => ({ async relevance() { return { relevance: 'financial' }; }, async proposal() {
+    return proposal({ binding: { kind: 'new' }, metric: { op: 'set', value: 'expenses', quote: 'погода' } });
+  } }));
+  assert.equal(rows[0]!.actualStatus, 'query'); assert.equal(rows[0]!.actualTotalMinor, '17000');
+  assert.equal(rows[0]!.relevanceCorrect, false); assert.equal(rows[0]!.privacyCorrect, false); assert.equal(rows[0]!.passed, false);
+});
+
 test('catalog preflight makes exactly one fixed GET with timeout and no redirects, sends no question and never reflects a key', async () => {
   let count = 0;
   const result = await inspectCloudTaskModel(credentials, (async (url, options) => {

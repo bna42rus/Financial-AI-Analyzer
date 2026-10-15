@@ -38,8 +38,8 @@
     "noLedgerMutation": true
   },
   "localValidation": {
-    "newUnitTestsPassed": 12,
-    "apiUnitTestsPassed": 131,
+    "newUnitTestsPassed": 13,
+    "apiUnitTestsPassed": 132,
     "apiTypes": "passed",
     "sourceIntegrity": "passed",
     "ci": "pending"
