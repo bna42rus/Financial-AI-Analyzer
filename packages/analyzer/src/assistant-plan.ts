@@ -1,6 +1,7 @@
 import { assertClosedSchema } from './closed-schema.ts';
 import { taskProposalSchema } from './task-protocol.ts';
-import { periodLiteral, amountLiteral } from './task-literals.ts';
+import { periodLiteral } from './task-literals.ts';
+import { assistantAmountLiteral } from './assistant-money.ts';
 import { intentBinding } from './task-intent.ts';
 import { conditionFields, resolveTaskDecision, globalSnapshot, parseTaskBook } from './task-context.ts';
 import type { Condition, ConditionEdit, TaskBinding, TaskBook, TaskScope, GlobalSnapshot, TaskDecision } from './task-context.ts';
@@ -150,7 +151,7 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
       } else if (field === 'amount') {
         const v = c.value as { basis: string; expression: string };
         if (v.basis === 'metric_part') return { status: 'unsupported', reason: 'component_amount_threshold' };
-        value = amountLiteral(v.expression, v.expression, v.basis);
+        value = assistantAmountLiteral(v.expression, v.basis);
       } else if (field === 'accounts') value = { accountIds: names(c.value, 'accounts').map(n => n.id) };
       else if (field === 'categories') {
         const cvalue = c.value as { names?: string[]; excludedNames?: string[]; uncategorized?: boolean; noSubcategory?: boolean };

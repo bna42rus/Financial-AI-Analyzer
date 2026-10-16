@@ -27,9 +27,9 @@ export function checkAssistantPermit(value: unknown): AssistantPermit {
 }
 /** Read-only admission from the previous attempt. Never frees a hold or
  * raises the owner's cumulative 10 RUB / 60 completion authorization. */
-export function remainingAssistantTrialBudget(value: unknown) {
+export function remainingAssistantTrialBudget(value: unknown, previous?: { previousBudgetSha256: string; spentAtoms: string; capAtoms: string; maximumCalls: number }) {
   const state = object(value, ['permit', 'entries', 'sha256']), permit = checkAssistantPermit(state.permit);
-  if (permit.capAtoms !== '10000000000' || permit.maximumCalls !== 60 || permit.previousBudgetSha256 !== undefined ||
+  if (permit.capAtoms !== (previous?.capAtoms ?? '10000000000') || permit.maximumCalls !== (previous?.maximumCalls ?? 60) || permit.previousBudgetSha256 !== previous?.previousBudgetSha256 ||
       !Array.isArray(state.entries) || state.entries.length > 60 || state.sha256 !== hash({ permit: state.permit, entries: state.entries })) throw new AssistantError('ASSISTANT_PREVIOUS_BUDGET_INVALID');
   let spent = 0n; const seen = new Set<string>();
   for (const raw of state.entries) {
@@ -41,8 +41,9 @@ export function remainingAssistantTrialBudget(value: unknown) {
     if (u.modelVersion !== permit.bound.modelVersion || usageTokens(u.inputTokens) > permit.bound.inputTokens || usageTokens(u.outputTokens) > permit.bound.outputTokens) throw new AssistantError('ASSISTANT_RECONCILIATION_REQUIRED');
     spent += tokenCost(permit.price, Number(u.inputTokens), Number(u.outputTokens)); seen.add(key);
   }
-  if (spent >= BigInt(permit.capAtoms) || state.entries.length >= 60) throw new AssistantError('ASSISTANT_BUDGET_EXHAUSTED');
-  return { previousBudgetSha256: hash(state), spentAtoms: spent.toString(), capAtoms: (BigInt(permit.capAtoms) - spent).toString(), maximumCalls: 60 - state.entries.length };
+  if (spent >= BigInt(permit.capAtoms) || state.entries.length >= permit.maximumCalls) throw new AssistantError('ASSISTANT_BUDGET_EXHAUSTED');
+  return { previousBudgetSha256: previous ? hash({ previous: previous.previousBudgetSha256, current: hash(state) }) : hash(state),
+    spentAtoms: (spent + BigInt(previous?.spentAtoms ?? '0')).toString(), capAtoms: (BigInt(permit.capAtoms) - spent).toString(), maximumCalls: permit.maximumCalls - state.entries.length };
 }
 async function syncDir(directory: string) { const fd = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await fd.sync(); } finally { await fd.close(); } }
 async function readPrivate(path: string) {

@@ -30,9 +30,10 @@ async function syncDirectory(directory: string) {
 function checkedReceipt(raw: unknown, fingerprint: string): RunReceipt {
   const r = object(raw, ['version', 'receipt']);
   if (r.version !== assistantWorkflowVersion) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
-  const v = object(r.receipt, ['fingerprint', 'calls', 'result', 'conversation']);
+  const v = object(r.receipt, ['fingerprint', 'calls', 'result', 'conversation', 'replayedCalls']);
   if (v.fingerprint !== fingerprint) throw new AssistantError('ASSISTANT_REQUEST_CHANGED');
   if (!Array.isArray(v.calls) || v.calls.length > 3) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
+  if (v.replayedCalls !== undefined && (!Number.isInteger(v.replayedCalls) || Number(v.replayedCalls) < 0 || Number(v.replayedCalls) > v.calls.length)) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
   if (Boolean(v.result) !== Boolean(v.conversation)) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
   for (const call of v.calls) {
     const c = object(call, ['fingerprint', 'phase', 'state', 'value', 'usage', 'code']);

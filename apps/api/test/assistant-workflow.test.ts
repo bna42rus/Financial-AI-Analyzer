@@ -5,6 +5,7 @@ import { emptyConversation, conversationInput } from '../../../packages/analyzer
 import { runAssistant, assistantRequestFingerprint } from '../src/assistant-workflow.ts';
 import type { AssistantJournal, AssistantModel, AssistantRequest, CompletionInput, AssistantServices } from '../src/assistant-workflow.ts';
 import { trialId, trialCatalog, trialResult } from '../src/task-trial.ts';
+import { assistantAmountLiteral } from '../../../packages/analyzer/src/assistant-money.ts';
 
 const scope = { ownerId: 'assistant-synthetic-owner', chatId: trialId(801), generation: trialId(802), chatEpoch: trialId(803) };
 const calendar = { timezone: 'Asia/Vladivostok', currentDate: '2026-10-16' };
@@ -56,6 +57,24 @@ test('boolean freshness defaults on read never cause repair or change the financ
     const reply = await h.execute(990, 'Подсчитай мои траты', [{ ...plan([set('metric', 'expenses')]), needsFreshSources: flag }]);
     assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 1); assert.equal(h.calls[0]!.phase, 'understand');
   }
+});
+
+test('amount ranges accept ordinary wording with or without inclusive suffix, shared units and strict single bounds', async () => {
+  for (const text of ['от 700 до 1800 рублей', 'от 700 до 1800 рублей включительно', 'с 700 по 1800 рублей']) {
+    assert.deepEqual(assistantAmountLiteral(text, 'absolute_operation'), { amountBasis: 'absolute_operation', amountFrom: '70000', amountThrough: '180000' });
+  }
+  assert.equal(assistantAmountLiteral('от 4 до 9 тысяч рублей', 'absolute_operation').amountFrom, '400000');
+  assert.equal(assistantAmountLiteral('от 4 до 9 копеек', 'absolute_operation').amountThrough, '9');
+  assert.equal(assistantAmountLiteral('больше 700 рублей', 'absolute_operation').amountFrom, '70001');
+  assert.equal(assistantAmountLiteral('меньше -7 рублей', 'signed_operation').amountThrough, '-701');
+  assert.throws(() => assistantAmountLiteral('от 9 до 4 рублей', 'absolute_operation'), /CONFLICT/);
+  assert.throws(() => assistantAmountLiteral('от 4 до 9 евро', 'absolute_operation'), /UNSUPPORTED/);
+  assert.throws(() => assistantAmountLiteral('от 4 до 9 рублей не включая границы', 'absolute_operation'), /UNSUPPORTED/);
+  const h = harness();
+  await h.execute(996, 'Расходы в августе по категориям', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category')])]);
+  const result = await h.execute(997, 'Только операции от 700 до 1800 рублей', [plan([set('amount', { basis: 'absolute_operation', expression: 'от 700 до 1800 рублей' })], 'continue')]);
+  assert.equal(result.status, 'query'); assert.equal(result.modelCalls, 1); assert.equal(result.query!.grouping, 'category'); assert.equal(result.query!.filter.from, '2026-08-01');
+  assert.equal(result.query!.filter.amountThrough, '180000');
 });
 
 test('semantic review removes an unrequested reset and repairs a wrongly new amount-only continuation', async () => {

@@ -10,10 +10,22 @@ import { parseTool } from '../../../packages/analyzer/src/registry.ts';
 import { globalSnapshot } from '../../../packages/analyzer/src/task-context.ts';
 import type { Query } from '../../../packages/analyzer/src/registry.ts';
 import type { AssistantReply, AssistantRequest, AssistantServices } from './assistant-workflow.ts';
+import type { AssistantJournal, RunReceipt } from './assistant-workflow.ts';
+import { assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
+import { parseAssistantPlan, AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
 import type { Conversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import type { OperationsFilter } from '../../../packages/finance-core/src/operations.ts';
 
-export const assistantTrialVersion = 'cashneuro-assistant-smoke/2';
+export const assistantTrialVersion = 'cashneuro-assistant-smoke/3';
+export function seedAssistantReplay(journal: AssistantJournal, saved: { version: string; receipt: RunReceipt }, request: AssistantRequest) {
+  const old = saved.receipt;
+  if (saved.version !== assistantWorkflowVersion || old.fingerprint !== assistantRequestFingerprint(request) || journal.receipt.fingerprint !== old.fingerprint ||
+      journal.receipt.calls.length || !Array.isArray(old.calls) || old.calls.length !== 1 || old.calls[0]!.phase !== 'understand' || old.calls[0]!.state !== 'received' || !old.calls[0]!.usage ||
+      parseAssistantPlan(old.calls[0]!.value).action !== 'read') throw new AssistantError('ASSISTANT_REPLAY_CHANGED');
+  // Recompile the actual received plan; never import an old result, golden
+  // query or failed conversation. runAssistant verifies the call fingerprint.
+  journal.receipt.calls = structuredClone(old.calls); journal.receipt.replayedCalls = old.calls.length;
+}
 const base = { from: '2026-10-01', through: '2026-10-31' }, september = { from: '2026-09-01', through: '2026-09-30' };
 type Expected = { status: AssistantReply['status']; code?: string; query?: Query; totalMinor?: string; parent?: string | null; categorySuggestion?: string };
 export type AssistantTrialCase = { id: string; scenario: string; question: string; timezone?: string; noTaxi?: boolean; expected: Expected };

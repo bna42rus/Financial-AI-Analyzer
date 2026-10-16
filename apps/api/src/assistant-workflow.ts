@@ -18,7 +18,7 @@ export type CompletionInput = { phase: Phase; prompt: string; input: unknown; sc
 export type ModelReply = { value: unknown; usage: Usage };
 export type AssistantModel = { bound: DispatchBound; complete(input: CompletionInput, beforeDispatch: () => Promise<void>): Promise<ModelReply> };
 export type CallReceipt = { fingerprint: string; phase: Phase; state: 'sent' | 'received' | 'unknown' | 'failed'; value?: unknown; usage?: Usage; code?: string };
-export type RunReceipt = { fingerprint: string; calls: CallReceipt[]; result?: AssistantReply; conversation?: Conversation };
+export type RunReceipt = { fingerprint: string; calls: CallReceipt[]; result?: AssistantReply; conversation?: Conversation; replayedCalls?: number };
 export type AssistantReply = { status: 'query' | 'answer' | 'redirect' | 'clarification' | 'unsupported' | 'error'; code: string; text: string; query?: Query; result?: unknown; modelCalls: number; usage: Usage[] };
 /** The journal lock must be held for the entire workflow. Writes and budget
  * settlement are durable before parsing. No completion function is a default. */

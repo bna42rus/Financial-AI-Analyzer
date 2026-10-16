@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assistantTrialCases, assistantTrialCalculate, assistantTrialManifest, assistantTrialRequest, assistantTrialServices, scoreAssistantTrial } from '../src/assistant-trial.ts';
+import { assistantTrialCases, assistantTrialCalculate, assistantTrialManifest, assistantTrialRequest, assistantTrialServices, scoreAssistantTrial, seedAssistantReplay } from '../src/assistant-trial.ts';
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
-import { runAssistant, assistantRequestFingerprint } from '../src/assistant-workflow.ts';
+import { runAssistant, assistantRequestFingerprint, assistantWorkflowVersion } from '../src/assistant-workflow.ts';
 import type { AssistantJournal, AssistantModel } from '../src/assistant-workflow.ts';
 import type { Conversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 
@@ -29,5 +29,13 @@ test('the operator evaluator runs the actual workflow, retains parents, and dete
     assert.equal(scoreAssistantTrial(c, result, states.get(c.scenario)!).passed, true);
     const wrong = { ...result, query: { ...result.query!, filter: { ...result.query!.filter, through: '2026-09-29' } } };
     assert.ok(scoreAssistantTrial(c, wrong, states.get(c.scenario)!).failures.includes('query'));
+    if (i === 0) {
+      const replay: AssistantJournal = { ...journal, receipt: { fingerprint: assistantRequestFingerprint(r), calls: [] } };
+      seedAssistantReplay(replay, { version: assistantWorkflowVersion, receipt: journal.receipt }, r);
+      const noHttp: AssistantModel = { ...model, async complete() { throw Error('UNEXPECTED_MODEL_CALL'); } };
+      const answer = await runAssistant(r, noHttp, replay, assistantTrialServices(r, c, () => {}));
+      assert.equal(answer.status, 'query'); assert.equal(replay.receipt.replayedCalls, 1); assert.equal(replay.receipt.result!.code, 'FINANCIAL_QUERY');
+      assert.throws(() => seedAssistantReplay({ ...replay, receipt: { fingerprint: 'changed', calls: [] } }, { version: assistantWorkflowVersion, receipt: journal.receipt }, r), /REPLAY_CHANGED/);
+    }
   }
 });

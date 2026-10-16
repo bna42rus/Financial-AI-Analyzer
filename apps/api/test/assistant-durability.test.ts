@@ -32,6 +32,10 @@ test('a continuation deducts prior settled cost and call count and never clears 
   assert.equal(result.spentAtoms, '4636000'); assert.equal(result.capAtoms, '9995364000'); assert.equal(result.maximumCalls, 59);
   assert.throws(() => remainingAssistantTrialBudget(snapshot([{ requestId: id(4), index: 0, bound, unknown: true }])), /RECONCILIATION_REQUIRED/);
   assert.throws(() => remainingAssistantTrialBudget({ ...snapshot(entries), sha256: 'f'.repeat(64) }), /PREVIOUS_BUDGET_INVALID/);
+  const nextPermit = { ...p, capAtoms: result.capAtoms, maximumCalls: result.maximumCalls, previousBudgetSha256: result.previousBudgetSha256 };
+  const next = { permit: nextPermit, entries, sha256: createHash('sha256').update(JSON.stringify({ permit: nextPermit, entries })).digest('hex') };
+  const continuation = remainingAssistantTrialBudget(next, result);
+  assert.equal(continuation.spentAtoms, '9272000'); assert.equal(continuation.capAtoms, '9990728000'); assert.equal(continuation.maximumCalls, 58);
 });
 function services() {
   let committed: Parameters<AssistantServices['commit']>[0] | undefined, fail = false;
