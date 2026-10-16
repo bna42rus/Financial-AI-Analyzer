@@ -1,18 +1,19 @@
 import { object, uuid } from '../../finance-core/src/model.ts';
 import { parseTaskBook, emptyTaskBook, globalSnapshot } from './task-context.ts';
-import type { TaskBook, TaskScope, GlobalSnapshot } from './task-context.ts';
+import type { TaskNode, TaskBook, TaskScope, GlobalSnapshot } from './task-context.ts';
 import { parseCalendar, cleanAssistantQuestion, AssistantError, assistantGrouping } from './assistant-plan.ts';
 import type { Calendar, SourceContext } from './assistant-plan.ts';
 
-export const conversationVersion = 'cashneuro-assistant-conversation/1';
+export const conversationVersion = 'cashneuro-assistant-conversation/2';
 export type ConversationTurn = { messageId: string; question: string; calendar: Calendar; global: GlobalSnapshot;
   status: 'query' | 'answer' | 'redirect' | 'clarification' | 'unsupported' | 'error'; code: string; pending: boolean };
-export type Conversation = { version: typeof conversationVersion; book: TaskBook; turns: ConversationTurn[]; pendingMessageId: string | null };
+export type CategoryChoice = { node: TaskNode; options: string[] };
+export type Conversation = { version: typeof conversationVersion; book: TaskBook; turns: ConversationTurn[]; pendingMessageId: string | null; categoryChoice: CategoryChoice | null };
 export function emptyConversation(scope: TaskScope): Conversation {
-  return { version: conversationVersion, book: emptyTaskBook(scope), turns: [], pendingMessageId: null };
+  return { version: conversationVersion, book: emptyTaskBook(scope), turns: [], pendingMessageId: null, categoryChoice: null };
 }
 export function parseConversation(value: unknown, scope: TaskScope): Conversation {
-  const r = object(value, ['version', 'book', 'turns', 'pendingMessageId']);
+  const r = object(value, ['version', 'book', 'turns', 'pendingMessageId', 'categoryChoice']);
   if (r.version !== conversationVersion || !Array.isArray(r.turns) || r.turns.length > 100) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
   const book = parseTaskBook(r.book, scope), seen = new Set<string>();
   const turns = r.turns.map(raw => {
@@ -26,7 +27,15 @@ export function parseConversation(value: unknown, scope: TaskScope): Conversatio
   if (book.nodes.some(n => !seen.has(n.messageId))) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
   const pendingMessageId = r.pendingMessageId === null ? null : uuid(r.pendingMessageId);
   if (pendingMessageId && !turns.some(t => t.messageId === pendingMessageId && t.pending)) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
-  return { version: conversationVersion, book, turns, pendingMessageId };
+  let categoryChoice: CategoryChoice | null = null;
+  if (r.categoryChoice !== null) {
+    const choice = object(r.categoryChoice, ['node', 'options']);
+    const draft = parseTaskBook({ ...book, nodes: [...book.nodes, choice.node] }, scope).nodes.at(-1)!;
+    if (draft.messageId !== pendingMessageId || !turns.some(t => t.messageId === draft.messageId && t.code === 'CATEGORY_CHOICE_REQUIRED') ||
+        !Array.isArray(choice.options) || choice.options.length > 3 || choice.options.some(n => typeof n !== 'string' || n.length > 160 || cleanAssistantQuestion(n) !== n)) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
+    categoryChoice = { node: draft, options: choice.options as string[] };
+  }
+  return { version: conversationVersion, book, turns, pendingMessageId, categoryChoice };
 }
 
 /** Only cleaned user requests and coarse outcomes leave the server. No model
@@ -46,13 +55,15 @@ export function conversationInput(raw: Conversation, scope: TaskScope, question:
   const active = state.book.nodes.at(-1)?.query;
   return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar),
     activeTask: active ? { metric: active.metric, grouping: assistantGrouping[active.grouping], comparison: active.comparison, omittedChanges: 'preserve' } : null,
+    categoryChoice: state.categoryChoice ? { options: state.categoryChoice.options, omittedChanges: 'preserve' } : null,
     pendingRequest: pending < 0 ? null : history.find(t => t.ref === 'h' + (pending + 1)) ?? null,
     history, omittedHistoryCount: state.turns.length - history.length },
     sources, pendingSource: pending < 0 ? undefined : 'h' + (pending + 1) };
 }
 
-export function appendConversation(state: Conversation, scope: TaskScope, turn: ConversationTurn, book = state.book): Conversation {
+export function appendConversation(state: Conversation, scope: TaskScope, turn: ConversationTurn, book = state.book, categoryChoice: CategoryChoice | null = null): Conversation {
   const next = { version: conversationVersion, book, turns: [...state.turns, turn],
-    pendingMessageId: turn.status === 'query' ? null : turn.pending ? turn.messageId : state.pendingMessageId };
+    pendingMessageId: turn.status === 'query' ? null : turn.pending ? turn.messageId : state.pendingMessageId,
+    categoryChoice: turn.status === 'query' ? null : categoryChoice ?? (turn.pending ? null : state.categoryChoice) };
   return parseConversation(next, scope);
 }

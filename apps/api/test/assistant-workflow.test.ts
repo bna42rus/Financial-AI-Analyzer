@@ -1,10 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assistantVersion, parseAssistantPlan, profileCalendar, compileAssistantPlan, cleanAssistantQuestion } from '../../../packages/analyzer/src/assistant-plan.ts';
-import { emptyConversation, conversationInput } from '../../../packages/analyzer/src/assistant-conversation.ts';
+import { emptyConversation, conversationInput, parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { runAssistant, assistantRequestFingerprint } from '../src/assistant-workflow.ts';
 import type { AssistantJournal, AssistantModel, AssistantRequest, CompletionInput, AssistantServices } from '../src/assistant-workflow.ts';
 import { trialId, trialCatalog, trialResult } from '../src/task-trial.ts';
+import { assistantDisplayText } from '../../../packages/analyzer/src/assistant-text.ts';
 import { assistantAmountLiteral } from '../../../packages/analyzer/src/assistant-money.ts';
 
 const scope = { ownerId: 'assistant-synthetic-owner', chatId: trialId(801), generation: trialId(802), chatEpoch: trialId(803) };
@@ -295,4 +296,72 @@ test('conceptual guidance can correct an overbroad freshness flag and answer wit
   ]);
   assert.equal(reply.code, 'FINANCIAL_EXPLANATION'); assert.equal(reply.modelCalls, 3);
   assert.equal(h.calculations, 0); assert.equal(h.catalogs, 0);
+});
+
+
+test('server category draft preserves conditions even when both model passes wrongly say new, without a successful draft parent', async () => {
+  const h = harness(), catalog = { ...trialCatalog, categories: [{ ...trialCatalog.categories[1]!, name: 'Транспорт' }] };
+  const initial = await h.execute(610, 'Доходы на парковку в августе по категориям, сравни с прошлым периодом, от 600 до 1900 рублей', [
+    plan([set('metric', 'income'), set('period', 'август 2026'), set('grouping', 'category_totals'), set('comparison', 'previous_same'),
+      set('amount', { basis: 'absolute_operation', expression: 'от 600 до 1900 рублей' }), set('categories', { names: ['Парковка'] })]),
+    { names: ['Транспорт'] },
+  ], { catalog });
+  assert.equal(initial.code, 'CATEGORY_CHOICE_REQUIRED'); assert.equal(h.calculations, 0);
+  assert.equal(h.state.book.nodes.length, 0); assert.equal(h.state.categoryChoice!.node.query.filter.from, '2026-08-01');
+  const selected = await h.execute(611, 'Тогда посчитай по категории Транспорт', [plan([set('metric', 'income'), set('categories', { names: ['Транспорт'] })])], { catalog });
+  assert.equal(selected.status, 'query'); assert.equal(selected.query!.filter.from, '2026-08-01');
+  assert.equal(selected.query!.grouping, 'category'); assert.equal(selected.query!.comparison, 'previous_same');
+  assert.equal(selected.query!.filter.amountThrough, '190000'); assert.deepEqual(selected.query!.filter.categoryIds, [trialId(11)]);
+  assert.equal(h.state.book.nodes.length, 1); assert.equal(h.state.book.nodes[0]!.parent, null); assert.equal(h.state.categoryChoice, null);
+});
+
+test('category draft respects a newer UI period and explicit restart; unresolvable dates never become a draft', async () => {
+  const catalog = { ...trialCatalog, categories: [{ ...trialCatalog.categories[1]!, name: 'Транспорт' }] };
+  const initial = plan([set('metric', 'expenses'), set('period', 'август 2026'), set('categories', { names: ['Парковка'] })]);
+  const h = harness(); await h.execute(620, 'Расходы на парковку в августе', [initial, { names: ['Транспорт'] }], { catalog });
+  const changed = await h.execute(621, 'Выбери Транспорт', [plan([set('categories', { names: ['Транспорт'] })])], { catalog,
+    global: { revision: 1, filter: { from: '2026-07-01', through: '2026-07-31' }, touched: { period: 1 } } });
+  assert.equal(changed.query!.filter.from, '2026-07-01');
+  const h2 = harness(); await h2.execute(622, 'Расходы на парковку в августе', [initial, { names: ['Транспорт'] }], { catalog });
+  const standalone = { ...plan([set('metric', 'income'), set('categories', { names: ['Транспорт'] })]), context: { mode: 'new', restart: true } };
+  const restarted = await h2.execute(623, 'Забудь предыдущий запрос. Новый расчёт доходов по категории Транспорт', [standalone], { catalog });
+  assert.equal(restarted.query!.filter.from, '2026-10-01'); assert.equal(restarted.query!.metric, 'income');
+  const independent = harness(); await independent.execute(625, 'Расходы на парковку в августе', [initial, { names: ['Транспорт'] }], { catalog });
+  const newQuestion = await independent.execute(626, 'Сколько доходов по категории Транспорт?', [plan([set('metric', 'income'), set('categories', { names: ['Транспорт'] })])], { catalog });
+  assert.equal(newQuestion.query!.filter.from, '2026-10-01');
+  const h3 = harness(); const unresolved = await h3.execute(624, 'Расходы на парковку после моего переезда', [
+    plan([set('metric', 'expenses'), set('period', 'после моего переезда'), set('categories', { names: ['Парковка'] })]),
+  ], { catalog });
+  assert.equal(unresolved.status, 'clarification'); assert.equal(h3.state.categoryChoice, null); assert.equal(h3.calculations, 0);
+});
+
+test('category draft cannot cross a chat or refer to a successful turn; older successful ancestry remains real', async () => {
+  const h = harness(), catalog = { ...trialCatalog, categories: [{ ...trialCatalog.categories[1]!, name: 'Транспорт' }] };
+  await h.execute(630, 'Расходы в августе', [plan([set('metric', 'expenses'), set('period', 'август 2026')])]);
+  await h.execute(631, 'А на парковку?', [plan([set('categories', { names: ['Парковка'] })], 'continue'), { names: ['Транспорт'] }], { catalog });
+  assert.equal(h.state.book.nodes.length, 1);
+  assert.throws(() => parseConversation(h.state, { ...scope, chatId: trialId(999) }), /SCOPE/);
+  assert.throws(() => parseConversation({ ...h.state, categoryChoice: { ...h.state.categoryChoice, node: h.state.book.nodes[0] } }, scope));
+  await h.execute(632, 'Возьми Транспорт', [plan([set('metric', 'expenses'), set('categories', { names: ['Транспорт'] })])], { catalog });
+  assert.equal(h.state.book.nodes.length, 2); assert.equal(h.state.book.nodes[1]!.parent, trialId(630));
+});
+
+test('display normalization preserves paragraphs and protects identifiers split by line breaks', () => {
+  assert.equal(assistantDisplayText('Рост цен\n\nуменьшает покупательную способность.\u202f'), 'Рост цен\n\nуменьшает покупательную способность.');
+  assert.equal(assistantDisplayText('Условие: 5\u202f%'), 'Условие: 5 %');
+  const text = assistantDisplayText('Номер карты: 4111\n1111 1111 1111, почта owner@example.com');
+  assert.equal(text.includes('4111'), false); assert.equal(text.includes('owner@example.com'), false);
+});
+
+test('a numerical explanation is rewritten once and cannot publish unverified figures or repeat indefinitely', async () => {
+  const p = { version: assistantVersion, topic: 'general_finance', action: 'explain' };
+  const h = harness();
+  const answer = await h.execute(640, 'Как рост цен влияет на сбережения?', [p,
+    { text: 'Предположим, цены растут на 9\u202f%.\nЭто пример.' },
+    { text: 'При росте цен на ту же сумму можно купить меньше.\n\nДоходность, комиссии и налоги также влияют на покупательную способность.' },
+  ]);
+  assert.equal(answer.code, 'FINANCIAL_EXPLANATION'); assert.match(answer.text, /\n\n/); assert.equal(answer.modelCalls, 3);
+  assert.equal(h.calculations, 0);
+  const failed = await h.execute(641, 'Ещё объяснение', [p, { text: 'Ставка 9%.' }, { text: 'Ставка 8%.' }]);
+  assert.equal(failed.code, 'EXPLANATION_REQUIRES_SOURCES'); assert.equal(failed.modelCalls, 3); assert.equal(failed.text.includes('8%'), false);
 });

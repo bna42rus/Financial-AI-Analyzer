@@ -12,7 +12,7 @@ import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 import type { OperationsFilter } from '../../finance-core/src/operations.ts';
 import { sanitizeText, safeText } from '../../privacy/src/text.ts';
 
-export const assistantVersion = 'cashneuro-assistant-plan/4';
+export const assistantVersion = 'cashneuro-assistant-plan/5';
 export const assistantGrouping = { none: 'total', category: 'category_totals', operation: 'operation_list' } as const;
 const registryGrouping = { total: 'none', category_totals: 'category', operation_list: 'operation' } as const;
 const closed = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object', additionalProperties: false, properties, required });
@@ -31,7 +31,7 @@ export const assistantPlanSchema = closed({
   version: enumeration([assistantVersion]),
   topic: enumeration(['personal_finance', 'general_finance', 'financial_guidance', 'mixed', 'ambiguous', 'unrelated']),
   action: enumeration(['read', 'explain', 'propose_change', 'unsupported', 'clarification', 'redirect']),
-  context: closed({ mode: enumeration(['new', 'continue', 'reference', 'pending']), reference: text }, ['mode']),
+  context: closed({ mode: enumeration(['new', 'continue', 'reference', 'pending']), reference: text, restart: { type: 'boolean' } }, ['mode']),
   changes: { type: 'array', maxItems: 64, items: { anyOf: [
     ...Object.entries(scalars).map(([field, values]) => closed({ field: enumeration([field]), op: enumeration(['set']), value: enumeration(values), source }, ['field', 'op', 'value'])),
     ...sets,
@@ -66,7 +66,7 @@ export function cleanAssistantQuestion(value: unknown): string {
 }
 export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 'clear' | 'use_current'; value?: unknown; source?: string };
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
-  action: 'read' | 'explain' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string }; changes?: PlanChange[]; needsFreshSources?: boolean };
+  action: 'read' | 'explain' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; restart?: boolean }; changes?: PlanChange[]; needsFreshSources?: boolean };
 export function parseAssistantPlan(value: unknown): AssistantPlan {
   if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
@@ -77,6 +77,7 @@ export function parseAssistantPlan(value: unknown): AssistantPlan {
       p.action === 'redirect' && p.topic !== 'unrelated' || read && !personal || p.action === 'propose_change' && !personal ||
       p.action === 'explain' && !['general_finance', 'financial_guidance', 'mixed'].includes(p.topic)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if (read && !p.context || !read && (p.context !== undefined || p.changes !== undefined)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  if (p.context?.restart && p.context.mode !== 'new') throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if (p.context && ((p.context.mode === 'reference') !== (p.context.reference !== undefined))) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   // This routing hint is only consumed by explain. In other actions a boolean
   // default is harmless; it must not trigger a paid structure repair.
@@ -94,7 +95,7 @@ export type SourceContext = { calendar: Calendar; global: GlobalSnapshot; pendin
 type CompilerInput = { plan: AssistantPlan; book: TaskBook; scope: TaskScope; global: GlobalSnapshot; messageId: string; calendar: Calendar;
   sources?: Record<string, SourceContext>; pendingSource?: string };
 export type PreparedAssistant = ReturnType<typeof resolveTaskDecision> | { status: 'unsupported'; reason: string } |
-  { status: 'names_required'; reason: string; requested: string[]; categoryOptions: string[] };
+  { status: 'names_required'; reason: string; requested: string[]; categoryOptions: string[]; draft?: Extract<ReturnType<typeof resolveTaskDecision>, { status: 'resolved' }> };
 const folded = (s: string) => s.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/ё/g, 'е').replace(/\s+/gu, ' ').trim();
 
 export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): PreparedAssistant {
@@ -196,7 +197,13 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
     if (error && typeof error === 'object' && 'names' in error) {
       const e = error as unknown as { kind: string; name: string; ambiguous: boolean };
       const categoryOptions = catalog.categories.filter(c => { try { return cleanAssistantQuestion(c.name) === c.name && Boolean(safeText(c.name, 160)); } catch { return false; } }).map(c => c.name);
-      return e.kind === 'categories' && !e.ambiguous ? { status: 'names_required', reason: 'category_missing', requested: [e.name], categoryOptions: categoryOptions.length <= 250 ? categoryOptions : [] } : { status: 'clarification', reason: e.ambiguous ? 'reference_ambiguous' : 'reference_missing' };
+      if (e.kind !== 'categories' || e.ambiguous) return { status: 'clarification', reason: e.ambiguous ? 'reference_ambiguous' : 'reference_missing' };
+      // Resolve EVERY remaining condition before saving a category choice.
+      // The resulting node is a separate draft, never an executed task/parent.
+      const draft = compileAssistantPlan({ ...input, plan: { ...p, changes: p.changes?.filter(c => c.field !== 'categories') } }, catalog);
+      if (draft.status !== 'resolved') return draft;
+      return { status: 'names_required', reason: 'category_missing', requested: [e.name], categoryOptions: categoryOptions.length <= 250 ? categoryOptions : [], draft };
+
     }
     if (error instanceof TypeError && ['TASK_PERIOD_UNSUPPORTED', 'TASK_AMOUNT_EXPRESSION_UNSUPPORTED', 'TASK_AMOUNT_EXPRESSION_CONFLICT'].includes(error.message)) return { status: 'clarification', reason: error.message };
     throw error;
@@ -223,7 +230,7 @@ export const assistantPrompt = [
   'action: read для личных расчётов; explain для общих финансов; propose_change для изменения (только предложение, без исполнения); unsupported для отсутствующего инструмента; clarification для настоящей неоднозначности; redirect только unrelated. У ambiguous action=clarification, у unrelated action=redirect.',
   'context и changes существуют ТОЛЬКО при action=read. В explain/redirect/clarification/unsupported/propose_change полностью пропускай оба поля, даже если пустые. В read changes — только новые указания текущего question, не полное состояние задачи.',
   'needsFreshSources используется только для explain: true только если вопрос требует сегодняшних/актуальных чисел, ставок, курсов, цен или новостей. Объяснение механизма, понятия, влияния инфляции на покупательную способность, принципов накопления или условного примера НЕ требует свежего источника: false. Само упоминание экономики или накоплений не делает сведения текущими. В остальных действиях поле пропускай. Не выдумывай сегодняшний показатель.',
-  'Для read context обязателен: new самостоятельный новый вопрос; continue смысловое продолжение, даже при смене расходов на доходы; reference явный возврат (reference=фраза из просьбы); pending продолжение неуспешной просьбы. Не определяй связь по одному слову А. История помечает неподтверждённые просьбы, это не готовые параметры.',
+  'Для read context обязателен: new самостоятельный новый вопрос; continue смысловое продолжение, даже при смене расходов на доходы; reference явный возврат (reference=фраза из просьбы); pending продолжение неуспешной просьбы. При явном отказе от предыдущей просьбы или новом расчёте с нуля передай context={mode:new,restart:true}. Сам по себе выбор предложенной категории не новый расчёт. Не определяй связь по одному слову А. История помечает неподтверждённые просьбы, это не готовые параметры.',
   'changes — только явно изменённое. field metric expenses/income/attention; grouping total/category_totals/operation_list; comparison none/previous_same. op=set/clear/use_current; source пропускай для текущей просьбы. Формат grouping: total=один общий итог; category_totals=итоги по категориям; operation_list=список отдельных операций, каждая отдельной строкой. Это формат результата. «Каждую операцию отдельно» всегда operation_list, общий итог total. Пропуск поля сохраняет условие, не обнуляет. Не выдумывай без сравнения, не дублируй attention в metric и фильтре.',
   'ГЛАВНОЕ: changes извлекай ТОЛЬКО из question текущего сообщения. История помогает выбрать context, но её даты, категории, формат и сравнение НЕ копируются в changes успешной задачи. Исключение: pending восстанавливает неуспешную просьбу с историческими source=hN. Не заполняй значения по умолчанию: их хранит сервер. activeTask показывает сохраняемые настройки, это не просьба изменить их.',
   'Примеры продолжения при существующей задаче: «Дальше расходы» -> context continue, changes=[{field:"metric",op:"set",value:"expenses"}]; «Только суммы больше 500 рублей» -> context continue, только amount. Даже без слова «А» это уточнение предыдущего расчёта. «Итог одной суммой» -> только grouping=total; «Убери сравнение» -> только comparison=none. Смена показателя не отменяет формат, период, категории или сравнение.',
