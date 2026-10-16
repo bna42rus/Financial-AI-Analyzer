@@ -32,7 +32,7 @@ export async function analyzerQuota(db:PoolClient,userId:string,journal=false):P
  if(!c||!Number.isSafeInteger(c.quota_policy?.limit)||c.quota_policy.limit<0)return {available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null};
  // Preserve the canonical database timestamp: pg Date serialization truncates microseconds.
  const used=Number((await db.query("SELECT COALESCE(sum(units),0) AS n FROM commerce.analyzer_usage WHERE user_id=$1 AND anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND period_start IN ($2::timestamptz,date_trunc('milliseconds',$2::timestamptz))",[userId,c.startExact])).rows[0].n),limit=c.quota_policy.limit;
- const reserved=journal?Number((await db.query(`SELECT count(*) AS n FROM commerce.analyzer_request r WHERE r.user_id=$1 AND r.step='plan'
+ const reserved=journal?Number((await db.query(`SELECT count(*) AS n FROM commerce.analyzer_request r WHERE r.user_id=$1 AND r.step IN ('plan','assistant_0')
    AND r.state IN ('sent','received','unknown') AND r.anchor_at=(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AND r.period_start IN ($2::timestamptz,date_trunc('milliseconds',$2::timestamptz))
    AND NOT EXISTS(SELECT 1 FROM commerce.analyzer_usage u WHERE u.user_id=r.user_id AND u.request_id=r.request_id)`,[userId,c.startExact])).rows[0].n):0;
  const occupied=used+reserved,warning=occupied>=limit?100:occupied*100>=limit*95?95:occupied*100>=limit*80?80:null;
@@ -162,10 +162,10 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
 }
 
 /** Shared exact financial execution for both HTTP contracts. No model arithmetic. */
-export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;provider?:Answer['provider']}){
+export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;timezone?:string;provider?:Answer['provider']}){
  await assertReferences(db,userId,query.filter);const {state,operations}=await operationsDataset(db,userId);
   const widget=parseWidget({id:randomUUID(),name:query.metric==='income'?'Доходы':query.metric==='attention'?'Требуют внимания':'Расходы',metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:{kind:query.comparison},chart:'table',topN:query.grouping==='operation'?3:10});
-  const result=calculateWidget(widget,operations,state,{},now,'Europe/Moscow');
+  const result=calculateWidget(widget,operations,state,{},now,options.timezone??'Europe/Moscow');
   const selected=queryOperations(operations,state,{filter:query.filter,sort:'date',direction:'asc',group:'none'}).operations;
   let dependencyIds=selected.map(o=>o.id);if(result.comparisonFilter)dependencyIds=[...new Set([...dependencyIds,...queryOperations(operations,state,{filter:result.comparisonFilter,sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)])];
   // Linked source facts outside the visible period contribute to terminal allocations.

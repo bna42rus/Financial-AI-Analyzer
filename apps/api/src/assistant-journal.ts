@@ -27,7 +27,7 @@ export async function readAssistantPrivateFile(path: string) {
 async function syncDirectory(directory: string) {
   const fd = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await fd.sync(); } finally { await fd.close(); }
 }
-function checkedReceipt(raw: unknown, fingerprint: string): RunReceipt {
+export function checkedAssistantReceipt(raw: unknown, fingerprint: string): RunReceipt {
   const r = object(raw, ['version', 'receipt']);
   if (r.version !== assistantWorkflowVersion) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
   const v = object(r.receipt, ['fingerprint', 'calls', 'result', 'conversation', 'replayedCalls']);
@@ -66,7 +66,7 @@ export async function withAssistantJournal<T>(directory: string, request: Assist
   try {
     await lock.writeFile(String(process.pid)); await lock.sync(); await syncDirectory(directory);
     const fingerprint = assistantRequestFingerprint(request); let receipt: RunReceipt;
-    try { receipt = checkedReceipt(await readAssistantPrivateFile(path), fingerprint); }
+    try { receipt = checkedAssistantReceipt(await readAssistantPrivateFile(path), fingerprint); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; receipt = { fingerprint, calls: [] }; }
     const journal: AssistantJournal = { receipt,
       reserve: (index, bound) => accounting.reserve(id, index, bound), settle: (index, usage) => accounting.settle(id, index, usage),

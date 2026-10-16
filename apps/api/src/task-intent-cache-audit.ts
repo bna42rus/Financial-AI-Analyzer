@@ -142,7 +142,7 @@ export async function auditObservedIntentCache(value: unknown) {
     ledgerModified: false, holdoutOpened: false, historicalContractOnly: true, turns: rows.length, passed: count(r => r.score!.passed), rejected: count(r => !r.inspection.accepted),
     totalCostAtoms, tokens: { input: rows.reduce((n, r) => n + r.usage.inputTokens, 0), output: rows.reduce((n, r) => n + r.usage.outputTokens, 0) },
     failuresByCategory: Object.fromEntries([...new Set(failed.map(r => r.errorClass!))].map(c => [c, count(r => r.errorClass === c)])),
-    earlierFailurePresent: count(r => !r.score!.passed && r.score!.earlierFailure), expectedParentFailed: count(r => !r.score!.passed && r.expectedParentFailed),
+    earlierFailurePresent: count(r => !r.score!.passed && r.score!.earlierFailure), expectedParentFailed: count(r => !r.score!.passed && !!r.expectedParentFailed),
     repeatGroups: corpus.repetitions.map(g => {
       const copies = rows.filter(r => r.id === g.caseId);
       return { id: g.caseId, occurrences: copies.map(r => r.occurrence), passed: copies.map(r => r.score!.passed),

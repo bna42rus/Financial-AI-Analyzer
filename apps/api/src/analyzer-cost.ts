@@ -4,7 +4,7 @@ import { baseMonthlyCost, rubAmount, tokenPrice, tokenCost, CostError } from '..
 import type { TokenPrice, DispatchBound, Usage } from '../../../packages/analyzer/src/cost.ts';
 
 export type CostPolicy = { projectId: string; projectPeriodStart: string; projectPeriodEnd: string; projectLimitRub: string; price: TokenPrice };
-export type CostIdentity = { userId: string; requestId: string; step: 'gate' | 'plan'; anchorAt: string; periodStart: string };
+export type CostIdentity = { userId: string; requestId: string; step: 'gate' | 'plan' | 'assistant_0' | 'assistant_1' | 'assistant_2'; anchorAt: string; periodStart: string };
 export function costPolicy(value: unknown): CostPolicy {
   const r = object(value, ['projectId', 'projectPeriodStart', 'projectPeriodEnd', 'projectLimitRub', 'price']);
   if (typeof r.projectId !== 'string' || !/^[a-z0-9._/-]{1,80}$/.test(r.projectId) || typeof r.projectPeriodStart !== 'string' || typeof r.projectPeriodEnd !== 'string') throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');

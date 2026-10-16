@@ -4,6 +4,9 @@ on:
     paths:
       - 'apps/api/src/assistant-*.ts'
       - 'apps/api/test/assistant-*.test.ts'
+      - 'apps/api/src/analyzer-assistant-*.ts'
+      - 'apps/api/test/analyzer-assistant-*.test.ts'
+      - 'packages/database/migrations/0027_assistant_runtime.sql'
       - 'packages/analyzer/**'
       - 'packages/finance-core/**'
       - 'packages/privacy/**'
@@ -25,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Install locked workspace dependencies for the database adapter types
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
       - name: Install only the pinned compiler and Node types
         run: npm install --prefix "$RUNNER_TEMP/assistant-typecheck" --no-save --ignore-scripts typescript@7.0.2 @types/node@24.19.1
       - name: Strict types for the candidate and its import closure
@@ -49,3 +56,35 @@ jobs:
           packages/analyzer/test/task-literals.test.ts
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
+
+  postgres-assistant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: public.ecr.aws/docker/library/postgres:18.4
+        env:
+          POSTGRES_PASSWORD: synthetic-assistant-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Check API types
+        run: pnpm --filter @finance/api exec tsc --noEmit
+      - name: Verify the assistant HTTP and PostgreSQL boundary without paid calls
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-assistant-ci-password@127.0.0.1:5432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-integration.test.ts
