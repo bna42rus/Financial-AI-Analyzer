@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
 import { withAssistantJournal } from '../src/assistant-journal.ts';
-import { withAssistantBudget, assistantBudgetVersion, remainingAssistantTrialBudget } from '../src/assistant-budget.ts';
+import { withAssistantBudget, assistantBudgetVersion, remainingAssistantTrialBudget, checkAssistantPermit } from '../src/assistant-budget.ts';
 import type { AssistantPermit } from '../src/assistant-budget.ts';
 import { createCloudAssistantModel } from '../src/assistant-transport.ts';
 import { runAssistant } from '../src/assistant-workflow.ts';
@@ -131,3 +131,21 @@ test('journal refuses legacy directories, permissive files, symlinks, changed re
   await rm(path); await writeFile(join(root, 'outside.json'), '{}', { mode: 0o600 }); await symlink(join(root, 'outside.json'), path);
   await assert.rejects(withAssistantJournal(directory, r, accounting, async () => {}));
 }));
+
+
+test('explicit authorization extends cumulative ceilings without resetting old spend, calls, identities or unknown holds', () => {
+  const legacy = { ...permit(), version: 'cashneuro-assistant-budget/1' as const };
+  const entries = [{ requestId: id(4), index: 0, bound, usage }];
+  const snapshot = (p: unknown, rows = entries) => ({ permit: p, entries: rows, sha256: createHash('sha256').update(JSON.stringify({ permit: p, entries: rows })).digest('hex') });
+  const old = remainingAssistantTrialBudget(snapshot(legacy));
+  const authorization = { capAtoms: '10000000000', maximumCalls: 70 };
+  const expanded = { ...permit(), authorization, capAtoms: (BigInt(authorization.capAtoms) - BigInt(old.spentAtoms)).toString(), maximumCalls: 69, previousBudgetSha256: old.previousBudgetSha256 };
+  const next = remainingAssistantTrialBudget(snapshot(expanded), old);
+  assert.equal(next.calls, 2); assert.equal(next.maximumCalls, 68); assert.equal(next.spentAtoms, '9272000'); assert.equal(next.capAtoms, '9990728000');
+  assert.throws(() => remainingAssistantTrialBudget(snapshot({ ...expanded, capAtoms: authorization.capAtoms }), old), /PREVIOUS_BUDGET_INVALID/);
+  assert.throws(() => remainingAssistantTrialBudget(snapshot({ ...expanded, maximumCalls: 70 }), old), /PREVIOUS_BUDGET_INVALID/);
+  assert.throws(() => checkAssistantPermit({ ...expanded, authorization: undefined }), /PERMIT_INVALID/);
+  assert.throws(() => checkAssistantPermit({ ...expanded, version: legacy.version }), /PERMIT_INVALID/);
+  assert.throws(() => checkAssistantPermit({ ...expanded, authorization: { ...authorization, capAtoms: '11000000000' } }), /PERMIT_INVALID/);
+  assert.throws(() => remainingAssistantTrialBudget(snapshot(legacy, [{ requestId: id(4), index: 0, bound, unknown: true } as any])), /RECONCILIATION_REQUIRED/);
+});

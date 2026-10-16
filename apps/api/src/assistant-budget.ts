@@ -9,28 +9,42 @@ import type { TokenPrice, DispatchBound, Usage } from '../../../packages/analyze
 import { AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
 import type { AssistantAccounting } from './assistant-journal.ts';
 
-export const assistantBudgetVersion = 'cashneuro-assistant-budget/1';
-export type AssistantPermit = { version: typeof assistantBudgetVersion; sourceSha256: string; metadataSha256: string;
-  tariffCheckedAt: string; tariffSource: string; price: TokenPrice; bound: DispatchBound; capAtoms: string; maximumCalls: number; previousBudgetSha256?: string };
+export const assistantBudgetVersion = 'cashneuro-assistant-budget/2';
+type Authorization = { capAtoms: string; maximumCalls: number };
+const legacyAuthorization: Authorization = { capAtoms: '10000000000', maximumCalls: 60 };
+function checkAuthorization(value: unknown): Authorization {
+  const a = object(value, ['capAtoms', 'maximumCalls']);
+  if (typeof a.capAtoms !== 'string' || !/^[1-9][0-9]{0,11}$/.test(a.capAtoms) || BigInt(a.capAtoms) > 10_000_000_000n ||
+      !Number.isInteger(a.maximumCalls) || Number(a.maximumCalls) < 1 || Number(a.maximumCalls) > 70) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
+  return a as Authorization;
+}
+export type AssistantPermit = { version: typeof assistantBudgetVersion | 'cashneuro-assistant-budget/1'; sourceSha256: string; metadataSha256: string;
+  tariffCheckedAt: string; tariffSource: string; price: TokenPrice; bound: DispatchBound; capAtoms: string; maximumCalls: number; previousBudgetSha256?: string; authorization?: Authorization };
 type Entry = { requestId: string; index: number; bound: DispatchBound; usage?: Usage; unknown?: boolean };
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 export function checkAssistantPermit(value: unknown): AssistantPermit {
-  const p = object(value, ['version', 'sourceSha256', 'metadataSha256', 'tariffCheckedAt', 'tariffSource', 'price', 'bound', 'capAtoms', 'maximumCalls', 'previousBudgetSha256']);
-  if (p.version !== assistantBudgetVersion || ![p.sourceSha256, p.metadataSha256].every(v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v)) ||
+  const p = object(value, ['version', 'sourceSha256', 'metadataSha256', 'tariffCheckedAt', 'tariffSource', 'price', 'bound', 'capAtoms', 'maximumCalls', 'previousBudgetSha256', 'authorization']);
+  const authorization = p.authorization === undefined ? legacyAuthorization : checkAuthorization(p.authorization);
+  if (p.authorization !== undefined && p.version !== assistantBudgetVersion) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
+  if (![assistantBudgetVersion, 'cashneuro-assistant-budget/1'].includes(String(p.version)) || ![p.sourceSha256, p.metadataSha256].every(v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v)) ||
       typeof p.tariffCheckedAt !== 'string' || !Number.isFinite(Date.parse(p.tariffCheckedAt)) || p.tariffSource !== 'https://cloud.ru/products/evolution-ai-factory/catalog-foundation-models' ||
-      typeof p.capAtoms !== 'string' || !/^[1-9][0-9]{0,10}$/.test(p.capAtoms) || BigInt(p.capAtoms) > 10_000_000_000n ||
-      !Number.isInteger(p.maximumCalls) || Number(p.maximumCalls) < 1 || Number(p.maximumCalls) > 60) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
+      typeof p.capAtoms !== 'string' || !/^[1-9][0-9]{0,11}$/.test(p.capAtoms) || BigInt(p.capAtoms) > BigInt(authorization.capAtoms) ||
+      !Number.isInteger(p.maximumCalls) || Number(p.maximumCalls) < 1 || Number(p.maximumCalls) > authorization.maximumCalls) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   tokenPrice(p.price); const b = object(p.bound, ['inputTokens', 'outputTokens', 'modelVersion']);
   if (p.previousBudgetSha256 !== undefined && (typeof p.previousBudgetSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(p.previousBudgetSha256))) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   if (b.inputTokens !== 131072 || b.outputTokens !== 1200 || b.modelVersion !== 'openai/gpt-oss-120b') throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   return p as AssistantPermit;
 }
-/** Read-only admission from the previous attempt. Never frees a hold or
- * raises the owner's cumulative 10 RUB / 60 completion authorization. */
-export function remainingAssistantTrialBudget(value: unknown, previous?: { previousBudgetSha256: string; spentAtoms: string; capAtoms: string; maximumCalls: number }) {
+/** Read-only admission. A larger ceiling requires a NEW explicit authorization
+ * in a NEW permit. Previous cost/calls and unknown holds are never erased. */
+export function remainingAssistantTrialBudget(value: unknown, previous?: { previousBudgetSha256: string; spentAtoms: string; capAtoms: string; maximumCalls: number; calls?: number; authorization?: Authorization }) {
   const state = object(value, ['permit', 'entries', 'sha256']), permit = checkAssistantPermit(state.permit);
-  if (permit.capAtoms !== (previous?.capAtoms ?? '10000000000') || permit.maximumCalls !== (previous?.maximumCalls ?? 60) || permit.previousBudgetSha256 !== previous?.previousBudgetSha256 ||
-      !Array.isArray(state.entries) || state.entries.length > 60 || state.sha256 !== hash({ permit: state.permit, entries: state.entries })) throw new AssistantError('ASSISTANT_PREVIOUS_BUDGET_INVALID');
+  const before = previous?.authorization ?? legacyAuthorization, authorization = permit.authorization ?? before;
+  const previousCalls = previous?.calls ?? (previous ? before.maximumCalls - previous.maximumCalls : 0);
+  if (BigInt(authorization.capAtoms) < BigInt(before.capAtoms) || authorization.maximumCalls < before.maximumCalls ||
+      permit.capAtoms !== (BigInt(authorization.capAtoms) - BigInt(previous?.spentAtoms ?? '0')).toString() ||
+      permit.maximumCalls !== authorization.maximumCalls - previousCalls || permit.previousBudgetSha256 !== previous?.previousBudgetSha256 ||
+      !Array.isArray(state.entries) || state.entries.length > permit.maximumCalls || state.sha256 !== hash({ permit: state.permit, entries: state.entries })) throw new AssistantError('ASSISTANT_PREVIOUS_BUDGET_INVALID');
   let spent = 0n; const seen = new Set<string>();
   for (const raw of state.entries) {
     const e = object(raw, ['requestId', 'index', 'bound', 'usage', 'unknown']); uuid(e.requestId);
@@ -43,7 +57,7 @@ export function remainingAssistantTrialBudget(value: unknown, previous?: { previ
   }
   if (spent >= BigInt(permit.capAtoms) || state.entries.length >= permit.maximumCalls) throw new AssistantError('ASSISTANT_BUDGET_EXHAUSTED');
   return { previousBudgetSha256: previous ? hash({ previous: previous.previousBudgetSha256, current: hash(state) }) : hash(state),
-    spentAtoms: (spent + BigInt(previous?.spentAtoms ?? '0')).toString(), capAtoms: (BigInt(permit.capAtoms) - spent).toString(), maximumCalls: permit.maximumCalls - state.entries.length };
+    authorization, calls: previousCalls + state.entries.length, spentAtoms: (spent + BigInt(previous?.spentAtoms ?? '0')).toString(), capAtoms: (BigInt(permit.capAtoms) - spent).toString(), maximumCalls: permit.maximumCalls - state.entries.length };
 }
 async function syncDir(directory: string) { const fd = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await fd.sync(); } finally { await fd.close(); } }
 async function readPrivate(path: string) {
