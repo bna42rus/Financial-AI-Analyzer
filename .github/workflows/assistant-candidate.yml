@@ -1,0 +1,51 @@
+name: assistant-candidate
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/assistant-*.ts'
+      - 'apps/api/test/assistant-*.test.ts'
+      - 'packages/analyzer/**'
+      - 'packages/finance-core/**'
+      - 'packages/privacy/**'
+      - '.github/workflows/assistant-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: assistant-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  software-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install only the pinned compiler and Node types
+        run: npm install --prefix "$RUNNER_TEMP/assistant-typecheck" --no-save --ignore-scripts typescript@7.0.2 @types/node@24.19.1
+      - name: Strict types for the candidate and its import closure
+        run: >-
+          "$RUNNER_TEMP/assistant-typecheck/node_modules/.bin/tsc"
+          --noEmit --target ES2023 --module ESNext --moduleResolution Bundler
+          --strict --noUncheckedIndexedAccess --verbatimModuleSyntax
+          --allowImportingTsExtensions --skipLibCheck --types node
+          --typeRoots "$RUNNER_TEMP/assistant-typecheck/node_modules/@types"
+          packages/analyzer/src/assistant-*.ts apps/api/src/assistant-*.ts
+          apps/api/test/assistant-*.test.ts
+      - name: Offline checks only, with fake HTTP and synthetic finance
+        run: >-
+          node --experimental-transform-types --test
+          apps/api/test/assistant-workflow.test.ts
+          apps/api/test/assistant-durability.test.ts
+          apps/api/test/assistant-trial.test.ts
+          apps/api/test/task-intent-cache-audit.test.ts
+          apps/api/test/task-intent.test.ts
+          apps/api/test/task-json-cache-audit.test.ts
+          packages/analyzer/test/task-context.test.ts
+          packages/analyzer/test/task-literals.test.ts
+      - name: Prepare the experiment without network or credentials
+        run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
