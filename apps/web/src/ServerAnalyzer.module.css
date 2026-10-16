@@ -12,3 +12,6 @@
 .editor {display:grid;gap:12px;margin-top:16px;}
 .editor label {display:grid;gap:6px;min-width:0;}
 .editor input,.editor select {padding:9px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:inherit;max-width:100%;}
+
+.timezone {display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 16px;font-size:13px;overflow-wrap:anywhere;}
+.timezone form {flex-basis:100%;margin-top:0;}

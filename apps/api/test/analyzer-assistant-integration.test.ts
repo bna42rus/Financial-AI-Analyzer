@@ -163,3 +163,56 @@ test('a profile or UI change during HTTP invalidates the calculation without dis
   assert.deepEqual((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation, before);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
 });
+
+test('simultaneous duplicate and same-chat requests cannot dispatch twice or overwrite the first reply', async () => {
+  const b = await body(); outputs = [plan([set('metric', 'expenses')])];
+  let unblock!: () => void, signal!: () => void;
+  const barrier = new Promise<void>(resolve => { unblock = resolve; });
+  const dispatched = new Promise<void>(resolve => { signal = resolve; });
+  onDispatch = async () => { onDispatch = undefined; signal(); await barrier; };
+  const first = run(b).then(r => r);
+  try {
+    await dispatched;
+    const duplicate = await run(b); assert.equal(duplicate.statusCode, 409, duplicate.body);
+    const sameChat = await run({ ...b, id: randomUUID() }); assert.equal(sameChat.statusCode, 409, sameChat.body);
+    assert.equal(calls, 1);
+  } finally { unblock(); }
+  const reply = await first; assert.equal(reply.statusCode, 200, reply.body); assert.equal(calls, 2);
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_message')).rows[0].n, '1');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
+});
+
+test('today is resolved in each saved profile timezone, without converting date-only bank facts', async () => {
+  const b = await body();
+  for (const timezone of ['Asia/Vladivostok', 'America/Los_Angeles']) {
+    assert.equal((await request('/finance/assistant-profile', { timezone })).statusCode, 200);
+    outputs = [plan([set('metric', 'expenses'), set('period', 'сегодня')])];
+    const reply = await run({ ...b, id: randomUUID(), text: 'Расходы сегодня' }); assert.equal(reply.statusCode, 200, reply.body);
+    const input = outgoing.at(-2), day = input.calendar.currentDate;
+    assert.equal(input.calendar.timezone, timezone);
+    assert.equal(reply.json().answer.query.filter.from, day); assert.equal(reply.json().answer.query.filter.through, day);
+  }
+  const dates = (await pg.owner.query('SELECT DISTINCT operation_date FROM finance.source_observation')).rows;
+  assert.deepEqual(dates, [{ operation_date: { precision: 'day', date: '2026-09-02' } }]);
+});
+
+test('a follow-up recalculates current user corrections while the old answer remains a historical snapshot', async () => {
+  const b = await body(); outputs = [plan([set('metric', 'expenses')])];
+  const original = await run(b); assert.equal(original.statusCode, 200, original.body); assert.equal(original.json().answer.result.totals.expenses, '24690');
+  await within(async db => {
+    await db.query(`UPDATE finance.transaction SET semantics=jsonb_set(semantics,'{role}','{"value":"neutral","source":"user","confidence":100,"userVerified":true}'::jsonb) WHERE user_id='first' AND id=ANY($1::uuid[])`, [operationIds]);
+    await db.query("UPDATE finance.workspace SET revision=revision+1 WHERE user_id='first'");
+  });
+  outputs = [plan([set('grouping', 'category_totals')], 'continue')];
+  const updated = await run({ ...b, id: randomUUID(), text: 'А по категориям?' }); assert.equal(updated.statusCode, 200, updated.body); assert.equal(updated.json().answer.result.totals.expenses, '0');
+  const old = (await pg.owner.query('SELECT answer FROM finance.analyzer_message WHERE id=$1', [b.id])).rows[0].answer;
+  assert.equal(old.result.totals.expenses, '24690');
+});
+
+test('one structural repair is accounted and cannot execute model-generated SQL or exceed three calls', async () => {
+  const b = await body(), valid = plan([set('metric', 'expenses')]);
+  outputs = [{ ...valid, sql: 'DROP TABLE finance.transaction' }, valid];
+  const reply = await run(b); assert.equal(reply.statusCode, 200, reply.body); assert.equal(reply.json().code, 'FINANCIAL_QUERY'); assert.equal(calls, 3);
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.transaction')).rows[0].n, '2');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n, '3');
+});
