@@ -264,7 +264,7 @@ test('unknown event period clarifies instead of calculating globals, signed thre
 test('an omitted personal event blocks calculation when completeness review cannot resolve it', async () => {
   const h = harness(), omitted = plan([set('metric', 'expenses')]);
   const reply = await h.execute(600, 'Сколько расходов со дня моего переезда?', [omitted,
-    { plan: omitted, conditions: [{ text: 'со дня моего переезда', covered: false }] }]);
+    { plan: omitted, conditions: [{ text: 'со дня моего переезда', scope: 'financial', covered: false }] }]);
   assert.equal(reply.status, 'clarification'); assert.equal(reply.code, 'CONDITION_UNCLEAR');
   assert.equal(reply.modelCalls, 2); assert.equal(h.calculations, 0); assert.equal(h.catalogs, 0);
   assert.equal(h.state.turns[0]!.pending, true);
@@ -276,7 +276,7 @@ test('pending request is prominent even when the first model wrongly starts a ne
   const reply = await h.execute(602, 'Тогда возьми Автомобиль', [
     plan([set('metric', 'expenses'), set('categories', { names: ['Автомобиль'] })]),
     { plan: plan([set('metric', 'expenses', 'h1'), set('period', 'июль 2026', 'h1'), set('categories', { names: ['Автомобиль'] })], 'pending'),
-      conditions: [{ text: 'выбор Автомобиль в предыдущей просьбе', covered: true }] },
+      conditions: [{ text: 'выбор Автомобиль в предыдущей просьбе', scope: 'financial', covered: true }] },
   ], { catalog });
   assert.equal(reply.query!.filter.from, '2026-07-01'); assert.equal(reply.query!.filter.through, '2026-07-31');
   assert.deepEqual(reply.query!.filter.categoryIds, [trialId(11)]);
@@ -291,7 +291,7 @@ test('pending request is prominent even when the first model wrongly starts a ne
 test('conceptual guidance can correct an overbroad freshness flag and answer without reading finances', async () => {
   const h = harness(), concept = { version: assistantVersion, topic: 'financial_guidance', action: 'explain', needsFreshSources: true };
   const reply = await h.execute(603, 'Почему рост цен уменьшает покупательную способность сбережений?', [concept,
-    { plan: { ...concept, needsFreshSources: false }, conditions: [{ text: 'объяснить механизм', covered: true }] },
+    { plan: { ...concept, needsFreshSources: false }, conditions: [{ text: 'объяснить механизм', scope: 'financial', covered: true }] },
     { text: 'При росте цен на ту же сумму можно купить меньше товаров и услуг.' },
   ]);
   assert.equal(reply.code, 'FINANCIAL_EXPLANATION'); assert.equal(reply.modelCalls, 3);
@@ -381,4 +381,67 @@ test('two-dot money ranges preserve signs, shared units, decimals and exact quer
   assert.equal(result.status, 'query'); assert.equal(result.query!.filter.from, '2026-09-01'); assert.equal(result.query!.filter.through, '2026-09-30');
   assert.equal(result.query!.filter.amountFrom, '-120000'); assert.equal(result.query!.filter.amountThrough, '-40000'); assert.equal(result.query!.filter.amountBasis, 'signed_operation');
   assert.equal((result.result as any).totals.expenses, '160000'); assert.equal(result.modelCalls, 2);
+});
+
+test('mixed requests calculate the financial part using the selected UI period while leaving unrelated clauses uncovered', async () => {
+  const h = harness();
+  const candidate = { ...plan([set('metric', 'expenses'), set('period', 'use_current')]), topic: 'mixed' };
+  const reviewed = { ...plan([set('metric', 'expenses'), { field: 'period', op: 'use_current' }]), topic: 'mixed' };
+  const reply = await h.execute(660, 'Посчитай расходы за выбранный период и расскажи о погоде.', [candidate,
+    { plan: reviewed, conditions: [
+      { text: 'расходы', scope: 'financial', covered: true },
+      { text: 'выбранный период', scope: 'financial', covered: true },
+      { text: 'погода', scope: 'unrelated', covered: false },
+    ] },
+  ]);
+  assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 2);
+  assert.equal(reply.query!.filter.from, '2026-10-01'); assert.equal(reply.query!.filter.through, '2026-10-31');
+  assert.equal((reply.result as any).totals.expenses, '17000'); assert.equal(h.calculations, 1);
+  for (const call of h.calls) {
+    const input = call.input as any;
+    assert.deepEqual(input.selectedContext, { period: true });
+    assert.equal(JSON.stringify(input).includes('2026-10-31'), false);
+    assert.equal(JSON.stringify(input).includes('50000000-'), false);
+  }
+  assert.deepEqual((h.calls[1]!.input as any).candidate.changes[1], { field: 'period', op: 'use_current' });
+});
+
+test('an unrelated clause never excuses an unresolved financial condition in a mixed request', async () => {
+  const h = harness(), mixed = { ...plan([set('metric', 'expenses')]), topic: 'mixed' };
+  const reply = await h.execute(661, 'Посчитай расходы со дня моего переезда и расскажи о погоде.', [mixed,
+    { plan: mixed, conditions: [
+      { text: 'дата переезда', scope: 'financial', covered: false },
+      { text: 'погода', scope: 'unrelated', covered: false },
+    ] },
+  ]);
+  assert.equal(reply.code, 'CONDITION_UNCLEAR'); assert.equal(h.calculations, 0); assert.equal(h.catalogs, 0);
+  assert.equal(h.state.book.nodes.length, 0);
+});
+
+test('selected-period availability is absent without bounded UI dates, and unresolved selection blocks calculation', async () => {
+  const h = harness(), candidate = { ...plan([set('metric', 'expenses')]), topic: 'mixed' };
+  const reply = await h.execute(662, 'Расходы за выбранный период и погода.', [candidate,
+    { plan: candidate, conditions: [
+      { text: 'выбранный период', scope: 'financial', covered: false },
+      { text: 'погода', scope: 'unrelated', covered: false },
+    ] },
+  ], { global: { revision: 1, filter: {}, touched: { period: 1 } } });
+  assert.equal(reply.status, 'clarification'); assert.equal(h.calculations, 0);
+  for (const call of h.calls) assert.deepEqual((call.input as any).selectedContext, { period: false });
+});
+
+test('only the exact reserved period marker canonicalizes to use_current, without resetting other task groups', async () => {
+  for (const field of ['period', 'postedPeriod']) {
+    const parsed = parseAssistantPlan(plan([set(field, 'use_current')]));
+    assert.deepEqual(parsed.changes, [{ field, op: 'use_current' }]);
+  }
+  assert.equal(parseAssistantPlan(plan([set('search', 'use_current')])).changes![0]!.op, 'set');
+  assert.equal(parseAssistantPlan(plan([set('period', 'use_current завтра')])).changes![0]!.op, 'set');
+  const h = harness();
+  await h.execute(663, 'Расходы в августе по категориям со сравнением', [plan([set('metric', 'expenses'),
+    set('period', 'август 2026'), set('grouping', 'category_totals'), set('comparison', 'previous_same')])]);
+  const reply = await h.execute(664, 'Теперь за выбранный период', [plan([set('period', 'use_current')], 'continue')]);
+  assert.equal(reply.status, 'query'); assert.equal(reply.query!.filter.from, '2026-10-01');
+  assert.equal(reply.query!.grouping, 'category'); assert.equal(reply.query!.comparison, 'previous_same');
+  assert.equal(h.state.book.nodes[1]!.parent, trialId(663));
 });
