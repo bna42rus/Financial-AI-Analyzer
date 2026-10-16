@@ -2,6 +2,9 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -31,9 +34,19 @@ class UpdateTests(unittest.TestCase):
         unit = m.worker_unit(Path('/srv/cashneuro/staging/backend-releases') / ('a' * 40))
         self.assertIn('src/import-main.ts', unit)
         self.assertIn('DynamicUser=yes', unit)
+        self.assertIn('SupplementaryGroups=cashneuro-staging-code\n', unit)
         self.assertNotIn('LoadCredential', unit)
         self.assertNotIn('AUTH_SECRET', unit)
         self.assertNotIn('assistant-cloud', unit)
+
+    def test_root_inspection_does_not_leave_bytecode_in_the_users_build(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ['update-staging-release.py', 'install-assistant-staging.py']:
+                shutil.copyfile(Path(__file__).with_name(name), root / name)
+            result = subprocess.run([sys.executable, str(root / 'update-staging-release.py'), '--help'], capture_output=True)
+            self.assertEqual(result.returncode, 0)
+            self.assertFalse((root / '__pycache__').exists())
 
     def test_rollback_after_early_failure_still_restores_api_when_worker_was_not_created(self):
         with tempfile.TemporaryDirectory() as directory:
