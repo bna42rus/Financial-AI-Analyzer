@@ -1,7 +1,8 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { spawn } from 'node:child_process';
+import { spawn, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import type { ChildProcess } from 'node:child_process';
 import { chromium, expect as playwrightExpect } from '@playwright/test';
 import type { Page } from '@playwright/test';
@@ -14,6 +15,10 @@ import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.
 import { prepareFinance, financeView, acceptAccount, importEpoch } from '../src/finance.ts';
 import { token, hashPassword } from '../src/crypto.ts';
 import type { Config } from '../src/types.ts';
+import { syntheticCsv, syntheticXlsx } from '../../../packages/imports/test/tabular-fixtures.ts';
+import { syntheticPdf } from '../../../packages/imports/test/synthetic-pdf.ts';
+import { syntheticLayout } from '../../../packages/imports/test/synthetic-layout.ts';
+import { runImportStage } from '../src/import-ingestion.ts';
 
 const expect = playwrightExpect.configure({ timeout: 20000 });
 const web = 'http://127.0.0.1:5185', api = 'http://127.0.0.1:3035', password = 'Synthetic task browser password 123!';
@@ -37,7 +42,11 @@ before(async () => {
   const config: Config = { profile: 'finance', pool: pg.finance, baseURL: api, origin: web, authSecret: token(), wrappingKey: randomBytes(32), environment: 'test',
     assistantProvider: createTestAssistantProvider(pg.finance, fetcher, { projectId: 'test/task-browser', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' }) };
   server = await createServer(config); await server.app.listen(3035, '127.0.0.1');
-  child = spawn('pnpm', ['--filter', '@finance/web', 'dev', '--port', '5185', '--strictPort'], { cwd: new URL('../../../', import.meta.url), env: { ...process.env, VITE_API_ORIGIN: api }, stdio: 'ignore' });
+  const cwd = new URL('../../../', import.meta.url), env = { ...process.env, VITE_API_ORIGIN: api };
+  if(process.env.ASSISTANT_UI_ASSET_MODE==='built') {
+    await promisify(execFile)(process.execPath, ['scripts/build-connected-web.mjs', 'finance', '0'.repeat(40)], { cwd, env, timeout:120000 });
+    child = spawn('pnpm', ['--filter', '@finance/web', 'exec', 'vite', 'preview', '--port', '5185', '--strictPort'], {cwd,env,stdio:'ignore'});
+  } else child = spawn('pnpm', ['--filter', '@finance/web', 'dev', '--port', '5185', '--strictPort'], {cwd,env,stdio:'ignore'});
   for (let i = 0; i < 100; i++) { try { if ((await fetch(web)).ok) return; } catch { /* startup */ } await new Promise(r => setTimeout(r, 100)); }
   throw new Error('Task UI did not start');
 });
@@ -119,5 +128,29 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     assert.equal((await messages()).length, 0); await page.getByLabel('Ваш финансовый вопрос', { exact: true }).fill('Новый вопрос'); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeEnabled();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); assert.deepEqual(errors, []);
     assert.deepEqual(await page.evaluate(() => Object.keys(sessionStorage)), []); assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['finance-interface-epoch-v1']);
+
+    // Exercise the shipped bundle's file picker, lazy PDF/CSV/XLSX parsers,
+    // actual PostgreSQL acceptance and worker, rather than a dev-only import.
+    const prepared: string[] = [];
+    page.on('request', request => { if(request.url().endsWith('/finance/import-accept'))prepared.push(request.postData()??''); });
+    await page.getByRole('button', {name:'Загрузить файлы',exact:true}).click();
+    await page.getByLabel('Файлы выписок').setInputFiles([
+      {name:'Private.csv',mimeType:'text/csv',buffer:Buffer.from(syntheticCsv)},
+      {name:'Private.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(syntheticXlsx())},
+      {name:'Private.pdf',mimeType:'application/pdf',buffer:Buffer.from(syntheticPdf(syntheticLayout('tbank')))}
+    ]);
+    await expect(page.getByText('Загрузка принята сервером. Результат сохранён в истории загрузок.')).toBeVisible({timeout:30000});
+    assert.equal(prepared.length,1);
+    for(const secret of ['Private','%PDF','00000000000000000001','filename'])assert.equal(prepared[0]!.includes(secret),false);
+    assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_batch WHERE user_id='task-browser'")).rows[0].n,'1');
+    for(let i=0;i<15;i++) {
+      if(!(await pg.owner.query("SELECT 1 FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rowCount)break;
+      assert.equal(await runImportStage(pg.finance),true);
+    }
+    assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rows[0].n,'0');
+    assert.ok(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE user_id='task-browser'")).rows[0].n)>2);
+    await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+    assert.deepEqual(errors,[]);
+
   } finally { barrier.resolve(); await context.close(); await browser.close(); }
 });

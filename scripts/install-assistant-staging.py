@@ -246,6 +246,9 @@ def install(args):
     new_frontend = release / 'apps/web/dist'
     if not (new_frontend / 'index.html').is_file():
         raise InstallationError('FRONTEND_BUILD_MISSING')
+    frontend_manifest = json.loads((new_frontend / 'release.json').read_text())
+    if frontend_manifest != {'schema': 'cashneuro-web-build/1', 'revision': args.sha, 'profile': 'finance', 'mode': 'connected', 'apiOrigin': 'https://test.cashneuro.ru'}:
+        raise InstallationError('CONNECTED_FRONTEND_REQUIRED')
     candidate = backup / 'Caddyfile.candidate'
     private_write(candidate, original.replace(old_frontend.encode(), str(new_frontend).encode()))
     run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
