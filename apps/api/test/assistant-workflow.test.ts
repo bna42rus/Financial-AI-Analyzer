@@ -365,3 +365,20 @@ test('a numerical explanation is rewritten once and cannot publish unverified fi
   const failed = await h.execute(641, 'Ещё объяснение', [p, { text: 'Ставка 9%.' }, { text: 'Ставка 8%.' }]);
   assert.equal(failed.code, 'EXPLANATION_REQUIRES_SOURCES'); assert.equal(failed.modelCalls, 3); assert.equal(failed.text.includes('8%'), false);
 });
+
+
+test('two-dot money ranges preserve signs, shared units, decimals and exact query scope without another understanding call', async () => {
+  assert.deepEqual(assistantAmountLiteral('-700..-300 рублей', 'signed_operation'), { amountBasis: 'signed_operation', amountFrom: '-70000', amountThrough: '-30000' });
+  assert.deepEqual(assistantAmountLiteral('-1,25 .. -0,40 руб', 'signed_operation'), { amountBasis: 'signed_operation', amountFrom: '-125', amountThrough: '-40' });
+  assert.deepEqual(assistantAmountLiteral('4..9 тысяч рублей', 'absolute_operation'), { amountBasis: 'absolute_operation', amountFrom: '400000', amountThrough: '900000' });
+  for (const text of ['-300..-700 рублей', '900..400 рублей']) assert.throws(() => assistantAmountLiteral(text, 'signed_operation'), /CONFLICT/);
+  assert.throws(() => assistantAmountLiteral('-700..-300 рублей', 'absolute_operation'), /CONFLICT/);
+  for (const text of ['4...9 рублей', '4..9 евро', '4..9 рублей не включая границы', '4..9..12 рублей', '4..999999999999999999999999 рублей']) assert.throws(() => assistantAmountLiteral(text, 'signed_operation'), /UNSUPPORTED/);
+  const h = harness();
+  const result = await h.execute(650, 'Расходы за сентябрь 2026 со знаковой суммой от -1200 до -400 рублей включительно', [
+    plan([set('metric', 'expenses'), set('grouping', 'total'), set('period', 'сентябрь 2026'), set('amount', { basis: 'signed_operation', expression: '-1200..-400 рублей' })]),
+  ]);
+  assert.equal(result.status, 'query'); assert.equal(result.query!.filter.from, '2026-09-01'); assert.equal(result.query!.filter.through, '2026-09-30');
+  assert.equal(result.query!.filter.amountFrom, '-120000'); assert.equal(result.query!.filter.amountThrough, '-40000'); assert.equal(result.query!.filter.amountBasis, 'signed_operation');
+  assert.equal((result.result as any).totals.expenses, '160000'); assert.equal(result.modelCalls, 2);
+});
