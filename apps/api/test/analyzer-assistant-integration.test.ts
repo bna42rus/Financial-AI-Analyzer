@@ -216,3 +216,20 @@ test('one structural repair is accounted and cannot execute model-generated SQL 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.transaction')).rows[0].n, '2');
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n, '3');
 });
+
+test('two different chats racing for the last task unit cannot overbook the quota', async () => {
+  await pg.owner.query(`UPDATE commerce.access_cycle SET quota_policy='{"source":"override","limit":1}' WHERE user_id='first'`);
+  const first = await body(), second = await body(); outputs = [plan([set('metric', 'expenses')])];
+  const replies = await Promise.all([run(first), run(second)]);
+  assert.equal(replies.filter(r => r.statusCode === 200 && r.json().code === 'FINANCIAL_QUERY').length, 1);
+  assert.equal(calls, 2);
+  assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
+});
+
+test('browser initialization cannot overwrite a timezone chosen on another device', async () => {
+  const initial = await request('/finance/assistant-profile', { timezone: 'America/Los_Angeles', initialize: true });
+  assert.equal(initial.statusCode, 200, initial.body); assert.equal(initial.json().timezone, 'Asia/Vladivostok');
+  const changed = await request('/finance/assistant-profile', { timezone: 'America/Los_Angeles' });
+  assert.equal(changed.json().timezone, 'America/Los_Angeles');
+  assert.equal(calls, 0);
+});

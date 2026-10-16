@@ -142,6 +142,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['cloud-task-dispatch:' + userId]);
           if ((await db.query('SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3', [userId, id, step(index)])).rowCount) throw new HttpError(409, 'AI_DELIVERY_UNKNOWN');
           if ((await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND (state='sent' OR usage_state='unknown') LIMIT 1", [userId])).rowCount) throw new HttpError(409, 'AI_COST_RECONCILIATION_REQUIRED');
+          if (index === 0) { const quota = await analyzerQuota(db, userId, true); if (!quota.available || !quota.remaining) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED'); }
           await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
             VALUES($1,$2,$3,$4,'sent','cashneuro-assistant/1',$5,$6,$7,'not_sent')`, [userId, id, step(index), fingerprint, bound.modelVersion, claim.periodExact, claim.anchorExact]);
           await reserveCost(db, { userId, requestId: id, step: step(index), anchorAt: claim.anchorExact, periodStart: claim.periodExact }, provider.policy, bound);
@@ -197,6 +198,8 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
         await db.query(`INSERT INTO finance.analyzer_task_book(user_id,chat_id,chat_epoch,generation,book,head,node_count) VALUES($1,$2,$3,$4,$5,$6,$7)
           ON CONFLICT(user_id,chat_id) DO UPDATE SET book=EXCLUDED.book,head=EXCLUDED.head,node_count=EXCLUDED.node_count,generation=EXCLUDED.generation`, [userId, chatId, chatEpoch, generation, JSON.stringify(book), book.nodes.at(-1)?.messageId ?? null, book.nodes.length]);
         if (reply.status === 'query') {
+          const quota = await analyzerQuota(db, userId, true);
+          if (!quota.available || quota.limit === null || quota.used >= quota.limit) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
           const billed = await db.query(`INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version)
             SELECT user_id,request_id,anchor_at,period_start,1,(SELECT sum(input_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),
             (SELECT sum(output_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),provider,model,$3
