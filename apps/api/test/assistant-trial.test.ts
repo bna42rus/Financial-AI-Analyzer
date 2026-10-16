@@ -19,7 +19,7 @@ test('the operator evaluator runs the actual workflow, retains parents, and dete
   const states = new Map<string, Conversation>();
   const plans = [
     { context: { mode: 'new' }, changes: [{ field: 'metric', op: 'set', value: 'expenses' }, { field: 'period', op: 'set', value: 'сентябрь 2026' }, { field: 'categories', op: 'set', value: { names: ['Продукты'] } }] },
-    { context: { mode: 'continue' }, changes: [{ field: 'grouping', op: 'set', value: 'category' }] },
+    { context: { mode: 'continue' }, changes: [{ field: 'grouping', op: 'set', value: 'category_totals' }] },
   ];
   for (let i = 0; i < 2; i++) {
     const c = assistantTrialCases[i]!, r = assistantTrialRequest(c, i, states.get(c.scenario));

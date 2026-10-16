@@ -1,7 +1,7 @@
 import { object, uuid } from '../../finance-core/src/model.ts';
 import { parseTaskBook, emptyTaskBook, globalSnapshot } from './task-context.ts';
 import type { TaskBook, TaskScope, GlobalSnapshot } from './task-context.ts';
-import { parseCalendar, cleanAssistantQuestion, AssistantError } from './assistant-plan.ts';
+import { parseCalendar, cleanAssistantQuestion, AssistantError, assistantGrouping } from './assistant-plan.ts';
 import type { Calendar, SourceContext } from './assistant-plan.ts';
 
 export const conversationVersion = 'cashneuro-assistant-conversation/1';
@@ -39,13 +39,13 @@ export function conversationInput(raw: Conversation, scope: TaskScope, question:
   const history = selected.map(({ turn, index }) => {
     const node = state.book.nodes.find(n => n.messageId === turn.messageId);
     return { ref: 'h' + (index + 1), question: turn.question, calendar: turn.calendar, status: turn.status, pending: unresolved(turn, index),
-      ...(node ? { task: { metric: node.query.metric, grouping: node.query.grouping, comparison: node.query.comparison } } : {}) };
+      ...(node ? { task: { metric: node.query.metric, grouping: assistantGrouping[node.query.grouping], comparison: node.query.comparison } } : {}) };
   });
   const sources: Record<string, SourceContext> = Object.fromEntries(selected.map(({ turn, index }) => ['h' + (index + 1), { calendar: turn.calendar, global: turn.global, pending: unresolved(turn, index) }]));
   const pending = state.turns.findIndex(t => t.messageId === state.pendingMessageId);
   const active = state.book.nodes.at(-1)?.query;
   return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar),
-    activeTask: active ? { metric: active.metric, grouping: active.grouping, comparison: active.comparison, omittedChanges: 'preserve' } : null,
+    activeTask: active ? { metric: active.metric, grouping: assistantGrouping[active.grouping], comparison: active.comparison, omittedChanges: 'preserve' } : null,
     history, omittedHistoryCount: state.turns.length - history.length },
     sources, pendingSource: pending < 0 ? undefined : 'h' + (pending + 1) };
 }

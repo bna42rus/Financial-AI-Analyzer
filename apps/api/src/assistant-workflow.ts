@@ -12,7 +12,7 @@ import type { Catalog } from '../../../packages/analyzer/src/yandex-contract.ts'
 import type { Usage, DispatchBound } from '../../../packages/analyzer/src/cost.ts';
 import { assertClosedSchema } from '../../../packages/analyzer/src/closed-schema.ts';
 
-export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/2';
+export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/3';
 export type Phase = 'understand' | 'repair' | 'check_changes' | 'categories' | 'explain';
 export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown };
 export type ModelReply = { value: unknown; usage: Usage };
@@ -140,7 +140,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
     const risky = active && plan.action === 'read' && (
       plan.context?.mode === 'new' && !plan.changes?.some(c => c.field === 'metric' && c.op === 'set') ||
       plan.context?.mode === 'continue' && plan.changes?.some(c => (c.source ?? 'current') === 'current' && (
-        c.op === 'clear' || c.field === 'grouping' && c.value === 'none' && active.grouping !== 'none' ||
+        c.field === 'grouping' && c.value === 'total' && active.grouping !== 'none' ||
         c.field === 'comparison' && c.value === 'none' && active.comparison !== 'none')));
     if (risky) plan = await validatedCall({ phase: 'check_changes', prompt: assistantPrompt + '\nПРОВЕРКА СМЫСЛА: исходный план может ошибочно обнулить прежние условия или назвать продолжение новой задачей. Заново извлеки минимальные изменения ТОЛЬКО из question. previousTask — настройки, которые сервер сохранит. Исторические условия не копируй. Сброс none/clear допустим только по явной просьбе в question. Верни исправленный полный plan, сохранив все явно новые условия.',
       input: { question: context.input.question, calendar, previousTask: context.input.activeTask, candidate: plan, history: plan.context?.mode === 'pending' ? context.input.history : undefined }, schema: assistantPlanSchema }, parseAssistantPlan);

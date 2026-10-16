@@ -46,7 +46,7 @@ test('profile timezone defines date/month/year, including opposite sides of midn
 });
 
 test('new plan has field-specific types without quote duplication or lexical grouping failures', () => {
-  assert.doesNotThrow(() => parseAssistantPlan(plan([set('metric', 'attention'), set('grouping', 'operation')])));
+  assert.doesNotThrow(() => parseAssistantPlan(plan([set('metric', 'attention'), set('grouping', 'operation_list')])));
   assert.doesNotThrow(() => parseAssistantPlan(plan([set('metric', 'expenses'), set('period', 'в сентябре 2026 года')])));
   for (const value of [plan([set('amount', true)]), plan([set('operationIds', [trialId(1)])]), { ...plan([]), sql: 'SELECT 1' }, plan([set('period', 'сегодня'), set('period', 'вчера')])]) assert.throws(() => parseAssistantPlan(value));
 });
@@ -71,7 +71,7 @@ test('amount ranges accept ordinary wording with or without inclusive suffix, sh
   assert.throws(() => assistantAmountLiteral('от 4 до 9 евро', 'absolute_operation'), /UNSUPPORTED/);
   assert.throws(() => assistantAmountLiteral('от 4 до 9 рублей не включая границы', 'absolute_operation'), /UNSUPPORTED/);
   const h = harness();
-  await h.execute(996, 'Расходы в августе по категориям', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category')])]);
+  await h.execute(996, 'Расходы в августе по категориям', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category_totals')])]);
   const result = await h.execute(997, 'Только операции от 700 до 1800 рублей', [plan([set('amount', { basis: 'absolute_operation', expression: 'от 700 до 1800 рублей' })], 'continue')]);
   assert.equal(result.status, 'query'); assert.equal(result.modelCalls, 1); assert.equal(result.query!.grouping, 'category'); assert.equal(result.query!.filter.from, '2026-08-01');
   assert.equal(result.query!.filter.amountThrough, '180000');
@@ -79,9 +79,9 @@ test('amount ranges accept ordinary wording with or without inclusive suffix, sh
 
 test('semantic review removes an unrequested reset and repairs a wrongly new amount-only continuation', async () => {
   const h = harness();
-  await h.execute(991, 'Траты за август по категориям в сравнении с предыдущим периодом', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category'), set('comparison', 'previous_same')])]);
+  await h.execute(991, 'Траты за август по категориям в сравнении с предыдущим периодом', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category_totals'), set('comparison', 'previous_same')])]);
   const changed = await h.execute(992, 'Дальше поступления', [
-    { ...plan([set('metric', 'income'), set('grouping', 'none'), set('period', 'август 2026')], 'continue'), needsFreshSources: false },
+    { ...plan([set('metric', 'income'), set('grouping', 'total'), set('period', 'август 2026')], 'continue'), needsFreshSources: false },
     plan([set('metric', 'income')], 'continue'),
   ]);
   assert.equal(changed.query!.metric, 'income'); assert.equal(changed.query!.grouping, 'category'); assert.equal(changed.query!.comparison, 'previous_same');
@@ -91,6 +91,30 @@ test('semantic review removes an unrequested reset and repairs a wrongly new amo
   const narrowed = await h.execute(993, 'Отбери операции больше 750 рублей', [plan([amount]), plan([amount], 'continue')]);
   assert.equal(narrowed.status, 'query'); assert.equal(narrowed.query!.filter.amountFrom, '75001'); assert.equal(narrowed.query!.filter.from, '2026-08-01');
   assert.equal(narrowed.query!.grouping, 'category'); assert.equal(narrowed.query!.comparison, 'previous_same');
+});
+
+test('explicit presentation names map to distinct registry formats and clearing amount preserves the operation list in one call', async () => {
+  assert.throws(() => parseAssistantPlan(plan([{ field: 'grouping', op: 'set', value: 'none' }])));
+  const h = harness();
+  await h.execute(700, 'Поступления в августе по категориям со сравнением', [plan([set('metric', 'income'), set('period', 'август 2026'),
+    set('grouping', 'category_totals'), set('comparison', 'previous_same'), set('amount', { basis: 'absolute_operation', expression: 'от 600 до 1900 рублей' })])]);
+  const listed = await h.execute(701, 'Выведи операции отдельными строками', [plan([set('grouping', 'operation_list')], 'continue')]);
+  assert.equal(listed.query!.grouping, 'operation'); assert.equal(listed.query!.filter.amountFrom, '60000'); assert.equal(listed.query!.comparison, 'previous_same');
+  assert.equal(listed.modelCalls, 1);
+  const cleared = await h.execute(702, 'Убери только порог суммы', [plan([{ field: 'amount', op: 'clear' }], 'continue')]);
+  assert.equal(cleared.query!.grouping, 'operation'); assert.equal(cleared.query!.comparison, 'previous_same'); assert.equal(cleared.query!.filter.from, '2026-08-01');
+  assert.equal(cleared.query!.filter.amountFrom, undefined); assert.equal(cleared.modelCalls, 1);
+});
+
+test('a current category choice replaces the missing historical name before any name lookup', async () => {
+  const h = harness(), catalog = { ...trialCatalog, categories: [{ ...trialCatalog.categories[1]!, name: 'Транспорт' }] };
+  const initial = await h.execute(703, 'Траты на парковку в августе', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('categories', { names: ['Парковка'] })]), { names: ['Транспорт'] }], { catalog });
+  assert.equal(initial.status, 'clarification');
+  const selected = await h.execute(704, 'Возьми категорию Транспорт', [plan([
+    set('categories', { names: ['Транспорт'] }), set('metric', 'expenses', 'h1'), set('period', 'август 2026', 'h1'), set('categories', { names: ['Парковка'] }, 'h1'),
+  ], 'pending')], { catalog });
+  assert.equal(selected.status, 'query'); assert.equal(selected.modelCalls, 1); assert.equal(selected.query!.filter.from, '2026-08-01');
+  assert.deepEqual(selected.query!.filter.categoryIds, [trialId(11)]); assert.equal(h.calculations, 1);
 });
 
 test('structure repair cannot rewrite valid fields; semantic contract errors do not trigger paid repair', async () => {
@@ -114,7 +138,7 @@ test('today/current month use the profile date while explicit date-only operatio
 test('category grouping and metric changes preserve amount/account/date conditions, and explicit removal only removes its group', async () => {
   const h = harness();
   await h.execute(910, 'Доходы от 1000 до 2500 рублей включительно', [plan([set('metric', 'income'), set('amount', { basis: 'absolute_operation', expression: 'от 1000 до 2500 рублей включительно' })])]);
-  const byCategory = await h.execute(911, 'Разбей по категориям', [plan([set('grouping', 'category')], 'continue')]);
+  const byCategory = await h.execute(911, 'Разбей по категориям', [plan([set('grouping', 'category_totals')], 'continue')]);
   assert.equal(byCategory.query!.filter.amountFrom, '100000'); assert.equal(byCategory.query!.filter.amountThrough, '250000');
   const expenses = await h.execute(912, 'А расходы?', [plan([set('metric', 'expenses')], 'continue')]);
   assert.equal(expenses.query!.filter.amountFrom, '100000'); assert.equal(expenses.query!.grouping, 'category');
@@ -128,7 +152,7 @@ test('failed first request stays in cleaned history and can be reinterpreted wit
   const bad = { ...plan([]), arbitrary: true };
   const failure = await h.execute(920, 'Траты на продукты в сентябре 2026 года', [bad, bad]);
   assert.equal(failure.status, 'error'); assert.equal(h.state.book.nodes.length, 0); assert.equal(h.state.turns[0]!.pending, true);
-  const recovered = await h.execute(921, 'Теперь по категориям', [plan([set('metric', 'expenses', 'h1'), set('period', 'сентябрь 2026 года', 'h1'), set('categories', { names: ['продукты'] }, 'h1'), set('grouping', 'category')], 'pending')]);
+  const recovered = await h.execute(921, 'Теперь по категориям', [plan([set('metric', 'expenses', 'h1'), set('period', 'сентябрь 2026 года', 'h1'), set('categories', { names: ['продукты'] }, 'h1'), set('grouping', 'category_totals')], 'pending')]);
   assert.equal(recovered.status, 'query'); assert.equal(recovered.query!.filter.from, '2026-09-01'); assert.equal(recovered.query!.grouping, 'category');
   assert.deepEqual(recovered.query!.filter.categoryIds, [trialId(10)]);
   const sent = h.calls.findLast(c => c.phase === 'understand')!.input as any;
@@ -141,7 +165,7 @@ test('two failed messages can be reinterpreted together without losing the first
   await h.execute(980, 'Траты за сентябрь 2026', [bad, bad]);
   await h.execute(981, 'Только операции от 100 рублей', [bad, bad]);
   const recovered = await h.execute(982, 'Теперь по категориям', [plan([set('metric', 'expenses', 'h1'), set('period', 'сентябрь 2026', 'h1'),
-    set('amount', { basis: 'absolute_operation', expression: 'от 100 рублей' }, 'h2'), set('grouping', 'category')], 'pending')]);
+    set('amount', { basis: 'absolute_operation', expression: 'от 100 рублей' }, 'h2'), set('grouping', 'category_totals')], 'pending')]);
   assert.equal(recovered.status, 'query'); assert.equal(recovered.query!.filter.from, '2026-09-01'); assert.equal(recovered.query!.filter.amountFrom, '10000');
   assert.equal(recovered.query!.grouping, 'category');
 });
@@ -188,7 +212,7 @@ test('manual UI edits affect their group, explicit text wins, use_current is exp
   const h = harness();
   await h.execute(954, 'Расходы в сентябре', [plan([set('metric', 'expenses'), set('period', 'сентябрь'), set('amount', { basis: 'absolute_operation', expression: 'от 100 рублей' })])]);
   const changed = { revision: 1, filter: { from: '2026-08-01', through: '2026-08-31' }, touched: { period: 1 } };
-  const second = await h.execute(955, 'По категориям', [plan([set('grouping', 'category')], 'continue')], { global: changed });
+  const second = await h.execute(955, 'По категориям', [plan([set('grouping', 'category_totals')], 'continue')], { global: changed });
   assert.equal(second.query!.filter.from, '2026-08-01'); assert.equal(second.query!.filter.amountFrom, '10000');
   const explicit = await h.execute(956, 'Но за июль', [plan([set('period', 'июль')], 'continue')]); assert.equal(explicit.query!.filter.from, '2026-07-01');
   await h.execute(957, 'Что такое вклад?', [{ version: assistantVersion, topic: 'general_finance', action: 'explain' }, { text: 'Вклад — деньги, размещённые в банке на условиях договора.' }]);
@@ -200,10 +224,10 @@ test('pending recovery respects its old calendar and newer UI touches and cannot
   const h = harness(), bad = { wrong: true }, original = { ...global, filter: { ...global.filter, operationIds: [trialId(30)] } };
   await h.execute(970, 'Затраты сегодня от 100 рублей', [bad, bad], { global: original, now: new Date('2026-10-15T22:30:00Z') });
   const changed = { revision: 1, filter: { from: '2026-09-01', through: '2026-09-30', operationIds: [trialId(31)] }, touched: { period: 1 } };
-  const recovered = await h.execute(971, 'Разбей по категориям', [plan([set('metric', 'expenses', 'h1'), set('period', 'сегодня', 'h1'), set('amount', { basis: 'absolute_operation', expression: 'от 100 рублей' }, 'h1'), set('grouping', 'category')], 'pending')], { global: changed, now: new Date('2026-10-17T03:00:00Z') });
+  const recovered = await h.execute(971, 'Разбей по категориям', [plan([set('metric', 'expenses', 'h1'), set('period', 'сегодня', 'h1'), set('amount', { basis: 'absolute_operation', expression: 'от 100 рублей' }, 'h1'), set('grouping', 'category_totals')], 'pending')], { global: changed, now: new Date('2026-10-17T03:00:00Z') });
   assert.equal(recovered.status, 'query'); assert.equal(recovered.query!.filter.from, '2026-09-01'); assert.deepEqual(recovered.query!.filter.operationIds, []);
   const h2 = harness(); await h2.execute(972, 'Затраты сегодня', [bad, bad], { now: new Date('2026-10-15T22:30:00Z') });
-  const anchored = await h2.execute(973, 'Одной суммой', [plan([set('metric', 'expenses', 'h1'), set('period', 'сегодня', 'h1'), set('grouping', 'none')], 'pending')], { now: new Date('2026-10-17T03:00:00Z') });
+  const anchored = await h2.execute(973, 'Одной суммой', [plan([set('metric', 'expenses', 'h1'), set('period', 'сегодня', 'h1'), set('grouping', 'total')], 'pending')], { now: new Date('2026-10-17T03:00:00Z') });
   assert.equal(anchored.query!.filter.from, '2026-10-16');
 });
 
@@ -212,7 +236,7 @@ test('explicit old result returns to that task; vague reference to multiple inde
   await h.execute(980, 'Расходы за сентябрь', [plan([set('metric', 'expenses'), set('period', 'сентябрь')])]);
   await h.execute(981, 'Расходы за август новым расчётом', [plan([set('metric', 'expenses'), set('period', 'август')])]);
   const vague = await h.execute(982, 'Вернись к расходам', [{ ...plan([], 'reference'), context: { mode: 'reference', reference: 'к расходам' } }]); assert.equal(vague.status, 'clarification');
-  const old = await h.execute(983, 'К первому результату расходов', [{ ...plan([set('grouping', 'category')], 'reference'), context: { mode: 'reference', reference: 'первому результату расходов' } }]);
+  const old = await h.execute(983, 'К первому результату расходов', [{ ...plan([set('grouping', 'category_totals')], 'reference'), context: { mode: 'reference', reference: 'первому результату расходов' } }]);
   assert.equal(old.query!.filter.from, '2026-09-01'); assert.equal(old.query!.grouping, 'category');
 });
 
