@@ -12,15 +12,6 @@ jobs:
   analyzer-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    services:
-      postgres:
-        image: public.ecr.aws/docker/library/postgres:18.4
-        env:
-          POSTGRES_PASSWORD: synthetic-ci-password
-        ports: ['5432:5432']
-        options: >-
-          --health-cmd pg_isready --health-interval 5s
-          --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v5
         with:
@@ -32,6 +23,8 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
       - name: Check API types, native REST contract and privacy boundaries
         run: |
           pnpm run check:spec
@@ -46,11 +39,11 @@ jobs:
           pnpm run build:admin
       - name: Check isolated PostgreSQL, quota, rollback, role isolation and existing authentication
         env:
-          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts test/analyzer-cost.test.ts test/yandex-integration.test.ts test/analyzer.test.ts test/security.test.ts test/mail.test.ts test/owner-bootstrap.test.ts
       - name: Install pinned Chromium for browser acceptance
         run: pnpm --filter @finance/api exec playwright install --with-deps chromium
       - name: Check real Analyzer browser flows on desktop and mobile
         env:
-          SECURITY_TEST_DATABASE_URL: postgresql://postgres:synthetic-ci-password@127.0.0.1:5432/postgres
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-browser.test.ts test/analyzer-browser.test.ts

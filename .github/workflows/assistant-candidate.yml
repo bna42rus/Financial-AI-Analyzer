@@ -13,6 +13,7 @@ on:
       - 'scripts/*assistant-staging*'
       - 'scripts/*connected-web*'
       - 'scripts/*staging-release*'
+      - '.github/scripts/start-isolated-postgres.sh'
       - 'docs/architecture/branch-consolidation-20261016.json'
       - 'apps/web/vite.config.ts'
       - 'apps/admin/vite.config.ts'
@@ -87,15 +88,8 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
-      - name: Start an isolated PostgreSQL 18 without a shared Docker registry
-        run: |
-          npm install --prefix "$RUNNER_TEMP/assistant-postgres" --no-save --ignore-scripts embedded-postgres@18.4.0-beta.17
-          cd "$RUNNER_TEMP/assistant-postgres/node_modules/@embedded-postgres/linux-x64"
-          node scripts/hydrate-symlinks.js
-          pg_bin="$PWD/native/bin"
-          "$pg_bin/postgres" --version
-          "$pg_bin/initdb" -D "$RUNNER_TEMP/assistant-pgdata" -U postgres --auth=trust
-          "$pg_bin/pg_ctl" -D "$RUNNER_TEMP/assistant-pgdata" -l "$RUNNER_TEMP/assistant-postgres.log" -o "-h 127.0.0.1 -p 55432 -k $RUNNER_TEMP" -w start
+      - name: Start isolated PostgreSQL 18 without a shared Docker registry
+        run: bash .github/scripts/start-isolated-postgres.sh
       - name: Check Staging configuration without credentials or paid calls
         run: pnpm --filter @finance/api exec node --import tsx --test test/analyzer-assistant-settings.test.ts
       - name: Check private Staging setup without model POSTs
