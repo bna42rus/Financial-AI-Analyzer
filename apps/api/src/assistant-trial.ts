@@ -13,7 +13,7 @@ import type { AssistantReply, AssistantRequest, AssistantServices } from './assi
 import type { Conversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import type { OperationsFilter } from '../../../packages/finance-core/src/operations.ts';
 
-export const assistantTrialVersion = 'cashneuro-assistant-smoke/1';
+export const assistantTrialVersion = 'cashneuro-assistant-smoke/2';
 const base = { from: '2026-10-01', through: '2026-10-31' }, september = { from: '2026-09-01', through: '2026-09-30' };
 type Expected = { status: AssistantReply['status']; code?: string; query?: Query; totalMinor?: string; parent?: string | null; categorySuggestion?: string };
 export type AssistantTrialCase = { id: string; scenario: string; question: string; timezone?: string; noTaxi?: boolean; expected: Expected };
@@ -102,5 +102,5 @@ export async function assistantTrialManifest() {
   }
   const sorted = Object.fromEntries(Object.entries(source).sort(([a], [b]) => a.localeCompare(b)));
   return { version: assistantTrialVersion, sourceSha256: createHash('sha256').update(JSON.stringify(sorted)).digest('hex'), source: sorted,
-    cases: assistantTrialCases.length, maximumCalls: 60, proposedCapRub: '10', liveExecuted: false, runtimeAiEnabled: false, developmentSmokeOnly: true };
+    cases: assistantTrialCases.length, maximumCalls: 60, cumulativeCapRub: '10', deductPreviousAttempt: true, liveExecuted: false, runtimeAiEnabled: false, developmentSmokeOnly: true };
 }

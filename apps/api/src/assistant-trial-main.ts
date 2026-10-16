@@ -10,11 +10,12 @@ import { inspectCloudTaskModel } from './task-trial.ts';
 import { assistantTrialManifest, assistantTrialCases, assistantTrialRequest, assistantTrialRequestId, assistantTrialServices, scoreAssistantTrial } from './assistant-trial.ts';
 import { createCloudAssistantModel } from './assistant-transport.ts';
 import { withAssistantJournal, readAssistantPrivateFile } from './assistant-journal.ts';
-import { withAssistantBudget, assistantBudgetVersion, checkAssistantPermit } from './assistant-budget.ts';
+import { withAssistantBudget, assistantBudgetVersion, checkAssistantPermit, remainingAssistantTrialBudget } from './assistant-budget.ts';
 import { runAssistant } from './assistant-workflow.ts';
 import type { AssistantReply, CallReceipt } from './assistant-workflow.ts';
 
-const directory = '/var/lib/cashneuro/analyzer-assistant-smoke-v1';
+const directory = '/var/lib/cashneuro/analyzer-assistant-smoke-v2';
+const previousBudgetPath = '/var/lib/cashneuro/analyzer-assistant-smoke-v1/budget.json';
 const tariff = { version: 'cloud-20261016-oss120', currency: 'RUB' as const, inputRubPerMillion: '15.86', outputRubPerMillion: '61' };
 const tariffCheckedAt = '2026-10-16T10:45:00Z';
 const tariffSource = 'https://cloud.ru/products/evolution-ai-factory/catalog-foundation-models';
@@ -27,6 +28,7 @@ async function report() {
   await privateDirectory(directory);
   const budget = await privateJson(join(directory, 'budget.json'));
   const savedPermit = checkAssistantPermit(budget.permit);
+  if (savedPermit.previousBudgetSha256) console.log('Версия 2: предыдущий расход вычтен из общего лимита 10 RUB; новый доступный лимит ' + money(savedPermit.capAtoms) + ' RUB.');
   let spent = 0n, held = 0n, input = 0, output = 0;
   for (const e of budget.entries as { bound: { inputTokens: number; outputTokens: number }; usage?: { inputTokens: number; outputTokens: number } }[]) {
     if (e.usage) { spent += tokenCost(savedPermit.price, e.usage.inputTokens, e.usage.outputTokens); input += e.usage.inputTokens; output += e.usage.outputTokens; }
@@ -54,7 +56,7 @@ async function report() {
 }
 async function main() {
   const args = process.argv.slice(2), action = args[0];
-  if (!['--prepare', '--inspect', '--live', '--report'].includes(action ?? '') || args.length !== (action === '--live' ? 2 : 1) || action === '--live' && args[1] !== '--approve-cap-rub=10') throw new AssistantError('ASSISTANT_TRIAL_ARGUMENTS_INVALID');
+  if (!['--prepare', '--inspect', '--live', '--report'].includes(action ?? '') || args.length !== (action === '--live' ? 2 : 1) || action === '--live' && args[1] !== '--within-original-cap-rub=10') throw new AssistantError('ASSISTANT_TRIAL_ARGUMENTS_INVALID');
   const manifest = await assistantTrialManifest();
   if (action === '--prepare') { console.log(JSON.stringify({ ...manifest, source: undefined, tariff, tariffCheckedAt, tariffSource, paidCalls: 0 }, null, 2)); return; }
   if (process.getuid?.() !== 0) throw new AssistantError('ASSISTANT_TRIAL_ROOT_REQUIRED');
@@ -70,16 +72,21 @@ async function main() {
   const provider = await inspectCloudTaskModel(keys.cloud, fetch);
   if (action === '--inspect') { console.log(JSON.stringify({ ...manifest, source: undefined, provider, tariff, tariffCheckedAt, tariffSource, paidCalls: 0 }, null, 2)); return; }
   if (provider.numericMetadata.context_length !== 131072 || provider.numericMetadata.max_model_len !== 131072) throw new AssistantError('ASSISTANT_PROVIDER_METADATA_CHANGED');
+  const previous = remainingAssistantTrialBudget(await readAssistantPrivateFile(previousBudgetPath));
   try { await mkdir(directory, { mode: 0o700 }); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e; }
   await privateDirectory(directory);
   const requests = join(directory, 'requests'); try { await mkdir(requests, { mode: 0o700 }); } catch (e) { if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e; }
   const parent = await open('/var/lib/cashneuro', constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await parent.sync(); } finally { await parent.close(); }
   const model = createCloudAssistantModel(keys.cloud, fetch), states = new Map<string, Conversation>(); let failures = 0;
   await withAssistantBudget(directory, { version: assistantBudgetVersion, sourceSha256: manifest.sourceSha256, metadataSha256: provider.modelMetadataSha256,
-    tariffCheckedAt, tariffSource, price: tariff, bound: model.bound, capAtoms: '10000000000', maximumCalls: 60 }, async (accounting, totals) => {
+    tariffCheckedAt, tariffSource, price: tariff, bound: model.bound, capAtoms: previous.capAtoms, maximumCalls: previous.maximumCalls, previousBudgetSha256: previous.previousBudgetSha256 }, async (accounting, totals) => {
+    const monitored = { settle: accounting.settle, async reserve(requestId: string, index: number, bound: typeof model.bound) {
+      if (remainingAssistantTrialBudget(await readAssistantPrivateFile(previousBudgetPath)).previousBudgetSha256 !== previous.previousBudgetSha256) throw new AssistantError('ASSISTANT_PREVIOUS_BUDGET_CHANGED');
+      return accounting.reserve(requestId, index, bound);
+    } };
     for (const [i, c] of assistantTrialCases.entries()) {
       const r = assistantTrialRequest(c, i, states.get(c.scenario));
-      const reply = await withAssistantJournal(requests, r, accounting, j => runAssistant(r, model, j, assistantTrialServices(r, c, state => states.set(c.scenario, state))));
+      const reply = await withAssistantJournal(requests, r, monitored, j => runAssistant(r, model, j, assistantTrialServices(r, c, state => states.set(c.scenario, state))));
       const score = scoreAssistantTrial(c, reply, states.get(c.scenario)!); failures += Number(!score.passed);
       console.log((score.passed ? 'PASS ' : 'FAIL ') + c.id + '; вызовы ' + totals().calls + '; расход ' + money(totals().spentAtoms) + ' RUB.');
       if (reply.status === 'error' || failures >= 3 || totals().blocked) { console.log('Остановка: требуется разбор сохранённых ответов. Автоматического нового прогона не будет.'); break; }

@@ -11,7 +11,7 @@ import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 import type { OperationsFilter } from '../../finance-core/src/operations.ts';
 import { sanitizeText, safeText } from '../../privacy/src/text.ts';
 
-export const assistantVersion = 'cashneuro-assistant-plan/1';
+export const assistantVersion = 'cashneuro-assistant-plan/2';
 const closed = (properties: Record<string, unknown>, required = Object.keys(properties)) => ({ type: 'object', additionalProperties: false, properties, required });
 const enumeration = (values: readonly string[]) => ({ type: 'string', enum: values });
 const text = { type: 'string', minLength: 1, maxLength: 2000 };
@@ -65,8 +65,9 @@ export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
   action: 'read' | 'explain' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string }; changes?: PlanChange[]; needsFreshSources?: boolean };
 export function parseAssistantPlan(value: unknown): AssistantPlan {
+  if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
-  try { assertClosedSchema(value, assistantPlanSchema); } catch { throw new AssistantError('ASSISTANT_PLAN_INVALID'); }
+  try { assertClosedSchema(value, assistantPlanSchema); } catch { throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID'); }
   const p = structuredClone(value) as AssistantPlan;
   const personal = ['personal_finance', 'mixed'].includes(p.topic), read = p.action === 'read';
   if (p.topic === 'unrelated' && p.action !== 'redirect' || p.topic === 'ambiguous' && p.action !== 'clarification' ||
@@ -74,7 +75,9 @@ export function parseAssistantPlan(value: unknown): AssistantPlan {
       p.action === 'explain' && !['general_finance', 'financial_guidance', 'mixed'].includes(p.topic)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if (read && !p.context || !read && (p.context !== undefined || p.changes !== undefined)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if (p.context && ((p.context.mode === 'reference') !== (p.context.reference !== undefined))) throw new AssistantError('ASSISTANT_PLAN_INVALID');
-  if (p.needsFreshSources !== undefined && p.action !== 'explain') throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  // This routing hint is only consumed by explain. In other actions a boolean
+  // default is harmless; it must not trigger a paid structure repair.
+  if (p.action !== 'explain') delete p.needsFreshSources;
   const seen = new Set<string>();
   for (const c of p.changes ?? []) {
     const key = c.field + ':' + (c.source ?? 'current');
@@ -208,9 +211,11 @@ export const assistantPrompt = [
   'Ты финансовый помощник CashNeuro. Верни один JSON plan по schema. Не отвечай текстом, не считай деньги, не пиши SQL/UUID и не исполняй действия.',
   'topic: personal_finance=личные операции; general_finance=общие знания; financial_guidance=советы, накопления, экономия; mixed=финансовая и посторонняя части; ambiguous=смысл неясен; unrelated=совсем постороннее. Ключевая ставка и инфляция финансовые; корм для белки в расходах финансовый; цвет белки unrelated. В mixed работай с финансовой частью.',
   'action: read для личных расчётов; explain для общих финансов; propose_change для изменения (только предложение, без исполнения); unsupported для отсутствующего инструмента; clarification для настоящей неоднозначности; redirect только unrelated. У ambiguous action=clarification, у unrelated action=redirect.',
-  'needsFreshSources=true для текущих ставок/курсов/цен и новостей (action=explain). Не выдумывай сегодняшний показатель. Объяснение базового понятия не требует свежего поиска.',
+  'needsFreshSources используется только для explain: true для текущих ставок/курсов/цен и новостей. В остальных действиях поле пропускай. Не выдумывай сегодняшний показатель.',
   'Для read context обязателен: new самостоятельный новый вопрос; continue смысловое продолжение, даже при смене расходов на доходы; reference явный возврат (reference=фраза из просьбы); pending продолжение неуспешной просьбы. Не определяй связь по одному слову А. История помечает неподтверждённые просьбы, это не готовые параметры.',
   'changes — только явно изменённое. field metric expenses/income/attention; grouping none/category/operation; comparison none/previous_same. op=set/clear/use_current; source пропускай для текущей просьбы. Пропуск поля сохраняет условие, не обнуляет. Не выдумывай без сравнения, не дублируй attention в metric и фильтре.',
+  'ГЛАВНОЕ: changes извлекай ТОЛЬКО из question текущего сообщения. История помогает выбрать context, но её даты, категории, формат и сравнение НЕ копируются в changes. Не заполняй defaults none: их хранит сервер. activeTask показывает сохраняемые настройки, это не просьба изменить их.',
+  'Примеры продолжения при существующей задаче: «Дальше расходы» -> context continue, changes=[{field:"metric",op:"set",value:"expenses"}]; «Только суммы больше 500 рублей» -> context continue, только amount. Даже без слова «А» это уточнение предыдущего расчёта. «Итог одной суммой» -> только grouping=none; «Убери сравнение» -> только comparison=none. Смена показателя не отменяет формат, период, категории или сравнение.',
   'Для pending заново извлеки все условия исходной неуспешной просьбы с source=hN её сообщения; добавь изменения текущей просьбы с source=current. Нет источника или непонятен смысл — clarification. Исторический неправильный JSON недоступен и не источник правды.',
   'period/postedPeriod value=выражение периода, например сегодня, в сентябре 2026 года, за предыдущий месяц; календарь считает программа по timezone пользователя. Никаких дат ISO, которых пользователь не задавал. Не пропускай сегодня/текущий месяц/событийный период: неизвестный период передай выражением для уточнения.',
   'categories value={names:[имена]}; accounts value=[имена]; counterparties value={names:[имена]}; merchant value={name,exact}. На такси/продукты — категории. Неизвестное название извлекай, а не пропускай и не заменяй похожим. Программа предложит существующие варианты.',

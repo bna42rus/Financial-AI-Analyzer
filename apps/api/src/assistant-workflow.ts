@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
 import { safeText } from '../../../packages/privacy/src/text.ts';
 import { profileCalendar, parseAssistantPlan, compileAssistantPlan, assistantPlanSchema, assistantPrompt, cleanAssistantQuestion, AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
@@ -11,8 +12,8 @@ import type { Catalog } from '../../../packages/analyzer/src/yandex-contract.ts'
 import type { Usage, DispatchBound } from '../../../packages/analyzer/src/cost.ts';
 import { assertClosedSchema } from '../../../packages/analyzer/src/closed-schema.ts';
 
-export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/1';
-export type Phase = 'understand' | 'repair' | 'categories' | 'explain';
+export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/2';
+export type Phase = 'understand' | 'repair' | 'check_changes' | 'categories' | 'explain';
 export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown };
 export type ModelReply = { value: unknown; usage: Usage };
 export type AssistantModel = { bound: DispatchBound; complete(input: CompletionInput, beforeDispatch: () => Promise<void>): Promise<ModelReply> };
@@ -117,16 +118,32 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
     try { value = await call(input); }
     catch (error) { if (codeOf(error) !== 'ASSISTANT_RESPONSE_INVALID') throw error; }
     try { return parser(value); }
-    catch {
+    catch (error) {
+      if (!['ASSISTANT_PLAN_SHAPE_INVALID', 'ASSISTANT_RESPONSE_INVALID', 'TASK_WIRE_INVALID'].includes(codeOf(error))) throw error;
       if (repaired || cursor >= 3) throw new AssistantError('ASSISTANT_RESPONSE_INVALID');
       repaired = true;
+      const lockedFields: Record<string, unknown> = {};
+      const properties = (input.schema as { properties?: Record<string, unknown> }).properties;
+      if (value && typeof value === 'object' && !Array.isArray(value)) for (const [key, schema] of Object.entries(properties ?? {})) {
+        if (!(key in value)) continue;
+        try { const item = (value as Record<string, unknown>)[key]; assertClosedSchema(item, schema); lockedFields[key] = item; } catch { /* Only structurally valid fields can be locked. */ }
+      }
       const retry = await call({ phase: 'repair', prompt: input.prompt + '\nИсправь структуру ответа по schema. Сохрани все условия исходной просьбы; не удаляй их ради прохода проверки.',
-        input: { original: input.input, error: 'ASSISTANT_RESPONSE_INVALID' }, schema: input.schema });
+        input: { original: input.input, lockedFields, error: 'ASSISTANT_RESPONSE_INVALID', rule: 'lockedFields должны остаться дословно теми же значениями. Исправляй только остальные поля/структуру.' }, schema: input.schema });
+      if (!retry || typeof retry !== 'object' || Object.entries(lockedFields).some(([key, v]) => !isDeepStrictEqual(v, (retry as Record<string, unknown>)[key]))) throw new AssistantError('ASSISTANT_REPAIR_MEANING_CHANGED');
       try { return parser(retry); } catch { throw new AssistantError('ASSISTANT_RESPONSE_INVALID'); }
     }
   }
   try {
-    const plan = await validatedCall({ phase: 'understand', prompt: assistantPrompt, input: context.input, schema: assistantPlanSchema }, parseAssistantPlan);
+    let plan = await validatedCall({ phase: 'understand', prompt: assistantPrompt, input: context.input, schema: assistantPlanSchema }, parseAssistantPlan);
+    const active = state.book.nodes.at(-1)?.query;
+    const risky = active && plan.action === 'read' && (
+      plan.context?.mode === 'new' && !plan.changes?.some(c => c.field === 'metric' && c.op === 'set') ||
+      plan.context?.mode === 'continue' && plan.changes?.some(c => (c.source ?? 'current') === 'current' && (
+        c.op === 'clear' || c.field === 'grouping' && c.value === 'none' && active.grouping !== 'none' ||
+        c.field === 'comparison' && c.value === 'none' && active.comparison !== 'none')));
+    if (risky) plan = await validatedCall({ phase: 'check_changes', prompt: assistantPrompt + '\nПРОВЕРКА СМЫСЛА: исходный план может ошибочно обнулить прежние условия или назвать продолжение новой задачей. Заново извлеки минимальные изменения ТОЛЬКО из question. previousTask — настройки, которые сервер сохранит. Исторические условия не копируй. Сброс none/clear допустим только по явной просьбе в question. Верни исправленный полный plan, сохранив все явно новые условия.',
+      input: { question: context.input.question, calendar, previousTask: context.input.activeTask, candidate: plan, history: plan.context?.mode === 'pending' ? context.input.history : undefined }, schema: assistantPlanSchema }, parseAssistantPlan);
     personalPending = ['personal_finance', 'mixed'].includes(plan.topic) && ['read', 'propose_change', 'unsupported', 'clarification'].includes(plan.action);
     if (plan.topic === 'unrelated') return finish('redirect', 'UNRELATED', 'Моя специализация — финансы. Могу помочь с расходами, бюджетом и накоплениями.');
     if (plan.action === 'clarification') return finish('clarification', 'MEANING_UNCLEAR', 'Уточните, пожалуйста, условия или расчёт, который хотите продолжить.');

@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, chmod, readFile, writeFile, symlink, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { withAssistantJournal } from '../src/assistant-journal.ts';
-import { withAssistantBudget, assistantBudgetVersion } from '../src/assistant-budget.ts';
+import { withAssistantBudget, assistantBudgetVersion, remainingAssistantTrialBudget } from '../src/assistant-budget.ts';
 import type { AssistantPermit } from '../src/assistant-budget.ts';
 import { createCloudAssistantModel } from '../src/assistant-transport.ts';
 import { runAssistant } from '../src/assistant-workflow.ts';
@@ -23,6 +24,15 @@ const permit = (): AssistantPermit => ({ version: assistantBudgetVersion, source
   tariffCheckedAt: '2026-10-16T00:00:00Z', tariffSource: 'https://cloud.ru/products/evolution-ai-factory/catalog-foundation-models', price, bound, capAtoms: '10000000000', maximumCalls: 60 });
 const now = () => new Date('2026-10-16T12:00:00Z');
 const accounting = { async reserve() {}, async settle() {} };
+
+test('a continuation deducts prior settled cost and call count and never clears an unknown hold', () => {
+  const entries = [{ requestId: id(4), index: 0, bound, usage }], p = permit();
+  const snapshot = (rows: unknown[]) => ({ permit: p, entries: rows, sha256: createHash('sha256').update(JSON.stringify({ permit: p, entries: rows })).digest('hex') });
+  const result = remainingAssistantTrialBudget(snapshot(entries));
+  assert.equal(result.spentAtoms, '4636000'); assert.equal(result.capAtoms, '9995364000'); assert.equal(result.maximumCalls, 59);
+  assert.throws(() => remainingAssistantTrialBudget(snapshot([{ requestId: id(4), index: 0, bound, unknown: true }])), /RECONCILIATION_REQUIRED/);
+  assert.throws(() => remainingAssistantTrialBudget({ ...snapshot(entries), sha256: 'f'.repeat(64) }), /PREVIOUS_BUDGET_INVALID/);
+});
 function services() {
   let committed: Parameters<AssistantServices['commit']>[0] | undefined, fail = false;
   const s: AssistantServices = { async guard() { if (committed) throw Error('STATE_CHANGED'); }, async catalog() { throw Error('NO_CATALOG_ALLOWED'); },

@@ -7,7 +7,7 @@ cap=${3:-}
 [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
 case "$action" in
   --prepare|--inspect|--report) test -z "$cap" ;;
-  --live) test "$cap" = --approve-cap-rub=10 ;;
+  --live) test "$cap" = --within-original-cap-rub=10 ;;
   *) exit 2 ;;
 esac
 repo=/home/finance-admin/cashneuro-staging-src

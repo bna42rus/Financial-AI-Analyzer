@@ -43,7 +43,10 @@ export function conversationInput(raw: Conversation, scope: TaskScope, question:
   });
   const sources: Record<string, SourceContext> = Object.fromEntries(selected.map(({ turn, index }) => ['h' + (index + 1), { calendar: turn.calendar, global: turn.global, pending: unresolved(turn, index) }]));
   const pending = state.turns.findIndex(t => t.messageId === state.pendingMessageId);
-  return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar), history, omittedHistoryCount: state.turns.length - history.length },
+  const active = state.book.nodes.at(-1)?.query;
+  return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar),
+    activeTask: active ? { metric: active.metric, grouping: active.grouping, comparison: active.comparison, omittedChanges: 'preserve' } : null,
+    history, omittedHistoryCount: state.turns.length - history.length },
     sources, pendingSource: pending < 0 ? undefined : 'h' + (pending + 1) };
 }
 

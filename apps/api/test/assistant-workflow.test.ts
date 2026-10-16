@@ -18,10 +18,12 @@ function harness() {
     if (options.global) currentGlobal = options.global; if (options.now) currentNow = options.now;
     const request: AssistantRequest = requests.get(trialId(n)) ?? { requestId: trialId(n), scope, conversation: structuredClone(conversation), global: currentGlobal, dataRevision: '1', question, now: currentNow, timezone: options.timezone ?? calendar.timezone };
     requests.set(request.requestId, request);
-    let index = 0;
+    let index = 0; let lastPlan: unknown;
     const model: AssistantModel = { bound: { inputTokens: 131072, outputTokens: 1200, modelVersion: 'synthetic' }, async complete(input, before) {
       calls.push(input); await before(); if (options.failure) throw Error('SYNTHETIC_TIMEOUT');
-      return { value: replies[index++], usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } };
+      const value = input.phase === 'check_changes' && index >= replies.length ? lastPlan : replies[index++];
+      if (['understand', 'repair', 'check_changes'].includes(input.phase)) lastPlan = value;
+      return { value, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } };
     } };
     const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() {}, async settle() {} } as AssistantJournal;
     journals.set(request.requestId, journal);
@@ -46,6 +48,38 @@ test('new plan has field-specific types without quote duplication or lexical gro
   assert.doesNotThrow(() => parseAssistantPlan(plan([set('metric', 'attention'), set('grouping', 'operation')])));
   assert.doesNotThrow(() => parseAssistantPlan(plan([set('metric', 'expenses'), set('period', 'в сентябре 2026 года')])));
   for (const value of [plan([set('amount', true)]), plan([set('operationIds', [trialId(1)])]), { ...plan([]), sql: 'SELECT 1' }, plan([set('period', 'сегодня'), set('period', 'вчера')])]) assert.throws(() => parseAssistantPlan(value));
+});
+
+test('boolean freshness defaults on read never cause repair or change the financial route', async () => {
+  for (const flag of [false, true]) {
+    const h = harness();
+    const reply = await h.execute(990, 'Подсчитай мои траты', [{ ...plan([set('metric', 'expenses')]), needsFreshSources: flag }]);
+    assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 1); assert.equal(h.calls[0]!.phase, 'understand');
+  }
+});
+
+test('semantic review removes an unrequested reset and repairs a wrongly new amount-only continuation', async () => {
+  const h = harness();
+  await h.execute(991, 'Траты за август по категориям в сравнении с предыдущим периодом', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category'), set('comparison', 'previous_same')])]);
+  const changed = await h.execute(992, 'Дальше поступления', [
+    { ...plan([set('metric', 'income'), set('grouping', 'none'), set('period', 'август 2026')], 'continue'), needsFreshSources: false },
+    plan([set('metric', 'income')], 'continue'),
+  ]);
+  assert.equal(changed.query!.metric, 'income'); assert.equal(changed.query!.grouping, 'category'); assert.equal(changed.query!.comparison, 'previous_same');
+  assert.equal(changed.query!.filter.from, '2026-08-01'); assert.equal(changed.modelCalls, 2);
+  assert.equal(h.calls.at(-1)!.phase, 'check_changes'); assert.equal((h.calls.at(-1)!.input as any).history, undefined);
+  const amount = set('amount', { basis: 'absolute_operation', expression: 'больше 750 рублей' });
+  const narrowed = await h.execute(993, 'Отбери операции больше 750 рублей', [plan([amount]), plan([amount], 'continue')]);
+  assert.equal(narrowed.status, 'query'); assert.equal(narrowed.query!.filter.amountFrom, '75001'); assert.equal(narrowed.query!.filter.from, '2026-08-01');
+  assert.equal(narrowed.query!.grouping, 'category'); assert.equal(narrowed.query!.comparison, 'previous_same');
+});
+
+test('structure repair cannot rewrite valid fields; semantic contract errors do not trigger paid repair', async () => {
+  const h = harness(), original = plan([set('metric', 'income')]);
+  const changed = await h.execute(994, 'Доходы одной суммой', [{ ...original, extraneous: true }, plan([set('metric', 'expenses')])]);
+  assert.equal(changed.code, 'ASSISTANT_REPAIR_MEANING_CHANGED'); assert.equal(h.calculations, 0);
+  const invalid = await h.execute(995, 'Покажи расходы', [plan([set('metric', 'income'), set('metric', 'expenses')])]);
+  assert.equal(invalid.modelCalls, 1); assert.equal(invalid.code, 'ASSISTANT_DUPLICATE_CHANGE');
 });
 
 test('today/current month use the profile date while explicit date-only operation filters remain unchanged', async () => {

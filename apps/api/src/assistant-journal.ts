@@ -36,7 +36,7 @@ function checkedReceipt(raw: unknown, fingerprint: string): RunReceipt {
   if (Boolean(v.result) !== Boolean(v.conversation)) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
   for (const call of v.calls) {
     const c = object(call, ['fingerprint', 'phase', 'state', 'value', 'usage', 'code']);
-    if (typeof c.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(c.fingerprint) || !['understand', 'repair', 'categories', 'explain'].includes(String(c.phase)) ||
+    if (typeof c.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(c.fingerprint) || !['understand', 'repair', 'check_changes', 'categories', 'explain'].includes(String(c.phase)) ||
         !['sent', 'received', 'unknown', 'failed'].includes(String(c.state)) || c.state === 'received' && (!c.usage || !('value' in c))) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
     if (c.usage) { const u = object(c.usage, ['inputTokens', 'outputTokens', 'modelVersion']); usageTokens(u.inputTokens); usageTokens(u.outputTokens); }
   }

@@ -11,18 +11,38 @@ import type { AssistantAccounting } from './assistant-journal.ts';
 
 export const assistantBudgetVersion = 'cashneuro-assistant-budget/1';
 export type AssistantPermit = { version: typeof assistantBudgetVersion; sourceSha256: string; metadataSha256: string;
-  tariffCheckedAt: string; tariffSource: string; price: TokenPrice; bound: DispatchBound; capAtoms: string; maximumCalls: number };
+  tariffCheckedAt: string; tariffSource: string; price: TokenPrice; bound: DispatchBound; capAtoms: string; maximumCalls: number; previousBudgetSha256?: string };
 type Entry = { requestId: string; index: number; bound: DispatchBound; usage?: Usage; unknown?: boolean };
 const hash = (v: unknown) => createHash('sha256').update(JSON.stringify(v)).digest('hex');
 export function checkAssistantPermit(value: unknown): AssistantPermit {
-  const p = object(value, ['version', 'sourceSha256', 'metadataSha256', 'tariffCheckedAt', 'tariffSource', 'price', 'bound', 'capAtoms', 'maximumCalls']);
+  const p = object(value, ['version', 'sourceSha256', 'metadataSha256', 'tariffCheckedAt', 'tariffSource', 'price', 'bound', 'capAtoms', 'maximumCalls', 'previousBudgetSha256']);
   if (p.version !== assistantBudgetVersion || ![p.sourceSha256, p.metadataSha256].every(v => typeof v === 'string' && /^[a-f0-9]{64}$/.test(v)) ||
       typeof p.tariffCheckedAt !== 'string' || !Number.isFinite(Date.parse(p.tariffCheckedAt)) || p.tariffSource !== 'https://cloud.ru/products/evolution-ai-factory/catalog-foundation-models' ||
       typeof p.capAtoms !== 'string' || !/^[1-9][0-9]{0,10}$/.test(p.capAtoms) || BigInt(p.capAtoms) > 10_000_000_000n ||
       !Number.isInteger(p.maximumCalls) || Number(p.maximumCalls) < 1 || Number(p.maximumCalls) > 60) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   tokenPrice(p.price); const b = object(p.bound, ['inputTokens', 'outputTokens', 'modelVersion']);
+  if (p.previousBudgetSha256 !== undefined && (typeof p.previousBudgetSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(p.previousBudgetSha256))) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   if (b.inputTokens !== 131072 || b.outputTokens !== 1200 || b.modelVersion !== 'openai/gpt-oss-120b') throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   return p as AssistantPermit;
+}
+/** Read-only admission from the previous attempt. Never frees a hold or
+ * raises the owner's cumulative 10 RUB / 60 completion authorization. */
+export function remainingAssistantTrialBudget(value: unknown) {
+  const state = object(value, ['permit', 'entries', 'sha256']), permit = checkAssistantPermit(state.permit);
+  if (permit.capAtoms !== '10000000000' || permit.maximumCalls !== 60 || permit.previousBudgetSha256 !== undefined ||
+      !Array.isArray(state.entries) || state.entries.length > 60 || state.sha256 !== hash({ permit: state.permit, entries: state.entries })) throw new AssistantError('ASSISTANT_PREVIOUS_BUDGET_INVALID');
+  let spent = 0n; const seen = new Set<string>();
+  for (const raw of state.entries) {
+    const e = object(raw, ['requestId', 'index', 'bound', 'usage', 'unknown']); uuid(e.requestId);
+    const key = e.requestId + ':' + e.index;
+    if (!Number.isInteger(e.index) || Number(e.index) < 0 || Number(e.index) > 2 || seen.has(key) || !isDeepStrictEqual(e.bound, permit.bound)) throw new AssistantError('ASSISTANT_PREVIOUS_BUDGET_INVALID');
+    if (!e.usage || e.unknown) throw new AssistantError('ASSISTANT_RECONCILIATION_REQUIRED');
+    const u = object(e.usage, ['inputTokens', 'outputTokens', 'modelVersion']);
+    if (u.modelVersion !== permit.bound.modelVersion || usageTokens(u.inputTokens) > permit.bound.inputTokens || usageTokens(u.outputTokens) > permit.bound.outputTokens) throw new AssistantError('ASSISTANT_RECONCILIATION_REQUIRED');
+    spent += tokenCost(permit.price, Number(u.inputTokens), Number(u.outputTokens)); seen.add(key);
+  }
+  if (spent >= BigInt(permit.capAtoms) || state.entries.length >= 60) throw new AssistantError('ASSISTANT_BUDGET_EXHAUSTED');
+  return { previousBudgetSha256: hash(state), spentAtoms: spent.toString(), capAtoms: (BigInt(permit.capAtoms) - spent).toString(), maximumCalls: 60 - state.entries.length };
 }
 async function syncDir(directory: string) { const fd = await open(directory, constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW); try { await fd.sync(); } finally { await fd.close(); } }
 async function readPrivate(path: string) {
