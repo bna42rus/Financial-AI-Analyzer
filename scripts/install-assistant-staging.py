@@ -156,6 +156,15 @@ def restore(backup):
     print('Откат API и фронтенда выполнен. Миграции и квитанции расходов сохранены.', flush=True)
 
 
+def read_test_email(terminal_path='/dev/tty'):
+    # A terminal is not seekable; buffered r+ (BufferedRandom) rejects it.
+    # Separate read/write streams also work when stdin carries the Bash script.
+    with open(terminal_path, 'r') as reader, open(terminal_path, 'w') as writer:
+        writer.write('Почта вашего тестового аккаунта Finance: ')
+        writer.flush()
+        return reader.readline().strip().lower()
+
+
 def install(args):
     source = Path(args.source).resolve()
     if not re.fullmatch('[0-9a-f]{40}', args.sha) or not (source / 'apps/api/src/assistant-staging-main.ts').is_file():
@@ -179,10 +188,7 @@ def install(args):
         raise InstallationError('FRONTEND_LAYOUT_CHANGED')
     wait_health()
     container, owner, sql = docker_database()
-    with open('/dev/tty', 'r+') as terminal:
-        terminal.write('Почта вашего тестового аккаунта Finance: ')
-        terminal.flush()
-        email = terminal.readline().strip().lower()
+    email = read_test_email()
     if not re.fullmatch(r'[a-z0-9.!#$%&*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}', email) or len(email) > 200:
         raise InstallationError('TEST_ACCOUNT_EMAIL_INVALID')
     literal = "'" + email.replace("'", "''") + "'"

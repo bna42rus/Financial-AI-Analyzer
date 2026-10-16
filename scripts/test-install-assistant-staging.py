@@ -1,6 +1,8 @@
 import importlib.util
 import json
 import os
+import pty
+import io
 from pathlib import Path
 import subprocess
 import tempfile
@@ -13,6 +15,20 @@ spec.loader.exec_module(m)
 
 
 class InstallationTests(unittest.TestCase):
+    def test_real_terminal_accepts_email_without_requiring_seek(self):
+        master, slave = pty.openpty()
+        try:
+            terminal = os.ttyname(slave)
+            with self.assertRaises(io.UnsupportedOperation):
+                with open(terminal, 'r+'):
+                    pass
+            os.write(master, b'Owner@Example.Test\n')
+            self.assertEqual(m.read_test_email(terminal), 'owner@example.test')
+            self.assertIn('Почта', os.read(master, 4096).decode())
+        finally:
+            os.close(master)
+            os.close(slave)
+
     def test_frontend_requires_one_exclusive_test_host(self):
         def route(host, root):
             return {'match': [{'host': [host]}], 'handle': [{'handler': 'vars', 'root': root}]}
