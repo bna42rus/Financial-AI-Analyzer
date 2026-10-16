@@ -1,6 +1,6 @@
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID, createHash, generateKeyPairSync } from 'node:crypto';
 import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { postgresFixture } from './postgres.ts';
@@ -9,7 +9,12 @@ import { createServer } from '../src/server.ts';
 import type { Config } from '../src/types.ts';
 import { token, hashPassword } from '../src/crypto.ts';
 import { prepareFinance, financeView, acceptAccount, importEpoch } from '../src/finance.ts';
-import { createTestAssistantProvider } from '../src/analyzer-assistant-provider.ts';
+import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { unlockKmsKey, kmsRealms } from '../src/kms.ts';
+import { assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
+import { createTestAssistantProvider, createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 
@@ -43,7 +48,7 @@ const fetcher: typeof fetch = async (_url, options) => {
 };
 function provider() { return createTestAssistantProvider(pg.finance, fetcher, { projectId: 'test/assistant-integration', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' }); }
 before(async () => {
-  pg = await postgresFixture();
+  pg = await postgresFixture({ name: 'finance_staging' });
   config = { profile: 'finance', pool: pg.finance, baseURL: 'https://api.example.test', origin: 'https://app.example.test', authSecret: token(), wrappingKey: randomBytes(32), environment: 'test', assistantProvider: provider() };
   server = await createServer(config);
 });
@@ -244,4 +249,53 @@ test('a one-connection pool can complete a request without waiting for a second 
     const reply = await run(b, target); assert.equal(reply.statusCode, 200, reply.body); assert.equal(reply.json().code, 'FINANCIAL_QUERY'); assert.equal(calls, 2);
     assert.equal(pool.totalCount, 1);
   } finally { await target.close(); await pool.end(); }
+});
+
+
+async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@example.test'], clock = () => new Date()) {
+  const at = clock(), metadata = { id: 'openai/gpt-oss-120b', context_length: 131072, max_model_len: 131072 };
+  const raw = { realm:'staging/finance',apiKey:'synthetic-staging-key-for-tests-only',allowedEmails,
+    sourceSha256:'a'.repeat(64),modelMetadataSha256:createHash('sha256').update(JSON.stringify(metadata)).digest('hex'),maximumCalls,
+    admission:{budgetSha256:'b'.repeat(64),spentAtoms:'0',calls:60-maximumCalls,stageCapAtoms:'10000000000',stageMaximumCalls:60},
+    tariffCheckedAt:new Date(at.getTime()-1000).toISOString(),tariffSource:assistantTariffSource,expiresAt:new Date(at.getTime()+3600000).toISOString(),
+    cost:{projectId:'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
+      price:{version:'test-staging',currency:'RUB',inputRubPerMillion:'15.86',outputRubPerMillion:'61'}},
+  };
+  const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => String(url).endsWith('/models') ? new Response(JSON.stringify({data:[metadata]})) : fetcher(url,options),raw.sourceSha256,clock);
+  assert.equal(JSON.stringify(provider.binding).includes(raw.apiKey),false); assert.equal(JSON.stringify(provider.binding).includes(allowedEmails[0]!),false);
+  const dir=await mkdtemp(join(tmpdir(),'assistant-staging-kms-'));t.after(()=>rm(dir,{recursive:true,force:true}));
+  const realm='staging/finance',rsa=generateKeyPairSync('rsa',{modulusLength:2048}),auth=join(dir,'auth.json'),wrapped=join(dir,'wrapped.json');
+  await writeFile(auth,JSON.stringify({id:'synthetic',service_account_id:kmsRealms[realm].accountId,private_key:rsa.privateKey.export({type:'pkcs8',format:'pem'})}),{mode:0o600});
+  await writeFile(wrapped,JSON.stringify({v:1,realm,keyId:kmsRealms[realm].keyId,versionId:'synthetic-version',ciphertext:'YQ=='}),{mode:0o600});
+  t.mock.method(globalThis,'fetch',async(url: string)=>new Response(JSON.stringify(url.includes('/iam/')?{iamToken:'synthetic-token',expiresAt:new Date(Date.now()+3600000).toISOString()}:{keyId:kmsRealms[realm].keyId,versionId:'synthetic-version',plaintext:config.wrappingKey.toString('base64')})));
+  const key=await unlockKmsKey(realm,auth,wrapped);t.after(()=>key.destroy());
+  return { config:{...config,environment:'staging' as const,baseURL:'https://test.cashneuro.ru',origin:'https://test.cashneuro.ru',assistantProvider:provider,wrappingKey:key.bytes,kmsKey:key},raw };
+}
+const stageRun = (target: Awaited<ReturnType<typeof createServer>>, b: Awaited<ReturnType<typeof body>>) => target.fastify.inject({method:'POST',url:'/finance/analyzer-task',payload:b,headers:{origin:'https://test.cashneuro.ru',cookie,'content-type':'application/json'}});
+
+test('the real Staging configuration uses KMS, preserves prior call admission and enforces the shared pilot ceiling', async t => {
+  const b=await body(),staging=await stagingConfig(t),target=await createServer(staging.config);
+  try {
+    outputs=[plan([set('metric','expenses')])];
+    const first=await stageRun(target,b);assert.equal(first.statusCode,200,first.body);assert.equal(first.json().code,'FINANCIAL_QUERY');assert.equal(calls,2);
+    const next=await stageRun(target,{...b,id:randomUUID()});assert.equal(next.statusCode,200,next.body);assert.equal(next.json().code,'ASSISTANT_PILOT_CALL_LIMIT');assert.equal(calls,2);
+    assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n,'2');
+    const replay=await stageRun(target,b);assert.equal(replay.statusCode,200,replay.body);assert.equal(calls,2);
+  } finally {await target.close();}
+});
+
+test('a Staging account outside the explicit allowlist cannot dispatch', async t => {
+  const b=await body(),staging=await stagingConfig(t,2,['different@example.test']),target=await createServer(staging.config);
+  try {const reply=await stageRun(target,b);assert.equal(reply.statusCode,403,reply.body);assert.equal(calls,0);}finally{await target.close();}
+});
+
+test('expired Staging authorization blocks a fresh POST without resetting known cost', async t => {
+  let at=new Date();const b=await body(),staging=await stagingConfig(t,4,['first@example.test'],()=>at),target=await createServer(staging.config);
+  try {
+    outputs=[plan([set('metric','expenses')])];assert.equal((await stageRun(target,b)).statusCode,200);assert.equal(calls,2);
+    const before=(await pg.owner.query('SELECT spent_atoms FROM commerce.ai_project_budget')).rows[0].spent_atoms;
+    at=new Date(at.getTime()+3600001);
+    const reply=await stageRun(target,{...b,id:randomUUID()});assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'ASSISTANT_STAGING_CONFIGURATION_DENIED');assert.equal(calls,2);
+    assert.equal((await pg.owner.query('SELECT spent_atoms FROM commerce.ai_project_budget')).rows[0].spent_atoms,before);
+  }finally{await target.close();}
 });

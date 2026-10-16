@@ -80,6 +80,10 @@ jobs:
           "$pg_bin/postgres" --version
           "$pg_bin/initdb" -D "$RUNNER_TEMP/assistant-pgdata" -U postgres --auth=trust
           "$pg_bin/pg_ctl" -D "$RUNNER_TEMP/assistant-pgdata" -l "$RUNNER_TEMP/assistant-postgres.log" -o "-h 127.0.0.1 -p 55432 -k $RUNNER_TEMP" -w start
+      - name: Check Staging configuration without credentials or paid calls
+        run: pnpm --filter @finance/api exec node --import tsx --test test/analyzer-assistant-settings.test.ts
+      - name: Check private Staging setup without model POSTs
+        run: sudo "$(command -v node)" --experimental-transform-types --test apps/api/test/analyzer-assistant-setup.test.ts
       - name: Check API types
         run: pnpm --filter @finance/api exec tsc --noEmit
       - name: Verify the assistant HTTP and PostgreSQL boundary without paid calls

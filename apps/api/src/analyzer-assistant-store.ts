@@ -153,6 +153,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
             VALUES($1,$2,$3,$4,'sent','cashneuro-assistant/1',$5,$6,$7,'not_sent')`, [userId, id, step(index), fingerprint, bound.modelVersion, claim.periodExact, claim.anchorExact]);
           await reserveCost(db, { userId, requestId: id, step: step(index), anchorAt: claim.anchorExact, periodStart: claim.periodExact }, provider.policy, bound);
+          await provider.authorizeDispatch(db);
         });
       },
       async settle(index, usage) {

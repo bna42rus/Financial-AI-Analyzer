@@ -18,7 +18,7 @@ import { isAssistantProvider } from './analyzer-assistant-provider.ts';
 import { isCloudTaskProvider } from './analyzer-task-provider.ts';
 
 export async function createServer(config: Config) {
-  if (config.assistantProvider && (config.profile !== 'finance' || config.environment !== 'test' || !isAssistantProvider(config.assistantProvider) || config.assistantProvider.pool !== config.pool || config.taskProvider || config.yandexAnalyzer || config.analyzerAdapter)) throw new Error('Assistant provider requires isolated test acceptance');
+  if (config.assistantProvider && (config.profile !== 'finance' || !['test','staging'].includes(config.environment) || !isAssistantProvider(config.assistantProvider) || config.environment !== config.assistantProvider.environment || config.assistantProvider.pool !== config.pool || config.taskProvider || config.yandexAnalyzer || config.analyzerAdapter)) throw new Error('Assistant provider requires explicit matching acceptance configuration');
   if (config.taskProvider && (config.profile !== 'finance' || config.environment !== 'test' || !isCloudTaskProvider(config.taskProvider) || config.taskProvider.pool !== config.pool)) throw new Error('Task provider requires isolated test acceptance');
   if (!['development', 'test', 'staging'].includes(config.environment)) throw new Error('Production requires separate security and release acceptance');
   if (config.environment === 'staging' && !isKmsKey(config.kmsKey, 'staging/' + config.profile, config.wrappingKey)) throw new Error('Staging requires its own KMS key');
@@ -107,7 +107,7 @@ export async function createServer(config: Config) {
     }
     if (request.method === 'POST' && (origin !== config.origin || request.headers['content-type']?.split(';')[0] !== 'application/json')) return reply.code(403).send({ code: 'ORIGIN_DENIED' });
     const path = request.url.split('?')[0]!;
-    if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile };
+    if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile, ...(config.assistantProvider?{assistant:'cashneuro-assistant-workflow/6'}:{}) };
     let db: PoolClient | undefined;
     try {
       await rate(request);
@@ -214,12 +214,15 @@ export async function createServer(config: Config) {
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
+        if(config.assistantProvider&&path.startsWith('/finance/analyzer')&&!config.assistantProvider.allowed(s.user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
+        if(config.assistantProvider&&path==='/finance/assistant-profile'&&!config.assistantProvider.allowed(s.user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
         if(tasks&&path==='/finance/analyzer-task'){
           // Release the outer global/auth/workspace transaction before ANY network.
           await db.query('COMMIT');db.release();db=undefined;
           const authorize=async (connection:PoolClient)=>{
             const session=await current(makeAuth(config,connection,seal),request);
             if(!session||!session.user.emailVerified||session.user.id!==s.user.id)throw new HttpError(401,'AUTH_REQUIRED');
+            if(config.assistantProvider&&!config.assistantProvider.allowed(session.user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
           };
           const result=assistant
             ?await assistant.executeAssistant(config.pool,s.user.id,request.body,config.assistantProvider!,authorize)
