@@ -75,4 +75,7 @@ fixed selection, ownership/chat/reset scope, происхождение и ко�
 История общения и неподтверждённые просьбы текущему извлекателю не передаются.
 Новых paid calls, deployment, migration или изменений frozen experiment нет.
 
-Следующий контракт: [извлечение намерения №3](analyzer-extraction-contract-3-draft-20261016.md).
+Следующий контракт: [извлечение намерения №3](analyzer-extraction-contract-3-20261016.md).
+
+Контракт №3 согласован с поправкой: относительные даты и календарные
+периоды используют profile timezone пользователя, а не фиксированную Москву.
