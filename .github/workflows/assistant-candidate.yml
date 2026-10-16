@@ -10,6 +10,7 @@ on:
       - 'packages/analyzer/**'
       - 'packages/finance-core/**'
       - 'packages/privacy/**'
+      - 'scripts/*assistant-staging*'
       - '.github/workflows/assistant-candidate.yml'
   workflow_dispatch:
 permissions:
@@ -54,6 +55,11 @@ jobs:
           apps/api/test/task-json-cache-audit.test.ts
           packages/analyzer/test/task-context.test.ts
           packages/analyzer/test/task-literals.test.ts
+      - name: Check Staging installation and rollback without changing a service
+        run: |
+          python3 scripts/test-inspect-assistant-staging.py
+          python3 scripts/test-install-assistant-staging.py
+          bash -n scripts/prepare-assistant-staging.sh
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
 
