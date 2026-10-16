@@ -137,11 +137,12 @@ test('chat deletion during HTTP settles actual cost, removes private state and n
   for (const table of ['assistant_run', 'assistant_conversation', 'analyzer_task_request', 'analyzer_message']) assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.' + table)).rows[0].n, '0');
   assert.equal((await pg.owner.query('SELECT state FROM commerce.ai_cost_reservation')).rows[0].state, 'settled');
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_request')).rows[0].n, '1');
+  assert.equal((await pg.owner.query('SELECT state FROM commerce.analyzer_request')).rows[0].state, 'completed');
 });
 
 test('an access revocation during HTTP prevents another call and any financial result while preserving actual cost', async () => {
   const b = await body(); outputs = [plan([set('metric', 'expenses')])];
-  onDispatch = async () => { onDispatch = undefined; await pg.owner.query("UPDATE identity.security_state SET status='blocked' WHERE user_id='first'"); };
+  onDispatch = async () => { onDispatch = undefined; await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'"); };
   const reply = await run(b); assert.equal(reply.statusCode, 403, reply.body); assert.equal(calls, 1);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_message')).rows[0].n, '0');
   assert.equal((await pg.owner.query('SELECT state FROM commerce.ai_cost_reservation')).rows[0].state, 'settled');

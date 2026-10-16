@@ -107,7 +107,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
       return { input, expected, state: 'pending', reply: null, anchorExact: cycle.anchorExact, periodExact: cycle.startExact } as Claim;
     });
     if (claim.state === 'completed') return claim.reply;
-    const r = claim.input;
+    const r = claim.input, model = provider.forRequest();
     async function guard(db: PoolClient, expected = claim.expected) {
       const { workspace, timezone } = await currentScope(db);
       const active = (await own(db)).rows[0];
@@ -150,7 +150,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
         // Actual cost is settled even after cancellation, deletion or expiry.
         const violation = await within(async db => {
           const changed = await settleCost(db, userId, id, step(index), usage);
-          await db.query(`UPDATE commerce.analyzer_request SET state=$4,usage_state=$5,input_tokens=$6,output_tokens=$7,model_version=$8,updated_at=clock_timestamp()
+          await db.query(`UPDATE commerce.analyzer_request SET state=CASE WHEN $4='received' AND NOT EXISTS(SELECT 1 FROM finance.analyzer_task_request WHERE user_id=$1 AND id=$2 AND state='pending') THEN 'completed' ELSE $4 END,usage_state=$5,input_tokens=$6,output_tokens=$7,model_version=$8,updated_at=clock_timestamp()
             WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state IN ('sent','received','unknown')`,
           [userId, id, step(index), usage ? 'received' : 'unknown', usage ? 'reported' : 'unknown', usage?.inputTokens ?? null, usage?.outputTokens ?? null, usage?.modelVersion ?? null]);
           return changed;
@@ -162,7 +162,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
     let savedReply: unknown;
     type Calculation = Awaited<ReturnType<typeof calculateAnalyzerQuery>>;
     try {
-    await runAssistant(r, provider.model, journal, {
+    await runAssistant(r, model, journal, {
       guard: expected => within(db => guard(db, expected)),
       catalog: () => within(async db => { await guard(db); return yandexCatalog(db, userId); }),
       authorizeQuery: query => within(async db => { await guard(db); await assertReferences(db, userId, query.filter); }),
