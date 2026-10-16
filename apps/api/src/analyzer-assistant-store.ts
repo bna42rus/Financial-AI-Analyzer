@@ -9,7 +9,6 @@ import { globalSnapshot } from '../../../packages/analyzer/src/task-context.ts';
 import { runAssistant, assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
 import type { AssistantRequest, AssistantJournal, AssistantReply, ExpectedAssistantState, RunReceipt } from './assistant-workflow.ts';
 import { checkedAssistantReceipt } from './assistant-journal.ts';
-import { taskTransaction } from './analyzer-task-provider.ts';
 import { isAssistantProvider } from './analyzer-assistant-provider.ts';
 import type { AssistantProvider } from './analyzer-assistant-provider.ts';
 import { analyzerTaskContext, cancelAnalyzerTask } from './analyzer-task-store.ts';
@@ -64,7 +63,15 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
     if (!destroyed) lock.release();
   }
   async function executeLocked() {
-    const within = <T>(action: (db: PoolClient) => Promise<T>) => taskTransaction(pool, userId, action);
+    // Reuse the request-lock connection for short transactions. Borrowing a
+    // second connection here deadlocks when every pool slot has an active run.
+    const within = async <T>(action: (db: PoolClient) => Promise<T>) => {
+      await lock.query('BEGIN');
+      try {
+        await lock.query("SELECT set_config('app.user_id',$1,true)", [userId]);
+        const result = await action(lock); await lock.query('COMMIT'); return result;
+      } catch (error) { try { await lock.query('ROLLBACK'); } catch { /* Preserve the original error. */ } throw error; }
+    };
     const own = (db: PoolClient) => db.query('SELECT *,anchor_at::text AS "anchorExact",period_start::text AS "periodExact" FROM finance.analyzer_task_request WHERE user_id=$1 AND id=$2 FOR UPDATE', [userId, id]);
     async function currentScope(db: PoolClient) {
       await authorize(db);

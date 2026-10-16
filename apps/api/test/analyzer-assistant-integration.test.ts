@@ -1,6 +1,7 @@
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
+import { Pool } from 'pg';
 import type { PoolClient } from 'pg';
 import { postgresFixture } from './postgres.ts';
 import { syntheticOperations } from './operations-fixture.ts';
@@ -232,4 +233,15 @@ test('browser initialization cannot overwrite a timezone chosen on another devic
   const changed = await request('/finance/assistant-profile', { timezone: 'America/Los_Angeles' });
   assert.equal(changed.json().timezone, 'America/Los_Angeles');
   assert.equal(calls, 0);
+});
+
+test('a one-connection pool can complete a request without waiting for a second connection', { timeout: 15000 }, async () => {
+  const b = await body(), pool = new Pool({ ...pg.finance.options, max: 1 });
+  const smallProvider = createTestAssistantProvider(pool, fetcher, { projectId: 'test/assistant-small-pool', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' });
+  const target = await createServer({ ...config, pool, assistantProvider: smallProvider });
+  try {
+    outputs = [plan([set('metric', 'expenses')])];
+    const reply = await run(b, target); assert.equal(reply.statusCode, 200, reply.body); assert.equal(reply.json().code, 'FINANCIAL_QUERY'); assert.equal(calls, 2);
+    assert.equal(pool.totalCount, 1);
+  } finally { await target.close(); await pool.end(); }
 });
