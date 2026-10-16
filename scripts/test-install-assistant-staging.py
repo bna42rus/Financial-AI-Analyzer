@@ -29,6 +29,14 @@ class InstallationTests(unittest.TestCase):
             os.close(master)
             os.close(slave)
 
+    def test_piped_email_needs_no_privileged_terminal(self):
+        with patch.object(m.sys, 'stdin', io.StringIO('Owner@Example.Test\n')), patch('builtins.open', side_effect=AssertionError('must not open a terminal')):
+            self.assertEqual(m.read_test_email(from_stdin=True), 'owner@example.test')
+        # Exercise the actual subprocess stdin pipe used by the Bash wrapper.
+        code = ('import runpy; m=runpy.run_path(' + repr(str(Path(__file__).with_name('install-assistant-staging.py'))) + '); print(m["read_test_email"](from_stdin=True))')
+        result = subprocess.run([m.sys.executable, '-c', code], input='Owner@Example.Test\n', capture_output=True, text=True, check=True)
+        self.assertEqual(result.stdout, 'owner@example.test\n')
+
     def test_frontend_requires_one_exclusive_test_host(self):
         def route(host, root):
             return {'match': [{'host': [host]}], 'handle': [{'handler': 'vars', 'root': root}]}

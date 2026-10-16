@@ -156,7 +156,9 @@ def restore(backup):
     print('Откат API и фронтенда выполнен. Миграции и квитанции расходов сохранены.', flush=True)
 
 
-def read_test_email(terminal_path='/dev/tty'):
+def read_test_email(terminal_path='/dev/tty', *, from_stdin=False):
+    if from_stdin:
+        return sys.stdin.readline().strip().lower()
     # A terminal is not seekable; buffered r+ (BufferedRandom) rejects it.
     # Separate read/write streams also work when stdin carries the Bash script.
     with open(terminal_path, 'r') as reader, open(terminal_path, 'w') as writer:
@@ -188,7 +190,7 @@ def install(args):
         raise InstallationError('FRONTEND_LAYOUT_CHANGED')
     wait_health()
     container, owner, sql = docker_database()
-    email = read_test_email()
+    email = read_test_email(from_stdin=args.email_stdin)
     if not re.fullmatch(r'[a-z0-9.!#$%&*+/=?^_`{|}~-]+@[a-z0-9.-]+\.[a-z]{2,}', email) or len(email) > 200:
         raise InstallationError('TEST_ACCOUNT_EMAIL_INVALID')
     literal = "'" + email.replace("'", "''") + "'"
@@ -277,6 +279,7 @@ def main():
         raise InstallationError('ROOT_REQUIRED')
     parser = argparse.ArgumentParser()
     parser.add_argument('--copy-credentials', action='store_true')
+    parser.add_argument('--email-stdin', action='store_true')
     parser.add_argument('--rollback')
     parser.add_argument('--source')
     parser.add_argument('--sha')
