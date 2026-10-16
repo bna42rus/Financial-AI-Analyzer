@@ -1,0 +1,108 @@
+{
+  "version": "cashneuro-schema-probe-admission/1",
+  "date": "2026-10-15",
+  "status": "operator_executed_stopped_http400_usage_unknown",
+  "operatorCheckpoint": {
+    "checkpointSha256": "2f3012fc7cca47ee5abc6a3eea0276aea975a0681fb236c35193f95272734671",
+    "ledgerHeadSha256": "8ad850c2aa9ab4953bdef29ea612db90bdf2752fdff8d833c317787b79f856ec",
+    "frozenSha256": "11f6fafcd90671ce9d1283e6bc18f4c79d105131f71d25cff176d49fb6cdd991",
+    "baselineRecordsSha256": "cd3dbecfbd712a9959c692fdbd32aeb9f88a9cfbb480d6b828ba3b0e98a0fab2",
+    "gateCacheVerifiedFinancial": true,
+    "gateInputTokens": 570,
+    "gateOutputTokens": 132,
+    "originalCalls": 494,
+    "originalUpperBoundAtoms": "23058035380",
+    "originalPilotIncrementalUpperAtoms": "2169094120",
+    "remainingOriginal20RubHeadroomAtoms": "17830905880"
+  },
+  "scope": {
+    "cli": "src/task-schema-probe-main.ts --live",
+    "reportCli": "src/task-schema-probe-main.ts --report",
+    "maximumNewCompletionCalls": 1,
+    "maximumNewReservationAtoms": "2152001920",
+    "incrementalBaselineUpperAtoms": "20888941260",
+    "sameOriginalIncrementalCapAtoms": "20000000000",
+    "sameOriginalGlobalCapAtoms": "45000000000",
+    "allOldHoldsPreserved": true,
+    "oldLedgerBlockedFlagRemainsTrue": true,
+    "fullPilotAutomaticallyResumed": false,
+    "modelAccepted": false,
+    "runtimeAiEnabled": false
+  },
+  "request": {
+    "case": "single-01",
+    "gate": "Verified existing cache, no new gate dispatch or payment",
+    "proposal": "Exact reconstructed old prompt/input/model/sampling/output bound; only decoder schema uniqueItems is projected out",
+    "serverValidation": "Original full closed schema, quote guards, duplicate-name checks and shared finance calculation remain authoritative",
+    "rootCauseClaim": "No claim that Cloud's decoder or exact prior HTTP 400 cause is known; the single probe measures actual acceptance and captures fixed-vocabulary error diagnostics"
+  },
+  "persistence": {
+    "sameOriginalLedger": true,
+    "legacyEventShapesOnly": true,
+    "reserveFsyncBeforeHttp": true,
+    "receiptFsyncBeforeParserAndCache": true,
+    "frozenArtifact": "task-schema-probe-v1.json",
+    "privateResult": "task-schema-probe-v1-result.json",
+    "newExclusiveLock": "task-schema-probe-v1.lock",
+    "oldLocksModifiedOrRemoved": false,
+    "unknownUsageAndDeliveryRetainFullReserve": true,
+    "completedFailedAndPendingReplayNeverRepay": true,
+    "artifactCacheAndLockModes": "0600 files inside existing 0700 root directory",
+    "newCheckoutRequired": true,
+    "archivedV1InspectorCommit": "1fe44540196e8ad5167e2229daa2fb4c956c2fb5"
+  },
+  "validation": {
+    "newTestsPassed": 14,
+    "apiUnitTestsPassed": 174,
+    "apiTypes": "passed",
+    "fullCi": {
+      "commit": "7417c3882cf963a1d48b1f7a0b986cddd6e663a4",
+      "runId": 38748805796,
+      "jobId": 116470096707,
+      "attempt": 2,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38748805796",
+      "conclusion": "success",
+      "core": 246,
+      "apiUnit": 174,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 667,
+      "passed": 667,
+      "failed": 0,
+      "postgresVersion": "18.4",
+      "typesBuildsAndPrivacyChecks": "passed",
+      "paidModelCalls": 0,
+      "firstAttempt": "Public ECR image download data limit before checkout; same-source rerun succeeded."
+    },
+    "isolatedCheckoutTypes": "passed",
+    "isolatedCheckoutBindingByteIdentical": true
+  },
+  "testedArtifact": {
+    "codeCommit": "7417c3882cf963a1d48b1f7a0b986cddd6e663a4",
+    "bindingSha256": "b1068b151b89dc861b630430500cb162ec0259addc6e0ca03f94a333922a53ef",
+    "requestId": "35a00c586c7cf8b13b5c8aaf198fde7abad80d605886ee7e39ff7995da71bba4",
+    "wireSha256": "5978cbddbbe4207dfa89adce37ce73b2e98be5364a6cc04dfefbba0b7ead3016",
+    "sourceSha256": "71c31eb389b644301371d6ce4b46169c114a2b04af4e0cc0d6e1467023e08be4",
+    "inputSha256": "40ae33cefe24c6592fcfda55dfa6e5c759c9af861aba5279de3867bfd2af1093"
+  },
+  "assistantPaidCalls": 0,
+  "operatorSchemaProbeExecuted": true,
+  "remaining": [
+    "Documented json_object format and automatic bounded continuation are described in analyzer-task-json-trial-20261015.json"
+  ],
+  "operatorResult": {
+    "error": "BENCH_PROVIDER_FAILURE_HTTP_400",
+    "providerAcceptedRequest": false,
+    "usage": null,
+    "callsThisRun": 1,
+    "reason": "unclassified",
+    "allHoldsPreserved": true,
+    "calls": 495,
+    "spentAtoms": "13389232820",
+    "heldAtoms": "11820804480",
+    "upperBoundAtoms": "25210037300",
+    "incrementalUpperAtoms": "4321096040",
+    "remainingOriginal20RubHeadroomAtoms": "15678903960"
+  }
+}

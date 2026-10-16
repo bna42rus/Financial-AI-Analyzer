@@ -1,0 +1,76 @@
+{
+  "candidate": "cloud-oss",
+  "fixtureVersion": "cashneuro-transfer/1",
+  "benchmarkPromptVersion": "cashneuro-smoke-prompt/5",
+  "responseContract": "cashneuro-response/2",
+  "mode": "task",
+  "runPhase": "after-funding",
+  "turns": 72,
+  "passed": 68,
+  "costPerTurnAtoms": {
+    "meanCeil": "61778835", "median": "61906460", "p95": "76844140",
+    "maximum": "87519140", "perCorrectTurnCeil": "65412884"
+  },
+  "checks": [
+    {
+      "id": "transfer-05", "gate": true, "plan": false, "calls": 2,
+      "inputTokens": 1599, "outputTokens": 1019, "costAtoms": "87519140", "latencyMs": 3747, "replayCalls": 2,
+      "diagnostics": {
+        "question": "Выведи операции, которые надо проверить.",
+        "expectedGate": {"relevance": "financial", "followUp": false},
+        "actualGate": {"relevance": "financial", "followUp": false},
+        "expectedPlan": {"status": "query", "query": {"name": "query_finances", "metric": "attention", "grouping": "operation", "comparison": "none", "filter": {"from": "2026-10-01", "through": "2026-10-31"}}},
+        "actualPlan": {"status": "query", "query": {"name": "query_finances", "metric": "attention", "grouping": "operation", "comparison": "none", "filter": {"from": "2026-10-01", "through": "2026-10-31", "attention": true}}},
+        "resolution": null,
+        "decisions": {"metric": "attention", "grouping": "operation", "comparison": "inherit", "from": "inherit", "through": "inherit", "categoryCount": 0, "filterFields": ["attention"]},
+        "errors": []
+      }
+    },
+    {
+      "id": "transfer-24", "gate": true, "plan": false, "calls": 2,
+      "inputTokens": 1623, "outputTokens": 734, "costAtoms": "70514780", "latencyMs": 3092, "replayCalls": 2,
+      "diagnostics": {
+        "question": "Общий доход по операциям с суммой от 1000 до 2500 рублей включительно.",
+        "expectedGate": {"relevance": "financial", "followUp": false},
+        "actualGate": {"relevance": "financial", "followUp": false},
+        "expectedPlan": {"status": "query", "query": {"name": "query_finances", "metric": "income", "grouping": "none", "comparison": "none", "filter": {"from": "2026-10-01", "through": "2026-10-31", "amountFrom": "100000", "amountThrough": "250000"}}},
+        "actualPlan": {"status": "query", "query": {"name": "query_finances", "metric": "income", "grouping": "none", "comparison": "none", "filter": {"from": "2026-10-01", "through": "2026-10-31", "amountFrom": "1000", "amountThrough": "2500"}}},
+        "resolution": null,
+        "decisions": {"metric": "income", "grouping": "none", "comparison": "none", "from": "inherit", "through": "inherit", "categoryCount": 0, "filterFields": ["amountFrom", "amountThrough"]},
+        "errors": []
+      }
+    },
+    {
+      "id": "transfer-25", "gate": true, "plan": false, "calls": 2,
+      "inputTokens": 1619, "outputTokens": 751, "costAtoms": "71488340", "latencyMs": 3364, "replayCalls": 2,
+      "diagnostics": {
+        "question": "Сумма доходов по операциям не выше 99 рублей 50 копеек.",
+        "expectedGate": {"relevance": "financial", "followUp": false},
+        "actualGate": {"relevance": "financial", "followUp": false},
+        "expectedPlan": {"status": "query", "query": {"name": "query_finances", "metric": "income", "grouping": "none", "comparison": "none", "filter": {"from": "2026-10-01", "through": "2026-10-31", "amountThrough": "9950"}}},
+        "actualPlan": {"status": "query", "query": {"name": "query_finances", "metric": "income", "grouping": "operation", "comparison": "none", "filter": {"from": "2026-10-01", "through": "2026-10-31", "amountThrough": "9950"}}},
+        "resolution": null,
+        "decisions": {"metric": "income", "grouping": "operation", "comparison": "inherit", "from": "inherit", "through": "inherit", "categoryCount": 0, "filterFields": ["amountThrough"]},
+        "errors": []
+      }
+    },
+    {
+      "id": "transfer-35", "gate": false, "plan": null, "calls": 1,
+      "inputTokens": 306, "outputTokens": 323, "costAtoms": "24556160", "latencyMs": 1262, "replayCalls": 1,
+      "diagnostics": {
+        "question": "Продолжи.",
+        "expectedGate": {"relevance": "ambiguous", "followUp": false},
+        "actualGate": {"relevance": "unrelated", "followUp": false},
+        "expectedPlan": null, "actualPlan": null, "resolution": null, "decisions": null, "errors": []
+      }
+    }
+  ],
+  "report": "saved-smoke/1",
+  "paidCalls": 0,
+  "cost": {
+    "calls": 402, "reportedCalls": 399, "failedCalls": 30,
+    "inputTokens": 258886, "outputTokens": 104378,
+    "spentAtoms": "10321681900", "heldAtoms": "7516800640", "budgetUsedUpperBoundAtoms": "17838482540",
+    "requiresReconciliation": true, "latencyP95Ms": 1891, "immutableModelVersionVerified": false
+  }
+}

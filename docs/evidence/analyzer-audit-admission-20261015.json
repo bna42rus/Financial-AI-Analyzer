@@ -1,0 +1,238 @@
+{
+  "version": "cashneuro-audit-admission/1",
+  "status": "json_run_audited_new_candidate_not_admitted",
+  "paidDispatchEnabled": false,
+  "latestObserved": {
+    "promptVersion": "cashneuro-smoke-prompt/7",
+    "strictPassed": 23,
+    "turns": 24,
+    "spentAtoms": "13372140620",
+    "heldAtoms": "7516800640",
+    "upperBoundAtoms": "20888941260"
+  },
+  "requirementsBeforeAnyNewPaidVersion": [
+    "Use the completed all-turn audit findings: remove contract gaps and distinguish primary errors, inherited bad state, valid-plan binding errors and successful-query edit/provenance risks.",
+    "Freeze relevance ontology and task binding separately; define keep/set/clear/use_current semantics and unsupported cases.",
+    "Document signed-operation versus absolute-metric amount semantics, inclusive/exclusive thresholds and mixed-operation treatment.",
+    "Freeze code/prompt/schema/resolver/price versions and the provider-supported sampling configuration; do not infer pinning from an alias.",
+    "Specify independent repetition IDs, a cumulative incremental budget within the existing 45 RUB cap, and stop rules before dispatch.",
+    "Run backend interaction and privacy invariants, then the same frozen development matrix across the candidate configuration.",
+    "Evaluate the existing 96 seen regression turns and a fresh held-out acceptance split with no intervening prompt edits.",
+    "Report relevance, task binding, plan field accuracy, clarification coverage, end-to-end finance/answer correctness, tokens and latency separately."
+  ],
+  "existingApprovedAcceptance": {
+    "standalone": 180,
+    "dialogs": 40,
+    "turnsPerDialog": 6,
+    "totalTurns": 420,
+    "development": {
+      "standalone": 120,
+      "dialogs": 30
+    },
+    "holdout": {
+      "standalone": 60,
+      "dialogs": 10
+    },
+    "status": "specified_not_executed"
+  },
+  "stopPolicy": [
+    "Any new unknown usage retains its full reserve and stops dispatch.",
+    "Any critical ownership/scope/money error blocks model acceptance.",
+    "A failed fixed experiment triggers root-cause review, not another prompt tweak against the last failing question.",
+    "Completed replay is never counted as an independent model repeat.",
+    "Identical temperature=0 request bodies already produced different valid gate values; one passing model run cannot establish stability."
+  ],
+  "limitations": [
+    "This file is an audit checklist, not an implemented paid experiment or a claim of model accuracy.",
+    "The CLI currently rejects all paid historical actions before keys, state or locks are accessed."
+  ],
+  "auditedHistoricalSource": "a10be832a225c692087239680ded41de8da37e45",
+  "savedExportSource": "0a043fb3708086b45c72482204ca6f4f83e8ba6f",
+  "completedAudit": {
+    "status": "complete_for_supplied_saved_decisions",
+    "sourceSha256": "2dc58de78c642dbc8e308708388240bf1be441466b05b862cc56842faa3307a6",
+    "ledgerRecords": 492,
+    "reconstructedRequests": 489,
+    "unmatchedRecords": 3,
+    "evaluatedTurns": 268,
+    "exactHistoricalScoresAndGoldens": true,
+    "paidCalls": 0,
+    "repeatedWireBodyGroups": 41,
+    "divergentGateWireGroups": 1,
+    "evidence": "docs/evidence/analyzer-saved-review-20261015.json"
+  },
+  "taskContractImplementation": {
+    "status": "test_http_postgresql18_browser_verified_paid_blocked",
+    "registry": "analyzer/3",
+    "context": "analyzer-task-context/1",
+    "protocol": "analyzer-task-protocol/2",
+    "literals": "analyzer-task-literals/1",
+    "workflow": "analyzer-task-workflow/1",
+    "document": "docs/architecture/analyzer-task-contract.md",
+    "newSoftwareTests": 49,
+    "modelAcceptanceExecuted": false,
+    "paidCalls": 0,
+    "remaining": [
+      "Frozen development/holdout/repeat IDs/budget/stop rules and controlled real-model trial adapter",
+      "Provider immutable model verification and actual GPT-OSS semantic acceptance"
+    ],
+    "validation": {
+      "coreTests": 246,
+      "apiTests": 119,
+      "webTests": 82,
+      "financeTypesAndBuild": "passed",
+      "controlTypesAndBuild": "passed",
+      "sourceIntegrity": "passed",
+      "historicalFullReviewByteIdentical": true,
+      "postgresPersistenceIntegration": {
+        "engine": "PostgreSQL 16.15",
+        "total": 161,
+        "passed": 160,
+        "failed": 1,
+        "onlyFailure": "existing strict PostgreSQL 18 version assertion",
+        "newTaskIntegrationTestsPassed": 16,
+        "syntheticProvider": true,
+        "targetPostgresql18Acceptance": true,
+        "targetCi": {
+          "commit": "8cf5e34b514c38fda809d6c196fe4fab62636dd2",
+          "engine": "PostgreSQL 18.4",
+          "passed": 161,
+          "failed": 0,
+          "runId": 38709689304,
+          "attempt": 2
+        }
+      },
+      "fullCi": {
+        "commit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+        "runId": 38727206822,
+        "attempt": 1,
+        "jobId": 116395916413,
+        "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38727206822",
+        "completedAt": "2026-10-15T11:28:04Z",
+        "core": 246,
+        "apiUnit": 119,
+        "web": 82,
+        "postgres18": 161,
+        "browser": 4,
+        "total": 612,
+        "passed": 612,
+        "failed": 0,
+        "paidModelCalls": 0
+      },
+      "browserAcceptance": {
+        "passed": 4,
+        "failed": 0,
+        "desktopAndMobile": true,
+        "syntheticProvider": true
+      }
+    },
+    "integrationEvidence": "docs/evidence/analyzer-task-integration-20261015.json"
+  },
+  "operatorVpsInspection": {
+    "status": "matches_reviewed_historical_export",
+    "date": "2026-10-15",
+    "codeCommit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+    "candidate": "cloud-oss",
+    "recordedCandidateCalls": 461,
+    "globalLedgerRecords": 492,
+    "paidCalls": 0,
+    "billingReconciled": false,
+    "holdsReleased": false,
+    "evidence": "docs/evidence/analyzer-vps-inspection-20261015.json",
+    "aggregateProviderComparison": {
+      "status": "matches_displayed_totals",
+      "reportedCalls": 489,
+      "reportedTokens": 474989,
+      "providerDisplayedTokensRounded": "475000",
+      "knownCostRoundedKopecks": 1337,
+      "individualUnknownReceiptsReconciled": false
+    }
+  },
+  "taskTrialPreparation": {
+    "status": "offline_corpus_and_get_preflight_implemented_paid_blocked",
+    "paidDispatchEnabled": false,
+    "baseTurns": 96,
+    "independentRepeatTurns": 24,
+    "newUnitTestsPassed": 13,
+    "evidence": "docs/evidence/analyzer-task-trial-20261015.json",
+    "validation": {
+      "commit": "20af685e30836981080e983c54218d09d15c8f19",
+      "runId": 38738230119,
+      "passed": 625,
+      "failed": 0,
+      "paidCalls": 0
+    }
+  },
+  "paidDispatchScope": [
+    "src/task-trial-main.ts --live-pilot only; fixed corpus and 20 RUB cumulative incremental ceiling",
+    "src/task-json-trial-main.ts --live only; exact verified 495-record prefix, same original 20 RUB cumulative incremental ceiling"
+  ],
+  "legacyPaidActionsPaused": true,
+  "immutableModelAcceptanceBlocked": true,
+  "runtimeAiEnabled": false,
+  "controlledPilot": {
+    "version": "cashneuro-cloud-service-pilot/1",
+    "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+    "promptsSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8",
+    "providerMetadataSha256": "b27d11d11429899c431d95d974e69a5dfb7e56797fe127584992a2782432db68",
+    "incrementalCapAtoms": "20000000000",
+    "maximumCalls": 240,
+    "immutableModelVersionVerified": false,
+    "currentTariffConfirmed": true,
+    "reasonForLimitedAdmission": "GET catalog supplied by the operator confirms the exact observed alias/context but exposes no immutable revision. A provisional evaluation of that service is useful and within the already approved test budget; it does not satisfy model acceptance or enable runtime AI. Exact current internal-model rates independently verified in current-version tariff 261015 rows 271/272.",
+    "evidence": "docs/evidence/analyzer-task-pilot-20261015.json",
+    "testedCodeCommit": "745d41275822c30f83bda4944095da015e3142ae",
+    "ciRunId": 38743441583,
+    "softwareTestsPassed": 647,
+    "realModelTrialExecuted": true,
+    "completedRealModelTurns": 0,
+    "currentStatus": "complete_offline_cache_audit_52_of_92_unchanged",
+    "nextAction": "Prepared contract requires a new frozen experiment and explicit budget admission; no new paid command is enabled by this audit",
+    "failureEvidence": "docs/evidence/analyzer-task-pilot-http400-20261015.json",
+    "oneShotSchemaProbe": {
+      "maximumCalls": 1,
+      "remainingOriginalCapAtoms": "15678903960",
+      "oldHoldsReleased": false,
+      "ledgerBlockedFlagCleared": false,
+      "admissionEvidence": "docs/evidence/analyzer-schema-probe-20261015.json",
+      "executed": true,
+      "result": "BENCH_PROVIDER_FAILURE_HTTP_400"
+    },
+    "jsonObjectContinuation": {
+      "evidence": "docs/evidence/analyzer-task-json-trial-20261015.json",
+      "maximumTurns": 120,
+      "maximumNewCalls": 239,
+      "originalBudgetBaselineUpperAtoms": "20888941260",
+      "remainingOriginalCapAtoms": "6441024920",
+      "operatorExecuted": true,
+      "allHoldsPreserved": true,
+      "testedCodeCommit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+      "ciRunId": 38770789164,
+      "softwareTestsPassed": 685,
+      "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b",
+      "evaluatedTurns": 92,
+      "passedTurns": 52,
+      "holdoutOpened": false,
+      "paidCallsThisRun": 170,
+      "resultEvidence": "docs/evidence/analyzer-task-json-trial-result-20261015.json"
+    },
+    "cacheAudit": {
+      "evidence": "docs/evidence/analyzer-task-json-cache-review-20261015.json",
+      "recordsConsumed": 170,
+      "turns": 92,
+      "passed": 52,
+      "developmentPassed": 36,
+      "developmentTurns": 68,
+      "repeatPassed": 16,
+      "repeatTurns": 24,
+      "semanticVariationGroups": 6,
+      "lostRejectedPayloads": 14,
+      "newPaidCalls": 0,
+      "historicalScoresRewritten": false,
+      "preparedPaidDispatchEnabled": false,
+      "testedCodeCommit": "5a46d450c10080ac233a8bee8301e66e391671a0",
+      "ciRunId": 38776922177,
+      "softwareTestsPassed": 697
+    }
+  }
+}

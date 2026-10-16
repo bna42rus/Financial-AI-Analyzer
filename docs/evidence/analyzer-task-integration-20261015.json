@@ -1,0 +1,116 @@
+{
+  "version": "analyzer-task-integration/1",
+  "date": "2026-10-15",
+  "status": "blocked_for_paid_and_staging",
+  "configuration": "explicit test provider only; mandatory synthetic fetch and synthetic key; no key loader or default real dispatch",
+  "migration": "packages/database/migrations/0026_analyzer_tasks.sql",
+  "validation": {
+    "core": 246,
+    "apiUnit": 119,
+    "web": 82,
+    "postgres": {
+      "engine": "PostgreSQL 16.15",
+      "total": 161,
+      "passed": 160,
+      "failed": 1,
+      "skipped": 0,
+      "onlyFailure": "test/security.test.ts requires PostgreSQL >=180000 and <190000; requirement left unchanged",
+      "newTaskHttpTestsPassed": 16,
+      "localRunner": "disposable local cluster; temporary mapped-process UID shim; SQL engine and scoped runtime roles unchanged"
+    },
+    "types": [
+      "API",
+      "Finance",
+      "Control"
+    ],
+    "builds": [
+      "Finance",
+      "Control"
+    ],
+    "spec": {
+      "requirements": 494,
+      "appendixMaps": 9,
+      "contextSections": 30
+    },
+    "historicalReviewByteIdentical": true,
+    "savedExportSha256": "2dc58de78c642dbc8e308708388240bf1be441466b05b862cc56842faa3307a6",
+    "postgres18Ci": {
+      "engine": "PostgreSQL 18.4",
+      "commit": "8cf5e34b514c38fda809d6c196fe4fab62636dd2",
+      "runId": 38709689304,
+      "attempt": 2,
+      "jobId": 116344361471,
+      "total": 161,
+      "passed": 161,
+      "failed": 0,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38709689304/attempts/2",
+      "completedAt": "2026-10-15T09:18:13Z"
+    },
+    "browserAcceptance": {
+      "newTaskCases": 2,
+      "legacyCases": 2,
+      "viewports": [
+        "desktop",
+        "mobile"
+      ],
+      "status": "passed",
+      "commit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+      "passed": 4,
+      "failed": 0,
+      "runId": 38727206822,
+      "engine": "pinned Playwright Chromium on PostgreSQL 18.4"
+    },
+    "fullCi": {
+      "commit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+      "runId": 38727206822,
+      "attempt": 1,
+      "jobId": 116395916413,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38727206822",
+      "completedAt": "2026-10-15T11:28:04Z",
+      "core": 246,
+      "apiUnit": 119,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 612,
+      "passed": 612,
+      "failed": 0,
+      "paidModelCalls": 0
+    }
+  },
+  "paidCalls": 0,
+  "historicalCost": {
+    "spentAtoms": "13372140620",
+    "heldAtoms": "7516800640",
+    "upperBoundAtoms": "20888941260",
+    "modified": false
+  },
+  "verifiedInvariants": [
+    "Atomic answer/book/customer-unit commit with fresh ownership/access/data/global/head/lifetime guards",
+    "No network under global auth/access/workspace transaction",
+    "Restart resumes cached gate; receipt without cache never repeats dispatch",
+    "Cancellation before claim and during network; delete/recreate lifetime isolation",
+    "Reported usage settled before private cache/parser failure; unknown reserve retained and blocks new calls",
+    "Full wire validation before missing-reference short circuit",
+    "New opaque auth IDs and RLS denial for other owner/Control/mail",
+    "Exact and legacy millisecond period keys cannot reset quota or create a second user cost bucket",
+    "Partial deletion preserves unrelated completed task definitions; full reset clears all chats",
+    "Deleted UI reference blocks rather than widens scope; manual stamps and independent filters survive",
+    "UI queue survives workspace navigation and exact retry ACK; cross-tab conflict does not auto-overwrite",
+    "Actual desktop/mobile browser confirms A->B->A across routes, lost ACK same request ID, cross-tab CAS, pending recovery/cancel, confirmed deletion and unlocked composer"
+  ],
+  "migrationAndRecovery": {
+    "appliedOnVps": false,
+    "preflight": [
+      "Target PostgreSQL 18 disposable full suite first",
+      "Check for duplicate millisecond-alias budget rows; duplicates must stop migration for explicit reconciliation",
+      "Keep taskProvider unset outside test; do not add real provider credentials to Git/config",
+      "Apply 0026 as owner within a transaction after approved release artifact/backup"
+    ],
+    "rollback": "Leave additive tables/index/epoch in place and keep taskProvider unset; revert application routing only if necessary. Do not delete commercial receipts, price quotes, actual spend or unknown holds. Forward-fix partial migration errors transactionally; no automatic data reconciliation."
+  },
+  "remaining": [
+    "Frozen dev/holdout/regression/repetition manifest and budget/stop rules",
+    "Controlled real GPT-OSS trial and model pinning; no accuracy inference from scripted decisions"
+  ]
+}

@@ -1,0 +1,104 @@
+name: assistant-candidate
+on:
+  pull_request:
+    paths:
+      - 'apps/api/src/assistant-*.ts'
+      - 'apps/api/test/assistant-*.test.ts'
+      - 'apps/api/src/analyzer-assistant-*.ts'
+      - 'apps/api/test/analyzer-assistant-*.test.ts'
+      - 'packages/database/migrations/0027_assistant_runtime.sql'
+      - 'packages/analyzer/**'
+      - 'packages/finance-core/**'
+      - 'packages/privacy/**'
+      - 'scripts/*assistant-staging*'
+      - '.github/workflows/assistant-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: assistant-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  software-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked workspace dependencies for the database adapter types
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install only the pinned compiler and Node types
+        run: npm install --prefix "$RUNNER_TEMP/assistant-typecheck" --no-save --ignore-scripts typescript@7.0.2 @types/node@24.19.1
+      - name: Strict types for the candidate and its import closure
+        run: >-
+          "$RUNNER_TEMP/assistant-typecheck/node_modules/.bin/tsc"
+          --noEmit --target ES2023 --module ESNext --moduleResolution Bundler
+          --strict --noUncheckedIndexedAccess --verbatimModuleSyntax
+          --allowImportingTsExtensions --skipLibCheck --types node
+          --typeRoots "$RUNNER_TEMP/assistant-typecheck/node_modules/@types"
+          packages/analyzer/src/assistant-*.ts apps/api/src/assistant-*.ts
+          apps/api/test/assistant-*.test.ts
+      - name: Offline checks only, with fake HTTP and synthetic finance
+        run: >-
+          node --experimental-transform-types --test
+          apps/api/test/assistant-workflow.test.ts
+          apps/api/test/assistant-durability.test.ts
+          apps/api/test/assistant-trial.test.ts
+          apps/api/test/task-intent-cache-audit.test.ts
+          apps/api/test/task-intent.test.ts
+          apps/api/test/task-json-cache-audit.test.ts
+          packages/analyzer/test/task-context.test.ts
+          packages/analyzer/test/task-literals.test.ts
+      - name: Check Staging installation and rollback without changing a service
+        run: |
+          python3 scripts/test-inspect-assistant-staging.py
+          python3 scripts/test-install-assistant-staging.py
+          bash -n scripts/prepare-assistant-staging.sh
+      - name: Prepare the experiment without network or credentials
+        run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
+
+  postgres-assistant:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start an isolated PostgreSQL 18 without a shared Docker registry
+        run: |
+          npm install --prefix "$RUNNER_TEMP/assistant-postgres" --no-save --ignore-scripts embedded-postgres@18.4.0-beta.17
+          cd "$RUNNER_TEMP/assistant-postgres/node_modules/@embedded-postgres/linux-x64"
+          node scripts/hydrate-symlinks.js
+          pg_bin="$PWD/native/bin"
+          "$pg_bin/postgres" --version
+          "$pg_bin/initdb" -D "$RUNNER_TEMP/assistant-pgdata" -U postgres --auth=trust
+          "$pg_bin/pg_ctl" -D "$RUNNER_TEMP/assistant-pgdata" -l "$RUNNER_TEMP/assistant-postgres.log" -o "-h 127.0.0.1 -p 55432 -k $RUNNER_TEMP" -w start
+      - name: Check Staging configuration without credentials or paid calls
+        run: pnpm --filter @finance/api exec node --import tsx --test test/analyzer-assistant-settings.test.ts
+      - name: Check private Staging setup without model POSTs
+        run: sudo "$(command -v node)" --experimental-transform-types --test apps/api/test/analyzer-assistant-setup.test.ts
+      - name: Check API types
+        run: pnpm --filter @finance/api exec tsc --noEmit
+      - name: Verify the assistant HTTP and PostgreSQL boundary without paid calls
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-integration.test.ts
+      - name: Install Chromium for the assistant interface check
+        run: pnpm --filter @finance/api exec playwright install --with-deps chromium
+      - name: Verify the connected desktop and mobile interface
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts

@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
 
 /** Dedicated disposable cluster only. CI provisions official PostgreSQL 18 as a service. */
-export async function postgresFixture() {
+export async function postgresFixture(options: { name?: 'finance_staging' } = {}) {
   const connectionString = process.env.SECURITY_TEST_DATABASE_URL;
   if (!connectionString) throw new Error('SECURITY_TEST_DATABASE_URL must point to an isolated PostgreSQL 18 test cluster');
   const url = new URL(connectionString);
@@ -11,7 +11,7 @@ export async function postgresFixture() {
   const operator = new Pool({ connectionString });
   const existing = await operator.query("SELECT 1 FROM pg_roles WHERE rolname IN ('finance_api','control_api','mail_finance','mail_control')");
   if (existing.rowCount) { await operator.end(); throw new Error('Runtime roles already exist: use a fresh isolated test cluster'); }
-  const name = 'finance_security_test_' + randomBytes(8).toString('hex');
+  const name = options.name ?? 'finance_security_test_' + randomBytes(8).toString('hex');
   await operator.query(`CREATE DATABASE ${name}`); url.pathname = '/' + name;
   const owner = new Pool({ connectionString: url.toString() });
   const migration = await readFile(new URL('../../../packages/database/migrations/0001_access_security.sql', import.meta.url), 'utf8');
@@ -45,6 +45,8 @@ export async function postgresFixture() {
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0023_postbox_acceptance.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0024_yandex_analyzer.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0025_analyzer_cost.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0026_analyzer_tasks.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0027_assistant_runtime.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

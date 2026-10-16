@@ -1,0 +1,143 @@
+{
+  "version": "cashneuro-task-json-trial-admission/1",
+  "date": "2026-10-15",
+  "status": "operator_executed_development_failed",
+  "operatorBaseline": {
+    "records": 495,
+    "spentAtoms": "13389232820",
+    "heldAtoms": "11820804480",
+    "upperAtoms": "25210037300",
+    "retainedHttp400s": [
+      "fa60ae8109ffd7c8a49c9f51d3f3206e4dc1ab41aacc247a1ebc44f532721ab4",
+      "35a00c586c7cf8b13b5c8aaf198fde7abad80d605886ee7e39ff7995da71bba4"
+    ],
+    "originalBudgetBaselineUpperAtoms": "20888941260",
+    "originalIncrementalCapAtoms": "20000000000",
+    "alreadyUsedIncrementalUpperAtoms": "4321096040",
+    "remainingOriginal20RubHeadroomAtoms": "15678903960",
+    "globalCapAtoms": "45000000000",
+    "holdsReleased": false,
+    "globalBlockedFlagCleared": false
+  },
+  "request": {
+    "wireVersion": "cashneuro-task-json-object/1",
+    "mode": "json_object",
+    "officialSpecification": "https://cloud.ru/docs/api/specs/foundation-models/ug/_downloads/f2949c1237d79b17b2df8e523e02a89a/openapi__foundation-models.yaml",
+    "offlineOpenapiValidation": {
+      "extractedSpecificationSha256": "d99c3c3b6f12f644d667193ac0cfde2a4ca6921bd4f5ca779c02cdbcfef17b27",
+      "modes": [
+        "text",
+        "json_object"
+      ],
+      "requests": {
+        "old_gate": [
+          {
+            "path": "response_format/type",
+            "message": "'json_schema' is not one of ['text', 'json_object']"
+          }
+        ],
+        "old_plan": [
+          {
+            "path": "response_format/type",
+            "message": "'json_schema' is not one of ['text', 'json_object']"
+          }
+        ],
+        "new_gate": [],
+        "new_plan": []
+      }
+    },
+    "rootCauseClaim": "Published request enum excludes json_schema. This is a contract mismatch, not proof of the exact prior 400 cause: a small gate previously passed with json_schema.",
+    "promptChange": "Unchanged task instructions plus exact full authoritative JSON schema in system message. New actual wire prompts have a distinct frozen SHA.",
+    "serverContractUnchanged": true,
+    "noCatalogOrOperationRowsSent": true
+  },
+  "execution": {
+    "cli": "src/task-json-trial-main.ts --live",
+    "reportCli": "src/task-json-trial-main.ts --report",
+    "maximumTurns": 120,
+    "development": 68,
+    "independentRepeatTurns": 24,
+    "holdout": 28,
+    "holdoutAdmission": "All exact 92 development/repeat slots must pass; no tuning between phases.",
+    "maximumNewPaidCalls": 239,
+    "initialGate": "Only observed verified single-01 base gate is reused for free; independent repeats use new IDs and actual calls.",
+    "automaticContinuation": true,
+    "operatorExecuted": true,
+    "assistantPaidCalls": 0,
+    "runtimeAiEnabled": false,
+    "modelAccepted": false,
+    "immutableModelVersionVerified": false,
+    "notFullProductAcceptance": true,
+    "completedTurns": 92,
+    "passedTurns": 52,
+    "paidCallsThisRun": 170,
+    "holdoutOpened": false,
+    "stop": "TASK_PILOT_DEVELOPMENT_FAILED"
+  },
+  "persistence": {
+    "sameOriginalLedger": true,
+    "originalReceiptsUnchanged": true,
+    "legacyEventShapesOnly": true,
+    "newPrivateFrozenFile": "task-json-trial-v1.json",
+    "newCache": "task-json-trial-v1-cache",
+    "newExclusiveLock": "task-json-trial-v1.lock",
+    "oldLocksRemoved": false,
+    "freshDispatchDateMoscow": "2026-10-15",
+    "repeatedLiveIsReadOnlyReport": true,
+    "reserveFsyncBeforeHttp": true,
+    "receiptFsyncBeforeParserCacheOrDiagnostics": true,
+    "unknownUsageRetainsFullReservationAndStops": true,
+    "newUnknownOrDriftNotExempted": true,
+    "rawError": "Up to 16384 original bytes encrypted with AES-256-GCM in root-private 0600 files; neither raw bytes nor key printed or committed.",
+    "safeError": "Bounded provider message with known credentials/Bearer/URLs/token-like strings redacted; safe report works without decrypting raw evidence.",
+    "consoleReport": "Includes exact new ledger head, frozen artifact hash and safe provider error so another manual checkpoint is unnecessary.",
+    "separateCheckoutRequired": true
+  },
+  "softwareValidation": {
+    "newTests": 18,
+    "apiUnitTests": 192,
+    "status": "passed",
+    "syntheticResponsesOnly": true,
+    "apiTypes": "passed",
+    "isolatedCheckoutTypes": "passed",
+    "isolatedCheckoutBindingByteIdentical": true,
+    "publishedSourceBlobsVerified": 49,
+    "sourceBlobMismatches": 0,
+    "consoleBlockBashSyntax": "passed",
+    "fullCi": {
+      "commit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+      "runId": 38770789164,
+      "jobId": 116545738638,
+      "attempt": 1,
+      "url": "https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/38770789164",
+      "conclusion": "success",
+      "core": 246,
+      "apiUnit": 192,
+      "web": 82,
+      "postgres18": 161,
+      "browser": 4,
+      "total": 685,
+      "passed": 685,
+      "failed": 0,
+      "postgresVersion": "18.4",
+      "typesBuildsAndPrivacyChecks": "passed",
+      "paidModelCalls": 0
+    }
+  },
+  "limitations": [
+    "JSON mode constrains JSON syntax; full server parser remains authoritative.",
+    "Software tests do not establish actual GPT-OSS language accuracy.",
+    "The immutable model revision is unavailable; even a successful pilot remains provisional.",
+    "Full 420-turn product acceptance and 96 historical regression turns under the new protocol remain separate."
+  ],
+  "testedArtifact": {
+    "codeCommit": "8105e713d9045bae0182dbb7aabeeb8dcf354fec",
+    "bindingSha256": "852762c202aa874604736a9406ccf134e8de90fe7485aadc15972eb5e77a362b",
+    "sourceSha256": "1d1c8a8107a8bd044337fda7b701182cf205d9dde6e6bb0479c1d5f637df5958",
+    "wirePromptsSha256": "cf50c09ce9ea7faf3d8f67213cd30eb8e3643c8c966379ce2762f47294d7bf1d",
+    "corpusSha256": "8b7f4890d9cc172c37856be9e0bea53a455a07dcc33a76829bb2a834e19e213f",
+    "basePromptsSha256": "e2465ece6e41faf4cb7277c4b667ef6b1ce544e705412a23dabc1c11f3c347e8"
+  },
+  "operatorResultEvidence": "docs/evidence/analyzer-task-json-trial-result-20261015.json",
+  "currentRemainingOriginal20RubHeadroomAtoms": "6441024920"
+}

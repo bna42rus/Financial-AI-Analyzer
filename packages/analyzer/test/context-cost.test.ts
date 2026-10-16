@@ -41,6 +41,39 @@ test('latest explicit category removes a newly selected global leaf even when it
   const r=resolveScope({...globals,subcategoryIds:[leaf]},task,globals,{categoryIds:[other]});
   assert.deepEqual(r.filter.categoryIds,[other]);assert.equal(r.filter.subcategoryIds,undefined);assert.equal(r.sources.categoryIds,'message');
 });
+test('an explicit same-parent selection clears its previous leaf; a date-only edit preserves it', () => {
+  const leaf = '10000000-0000-4000-8000-000000000003';
+  const selected = { ...globals, subcategoryIds: [leaf], accountIds: [other], amountFrom: '25000', operationIds: [leaf] };
+  const unchanged = resolveScope(globals, selected, globals, { from: '2026-08-01', through: '2026-08-31' });
+  assert.deepEqual(unchanged.filter.subcategoryIds, [leaf]);
+  const parent = resolveScope(globals, unchanged.filter, globals, { categoryIds: [id] });
+  assert.equal(parent.filter.subcategoryIds, undefined); assert.equal(parent.sources.subcategoryIds, undefined);
+  assert.deepEqual(parent.filter.categoryIds, [id]); assert.equal(parent.sources.categoryIds, 'message');
+  assert.deepEqual(parent.filter.accountIds, [other]); assert.equal(parent.filter.amountFrom, '25000');
+  assert.deepEqual(parent.filter.operationIds, [leaf]);
+  assert.equal(parent.filter.from, '2026-08-01');
+  const next = resolveScope(globals, parent.filter, globals, { attention: true });
+  assert.equal(next.filter.subcategoryIds, undefined); assert.equal(next.filter.attention, true);
+  assert.deepEqual(selected.subcategoryIds, [leaf]);
+});
+test('explicit leaf replacements remain paired with the parent across date edits and manual removal', () => {
+  const leaf = '10000000-0000-4000-8000-000000000003';
+  const { categoryIds: _initial, ...common } = globals;
+  // Exercise all previous parent/leaf shapes, not just the one observed text.
+  for (const categories of [undefined, [id], [other], [id, other]]) {
+    for (const leaves of [undefined, [leaf]]) {
+      const base = { ...common, ...(categories ? { categoryIds: categories } : {}), ...(leaves ? { subcategoryIds: leaves } : {}) };
+      const replaced = resolveScope(base, undefined, undefined, { categoryIds: [id], subcategoryIds: [leaf] });
+      assert.deepEqual(replaced.filter.subcategoryIds, [leaf]);
+      const dates = resolveScope(base, replaced.filter, base, { from: '2024-02-01', through: '2024-02-29' });
+      assert.deepEqual(dates.filter.subcategoryIds, [leaf]);
+      const { categoryIds: _category, subcategoryIds: _leaf, ...withoutClassification } = base;
+      const removed = resolveScope(withoutClassification, dates.filter, { ...base, categoryIds: [id], subcategoryIds: [leaf] });
+      assert.equal(removed.filter.categoryIds, undefined); assert.equal(removed.filter.subcategoryIds, undefined);
+      assert.equal(removed.filter.from, '2024-02-01');
+    }
+  }
+});
 const price = { version: 'cloud-261002', currency: 'RUB' as const, inputRubPerMillion: '15.86', outputRubPerMillion: '61' };
 test('million-token rates and sub-copeck costs are exact integer accounting values', () => {
   assert.equal(tokenCost(price, 3000, 500), rubAmount('0.07808'));

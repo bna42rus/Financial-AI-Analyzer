@@ -1,0 +1,74 @@
+{
+  "candidate": "cloud-oss",
+  "fixtureVersion": "cashneuro-smoke/1",
+  "benchmarkPromptVersion": "cashneuro-smoke-prompt/7",
+  "responseContract": "cashneuro-response/2",
+  "mode": "task",
+  "runPhase": "after-funding",
+  "turns": 24,
+  "passed": 23,
+  "costPerTurnAtoms": {
+    "meanCeil": "64497842",
+    "median": "70102420",
+    "p95": "82068180",
+    "maximum": "91025420",
+    "perCorrectTurnCeil": "67302096"
+  },
+  "checks": [
+    {
+      "id": "attention",
+      "gate": false,
+      "plan": false,
+      "calls": 1,
+      "inputTokens": 429,
+      "outputTokens": 206,
+      "costAtoms": "19369940",
+      "latencyMs": 908,
+      "replayCalls": 0,
+      "diagnostics": {
+        "question": "Какие операции требуют внимания?",
+        "expectedGate": {
+          "relevance": "financial",
+          "followUp": false
+        },
+        "actualGate": {
+          "relevance": "unrelated",
+          "followUp": false
+        },
+        "expectedPlan": {
+          "status": "query",
+          "query": {
+            "name": "query_finances",
+            "metric": "attention",
+            "grouping": "operation",
+            "comparison": "none",
+            "filter": {
+              "from": "2026-10-01",
+              "through": "2026-10-31"
+            }
+          }
+        },
+        "actualPlan": null,
+        "resolution": null,
+        "decisions": null,
+        "money": null,
+        "normalizations": [],
+        "errors": []
+      }
+    }
+  ],
+  "regression": "smoke-only/1",
+  "cost": {
+    "calls": 492,
+    "reportedCalls": 489,
+    "failedCalls": 30,
+    "inputTokens": 342288,
+    "outputTokens": 132701,
+    "spentAtoms": "13372140620",
+    "heldAtoms": "7516800640",
+    "budgetUsedUpperBoundAtoms": "20888941260",
+    "requiresReconciliation": true,
+    "latencyP95Ms": 2075,
+    "immutableModelVersionVerified": false
+  }
+}

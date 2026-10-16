@@ -1,0 +1,78 @@
+{
+  "version": "cashneuro-vps-inspection/1",
+  "date": "2026-10-15",
+  "source": "Operator-pasted stdout from the protected VPS ledger; no direct server access by the assistant.",
+  "codeCommit": "ddbb4a3a74884a9d9ce89339eda1181e32a2798a",
+  "command": "sudo /usr/bin/node --import tsx src/benchmark-main.ts --inspect cloud-oss task",
+  "inspection": "saved-ledger/1",
+  "candidate": "cloud-oss",
+  "paidCalls": 0,
+  "recordedCandidateCalls": 461,
+  "observedCandidateUnresolved": [
+    {
+      "id": "450efb69910d48616d56b90fbc4d486ad693e39fa3ebcb6c2c2d7c2efc1e1f67",
+      "error": "BENCH_PROVIDER_FAILURE",
+      "heldAtoms": "2152001920"
+    },
+    {
+      "id": "0ad80ba131a38008dacf4478f6920d91bea1b5b9c4432c48cdb944d3fea43fd6",
+      "error": "BENCH_PROVIDER_FAILURE_HTTP_402",
+      "heldAtoms": "2152001920"
+    }
+  ],
+  "observedGlobalCost": {
+    "calls": 492,
+    "reportedCalls": 489,
+    "failedCalls": 30,
+    "inputTokens": 342288,
+    "outputTokens": 132701,
+    "spentAtoms": "13372140620",
+    "heldAtoms": "7516800640",
+    "budgetUsedUpperBoundAtoms": "20888941260",
+    "requiresReconciliation": true,
+    "latencyP95Ms": 2075,
+    "immutableModelVersionVerified": false
+  },
+  "comparisonWithPreviouslyReviewedExport": {
+    "sourceSha256": "2dc58de78c642dbc8e308708388240bf1be441466b05b862cc56842faa3307a6",
+    "allReportedCostFieldsMatch": true,
+    "candidateRecordCountMatches": true,
+    "candidateUnresolvedMatch": true,
+    "historicalOtherCandidate": {
+      "candidate": "cloud-giga",
+      "recordedCalls": 31,
+      "id": "25a3ac53af98c5810ed7fd871cab65ff664b0191c43e9a63c1d156ca879ed185",
+      "error": "BENCH_PROVIDER_FAILURE_HTTP_400",
+      "heldAtoms": "3212796800",
+      "source": "Previously reviewed saved export; not a new cloud-giga VPS inspection."
+    }
+  },
+  "budget": {
+    "existingCapAtoms": "45000000000",
+    "knownCostAndHoldsAtoms": "20888941260",
+    "remainingWithinExistingCapAtoms": "24111058740",
+    "meaning": "Ledger headroom, not Cloud.ru balance or authorization to resume paid dispatch."
+  },
+  "status": "vps_inspection_matches_historical_export_provider_billing_not_reconciled",
+  "ledgerModified": false,
+  "holdsReleased": false,
+  "modelAcceptanceExecuted": false,
+  "paidDispatchEnabled": false,
+  "remaining": [
+    "Prepare frozen executable development/holdout/repetition cases, immutable experiment identity, budget and stop rules.",
+    "Prepare a controlled real-model trial adapter and verify current provider model/configuration/tariff; test-only provider remains synthetic.",
+    "Compare external provider usage/billing evidence before changing any unknown receipt or releasing a historical hold; absence of usage is not zero cost."
+  ],
+  "providerUsageDocumentation": {
+    "url": "https://cloud.ru/docs/foundation-models/ug/topics/guides__activity",
+    "checkedOn": "2026-10-15",
+    "path": "AI Factory -> Foundation Models -> Activity",
+    "filters": [
+      "service account",
+      "model",
+      "API key",
+      "period"
+    ],
+    "limitations": "Model/token/request aggregates alone do not prove which of the three old failed requests was billed; no request-level zero-charge evidence has been supplied."
+  }
+}
