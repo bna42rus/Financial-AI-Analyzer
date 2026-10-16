@@ -24,7 +24,7 @@ test('the operator evaluator runs the actual workflow, retains parents, and dete
   for (let i = 0; i < 2; i++) {
     const c = assistantTrialCases[i]!, r = assistantTrialRequest(c, i, states.get(c.scenario));
     const journal: AssistantJournal = { receipt: { fingerprint: assistantRequestFingerprint(r), calls: [] }, async persist() {}, async reserve() {}, async settle() {} };
-    const model: AssistantModel = { bound: { modelVersion: 'synthetic', inputTokens: 131072, outputTokens: 1200 }, async complete(_input, before) { await before(); return { value: { version: assistantVersion, topic: 'personal_finance', action: 'read', ...plans[i] }, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } }; } };
+    const model: AssistantModel = { bound: { modelVersion: 'synthetic', inputTokens: 131072, outputTokens: 1200 }, async complete(input, before) { await before(); const plan = { version: assistantVersion, topic: 'personal_finance', action: 'read', ...plans[i] }; return { value: input.phase === 'check_changes' ? { plan, conditions: [] } : plan, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } }; } };
     const result = await runAssistant(r, model, journal, assistantTrialServices(r, c, state => states.set(c.scenario, state)));
     assert.equal(scoreAssistantTrial(c, result, states.get(c.scenario)!).passed, true);
     const wrong = { ...result, query: { ...result.query!, filter: { ...result.query!.filter, through: '2026-09-29' } } };
@@ -34,7 +34,7 @@ test('the operator evaluator runs the actual workflow, retains parents, and dete
       seedAssistantReplay(replay, { version: assistantWorkflowVersion, receipt: journal.receipt }, r);
       const noHttp: AssistantModel = { ...model, async complete() { throw Error('UNEXPECTED_MODEL_CALL'); } };
       const answer = await runAssistant(r, noHttp, replay, assistantTrialServices(r, c, () => {}));
-      assert.equal(answer.status, 'query'); assert.equal(replay.receipt.replayedCalls, 1); assert.equal(replay.receipt.result!.code, 'FINANCIAL_QUERY');
+      assert.equal(answer.status, 'query'); assert.equal(replay.receipt.replayedCalls, 2); assert.equal(replay.receipt.result!.code, 'FINANCIAL_QUERY');
       assert.throws(() => seedAssistantReplay({ ...replay, receipt: { fingerprint: 'changed', calls: [] } }, { version: assistantWorkflowVersion, receipt: journal.receipt }, r), /REPLAY_CHANGED/);
     }
   }

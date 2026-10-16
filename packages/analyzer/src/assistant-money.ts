@@ -8,7 +8,7 @@ import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 export function assistantAmountLiteral(expression: string, basis: string) {
   const text = expression.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/\s+/gu, ' ').trim().replace(/[.?]$/u, '');
   if (!['absolute_operation', 'signed_operation'].includes(basis)) throw new TypeError('TASK_AMOUNT_BASIS_UNSUPPORTED');
-  const range = /^(?:от|с) (.+) (?:до|по) (.+)$/u.exec(text.replace(/ включительно$/u, ''));
+  const range = /^(?:(?:от|с) )?(.+) (?:до|по) (.+)$/u.exec(text.replace(/ включительно$/u, ''));
   try {
     if (!range) return amountLiteral(text, text, basis);
     const bounds = parseMoneyRange(range[1], range[2]);

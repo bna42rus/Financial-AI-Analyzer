@@ -22,8 +22,13 @@ function harness() {
     let index = 0; let lastPlan: unknown;
     const model: AssistantModel = { bound: { inputTokens: 131072, outputTokens: 1200, modelVersion: 'synthetic' }, async complete(input, before) {
       calls.push(input); await before(); if (options.failure) throw Error('SYNTHETIC_TIMEOUT');
-      const value = input.phase === 'check_changes' && index >= replies.length ? lastPlan : replies[index++];
-      if (['understand', 'repair', 'check_changes'].includes(input.phase)) lastPlan = value;
+      let value: any;
+      if (input.phase === 'check_changes') {
+        const next = replies[index] as any;
+        value = next?.version || next?.plan ? replies[index++] : lastPlan;
+        value = value?.plan ? value : { plan: value, conditions: [] };
+        lastPlan = value.plan;
+      } else { value = replies[index++]; if (['understand', 'repair'].includes(input.phase)) lastPlan = value; }
       return { value, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } };
     } };
     const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() {}, async settle() {} } as AssistantJournal;
@@ -55,17 +60,18 @@ test('boolean freshness defaults on read never cause repair or change the financ
   for (const flag of [false, true]) {
     const h = harness();
     const reply = await h.execute(990, 'Подсчитай мои траты', [{ ...plan([set('metric', 'expenses')]), needsFreshSources: flag }]);
-    assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 1); assert.equal(h.calls[0]!.phase, 'understand');
+    assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 2); assert.equal(h.calls[0]!.phase, 'understand');
   }
 });
 
 test('amount ranges accept ordinary wording with or without inclusive suffix, shared units and strict single bounds', async () => {
-  for (const text of ['от 700 до 1800 рублей', 'от 700 до 1800 рублей включительно', 'с 700 по 1800 рублей']) {
+  for (const text of ['700 до 1800 рублей', 'от 700 до 1800 рублей', 'от 700 до 1800 рублей включительно', 'с 700 по 1800 рублей']) {
     assert.deepEqual(assistantAmountLiteral(text, 'absolute_operation'), { amountBasis: 'absolute_operation', amountFrom: '70000', amountThrough: '180000' });
   }
   assert.equal(assistantAmountLiteral('от 4 до 9 тысяч рублей', 'absolute_operation').amountFrom, '400000');
   assert.equal(assistantAmountLiteral('от 4 до 9 копеек', 'absolute_operation').amountThrough, '9');
   assert.equal(assistantAmountLiteral('больше 700 рублей', 'absolute_operation').amountFrom, '70001');
+  assert.equal(assistantAmountLiteral('-700 до -300 рублей', 'signed_operation').amountFrom, '-70000');
   assert.equal(assistantAmountLiteral('меньше -7 рублей', 'signed_operation').amountThrough, '-701');
   assert.throws(() => assistantAmountLiteral('от 9 до 4 рублей', 'absolute_operation'), /CONFLICT/);
   assert.throws(() => assistantAmountLiteral('от 4 до 9 евро', 'absolute_operation'), /UNSUPPORTED/);
@@ -73,7 +79,7 @@ test('amount ranges accept ordinary wording with or without inclusive suffix, sh
   const h = harness();
   await h.execute(996, 'Расходы в августе по категориям', [plan([set('metric', 'expenses'), set('period', 'август 2026'), set('grouping', 'category_totals')])]);
   const result = await h.execute(997, 'Только операции от 700 до 1800 рублей', [plan([set('amount', { basis: 'absolute_operation', expression: 'от 700 до 1800 рублей' })], 'continue')]);
-  assert.equal(result.status, 'query'); assert.equal(result.modelCalls, 1); assert.equal(result.query!.grouping, 'category'); assert.equal(result.query!.filter.from, '2026-08-01');
+  assert.equal(result.status, 'query'); assert.equal(result.modelCalls, 2); assert.equal(result.query!.grouping, 'category'); assert.equal(result.query!.filter.from, '2026-08-01');
   assert.equal(result.query!.filter.amountThrough, '180000');
 });
 
@@ -93,17 +99,17 @@ test('semantic review removes an unrequested reset and repairs a wrongly new amo
   assert.equal(narrowed.query!.grouping, 'category'); assert.equal(narrowed.query!.comparison, 'previous_same');
 });
 
-test('explicit presentation names map to distinct registry formats and clearing amount preserves the operation list in one call', async () => {
+test('explicit presentation names map to distinct registry formats and clearing amount preserves the operation list through completeness review', async () => {
   assert.throws(() => parseAssistantPlan(plan([{ field: 'grouping', op: 'set', value: 'none' }])));
   const h = harness();
   await h.execute(700, 'Поступления в августе по категориям со сравнением', [plan([set('metric', 'income'), set('period', 'август 2026'),
     set('grouping', 'category_totals'), set('comparison', 'previous_same'), set('amount', { basis: 'absolute_operation', expression: 'от 600 до 1900 рублей' })])]);
   const listed = await h.execute(701, 'Выведи операции отдельными строками', [plan([set('grouping', 'operation_list')], 'continue')]);
   assert.equal(listed.query!.grouping, 'operation'); assert.equal(listed.query!.filter.amountFrom, '60000'); assert.equal(listed.query!.comparison, 'previous_same');
-  assert.equal(listed.modelCalls, 1);
+  assert.equal(listed.modelCalls, 2);
   const cleared = await h.execute(702, 'Убери только порог суммы', [plan([{ field: 'amount', op: 'clear' }], 'continue')]);
   assert.equal(cleared.query!.grouping, 'operation'); assert.equal(cleared.query!.comparison, 'previous_same'); assert.equal(cleared.query!.filter.from, '2026-08-01');
-  assert.equal(cleared.query!.filter.amountFrom, undefined); assert.equal(cleared.modelCalls, 1);
+  assert.equal(cleared.query!.filter.amountFrom, undefined); assert.equal(cleared.modelCalls, 2);
 });
 
 test('a current category choice replaces the missing historical name before any name lookup', async () => {
@@ -113,7 +119,7 @@ test('a current category choice replaces the missing historical name before any 
   const selected = await h.execute(704, 'Возьми категорию Транспорт', [plan([
     set('categories', { names: ['Транспорт'] }), set('metric', 'expenses', 'h1'), set('period', 'август 2026', 'h1'), set('categories', { names: ['Парковка'] }, 'h1'),
   ], 'pending')], { catalog });
-  assert.equal(selected.status, 'query'); assert.equal(selected.modelCalls, 1); assert.equal(selected.query!.filter.from, '2026-08-01');
+  assert.equal(selected.status, 'query'); assert.equal(selected.modelCalls, 2); assert.equal(selected.query!.filter.from, '2026-08-01');
   assert.deepEqual(selected.query!.filter.categoryIds, [trialId(11)]); assert.equal(h.calculations, 1);
 });
 
@@ -251,4 +257,42 @@ test('unknown event period clarifies instead of calculating globals, signed thre
   const unclear = await h.execute(960, 'Расходы после неизвестного события', [plan([set('metric', 'expenses'), set('period', 'после моей зарплаты')])]); assert.equal(unclear.status, 'clarification'); assert.equal(h.calculations, 0);
   const strict = await h.execute(961, 'Доходы больше 1000 рублей', [plan([set('metric', 'income'), set('amount', { basis: 'absolute_operation', expression: 'больше 1000 рублей' })])]);
   assert.equal(strict.query!.filter.amountFrom, '100001');
+});
+
+
+test('an omitted personal event blocks calculation when completeness review cannot resolve it', async () => {
+  const h = harness(), omitted = plan([set('metric', 'expenses')]);
+  const reply = await h.execute(600, 'Сколько расходов со дня моего переезда?', [omitted,
+    { plan: omitted, conditions: [{ text: 'со дня моего переезда', covered: false }] }]);
+  assert.equal(reply.status, 'clarification'); assert.equal(reply.code, 'CONDITION_UNCLEAR');
+  assert.equal(reply.modelCalls, 2); assert.equal(h.calculations, 0); assert.equal(h.catalogs, 0);
+  assert.equal(h.state.turns[0]!.pending, true);
+});
+
+test('pending request is prominent even when the first model wrongly starts a new category calculation', async () => {
+  const h = harness(), catalog = { ...trialCatalog, categories: [{ ...trialCatalog.categories[1]!, name: 'Автомобиль' }] };
+  await h.execute(601, 'Расходы на парковку в июле 2026', [plan([set('metric', 'expenses'), set('period', 'июль 2026'), set('categories', { names: ['Парковка'] })]), { names: ['Автомобиль'] }], { catalog });
+  const reply = await h.execute(602, 'Тогда возьми Автомобиль', [
+    plan([set('metric', 'expenses'), set('categories', { names: ['Автомобиль'] })]),
+    { plan: plan([set('metric', 'expenses', 'h1'), set('period', 'июль 2026', 'h1'), set('categories', { names: ['Автомобиль'] })], 'pending'),
+      conditions: [{ text: 'выбор Автомобиль в предыдущей просьбе', covered: true }] },
+  ], { catalog });
+  assert.equal(reply.query!.filter.from, '2026-07-01'); assert.equal(reply.query!.filter.through, '2026-07-31');
+  assert.deepEqual(reply.query!.filter.categoryIds, [trialId(11)]);
+  const understood = h.calls.findLast(c => c.phase === 'understand')!.input as any;
+  const reviewed = h.calls.findLast(c => c.phase === 'check_changes')!.input as any;
+  for (const input of [understood, reviewed]) {
+    assert.equal(input.pendingRequest.ref, 'h1'); assert.equal(input.pendingRequest.question, 'Расходы на парковку в июле 2026');
+    assert.equal(JSON.stringify(input).includes('50000000-'), false);
+  }
+});
+
+test('conceptual guidance can correct an overbroad freshness flag and answer without reading finances', async () => {
+  const h = harness(), concept = { version: assistantVersion, topic: 'financial_guidance', action: 'explain', needsFreshSources: true };
+  const reply = await h.execute(603, 'Почему рост цен уменьшает покупательную способность сбережений?', [concept,
+    { plan: { ...concept, needsFreshSources: false }, conditions: [{ text: 'объяснить механизм', covered: true }] },
+    { text: 'При росте цен на ту же сумму можно купить меньше товаров и услуг.' },
+  ]);
+  assert.equal(reply.code, 'FINANCIAL_EXPLANATION'); assert.equal(reply.modelCalls, 3);
+  assert.equal(h.calculations, 0); assert.equal(h.catalogs, 0);
 });

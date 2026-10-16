@@ -20,9 +20,10 @@ export const assistantTrialVersion = 'cashneuro-assistant-smoke/3';
 export function seedAssistantReplay(journal: AssistantJournal, saved: { version: string; receipt: RunReceipt }, request: AssistantRequest) {
   const old = saved.receipt;
   if (saved.version !== assistantWorkflowVersion || old.fingerprint !== assistantRequestFingerprint(request) || journal.receipt.fingerprint !== old.fingerprint ||
-      journal.receipt.calls.length || !Array.isArray(old.calls) || old.calls.length !== 1 || old.calls[0]!.phase !== 'understand' || old.calls[0]!.state !== 'received' || !old.calls[0]!.usage ||
+      journal.receipt.calls.length || !Array.isArray(old.calls) || old.calls.length < 1 || old.calls.length > 2 || old.calls[0]!.phase !== 'understand' ||
+      old.calls.some((c, i) => c.state !== 'received' || !c.usage || i > 0 && c.phase !== 'check_changes') ||
       parseAssistantPlan(old.calls[0]!.value).action !== 'read') throw new AssistantError('ASSISTANT_REPLAY_CHANGED');
-  // Recompile the actual received plan; never import an old result, golden
+  // Recompile the actual received plans; never import an old result, golden
   // query or failed conversation. runAssistant verifies the call fingerprint.
   journal.receipt.calls = structuredClone(old.calls); journal.receipt.replayedCalls = old.calls.length;
 }

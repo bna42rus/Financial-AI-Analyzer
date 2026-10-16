@@ -46,6 +46,7 @@ export function conversationInput(raw: Conversation, scope: TaskScope, question:
   const active = state.book.nodes.at(-1)?.query;
   return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar),
     activeTask: active ? { metric: active.metric, grouping: assistantGrouping[active.grouping], comparison: active.comparison, omittedChanges: 'preserve' } : null,
+    pendingRequest: pending < 0 ? null : history.find(t => t.ref === 'h' + (pending + 1)) ?? null,
     history, omittedHistoryCount: state.turns.length - history.length },
     sources, pendingSource: pending < 0 ? undefined : 'h' + (pending + 1) };
 }
