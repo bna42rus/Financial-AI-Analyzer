@@ -1,0 +1,49 @@
+{
+  "name": "@finance/api",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --import tsx src/main.ts",
+    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts test/task-trial.test.ts test/task-pilot.test.ts test/task-schema-probe.test.ts test/task-json-trial.test.ts test/task-json-cache-audit.test.ts test/task-prepared-contract.test.ts test/task-intent.test.ts test/task-intent-pilot.test.ts",
+    "benchmark": "node --import tsx src/benchmark-main.ts",
+    "benchmark:audit-review": "node --import tsx src/benchmark-audit-review-main.ts",
+    "kms:init": "node --import tsx src/kms-init.ts",
+    "services:migrate": "node --import tsx src/service-migrate.ts",
+    "test:integration": "pnpm run test:integration:base && node --import tsx --test --test-concurrency=1 test/overview.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer.test.ts",
+    "operator": "node --import tsx src/operator.ts",
+    "owner:begin": "node --import tsx src/owner-main.ts begin",
+    "owner:complete": "node --import tsx src/owner-main.ts complete",
+    "test:browser": "pnpm run test:browser:base && node --import tsx --test --test-concurrency=1 test/overview-browser.test.ts && node --import tsx --test --test-concurrency=1 test/analyzer-browser.test.ts",
+    "dev:mail": "node --import tsx src/mail-main.ts",
+    "dev:imports": "node --import tsx src/import-main.ts",
+    "test:integration:base": "node --import tsx --test --test-concurrency=1 test/security.test.ts test/mail.test.ts test/finance.test.ts test/finance-structure.test.ts test/finance-entities.test.ts test/finance-history.test.ts test/finance-reset.test.ts test/finance-chains.test.ts test/import-validation.test.ts test/import-ingestion.test.ts test/operations.test.ts test/budgets.test.ts",
+    "test:browser:base": "node --import tsx --test --test-concurrency=1 test/browser.test.ts test/review-browser.test.ts test/operations-browser.test.ts test/budgets-browser.test.ts",
+    "test:analyzer-tasks": "node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts",
+    "benchmark:task-trial": "node --import tsx src/task-trial-main.ts"
+  },
+  "dependencies": {
+    "@better-auth/drizzle-adapter": "1.7.7",
+    "@finance/access": "workspace:*",
+    "@finance/database": "workspace:*",
+    "@nestjs/common": "12.1.2",
+    "@nestjs/core": "12.1.2",
+    "@nestjs/platform-fastify": "12.1.2",
+    "@node-rs/argon2": "2.2.2",
+    "better-auth": "1.7.7",
+    "better-call": "1.4.0",
+    "drizzle-orm": "0.45.3",
+    "fastify": "5.12.5",
+    "pg": "8.23.1",
+    "pg-boss": "12.37.0",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "24.19.1",
+    "@types/pg": "8.15.6",
+    "tsx": "4.20.6",
+    "typescript": "7.0.2"
+  }
+}

@@ -1,0 +1,15 @@
+import { spawnSync } from 'node:child_process';
+import { writeFile } from 'node:fs/promises';
+const [profile,revision,...extra]=process.argv.slice(2),root=new URL('../',import.meta.url);
+if(extra.length||!['finance','control'].includes(profile)||!/^[a-f0-9]{40}$/.test(revision??''))throw Error('CONNECTED_BUILD_ARGUMENTS_INVALID');
+const raw=process.env.VITE_API_ORIGIN;
+if(!raw)throw Error('CONNECTED_BUILD_API_REQUIRED');
+const origin=new URL(raw);
+if(origin.username||origin.password||origin.search||origin.hash||!['http:','https:'].includes(origin.protocol)||!['test.cashneuro.ru','admin.test.cashneuro.ru','127.0.0.1','localhost'].includes(origin.hostname))throw Error('CONNECTED_BUILD_API_INVALID');
+if(origin.hostname.endsWith('cashneuro.ru')&&(origin.protocol!=='https:'||origin.port||origin.hostname!==(profile==='finance'?'test.cashneuro.ru':'admin.test.cashneuro.ru')))throw Error('CONNECTED_BUILD_PROFILE_INVALID');
+const apiOrigin=raw.replace(/\/$/,''),pkg=profile==='finance'?'web':'admin';
+const run=(exe,args)=>{const result=spawnSync(exe,args,{cwd:root,env:{...process.env,VITE_API_ORIGIN:apiOrigin},stdio:'inherit'});if(result.status!==0)throw Error('CONNECTED_BUILD_FAILED');};
+if(profile==='finance')run(process.execPath,['scripts/prepare-ocr-assets.mjs']);
+run('pnpm',['--filter',profile==='finance'?'@finance/web':'@finance/admin','exec','vite','build','--mode','staging']);
+await writeFile(new URL(`apps/${pkg}/dist/release.json`,root),JSON.stringify({schema:'cashneuro-web-build/1',revision,profile,mode:'connected',apiOrigin})+'\n');
+console.log('Собран интерфейс, подключённый к API: '+apiOrigin);

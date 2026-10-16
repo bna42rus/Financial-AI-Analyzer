@@ -9,11 +9,18 @@
   },
   "scripts": {
     "check:spec": "node scripts/check-spec.mjs",
-    "test": "node --test packages/finance-core/test/money.test.ts",
+    "test": "node --test packages/finance-core/test/money.test.ts packages/finance-core/test/graph.test.ts packages/finance-core/test/duplicate-merge.test.ts packages/finance-core/test/review-group.test.ts packages/finance-core/test/operations.test.ts packages/access/test/model.test.ts packages/imports/test/preparation.test.ts packages/imports/test/matching.test.ts packages/imports/test/bank-pdf.test.ts packages/imports/test/safe-source.test.ts packages/imports/test/bank-table.test.ts packages/privacy/test/text.test.ts packages/finance-core/test/budgets.test.ts packages/finance-core/test/overview.test.ts packages/analyzer/test/registry.test.ts packages/analyzer/test/context-cost.test.ts packages/analyzer/test/task-context.test.ts packages/analyzer/test/task-literals.test.ts",
     "dev:web": "pnpm --filter @finance/web dev",
     "build:web": "pnpm --filter @finance/web build",
     "check:web": "pnpm --filter @finance/web check",
-    "test:e2e": "pnpm --filter @finance/web test:e2e",
-    "check": "pnpm run check:spec && pnpm test && pnpm run check:web && pnpm run build:web"
+    "dev:admin": "pnpm --filter @finance/admin dev",
+    "check:admin": "pnpm --filter @finance/admin check",
+    "build:admin": "pnpm --filter @finance/admin build",
+    "test:e2e": "pnpm --filter @finance/web test:e2e && pnpm --filter @finance/admin test:e2e",
+    "check": "pnpm run check:spec && pnpm test && pnpm run check:web && pnpm run check:admin && pnpm run build:web && pnpm run build:admin && pnpm run check:api",
+    "dev:api": "pnpm --filter @finance/api dev",
+    "check:api": "pnpm --filter @finance/api check",
+    "test:security": "pnpm --filter @finance/api test:integration",
+    "test:access-browser": "pnpm --filter @finance/api test:browser"
   }
 }

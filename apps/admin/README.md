@@ -1,1 +1,11 @@
-Separate React/Vite administrative origin and session. No finance DB or chat access. Not implemented yet.
+# Первая версия админки
+
+Отдельное React/Vite приложение: `pnpm run dev:admin` из корня, http://127.0.0.1:5174. Пользовательское приложение работает отдельно на 5173. Общие зависимости имеют уже используемые точные версии; отдельная сборка не включает пользовательские операции или чаты.
+
+Первый вход пустой. «Открыть пример» включает synthetic заявки и один ранее учтённый synthetic payment. Можно искать/фильтровать заявки, открыть карточку, сверить перевод, посмотреть последствия, запросить доплату, принять mismatch за полный тариф, выбрать custom дни или отклонить заявку. Платежи, pending purchases, приглашения и история обновляются только в памяти. Закрытие примера/перезагрузка очищают данные. Продления обозначены отдельным неподключённым процессом.
+
+Условный email verification/actor в примере не являются реальной проверкой почты/роли. Auth/TOTP/recovery, серверные endpoints, DB roles, email delivery и secure links предстоят. Админка сейчас не выдает реальные права, не отправляет письма и не переводит деньги. Порт 5174 сам по себе не доказывает security isolation; runtime защита реализуется следующей частью этапа 3.
+
+Проверки: `pnpm run check:admin`, `pnpm run build:admin`, `pnpm --filter @finance/admin exec playwright test`. Chromium устанавливается из `@finance/web` той же версии Playwright. Сценарии: `e2e/requests.spec.ts`, 8 сценариев × desktop/mobile. Физический iPhone/Safari не проверялся.
+
+[Порядок, требования и границы](../../docs/architecture/access-admin-requests.md).

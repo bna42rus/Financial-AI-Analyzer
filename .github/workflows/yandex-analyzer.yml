@@ -1,0 +1,49 @@
+name: yandex-analyzer
+on:
+  pull_request:
+    branches: [main, feature/staging-owner-bootstrap, feature/yandex-analyzer, feature/analyzer-context-budget]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: analyzer-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  analyzer-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Check API types, native REST contract and privacy boundaries
+        run: |
+          pnpm run check:spec
+          pnpm run check:api
+      - name: Check deterministic finance and closed Analyzer Registry
+        run: pnpm test
+      - name: Check and build Finance and Control interfaces
+        run: |
+          pnpm run check:web
+          pnpm run check:admin
+          pnpm run build:web
+          pnpm run build:admin
+      - name: Check isolated PostgreSQL, quota, rollback, role isolation and existing authentication
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts test/analyzer-cost.test.ts test/yandex-integration.test.ts test/analyzer.test.ts test/security.test.ts test/mail.test.ts test/owner-bootstrap.test.ts
+      - name: Install pinned Chromium for browser acceptance
+        run: pnpm --filter @finance/api exec playwright install --with-deps chromium
+      - name: Check real Analyzer browser flows on desktop and mobile
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-browser.test.ts test/analyzer-browser.test.ts

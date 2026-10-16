@@ -1,0 +1,49 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {matchSource,sameSource,strictSourceDescriptor} from '../src/matching.ts';
+import type {SourceCandidate} from '../src/matching.ts';
+import type {PreparedRow} from '../src/contract.ts';
+const row:PreparedRow={ordinal:1,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',direction:'debit',account:{kind:'bank_account',hmac:'a'.repeat(64)},bankRefHmac:null};
+const source=(patch:Partial<SourceCandidate>={}):SourceCandidate=>({transactionId:'one',fileHmac:'file',ordinal:1,bankRefHmac:null,operationDate:row.operationDate,postedDate:null,amountMinor:'-100',currency:'RUB',direction:'debit',...patch});
+test('same-file row instance reuses a transaction, without suppressing the file',()=>assert.deepEqual(matchSource(row,'file',[source()],new Set()),{transactionId:'one',possibleIds:[]}));
+test('ordinal never becomes a bank ID across different files',()=>assert.deepEqual(matchSource(row,'different',[source()],new Set()),{transactionId:null,possibleIds:['one']}));
+test('two identical real purchases in one file remain separate without an invented duplicate warning',()=>assert.deepEqual(matchSource({...row,ordinal:2},'file',[source()],new Set(['one'])),{transactionId:null,possibleIds:[]}));
+test('strong bank reference reuses an operation even when source date/amount changed',()=>assert.equal(matchSource({...row,amountMinor:'-200',bankRefHmac:'ref'},'new',[source({bankRefHmac:'ref'})],new Set()).transactionId,'one'));
+test('one transaction is never matched twice within a file',()=>assert.deepEqual(matchSource({...row,bankRefHmac:'ref'},'new',[source({bankRefHmac:'ref'})],new Set(['one'])),{transactionId:null,possibleIds:['one']}));
+test('multiple observations of one bank operation are a single strong candidate',()=>assert.equal(matchSource({...row,bankRefHmac:'ref'},'new',[source({bankRefHmac:'ref'}),source({bankRefHmac:'ref',fileHmac:'older'})],new Set()).transactionId,'one'));
+test('a repeated reference shared by distinct transactions is ambiguous',()=>assert.deepEqual(matchSource({...row,bankRefHmac:'ref'},'new',[source({bankRefHmac:'ref'}),source({bankRefHmac:'ref',transactionId:'two'})],new Set()),{transactionId:null,possibleIds:['one','two']}));
+test('file instance disambiguates repeated bank references',()=>assert.equal(matchSource({...row,bankRefHmac:'ref'},'file',[source({bankRefHmac:'ref'}),source({bankRefHmac:'ref',transactionId:'two',ordinal:2})],new Set()).transactionId,'one'));
+test('no remaining observation means physical deletion permits reimport',()=>assert.equal(matchSource(row,'file',[],new Set()).transactionId,null));
+test('source precision is preserved, never inferred from equal calendar dates',()=>assert.deepEqual(matchSource(row,'new',[source({operationDate:{precision:'instant',instant:'2026-09-01T00:00:00.000Z'}})],new Set()),{transactionId:null,possibleIds:[]}));
+test('posting date and direction are source facts, not mutable effective corrections',()=>{assert.equal(sameSource(row,source({postedDate:{precision:'day',date:'2026-09-02'}})),false);assert.equal(sameSource(row,source({direction:'unknown'})),false);});
+test('JSONB key ordering does not change source-date identity',()=>assert.equal(sameSource(row,source({operationDate:{date:'2026-09-01',precision:'day'}})),true));
+test('strict source requires an exact bank instant and explicit merchant evidence',()=>{
+ const exact={...row,operationDate:{precision:'instant' as const,instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase' as const,merchant:'ozon' as const}};
+ assert.equal(strictSourceDescriptor(row),null);assert.equal(strictSourceDescriptor({...exact,operationDate:row.operationDate}),null);assert.equal(strictSourceDescriptor({...exact,safeSource:{event:'purchase',merchant:null}}),null);
+ assert.notEqual(strictSourceDescriptor(exact),strictSourceDescriptor({...exact,account:{...row.account,hmac:'b'.repeat(64)}}));
+ assert.notEqual(strictSourceDescriptor(exact),strictSourceDescriptor({...exact,safeSource:{event:'purchase',merchant:'magnit'}}));
+});
+test('strict cross-file match is one-to-one and never chooses an ambiguous instance',()=>{
+ const exact={...row,operationDate:{precision:'instant' as const,instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase' as const,merchant:'ozon' as const}},c=source({operationDate:exact.operationDate,strictFingerprint:'key'});
+ assert.equal(matchSource(exact,'new',[c],new Set(),'key').transactionId,'one');
+ assert.equal(matchSource(exact,'new',[c],new Set(['one']),'key').transactionId,null);
+ assert.equal(matchSource(exact,'new',[c,{...c,transactionId:'two'}],new Set(),'key').transactionId,null);
+ assert.equal(matchSource(exact,'new',[{...c,bankRefHmac:'different-stable-id'}],new Set(),'key').transactionId,null);
+});
+
+test('explicitly merged known file ordinals reuse their canonical operation, but unseen instances remain one-to-one',()=>{
+ const c=source({mergedInstance:true});assert.equal(matchSource(row,'file',[c],new Set(['one'])).transactionId,'one');
+ assert.equal(matchSource({...row,ordinal:2},'file',[c],new Set(['one'])).transactionId,null);
+ assert.equal(matchSource(row,'other-file',[c],new Set(['one'])).transactionId,null);
+});
+test('new strict identity includes full description evidence for unknown merchants; unsafe or date-only rows stay ambiguous',()=>{
+ const exact={...row,descriptionHmac:'a'.repeat(64),operationDate:{precision:'instant' as const,instant:'2026-09-01T10:00:00.000Z'},safeSource:{event:'purchase' as const,merchant:null}};
+ assert.ok(strictSourceDescriptor(exact));assert.notEqual(strictSourceDescriptor(exact),strictSourceDescriptor({...exact,descriptionHmac:'b'.repeat(64)}));
+ assert.equal(strictSourceDescriptor({...exact,descriptionHmac:null}),null);assert.equal(strictSourceDescriptor({...exact,operationDate:row.operationDate}),null);
+});
+test('different full descriptions do not become false duplicate candidates solely through equal day, amount and brand',()=>{
+ const identified={...row,descriptionHmac:'a'.repeat(64)},c=source({descriptionHmac:'b'.repeat(64)});
+ assert.deepEqual(matchSource(identified,'new',[c],new Set()),{transactionId:null,possibleIds:[]});
+ assert.deepEqual(matchSource(identified,'new',[{...c,descriptionHmac:identified.descriptionHmac}],new Set()),{transactionId:null,possibleIds:['one']});
+ assert.equal(matchSource({...identified,bankRefHmac:'stable'},'new',[{...c,bankRefHmac:'stable'}],new Set()).transactionId,'one');
+});

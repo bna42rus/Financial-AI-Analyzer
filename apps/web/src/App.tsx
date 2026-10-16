@@ -12,8 +12,9 @@ import type { OperationsView, OperationScope } from './demo/operations';
 import { Analyzer } from './Analyzer';
 import { newChatBook } from './demo/analyzer';
 import type { ChatBook } from './demo/analyzer';
-import { Settings, defaultAppearance } from './Settings';
+import { Settings } from './Settings';
 import type { Appearance } from './Settings';
+import {applyAppearance,readAppearance} from './workspace';
 import { ProfileDialog, UploadDialog } from './ShellDialogs';
 
 type Detail = { title: string; description: string; rows: readonly DemoOperation[]; calculation?: boolean };
@@ -36,12 +37,8 @@ export function App() {
   const [screen,setScreen] = useState<Screen>(currentScreen);
   const [modal,setModal] = useState<'upload'|'profile'|null>(null);
   const [historyOperation,setHistoryOperation] = useState<DemoOperation|null>(null);
-  const [appearance,setAppearance] = useState<Appearance>(()=>({...defaultAppearance}));
-  useEffect(()=>{
-    const root=document.documentElement;
-    root.dataset.theme=appearance.theme;root.dataset.density=appearance.density;
-    root.dataset.textSize=appearance.textSize;root.dataset.motion=appearance.motion;
-  },[appearance]);
+  const [appearance,setAppearance] = useState<Appearance>(readAppearance);
+  useEffect(()=>applyAppearance(appearance),[appearance]);
   const [chatBook,setChatBook] = useState<ChatBook>(newChatBook);
   const [operationsView,setOperationsView] = useState<OperationsView>(defaultOperationsView);
   const [scope,setScope] = useState<OperationScope|null>(null);
@@ -92,7 +89,7 @@ export function App() {
     <a className={styles.skip} href={`#${screen}`}>Перейти к содержимому</a>
     <header className={styles.header}>
       <a href="#overview" onClick={event=>{event.preventDefault();navigate("overview");}} className={styles.brand}><span className={styles.brandMark}><ChartNoAxesCombined size={19} aria-hidden="true" /></span><span>Финансовый анализатор<span className={styles.brandNote}>Первая версия интерфейса</span></span></a>
-      <div className={styles.headerActions}><button className={styles.primaryButton} onClick={()=>setModal('upload')} aria-label="Загрузить файлы"><Upload size={17} aria-hidden="true" /><span className={styles.uploadLabel}>Загрузить файлы</span></button><button className={styles.button} onClick={()=>setModal('profile')} aria-label="Профиль"><UserRound size={17} aria-hidden="true" /></button></div>
+      <div className={styles.headerActions}><a className={styles.button} href="#access">Получить доступ</a><button className={styles.primaryButton} onClick={()=>setModal('upload')} aria-label="Загрузить файлы"><Upload size={17} aria-hidden="true" /><span className={styles.uploadLabel}>Загрузить файлы</span></button><button className={styles.button} onClick={()=>setModal('profile')} aria-label="Профиль"><UserRound size={17} aria-hidden="true" /></button></div>
       <nav className={styles.nav} aria-label="Разделы сайта">
         <a href="#overview" onClick={event=>{event.preventDefault();navigate("overview");}} aria-current={screen==='overview'?'page':undefined}><LayoutDashboard size={17} aria-hidden="true" />Обзор</a>
         <a href="#operations" onClick={event=>{event.preventDefault();setScope(null);navigate("operations");}} aria-current={screen==='operations'?'page':undefined}><List size={17} aria-hidden="true" />Операции</a>

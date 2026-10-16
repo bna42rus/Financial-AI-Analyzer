@@ -1,1 +1,5 @@
-Financial Relevance Gate, closed Registry, provider gateway and quota accounting. Not implemented yet.
+Versioned finite Registry, deterministic financial intents and strict synthetic provider contract. Authenticated persisted chats, server calculations, permission checks and monthly quota ledger live in `apps/api/src/analyzer.ts`; the frontend uses the same finance preview/commit and Undo services as Operations.
+
+The separately versioned task context/protocol/literals and `apps/api/src/analyzer-task-workflow.ts` implement task selection, keep/set/clear/use_current and guarded execution through injected services. They are connected to durable PostgreSQL/CAS, opt-in test HTTP routes, a synthetic Cloud adapter and UI revision stamps. No staging provider/real network switch is available; paid CLI remains paused. Target PostgreSQL 18, browser acceptance and frozen real-model acceptance remain gates. See [task contract and status](../../docs/architecture/analyzer-task-contract.md).
+
+This is the Analyzer foundation, not a production AI provider. Unknown financial language, financial-adjacent classification, documents, web/freshness, calculators and the remaining Registry groups require subsequent implementation and provider acceptance. See [contract and boundaries](../../docs/architecture/analyzer-foundation.md).

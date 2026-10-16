@@ -3,7 +3,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, feature/web-settings-recovery]
+    branches: [main, feature/web-settings-recovery, feature/access-admin-requests, feature/server-access-security, feature/invitation-registration, feature/access-renewal, feature/manual-access, feature/mail-notifications, feature/finance-foundation, feature/account-structure-deletion, feature/category-counterparty-structure, feature/exclusions-history, feature/financial-reset, feature/derived-links, feature/import-preparation, feature/import-ingestion, feature/local-bank-parsers, feature/safe-bank-source, feature/live-import-ui, feature/live-operation-review, feature/spec-screen-audit, feature/import-cancellation-dedupe, feature/duplicate-merge, feature/operation-relations, feature/review-bulk-actions, feature/settings-rule-editors, feature/deletion-reset-ui, feature/import-review-expansion, feature/local-tabular-ocr, feature/comprehensive-spec-audit, feature/operations-views-pagination, feature/budgets-periods-versions, feature/overview-complete, feature/analyzer-foundation, feature/analyzer-tools]
     types: [opened, reopened, synchronize]
   workflow_dispatch:
 permissions:
@@ -11,6 +11,138 @@ permissions:
 jobs:
   bootstrap-checks:
     name: bootstrap-checks
+    runs-on: ubuntu-latest
+    # Real PostgreSQL and HTTP suites include two 10k-row browser journeys.
+    # Individual request/test timeouts still detect stalled operations.
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Reject known high and critical dependency advisories
+        run: pnpm audit --audit-level=high
+      - name: Verify sources, calculations, types and web build
+        run: pnpm run check
+      - name: Check auth, TOTP, recovery, ownership and database roles on PostgreSQL 18
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        # Overview has its own PostgreSQL/browser job below; run each large suite once.
+        run: pnpm --filter @finance/api run test:integration:base
+      - name: Install browser for interface checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check full application, payment review and registration over HTTP with PostgreSQL
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api run test:browser:base
+      - name: Save real PostgreSQL Operations desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: operations-previews
+          path: apps/api/operations-previews/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+  budget-checks:
+    name: budget-checks
+    runs-on: ubuntu-latest
+    # Real PostgreSQL and HTTP suites include two 10k-row browser journeys.
+    # Individual request/test timeouts still detect stalled operations.
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Reject known high and critical dependency advisories
+        run: pnpm audit --audit-level=high
+      - name: Check API types for budget scenarios
+        run: pnpm run check:api
+      - name: Check budget periods, versions, tenant isolation and deletion on PostgreSQL 18
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/budgets.test.ts
+      - name: Install browser for interface checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check budget creation, limits, drill-down and Undo in real browsers
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/budgets-browser.test.ts
+      - name: Check budget drafts, delayed responses and access loss in desktop and mobile browsers
+        run: pnpm --filter @finance/web exec playwright test e2e/budgets.spec.ts
+      - name: Save real PostgreSQL Budget desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: budgets-previews
+          path: apps/api/budgets-previews/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+
+  overview-checks:
+    name: overview-checks
+    runs-on: ubuntu-latest
+    # Real PostgreSQL and HTTP suites include two 15k-row browser journeys.
+    # Individual request/test timeouts still detect stalled operations.
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Reject known high and critical dependency advisories
+        run: pnpm audit --audit-level=high
+      - name: Check API types for overview scenarios
+        run: pnpm run check:api
+      - name: Check overview metrics, comparisons, saved views, tenant isolation and deletion on PostgreSQL 18
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/overview.test.ts
+      - name: Install browser for interface checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check overview widgets, layouts, reload, drill-down and Undo in real browsers
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/overview-browser.test.ts
+      - name: Check overview drafts, comparisons, delayed responses and access loss in desktop and mobile browsers
+        run: pnpm --filter @finance/web exec playwright test e2e/overview-connected.spec.ts
+      - name: Save real PostgreSQL Overview desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: overview-previews
+          path: |
+            apps/api/overview-previews/*.png
+            apps/web/test-results/**/overview-complete.png
+          if-no-files-found: error
+          retention-days: 7
+
+
+  interface-checks:
+    name: interface-checks
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -24,9 +156,114 @@ jobs:
         run: npm install --global pnpm@11.25.0 --ignore-scripts
       - name: Install locked dependencies
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Verify sources, calculations, types and web build
-        run: pnpm run check
       - name: Install browser for interface checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
       - name: Check interface on desktop and mobile
         run: pnpm run test:e2e
+      - name: Save financial reset desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: financial-reset-previews
+          path: apps/web/test-results/**/financial-reset-preview.png
+          if-no-files-found: error
+          retention-days: 7
+      - name: Save similar-purchase Review desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-group-previews
+          path: apps/web/test-results/**/review-group-preview.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Save CSV XLSX OCR upload desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-import-previews
+          path: apps/web/test-results/**/local-import-preview.png
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Save synthetic interface diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: interface-failure-diagnostics
+          path: |
+            apps/web/test-results/
+            apps/admin/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  local-import-checks:
+    name: local-import-checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install browser for local import checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check actual CSV XLSX and scanned PDF locally in desktop and mobile browsers
+        run: pnpm --filter @finance/web exec playwright test e2e/import-tabular.spec.ts
+      - name: Save synthetic local import diagnostics on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-import-failure-diagnostics
+          path: apps/web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  analyzer-checks:
+    name: analyzer-checks
+    runs-on: ubuntu-latest
+    # Real PostgreSQL and HTTP suites include saved-chat and confirmed-action browser journeys.
+    # Individual request/test timeouts still detect stalled operations.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Reject known high and critical dependency advisories
+        run: pnpm audit --audit-level=high
+      - name: Check API types for analyzer scenarios
+        run: pnpm run check:api
+      - name: Check Analyzer gate, scope, quotas, tenant isolation and deletion on PostgreSQL 18
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer.test.ts
+      - name: Install browser for interface checks
+        run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
+      - name: Check Analyzer saved chats, confirmation, reload and Undo in real browsers
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-browser.test.ts
+      - name: Check analyzer drafts, comparisons, delayed responses and access loss in desktop and mobile browsers
+        run: pnpm --filter @finance/web exec playwright test e2e/analyzer-connected.spec.ts
+      - name: Save real PostgreSQL Analyzer desktop and mobile previews
+        uses: actions/upload-artifact@v4
+        with:
+          name: analyzer-previews
+          path: |
+            apps/api/analyzer-previews/*.png
+            apps/web/test-results/**/analyzer-connected.png
+          if-no-files-found: error
+          retention-days: 7
+

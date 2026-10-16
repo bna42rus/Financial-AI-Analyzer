@@ -1,25 +1,39 @@
 # Состояние проекта
 
-Обновлено 4 октября 2026 года. Продуктовая база 1.3 и исходные документы сохранены без изменения.
+Обновлено 7 октября 2026 года. Продуктовая база 1.3, исходные PDF/Word и agreed A/B/E сохранены без изменений.
 
-Подготовлены закрытый репозиторий bna42rus/Financial-AI-Analyzer, список реализации/проверок и карта всех разделов PDF. План и согласованное оформление сохранены в main через [PR #1](https://github.com/bna42rus/Financial-AI-Analyzer/pull/1), merge commit 4bb5d77287d675f32fb9e65d6827e03908225e64. Предшествующие GitHub проверки прошли; доступ к чтению и записи подтверждён.
+Закрытый репозиторий владельца: https://github.com/bna42rus/Financial-AI-Analyzer. Документы, чтение/запись и GitHub CI проверены. История исходной базы сохранена. Подписка Pro и защита main пока не подтверждены.
 
-В ветке feature/web-overview реализована запускаемая React/Vite оболочка и первая часть экрана «Обзор». Закреплены версии зависимостей и pnpm lockfile. Первый вход пустой, искусственные операции включаются отдельно и остаются только в памяти. Есть фильтры, показатели, простые графики, крупнейшие расходы и окна для чтения/объяснения. Детали и границы: [web-overview.md](web-overview.md).
+## Принятая интерфейсная версия
 
-Локально прошли проверка исходных hashes, 10 тестов денежных primitives, strict TypeScript, 20 тестов искусственных проекций, сборка Vite и 32 браузерные проверки (компьютер/мобильная эмуляция Chromium). Audit runtime зависимостей не сообщил известных уязвимостей на дату проверки; это не полный аудит безопасности сайта. Workflow дополнен проверками первого интерфейса; результат нового GitHub запуска проверяется отдельно.
+Обзор, Операции, Анализатор и Настройки, окна загрузки/профиля и переходы к истории объединены с main через PR №2–6. Main после PR №6: `bf3e2db1e6314c84c8e28df8d9c71cbb2af21ac4`; [88 проверок после объединения](https://github.com/bna42rus/Financial-AI-Analyzer/actions/runs/37617425642) прошли. Первая интерфейсная версия этапа 2 принята. [Обзор](web-overview.md), [Операции](web-operations.md), [Анализатор](web-analyzer.md), [Настройки](web-settings.md), [загрузка/профиль/история](web-shell-completion.md).
 
-Этап 1 (документы и цикл GitHub/CI) завершён. Этап 2 (четыре первых экрана) выполнен частично: есть оболочка и первые части Обзора/Операций/Анализатора. Обзор и Операции приняты и объединены через PR #2/#3. В `feature/web-analyzer` добавлены диалоги и локальные демонстрационные ответы; [результат](web-analyzer.md). Следующий экран — Настройки. Это не готовый финансовый сайт; настоящее подключение AI и постоянное хранение чатов предстоят.
+Примеры явно включаются и существуют только в памяти. Файлы ещё не обрабатываются; аккаунты, API, финансовая база, истинная история/Undo и AI не подключены.
 
-Предстоят: остальные экраны, сервер/API и админка, авторизация и права, база/roles/RLS, общее финансовое ядро, imports/privacy/dedupe, components/links, Registry/AI, почта, история, бюджеты, графики/виджеты/saved views, эксплуатационные и полные проверки. Подписка Pro и защита main, облачные среды и доступ к провайдерам не подтверждены. Docker здесь отсутствует; инфраструктурные шаблоны не запускались.
+## Первый блок этапа 3
 
-Для Production нужны все проверки, согласованные legal/retention/RPO/RTO, принятие владельцем отдельного Staging и конкретной сборки, миграции и восстановление. Основа будущего размещения — Timeweb RU, managed PostgreSQL предпочтителен после проверки цены/возможностей. Домен и тарифы открыты. Услуги не приобретались, Production не публиковался.
+В `feature/access-admin-requests` добавлены чистая модель заявки/ручной оплаты/приглашений и интерфейс для приёмки: публичный тестовый путь `#access`, отдельная админка на Development origin 5174. Очередь, карточка, preview, mismatch decisions, отдельная доплата, payment journal, pending purchase/invitation и audit работают на synthetic данных. [Границы и проверки](access-admin-requests.md).
 
-Денежные primitives и искусственная UI-проекция не заменяют полный финансовый движок. Никакие требования не отменены. По E-04 TOTP администратора остаётся обязательным; single-use recovery codes заменяют обязательное SMS-восстановление, со сбросом прежних сессий/TOTP и повторным enrollment до доступа.
+Конфигурация проверок: 10 денежных + 16 domain + 20 projection tests, strict TypeScript и две сборки, 62 web + 16 admin browser scenarios. Hosted результат фиксируется в новом PR. Это не полная security/runtime acceptance.
 
-### Первая версия Настроек
+## Второй блок этапа 3
 
-[Экран и результаты проверки](../architecture/web-settings.md). В отдельной feature branch добавлены десять разделов, поиск, параметры оформления, сброс и точные переходы к операциям. Базовые интерфейсные версии четырёх экранов доступны; этап 2 остаётся частично выполненным. Настройки финансовой логики пока для чтения; полноценные редактирование, persistence, API/права и история/удаление предстоят.
+В `feature/server-access-security` / PR №8 реализованы NestJS/Fastify, PostgreSQL/Drizzle/Better Auth, два runtime DB roles и отдельные auth realms/cookies, single-use hashed verification/reset/recovery codes, owned application sessions, mandatory admin TOTP и recovery-only verified re-enrollment. Reset отзывает все старые sessions/tokens/contexts. Durable rate limits, no-store/CSRF и transactional encrypted outbox проверяются security tests. [Реализация, endpoints и ограничения](server-access-security.md).
 
-### Окна загрузки, профиль и переходы к истории — 7 октября
+Локально прошли общий check, две crypto проверки и 78 browser scenarios. 24 integration scenarios выполняются на official PostgreSQL 18.4 в GitHub CI; локальная среда ограничивает OS users, поэтому локального DB success не заявляем. Итог конкретного head/run фиксируется в PR №8. RLS/tenant isolation проверяются на canary, actual finance schema ещё отсутствует.
 
-Четыре базовых экрана дополнены оставшимися интерфейсными окнами этапа 2. [Результат](web-shell-completion.md). Настройки предложены в PR №5; следующая feature branch основана на его проверенном head и не меняет main. Новая версия предлагается отдельно для приёмки. После неё по плану следует этап 3: доступ, безопасность и админка. Реальные сервисы и Production не подключались.
+Третий Development блок добавляет UI binding, transactional manual payment/invitations и invitation-only registration/activation; четвёртый — renewal. PR №7/№8 не объединены с main. Delivery worker/provider, реальные owner onboarding/тарифы/KMS/credentials и полный security/release acceptance остаются открытыми. Client actor/verification events UI не дают server authority. Production startup серверного foundation заблокирован.
+
+## Остальная работа и запуск
+
+Предстоят общее финансовое ядро, imports/privacy/HMAC/dedupe, components/links, Registry/AI, настоящие история/Undo, бюджеты/графики/виджеты/saved views, полный пользовательский и административный контур, эксплуатационные и общие проверки.
+
+Облачные среды/доступ к провайдерам, legal/retention/RPO/RTO и конкретная смета ещё не подтверждены. Docker здесь не установлен; инфраструктурные шаблоны не запускались. Основа будущего размещения — Timeweb RU, managed PostgreSQL после проверки цены/возможностей. Домен и настоящие тарифы остаются открытыми. Услуги не приобретались, Production не публиковался.
+
+Для Production нужны все требования и проверки, принятие владельцем конкретного Staging artifact, миграции и план восстановления. Оплата/провайдеры/Production остаются отдельными решениями владельца. Админка не управляет deployment.
+
+
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+
+
+Четвёртый Development блок: [продление доступа](access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.

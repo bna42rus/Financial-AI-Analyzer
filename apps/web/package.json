@@ -4,17 +4,22 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
-    "build": "vite build",
+    "dev": "node ../../scripts/prepare-ocr-assets.mjs && vite --host 127.0.0.1",
+    "build": "node ../../scripts/prepare-ocr-assets.mjs && vite build",
     "preview": "vite preview --host 127.0.0.1",
     "check": "tsc --noEmit && vitest run",
     "test:e2e": "playwright test"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "1.1.23",
+    "@tesseract.js-data/eng": "1.0.0",
+    "@tesseract.js-data/rus": "1.0.0",
+    "echarts": "6.1.0",
     "lucide-react": "1.51.0",
+    "pdfjs-dist": "6.2.108",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "tesseract.js": "7.0.0"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

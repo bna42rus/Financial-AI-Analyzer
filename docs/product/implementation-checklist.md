@@ -57,7 +57,7 @@ A/B необходимо читать полностью вместе с исх�
 | [A-04](baseline.md) | Математика components и allocations | Частично: только денежные primitives |
 | [A-05](baseline.md) | Provenance и dedupe | Полная реализация/проверка предстоит |
 | [A-06](baseline.md) | Подтверждения jobs и concurrency | Полная реализация/проверка предстоит |
-| [A-07](baseline.md) | Password reset | Полная реализация/проверка предстоит |
+| [A-07](baseline.md) | Password reset | Частично: Development backend reset отзывает все sessions/reset tokens/contexts; real delivery/UI/полная acceptance предстоят |
 | [A-08](baseline.md) | Confidence | Полная реализация/проверка предстоит |
 | [A-09](baseline.md) | Состояния и справочники | Полная реализация/проверка предстоит |
 | [A-10](baseline.md) | Deletion финансовых ответов и backup restore | Полная реализация/проверка предстоит |
@@ -85,7 +85,7 @@ A/B необходимо читать полностью вместе с исх�
 | [E-01](baseline.md) | Цена, качество и полнота | Полная реализация/проверка предстоит |
 | [E-02](baseline.md) | Программная основа и private Git | Полная реализация/проверка предстоит |
 | [E-03](baseline.md) | Размещение и среды | Полная реализация/проверка предстоит |
-| [E-04](baseline.md) | Admin TOTP и аварийное восстановление | Полная реализация/проверка предстоит |
+| [E-04](baseline.md) | Admin TOTP и аварийное восстановление | Частично: mandatory TOTP, hashed recovery codes, atomic revocation и recovery-only re-enrollment в Development; real owner/KMS/UI/полная acceptance предстоят |
 | [E-05](baseline.md) | AI и email | Полная реализация/проверка предстоит |
 | [E-06](baseline.md) | Домен и HTTPS | Полная реализация/проверка предстоит |
 | [E-07](baseline.md) | Доступ агента и бюджет | Полная реализация/проверка предстоит |
@@ -118,7 +118,7 @@ A/B необходимо читать полностью вместе с исх�
 | 19. Дедупликация | 27 | 19.1, 19.2, 19.3, 19.4, 19.5, 19.6, 19.7, 19.8, 19.9 | Не проверено |
 | 20. История импортов и отмена импорта | 28 | 20.1, 20.2, 20.3, 20.4, 20.5, 20.6, 20.7, 20.8, 20.9, 20.10, 20.11, 20.12 | Не проверено |
 | 21. Обзор (Overview) | 32 | 21.1, 21.2, 21.3, 21.4, 21.5, 21.6, 21.7, 21.8, 21.9, 21.10, 21.11, 21.12, 21.13 | Не проверено |
-| 22. Бюджеты | 33 | 22.1, 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9 | Не проверено |
+| 22. Бюджеты | 33 | 22.1, 22.2, 22.3, 22.4, 22.5, 22.6, 22.7, 22.8, 22.9 | GUI, storage, periods, versions, History/Undo реализованы; §22.7 Analyzer, Overview widgets и real-environment acceptance открыты. См. architecture/budgets-periods-versions.md |
 | 23. Экран «Операции» | 35 | 23.1, 23.2, 23.3, 23.4, 23.5, 23.6, 23.7, 23.8, 23.9, 23.10, 23.11, 23.12, 23.13 | Не проверено |
 | 24. Карточка операции | 36 | 24.1, 24.2, 24.3, 24.4, 24.5, 24.6, 24.7, 24.8, 24.9 | Не проверено |
 | 25. Review Flow | 38 | 25.1, 25.2, 25.3, 25.4 | Не проверено |
@@ -170,3 +170,30 @@ A/B необходимо читать полностью вместе с исх�
 ### Завершение первой интерфейсной версии
 
 [Описание и проверки](../architecture/web-shell-completion.md). Добавлены окно выбора нескольких PDF/CSV/XLSX, удаление/очистка выбора, профиль и переходы к истории из списка/карточки операции. Реальные чтение/отправка файлов, imports, аккаунты, email, sessions, paid access и Undo не реализованы. Черновики и выбор файлов очищаются при закрытии окна. Тема меняет текущий интерфейс без изменения финансовых данных. Этап 2 готов к приёмке как первая интерфейсная версия; все полные продуктовые пункты остаются partial либо not_verified до соответствующих реализации и проверок.
+
+## Первый доступ и админка — 7 октября 2026 года
+
+Частично реализованы правила первого доступа и модель ручной оплаты/приглашений: `packages/access/src/model.ts`, 16 domain tests; тестовый публичный путь `apps/web/src/AccessRequestPage.tsx`; отдельное `apps/admin` с 16 desktop/mobile сценариями. [Точные границы](../architecture/access-admin-requests.md). B-10 проверен в чистых state transitions; DB concurrency/auth/runtime isolation ещё не проверены.
+
+Public и admin UI работают только в явно обозначенном примере. Цена, AI quota, verified-email event и actor являются synthetic inputs; реальные письма, платежи и права не создаются. PDF 40.5/40.10, auth/DB/RLS/secure tokens и E-04 остаются not_verified. Этап 3 начат, но не завершён. PR №5 и №6 приняты и объединены с main; 88 проверок прежней интерфейсной версии прошли после объединения.
+
+### Сервер доступа и безопасности
+
+[Development backend, границы и проверки](../architecture/server-access-security.md): strict API types, две crypto проверки, 24 real PostgreSQL integration scenarios в GitHub CI. Реализованы verification/application ownership, scoped DB roles, TOTP/recovery-only flow и A-07 reset. Третий Development блок добавляет UI/API и transactional invitation registration/activation. Полные пункты остаются partial: delivery, renewal, actual finance schema/RLS, KMS и общая security/release acceptance впереди.
+
+
+Третий Development блок: [оплата, приглашения, регистрация и UI/API](../architecture/invitation-registration.md). Реализованы server preview/commit, independent email proof и activation; real mail delivery, owner onboarding и Production остаются впереди. Результаты real PostgreSQL/HTTP/browser checks фиксируются в PR; источники не изменены.
+
+
+Четвёртый Development блок: [продление доступа](../architecture/access-renewal.md). Own verified-session заявки, change/cancel до claim, отдельная TOTP admin очередь, server preview/commit, canonical paid cycle, A-01 restoration/B-06 calendar anchor, suspension independent, RLS и transactional no-double-extension. Реальные reminders/delivery/оплаты, manual grants/refunds и AI usage/quota впереди; registry partial, источники неизменны. Exact-head проверки фиксируются в PR.
+
+
+## Расширение внутренних инструментов Анализатора
+
+- [x] Закрытый Registry analyzer/2 поверх существующих financial handlers, фиксированный answer scope, server-side permissions и strict intent parsing.
+- [x] Привязка tool/action к диалогу, повторный просмотр после reload, точные retries, общий preview/commit/History/Undo и privacy dependencies полного impact.
+- [x] UI изменения категорий/полей операций, названий структурных объектов, future rules и loan mode; политика одиночных и массовых подтверждений.
+- [x] 362 локальных теста текущего блока, исходные документы, типы, сборки и визуальная проверка desktop/mobile; состав проверок и ограничения указаны в контракте.
+- [ ] Результаты окончательного CI и owner Staging acceptance проверять отдельно по конкретному commit; текущий runtime ещё не означает завершение external AI.
+
+Контракт и ограничения: [analyzer-tools](../architecture/analyzer-tools.md).

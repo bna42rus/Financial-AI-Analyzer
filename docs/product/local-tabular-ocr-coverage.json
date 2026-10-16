@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "parent_registry": "docs/product/implementation-registry.json",
+  "branch": "feature/local-tabular-ocr",
+  "scope": "Additive coverage notes; original requirements and partial status remain unchanged.",
+  "requirements": [
+    {
+      "id": "PDF-18.2",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    },
+    {
+      "id": "PDF-18.3",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    },
+    {
+      "id": "PDF-18.5",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    },
+    {
+      "id": "PDF-18.6",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    },
+    {
+      "id": "PDF-18.10",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    },
+    {
+      "id": "PDF-18.11",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    },
+    {
+      "id": "PDF-18.12",
+      "status": "partial",
+      "implementation_refs": [
+        "packages/imports/src/bank-table.ts",
+        "packages/imports/src/xlsx-reader.ts",
+        "apps/web/src/ocr-local.ts",
+        "docs/architecture/local-tabular-ocr.md"
+      ],
+      "verification_refs": [
+        "packages/imports/test/bank-table.test.ts",
+        "apps/web/e2e/import-tabular.spec.ts",
+        "apps/api/test/import-ingestion.test.ts"
+      ],
+      "implementation_note": " self-identifying CSV/XLSX schemas, bounded same-origin local OCR, closed bank-source/3 cash/transfer codes and per-row parser versions. Real-bank/device corpus, unknown-format AI, arbitrary sanitized descriptions and full final classification/link matching remain open. See local-tabular-ocr.md."
+    }
+  ]
+}

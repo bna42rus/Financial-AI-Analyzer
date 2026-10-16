@@ -67,7 +67,9 @@ test('appearance changes actual styles, follows system theme and remains across 
   await section(page, 'Интерфейс');
   await expect(page.getByLabel('Размер текста', { exact: true })).toHaveValue('large');
   await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('dark');
-  expect(await page.evaluate(() => localStorage.length + sessionStorage.length)).toBe(0);
+  expect(await page.evaluate(() => ({keys:Object.keys(localStorage),session:sessionStorage.length,value:JSON.parse(localStorage.getItem('finance-appearance-v1')!)}))).toEqual({keys:['finance-appearance-v1'],session:0,value:{theme:'dark',density:'compact',textSize:'large',motion:'reduced'}});
+  await page.reload();
+  await expect(page.getByLabel('Тема', {exact:true})).toHaveValue('dark');
 });
 
 test('account and exclusion links open the exact rows even after restrictive filters', async ({ page }) => {

@@ -1,0 +1,198 @@
+{
+  "version": "cashneuro-branch-consolidation/1",
+  "auditedBase": "96e7792223247d77e8fe221dd61dabb54d52f43f",
+  "remoteBranches": [
+    {
+      "branch": "docs/approved-stack-domain",
+      "sha": "1d8219e6966711c1bf5f1aa5b8ef638c329f4ad5"
+    },
+    {
+      "branch": "docs/implementation-plan-v1-3",
+      "sha": "30b4783a2c38b6de96a4ed84dac10da8f842a96f"
+    },
+    {
+      "branch": "feature/access-admin-requests",
+      "sha": "69d3d286fd379aba19abfdc6e2b2db322db837ea"
+    },
+    {
+      "branch": "feature/access-renewal",
+      "sha": "1836097f1add7370b9281b943bd3545dcd608890"
+    },
+    {
+      "branch": "feature/account-structure-deletion",
+      "sha": "5cce1312eeaf18fa5f1e7c061e4addde220a4607"
+    },
+    {
+      "branch": "feature/analyzer-context-budget",
+      "sha": "78f83c474499e63a4b6ba583832a63f440c15d5b"
+    },
+    {
+      "branch": "feature/analyzer-foundation",
+      "sha": "04c96d7ef8ae80275db167c2cbe85a19b4c295ac"
+    },
+    {
+      "branch": "feature/analyzer-model-bench",
+      "sha": "96e7792223247d77e8fe221dd61dabb54d52f43f"
+    },
+    {
+      "branch": "feature/analyzer-tools",
+      "sha": "8c57a35eb442b8bc74e7319daee34ee4419f29b2"
+    },
+    {
+      "branch": "feature/budgets-periods-versions",
+      "sha": "d92a0f7bbf405b7c938ace220715ad0c912d4fc1"
+    },
+    {
+      "branch": "feature/category-counterparty-structure",
+      "sha": "6486e8a4b884a8b835d04e827df6f000850a1d01"
+    },
+    {
+      "branch": "feature/comprehensive-spec-audit",
+      "sha": "04fb5fa789d87efff71b49b22d31fa926b4f0b71"
+    },
+    {
+      "branch": "feature/deletion-reset-ui",
+      "sha": "46f1a1b8b7eca3ebe94a09c10351e8e99bc74fea"
+    },
+    {
+      "branch": "feature/derived-links",
+      "sha": "67746bb64c89b7852ca30f0f907cb3a378747295"
+    },
+    {
+      "branch": "feature/duplicate-merge",
+      "sha": "3911ee9bda411b257e38b189c0df4352df5b5ab3"
+    },
+    {
+      "branch": "feature/exclusions-history",
+      "sha": "ecbe1bd2fc95bc30837a059a74abe24f654e6c3c"
+    },
+    {
+      "branch": "feature/finance-foundation",
+      "sha": "01ea1ee1241eeac4f65f85a49f09bf4628da6462"
+    },
+    {
+      "branch": "feature/financial-reset",
+      "sha": "95cdcdb45272338cbf92501f9b0dc5a92938c252"
+    },
+    {
+      "branch": "feature/import-cancellation-dedupe",
+      "sha": "1c45a3aedc0eebc8c4805d143a8dd596137e823d"
+    },
+    {
+      "branch": "feature/import-ingestion",
+      "sha": "5a0e9c9ce9252be86bfce219fc21b9ce5b442865"
+    },
+    {
+      "branch": "feature/import-preparation",
+      "sha": "f2ca98b13f4666a80dcb0c970a31e4734edd4538"
+    },
+    {
+      "branch": "feature/import-records",
+      "sha": "f2ca98b13f4666a80dcb0c970a31e4734edd4538"
+    },
+    {
+      "branch": "feature/import-review-expansion",
+      "sha": "e18ab1a9f7e1bb0934d89ad3a14fc569ab58e17a"
+    },
+    {
+      "branch": "feature/invitation-registration",
+      "sha": "c2cd0e0bdade7d6b83877443ffb196827b9bc34c"
+    },
+    {
+      "branch": "feature/kms-postbox",
+      "sha": "fc6220d3b1cfa9715f469044e483824202a76353"
+    },
+    {
+      "branch": "feature/live-import-ui",
+      "sha": "1bc5247335a081776061831d2e3c27eae027ff7b"
+    },
+    {
+      "branch": "feature/live-operation-review",
+      "sha": "b9f18db830330f2c29a32e133b417fe723e0ac12"
+    },
+    {
+      "branch": "feature/local-bank-parsers",
+      "sha": "a2aa3c988f9f87fa755c73c2321d86de609b2fd5"
+    },
+    {
+      "branch": "feature/local-tabular-ocr",
+      "sha": "6fec5fe2f56dd845690e49f8a952858d4e354e5c"
+    },
+    {
+      "branch": "feature/mail-notifications",
+      "sha": "79311444dac8e0dbb377bb1ca1bd619e43e5b5b5"
+    },
+    {
+      "branch": "feature/manual-access",
+      "sha": "014eec0d0aa36713b3dbab479512995dd205c541"
+    },
+    {
+      "branch": "feature/operation-relations",
+      "sha": "fceb99c23f828f62287c39598bdb22d8ae7a45d0"
+    },
+    {
+      "branch": "feature/operations-views-pagination",
+      "sha": "6b48f7e9413eb9d9502fce5f971d796dda510629"
+    },
+    {
+      "branch": "feature/overview-complete",
+      "sha": "d48ce31154d369241c04fb3a52af8b26edabde61"
+    },
+    {
+      "branch": "feature/review-bulk-actions",
+      "sha": "64b5ea1718c717cee7cea0f71421962cad158e99"
+    },
+    {
+      "branch": "feature/safe-bank-source",
+      "sha": "cfaf3b52b47e7784f3568472f8ba789024ec6012"
+    },
+    {
+      "branch": "feature/server-access-security",
+      "sha": "9b1be62d6053b46f2aa729ccdb63271d7d4e0eee"
+    },
+    {
+      "branch": "feature/settings-rule-editors",
+      "sha": "988727bca7db3297939c7f6056dd13fd5de82a47"
+    },
+    {
+      "branch": "feature/spec-screen-audit",
+      "sha": "75a7a4fd72ebc48f289e13344c0bc87caee7738f"
+    },
+    {
+      "branch": "feature/staging-owner-bootstrap",
+      "sha": "a84e687be5c25bbc655c3f75a049339e913b4ed4"
+    },
+    {
+      "branch": "feature/web-analyzer",
+      "sha": "4786639018137c239bfd6aca82f856df193e3497"
+    },
+    {
+      "branch": "feature/web-operations",
+      "sha": "ca50fe5e4a72cc55eb933ec832d2b7cc009e55d1"
+    },
+    {
+      "branch": "feature/web-overview",
+      "sha": "6ca673ec0d27e8c6396790af18b8bdd524409248"
+    },
+    {
+      "branch": "feature/web-settings",
+      "sha": "507cd0b9baf11b5f06a25e53bd51f2869db0194e"
+    },
+    {
+      "branch": "feature/web-settings-recovery",
+      "sha": "672c6f63406ae61f13e68d2454ffff949e5c6a65"
+    },
+    {
+      "branch": "feature/web-shell-completion",
+      "sha": "74ea103b0de53cf4cec3ce3dc288473e12a0e49a"
+    },
+    {
+      "branch": "feature/yandex-analyzer",
+      "sha": "3f7354657c88dcbf2cdd7d02d9f3cd3f2f61c61b"
+    },
+    {
+      "branch": "main",
+      "sha": "bf3e2db1e6314c84c8e28df8d9c71cbb2af21ac4"
+    }
+  ]
+}
