@@ -13,6 +13,9 @@ import sys
 import time
 from urllib.parse import urlsplit
 
+# Root inspection must not create root-owned cache files in the user's build.
+sys.dont_write_bytecode = True
+
 spec = importlib.util.spec_from_file_location('staging_install', Path(__file__).with_name('install-assistant-staging.py'))
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
@@ -50,7 +53,7 @@ def validate_manifest(value, sha, origin):
 
 def worker_unit(release):
     return ('[Unit]\nDescription=CashNeuro Staging import worker (Finance)\nAfter=network-online.target\nWants=network-online.target\n'
-            '[Service]\nType=exec\nDynamicUser=yes\nWorkingDirectory=' + str(release / 'apps/api') + '\n'
+            '[Service]\nType=exec\nDynamicUser=yes\nSupplementaryGroups=cashneuro-staging-code\nWorkingDirectory=' + str(release / 'apps/api') + '\n'
             'EnvironmentFile=' + str(WORKER_ENV) + '\nExecStart=/usr/bin/node --import tsx src/import-main.ts\n'
             'Restart=on-failure\nRestartSec=5\nTimeoutStopSec=30\nNoNewPrivileges=yes\nPrivateTmp=yes\nProtectSystem=strict\nProtectHome=yes\n'
             'ProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectControlGroups=yes\nRestrictSUIDSGID=yes\nRestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\nLimitCORE=0\nUMask=0077\n'

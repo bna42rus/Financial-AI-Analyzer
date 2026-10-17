@@ -6,6 +6,7 @@ import io
 from pathlib import Path
 import subprocess
 import tempfile
+import termios
 import unittest
 from unittest.mock import patch
 
@@ -22,6 +23,9 @@ class InstallationTests(unittest.TestCase):
             with self.assertRaises(io.UnsupportedOperation):
                 with open(terminal, 'r+'):
                     pass
+            attributes = termios.tcgetattr(slave)
+            attributes[3] &= ~termios.ECHO
+            termios.tcsetattr(slave, termios.TCSANOW, attributes)
             os.write(master, b'Owner@Example.Test\n')
             self.assertEqual(m.read_test_email(terminal), 'owner@example.test')
             self.assertIn('Почта', os.read(master, 4096).decode())
@@ -61,6 +65,13 @@ class InstallationTests(unittest.TestCase):
             with self.assertRaises(m.InstallationError) as caught:
                 m.run(['docker', 'exec', 'synthetic'])
         self.assertEqual(str(caught.exception), 'COMMAND_FAILED:docker')
+
+    def test_failed_systemd_operation_reports_verb_and_unit_without_stderr(self):
+        result = subprocess.CompletedProcess(['systemctl'], 1, b'private', b'sensitive provider credential')
+        with patch.object(m.subprocess, 'run', return_value=result):
+            with self.assertRaises(m.InstallationError) as caught:
+                m.run(['systemctl', 'restart', 'cashneuro-staging-api@finance.service'])
+        self.assertEqual(str(caught.exception), 'COMMAND_FAILED:systemctl:restart:cashneuro-staging-api@finance.service:EXIT_1')
 
     def test_private_snapshots_are_exclusive_and_replacement_keeps_original_bytes(self):
         with tempfile.TemporaryDirectory() as directory:

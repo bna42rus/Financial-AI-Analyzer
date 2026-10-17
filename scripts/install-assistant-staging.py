@@ -31,7 +31,12 @@ def run(args, *, data=None, timeout=90, output=None):
     result = subprocess.run([str(a) for a in args], input=data, stdout=output or subprocess.PIPE,
                             stderr=subprocess.PIPE, timeout=timeout)
     if result.returncode:
-        raise InstallationError('COMMAND_FAILED:' + Path(str(args[0])).name)
+        command = Path(str(args[0])).name
+        if command == 'systemctl':
+            verb = str(args[1]) if len(args) > 1 and re.fullmatch('[a-z-]+', str(args[1])) else 'operation'
+            units = [str(arg) for arg in args[2:] if re.fullmatch(r'[A-Za-z0-9@._-]+\.service', str(arg))]
+            command += ':' + verb + (':' + ','.join(units) if units else '') + ':EXIT_' + str(result.returncode)
+        raise InstallationError('COMMAND_FAILED:' + command)
     return result.stdout if output is None else b''
 
 
