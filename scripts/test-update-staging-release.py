@@ -44,7 +44,7 @@ class UpdateTests(unittest.TestCase):
             root = Path(directory)
             for name in ['update-staging-release.py', 'install-assistant-staging.py']:
                 shutil.copyfile(Path(__file__).with_name(name), root / name)
-            result = subprocess.run([sys.executable, str(root / 'update-staging-release.py'), '--help'], capture_output=True)
+            result = subprocess.run([sys.executable, '-c', 'import runpy,sys; runpy.run_path(sys.argv[1],run_name="cache_inspection")', str(root / 'update-staging-release.py')], capture_output=True)
             self.assertEqual(result.returncode, 0)
             self.assertFalse((root / '__pycache__').exists())
 
