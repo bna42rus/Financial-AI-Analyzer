@@ -1,3 +1,4 @@
+import {reserveCost} from '../src/analyzer-cost.ts';
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash, generateKeyPairSync } from 'node:crypto';
@@ -298,4 +299,19 @@ test('expired Staging authorization blocks a fresh POST without resetting known 
     const reply=await stageRun(target,{...b,id:randomUUID()});assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'ASSISTANT_STAGING_CONFIGURATION_DENIED');assert.equal(calls,2);
     assert.equal((await pg.owner.query('SELECT spent_atoms FROM commerce.ai_project_budget')).rows[0].spent_atoms,before);
   }finally{await target.close();}
+});
+
+test('the pilot call ceiling includes another tenant without exposing their private cost receipts',async t=>{
+ const b=await body(),staging=await stagingConfig(t,2,['first@example.test','second@example.test']),target=await createServer(staging.config),provider=staging.config.assistantProvider!;
+ try{
+  outputs=[plan([set('metric','expenses')])];assert.equal((await stageRun(target,b)).statusCode,200);assert.equal(calls,2);
+  await assert.rejects(within(async db=>{
+   const id=randomUUID(),at=provider.policy.projectPeriodStart;
+   await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES('second',$1,'classification',$2,'sent','synthetic',$3,$4,$4,'not_sent')`,[id,'c'.repeat(64),provider.model.bound.modelVersion,at]);
+   await reserveCost(db,{userId:'second',requestId:id,step:'classification',anchorAt:at,periodStart:at},provider.policy,provider.model.bound);
+   await provider.authorizeDispatch(db);
+  },'second'),/ASSISTANT_PILOT_CALL_LIMIT/);
+  assert.equal((await pg.owner.query('SELECT dispatch_count FROM commerce.ai_project_budget')).rows[0].dispatch_count,2);
+  assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM commerce.ai_cost_reservation WHERE user_id='second'")).rows[0].n,0);
+ }finally{await target.close();}
 });

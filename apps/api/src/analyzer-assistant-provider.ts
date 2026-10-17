@@ -46,8 +46,9 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
       checkAssistantStagingSettings(settings,now());
       if (!isDeepStrictEqual(settings,snapshot)) throw new AssistantError('ASSISTANT_STAGING_CONFIGURATION_DENIED');
       // reserveCost holds the project row lock through this check; concurrent
-      // users cannot race the total-call ceiling. This includes the new reserve.
-      const count = Number((await db.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation WHERE project_id=$1 AND project_period_start=$2', [settings.cost.projectId,settings.cost.projectPeriodStart])).rows[0].n);
+      // users cannot race the total-call ceiling. A trigger counts all tenants
+      // without exposing their RLS-protected receipts, including the new reserve.
+      const count = Number((await db.query('SELECT dispatch_count AS n FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2', [settings.cost.projectId,settings.cost.projectPeriodStart])).rows[0].n);
       if (count > settings.maximumCalls) throw new AssistantError('ASSISTANT_PILOT_CALL_LIMIT');
     },
     binding:{workflow:assistantWorkflowVersion,plan:assistantVersion,sourceSha256,modelMetadataSha256:metadata.modelMetadataSha256,
