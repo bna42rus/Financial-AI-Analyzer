@@ -1,3 +1,4 @@
+import { setTimeout } from 'node:timers/promises';
 import { Pool } from 'pg';
 import { createServer } from './server.ts';
 import type { Profile } from './types.ts';
@@ -14,7 +15,13 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, max: 10 });
 if (process.env.ASSISTANT_ENABLED === '1' && process.env.AI_ENABLED === '1') throw new Error('ASSISTANT_STAGING_CONFIGURATION_DENIED');
 const yandexAnalyzer = await loadYandexAnalyzer(environment, profile, process.env.DATABASE_URL!);
 const assistantProvider = await loadAssistantProvider(environment, profile, process.env.DATABASE_URL!, pool);
+if(![undefined,'0','1'].includes(process.env.CLASSIFICATION_ENABLED))throw new Error('CLASSIFICATION_CONFIGURATION_DENIED');
+const classificationEnabled=process.env.CLASSIFICATION_ENABLED==='1';
+if(classificationEnabled&&!assistantProvider)throw new Error('CLASSIFICATION_PROVIDER_REQUIRED');
 const server = await createServer({ profile, pool, baseURL: process.env.API_BASE_URL!, origin: process.env.WEB_ORIGIN!, authSecret: process.env.AUTH_SECRET!,
-  wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider });
+  wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider, classificationEnabled });
 await server.app.listen(Number(process.env.PORT ?? (profile === 'control' ? 3001 : 3000)), '127.0.0.1');
-for (const signal of ['SIGINT','SIGTERM']) process.once(signal, async () => { try { await server.close(); await pool.end(); await yandexAnalyzer?.pool.end(); } finally { key.destroy(); } });
+const classification=classificationEnabled?await import('./classification-store.ts'):undefined;
+let stopping=false;
+const classificationLoop=classificationEnabled?(async()=>{while(!stopping){try{await classification!.runClassificationStage(pool,assistantProvider!);}catch{/* No financial or provider text in logs. */}if(!stopping)await setTimeout(1000);}})():Promise.resolve();
+for (const signal of ['SIGINT','SIGTERM']) process.once(signal, async () => { try { stopping=true; await server.close(); await classificationLoop; await pool.end(); await yandexAnalyzer?.pool.end(); } finally { key.destroy(); } });

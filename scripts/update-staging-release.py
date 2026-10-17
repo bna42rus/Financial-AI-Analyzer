@@ -68,8 +68,19 @@ def snapshot(backup, name, path):
     return {'mode': stat.S_IMODE(info.st_mode), 'uid': info.st_uid, 'gid': info.st_gid}
 
 
+def rebind_classification_settings(previous, installed_sha, next_sha):
+    if previous.get('sourceSha256') != installed_sha or not re.fullmatch('[a-f0-9]{64}', next_sha):
+        raise m.InstallationError('INSTALLED_ASSISTANT_BINDING_CHANGED')
+    rebound = json.loads(json.dumps(previous))
+    rebound['sourceSha256'] = next_sha
+    return rebound
+
+
 def restore(backup):
     metadata = json.loads((backup / 'rollback.json').read_text())
+    if metadata.get('assistantConfig'):
+        previous = metadata['assistantConfig']
+        m.atomic_replace(m.CONFIG, (backup / 'assistantConfig').read_bytes(), previous['mode'], previous['uid'], previous['gid'])
     if metadata.get('workerManaged'):
         if WORKER_UNIT.exists():
             m.run(['systemctl', 'daemon-reload'])
@@ -87,7 +98,7 @@ def restore(backup):
         m.run(['systemctl', 'start', WORKER])
 
 
-def install(source, sha):
+def install(source, sha, enable_classification=False):
     if not re.fullmatch('[a-f0-9]{40}', sha):
         raise m.InstallationError('RELEASE_INVALID')
     config = settings()
@@ -100,10 +111,20 @@ def install(source, sha):
     private = m.CONFIG.lstat()
     if not stat.S_ISREG(private.st_mode) or private.st_uid != 0 or private.st_mode & 0o077:
         raise m.InstallationError('PRIVATE_CONFIGURATION_REQUIRED')
-    binding = json.loads(m.CONFIG.read_text())['sourceSha256']
+    original_settings = json.loads(m.CONFIG.read_text())
+    binding = original_settings['sourceSha256']
     identity = json.loads(m.run(['/usr/bin/node', '--experimental-transform-types', source / 'apps/api/src/assistant-staging-main.ts', '--prepare']))
     if identity['sourceSha256'] != binding:
-        raise m.InstallationError('API_SOURCE_CHANGED_REQUIRES_SEPARATE_ADMISSION')
+        if not enable_classification:
+            raise m.InstallationError('API_SOURCE_CHANGED_REQUIRES_SEPARATE_ADMISSION')
+        installed = json.loads(m.run(['/usr/bin/node', '--experimental-transform-types', current / 'apps/api/src/assistant-staging-main.ts', '--prepare']))
+        rebind_classification_settings(original_settings, installed['sourceSha256'], identity['sourceSha256'])
+    rebound = rebind_classification_settings(original_settings, binding, identity['sourceSha256'])
+    if enable_classification:
+        # Explicit feature opt-in changes only source identity. No new key,
+        # ceiling, accounting period, tariff or expiration is manufactured.
+        validation = 'import {checkAssistantStagingSettings} from ' + json.dumps((source / 'apps/api/src/analyzer-assistant-settings.ts').as_uri()) + ';import {readFileSync} from "node:fs";checkAssistantStagingSettings(JSON.parse(readFileSync(0,"utf8")));'
+        m.run(['/usr/bin/node', '--experimental-transform-types', '--input-type=module', '-e', validation], data=json.dumps(rebound).encode())
     original = m.CADDY.read_bytes()
     old_root = m.frontend_root(json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty'])))
     if original.count(old_root.encode()) != 1:
@@ -117,6 +138,8 @@ def install(source, sha):
     backup = Path('/var/lib/cashneuro') / ('connected-release-' + sha[:12] + '-' + str(int(time.time())))
     backup.mkdir(mode=0o700)
     metadata = {name: snapshot(backup, name, path) for name, path in [('caddy', m.CADDY), ('dropin', m.DROPIN), ('workerUnit', WORKER_UNIT), ('workerEnv', WORKER_ENV)]}
+    if enable_classification:
+        metadata['assistantConfig'] = snapshot(backup, 'assistantConfig', m.CONFIG)
     services = m.run(['systemctl', 'list-units', '--all', '--plain', '--no-legend', '--type=service', 'cashneuro*import*']).decode().splitlines()
     existing = [line.split()[0] for line in services if len(line.split()) > 3 and line.split()[2] == 'active']
     metadata['workerManaged'] = not existing or existing == [WORKER]
@@ -124,6 +147,15 @@ def install(source, sha):
     enabled = m.run(['systemctl', 'show', WORKER, '--property=UnitFileState', '--value']).decode().strip() if WORKER_UNIT.exists() else ''
     metadata['workerWasEnabled'] = enabled == 'enabled'
     m.private_write(backup / 'rollback.json', json.dumps(metadata).encode())
+    if enable_classification:
+        container, owner, sql = m.docker_database()
+        with os.fdopen(os.open(backup / 'database.dump', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as stream:
+            m.run(['docker', 'exec', container, 'pg_dump', '-U', owner, '-d', 'finance_staging', '-Fc'], output=stream, timeout=300)
+            stream.flush()
+            os.fsync(stream.fileno())
+        if sql("SELECT to_regclass('finance.classification_run') IS NOT NULL") == 'f':
+            migration = (source / 'packages/database/migrations/0028_ai_classification.sql').read_text()
+            sql('BEGIN;\n' + migration + '\nCOMMIT;')
     print('1/3: сохранена конфигурация отката; ключ, лимиты и БД остаются прежними.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
@@ -141,7 +173,13 @@ def install(source, sha):
     print('Откат: ' + rollback, flush=True)
     print('2/3: подключение собранного интерфейса к API и проверка обработчика импорта.', flush=True)
     try:
-        m.atomic_replace(m.DROPIN, old_dropin.replace(str(current).encode(), str(release).encode()))
+        new_dropin = old_dropin.replace(str(current).encode(), str(release).encode())
+        if enable_classification:
+            m.atomic_replace(m.CONFIG, json.dumps(rebound).encode(), 0o600)
+            print('Проверка категоризации: два платных запроса на синтетике в пределах прежнего лимита.', flush=True)
+            m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-smoke-main.ts', '--live'], output=sys.stdout.buffer, timeout=180)
+            new_dropin += b'\n[Service]\nEnvironment=CLASSIFICATION_ENABLED=1\n'
+        m.atomic_replace(m.DROPIN, new_dropin)
         if metadata['workerManaged']:
             # Copy only the scoped DB connection, never auth/KMS/AI credentials.
             worker_env = 'APP_ENV=staging\nAPI_PROFILE=finance\nDATABASE_URL=' + json.dumps(config['DATABASE_URL']) + '\n'
@@ -179,6 +217,7 @@ def main():
     parser.add_argument('--source')
     parser.add_argument('--sha')
     parser.add_argument('--rollback')
+    parser.add_argument('--enable-classification', action='store_true')
     args = parser.parse_args()
     if args.inspect_api_origin:
         print(validate_origin(settings()['API_BASE_URL']))
@@ -188,7 +227,7 @@ def main():
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

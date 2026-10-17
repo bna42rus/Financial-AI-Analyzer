@@ -15,6 +15,15 @@ spec.loader.exec_module(m)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_classification_rebind_preserves_key_call_ceiling_expiry_and_accounting(self):
+        previous = {'sourceSha256': 'a'*64, 'apiKey': 'synthetic-only', 'maximumCalls': 14, 'admission': {'calls': 46}, 'expiresAt': '2026-10-17T16:35:30Z', 'cost': {'projectLimitRub': '5.5'}}
+        changed = m.rebind_classification_settings(previous, 'a'*64, 'b'*64)
+        self.assertEqual({**changed, 'sourceSha256': 'a'*64}, previous)
+        changed['admission']['calls'] = 0
+        self.assertEqual(previous['admission']['calls'], 46)
+        with self.assertRaises(m.m.InstallationError):
+            m.rebind_classification_settings(previous, 'c'*64, 'b'*64)
+
     def test_only_the_finance_staging_origin_is_admitted(self):
         self.assertEqual(m.validate_origin('https://test.cashneuro.ru/'), 'https://test.cashneuro.ru')
         self.assertEqual(m.validate_origin('https://test.cashneuro.ru/api'), 'https://test.cashneuro.ru/api')

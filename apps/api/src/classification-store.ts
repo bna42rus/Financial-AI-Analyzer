@@ -1,0 +1,130 @@
+import {randomUUID} from 'node:crypto';
+import {isDeepStrictEqual} from 'node:util';
+import type {Pool,PoolClient} from 'pg';
+import {object} from '../../../packages/finance-core/src/model.ts';
+import type {Usage} from '../../../packages/analyzer/src/cost.ts';
+import {prepareFinance,loadFinance} from './finance.ts';
+import {isAssistantProvider} from './analyzer-assistant-provider.ts';
+import type {AssistantProvider} from './analyzer-assistant-provider.ts';
+import {reserveCost,settleCost} from './analyzer-cost.ts';
+import {HttpError} from './types.ts';
+import {classificationPlan,classificationVersion,classificationBatchSize,classificationPrompt,classificationSchema,parseClassification,applyClassification,digest} from './classification-plan.ts';
+import type {Decision,ClassificationPlan} from './classification-plan.ts';
+
+export async function enqueueClassification(db:PoolClient,userId:string){
+ const workspace=await prepareFinance(db,userId);
+ await db.query(`INSERT INTO finance.classification_dispatch(user_id,generation) VALUES($1,$2)
+ ON CONFLICT(user_id) DO UPDATE SET generation=EXCLUDED.generation,state='queued',updated_at=clock_timestamp()`,[userId,workspace.generation]);
+}
+export async function classificationStatus(db:PoolClient,userId:string,input:unknown,provider?:AssistantProvider){
+ const r=object(input,['start']);if(r.start!==undefined&&r.start!==true)throw new TypeError('INVALID_INPUT');
+ await prepareFinance(db,userId);
+ const email=(await db.query('SELECT email FROM identity.auth_user WHERE id=$1',[userId])).rows[0]?.email;
+ const enabled=!!provider&&isAssistantProvider(provider)&&provider.allowed(email??'');
+ if(r.start){if(!enabled)throw new HttpError(503,'CLASSIFICATION_UNAVAILABLE');await enqueueClassification(db,userId);}
+ const dispatch=(await db.query('SELECT state FROM finance.classification_dispatch WHERE user_id=$1',[userId])).rows[0];
+ const stats=(await db.query(`SELECT count(*)::int AS calls,COALESCE(sum(applied),0)::int AS applied,
+ count(*) FILTER(WHERE state IN ('sent','unknown'))::int AS uncertain FROM finance.classification_run WHERE user_id=$1`,[userId])).rows[0];
+ return {enabled,state:dispatch?.state??'idle',...stats};
+}
+async function transaction<T>(pool:Pool,userId:string,action:(db:PoolClient)=>Promise<T>){
+ const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[userId]);const result=await action(db);await db.query('COMMIT');return result;}
+ catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+}
+async function scope(db:PoolClient,userId:string,provider:AssistantProvider){
+ const workspace=await prepareFinance(db,userId);
+ const user=(await db.query('SELECT email FROM identity.auth_user WHERE id=$1',[userId])).rows[0];
+ if(!user||!provider.allowed(user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
+ return workspace;
+}
+async function applyCached(db:PoolClient,userId:string,plan:ClassificationPlan){
+ const cached=(await db.query<{signature:string;decision:Decision;run_id:string}>(`SELECT signature,decision,run_id FROM finance.classification_cache WHERE user_id=$1 AND decision IS NOT NULL`,[userId])).rows;
+ const bySignature=new Map(cached.map(c=>[c.signature,c])),operations=new Map(plan.operations.map(o=>[o.id,o]));let applied=0;
+ for(const group of plan.groups){const cached=bySignature.get(group.signature);if(!cached)continue;
+  const d=object(cached.decision,['categoryId','subcategoryId','confidence']);
+  const category=plan.categories.find(c=>c.id===d.categoryId),sub=plan.categories.find(c=>c.id===d.subcategoryId);
+  if(!Number.isInteger(d.confidence)||Number(d.confidence)<0||Number(d.confidence)>100||
+    d.categoryId!==null&&(!category||category.parentId!==null)||
+    d.subcategoryId!==null&&(!sub||!category||sub.parentId!==category.id)||
+    [category,sub].some(c=>c&&c.role!=='both'&&c.role!==group.signal.role))throw Error('CLASSIFICATION_CACHE_CHANGED');
+  for(const id of group.operationIds){
+   const op=operations.get(id);if(!op)continue;
+   const next=applyClassification(op,cached.decision);
+   // Reapplying an identical low-confidence decision is not another edit.
+   if(isDeepStrictEqual(op.semantics,next.semantics)&&isDeepStrictEqual(op.reviewReasons,next.reviewReasons))continue;
+   await db.query('INSERT INTO finance.classification_assignment(user_id,id,transaction_id,run_id,before_facets,after_facets) VALUES($1,$2,$3,$4,$5,$6)',[userId,randomUUID(),id,cached.run_id,JSON.stringify({category:op.semantics.category,subcategory:op.semantics.subcategory}),JSON.stringify({category:next.semantics.category,subcategory:next.semantics.subcategory})]);
+   await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,id,JSON.stringify(next.semantics),JSON.stringify(next.reviewReasons)]);
+   await db.query('UPDATE finance.classification_run SET applied=applied+1 WHERE user_id=$1 AND id=$2',[userId,cached.run_id]);applied++;
+  }
+ }
+ if(applied){await prepareFinance(db,userId);await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);}
+ return applied;
+}
+
+/** One bounded model call, no transaction across HTTP and no automatic POST retry.
+ * A session lock excludes another worker/API process for this tenant. */
+export async function runClassificationStage(pool:Pool,provider:AssistantProvider){
+ if(!isAssistantProvider(provider)||provider.pool!==pool)throw Error('CLASSIFICATION_PROVIDER_DENIED');
+ const pending=(await pool.query("SELECT user_id FROM finance.classification_dispatch WHERE state='queued' ORDER BY updated_at,user_id LIMIT 1")).rows[0];
+ if(!pending)return false;const userId=String(pending.user_id),lock=await pool.connect(),lockName='classification:'+userId;
+ const locked=(await lock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[lockName])).rows[0].locked;
+ if(!locked){lock.release();return false;}
+ try{
+  const planned=await transaction(pool,userId,async db=>{
+   const workspace=await scope(db,userId,provider),loaded=await loadFinance(db,userId);
+   if((await db.query("SELECT 1 FROM finance.classification_run WHERE user_id=$1 AND state IN ('sent','unknown') LIMIT 1",[userId])).rowCount){await db.query("UPDATE finance.classification_dispatch SET state='blocked' WHERE user_id=$1",[userId]);return null;}
+   let plan=classificationPlan(loaded.graph,loaded.rules);await applyCached(db,userId,plan);
+   const fresh=await loadFinance(db,userId);plan=classificationPlan(fresh.graph,fresh.rules);
+   const attempts=(await db.query('SELECT signature FROM finance.classification_cache WHERE user_id=$1',[userId])).rows;
+   const seen=new Set(attempts.map(r=>r.signature));const groups=plan.groups.filter(g=>!seen.has(g.signature)).slice(0,classificationBatchSize);
+   if(!groups.length){await db.query("UPDATE finance.classification_dispatch SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1",[userId]);return null;}
+   return {plan,groups,generation:workspace.generation,keyVersion:workspace.key_version,revision:fresh.state.revision};
+  });
+  if(!planned)return true;
+  const id=randomUUID(),model=provider.forRequest(),input={catalog:planned.plan.catalog,operations:planned.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))};
+  let sent=false,knownUsage:Usage|undefined;
+  const settle=async(usage?:Usage)=>transaction(pool,userId,async db=>{
+   const violation=await settleCost(db,userId,id,'classification',usage);
+   await db.query("UPDATE commerce.analyzer_request SET state=$3,usage_state=$4,updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='classification'",[userId,id,usage?'received':'unknown',usage?'reported':'unknown']);
+   return violation;
+  });
+  try{
+   const completed=await model.complete({phase:'understand',prompt:classificationPrompt,input,schema:classificationSchema},async()=>{
+    if(sent)throw Error('CLASSIFICATION_DUPLICATE_DISPATCH');
+    await transaction(pool,userId,async db=>{
+     const workspace=await scope(db,userId,provider);
+     if(workspace.generation!==planned.generation||workspace.key_version!==planned.keyVersion||workspace.revision!==planned.revision)throw Error('CLASSIFICATION_CONTEXT_CHANGED');
+     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['cloud-task-dispatch:'+userId]);
+     if((await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND (state='sent' OR usage_state='unknown') LIMIT 1",[userId])).rowCount)throw Error('AI_COST_RECONCILIATION_REQUIRED');
+     await db.query(`INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state) VALUES($1,$2,$3,$4,$5,'sent')`,[userId,id,planned.generation,classificationVersion,planned.plan.catalogHash]);
+     for(const group of planned.groups)await db.query('INSERT INTO finance.classification_cache(user_id,signature,run_id) VALUES($1,$2,$3)',[userId,group.signature,id]);
+     await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
+     VALUES($1,$2,'classification',$3,'sent','cashneuro-categories/1',$4,$5,$5,'not_sent')`,[userId,id,digest(input),model.bound.modelVersion,provider.policy.projectPeriodStart]);
+     await reserveCost(db,{userId,requestId:id,step:'classification',anchorAt:provider.policy.projectPeriodStart,periodStart:provider.policy.projectPeriodStart},provider.policy,model.bound);
+     await provider.authorizeDispatch(db);
+    });sent=true;
+   });
+   if(!sent)throw Error('CLASSIFICATION_DISPATCH_NOT_RECORDED');knownUsage=completed.usage;
+   if(await settle(knownUsage))throw Error('CLASSIFICATION_PROVIDER_CHANGED');
+   const decisions=parseClassification(completed.value,planned.plan,planned.groups);
+   // Persist only validated finite decisions; never persist arbitrary model text.
+   await transaction(pool,userId,async db=>{
+    for(const [i,group]of planned.groups.entries())await db.query('UPDATE finance.classification_cache SET decision=$3 WHERE user_id=$1 AND signature=$2',[userId,group.signature,JSON.stringify(decisions[i])]);
+    await db.query("UPDATE finance.classification_run SET state='received',decisions=$3 WHERE user_id=$1 AND id=$2",[userId,id,JSON.stringify(decisions)]);
+   });
+   await transaction(pool,userId,async db=>{
+    const workspace=await scope(db,userId,provider),loaded=await loadFinance(db,userId),plan=classificationPlan(loaded.graph,loaded.rules);
+    if(workspace.generation!==planned.generation||workspace.key_version!==planned.keyVersion||plan.catalogHash!==planned.plan.catalogHash){await db.query("UPDATE finance.classification_run SET state='discarded' WHERE user_id=$1 AND id=$2",[userId,id]);return;}
+    await applyCached(db,userId,plan);
+    await db.query("UPDATE finance.classification_run SET state='completed' WHERE user_id=$1 AND id=$2",[userId,id]);
+   });
+  }catch(error){
+   const usage=knownUsage??(error&&typeof error==='object'&&'usage'in error?(error as {usage?:Usage}).usage:undefined);
+   if(sent){await settle(usage);await transaction(pool,userId,async db=>{await db.query('UPDATE finance.classification_run SET state=$3 WHERE user_id=$1 AND id=$2',[userId,id,usage?'failed':'unknown']);});}
+   await transaction(pool,userId,async db=>{await db.query("UPDATE finance.classification_dispatch SET state='blocked',updated_at=clock_timestamp() WHERE user_id=$1",[userId]);});
+  }
+  return true;
+ }catch{
+  await transaction(pool,userId,async db=>{await db.query("UPDATE finance.classification_dispatch SET state='blocked',updated_at=clock_timestamp() WHERE user_id=$1",[userId]);});return true;
+ }finally{await lock.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[lockName]);lock.release();}
+}
