@@ -87,13 +87,14 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Продолжить', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
     await expect(page.getByText('Часовой пояс анализа: Pacific/Honolulu', { exact: true })).toBeVisible();
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
+    await screen(page,'Операции');
     const categoryPanel=page.getByRole('region',{name:'Категории с помощью AI'});
     await categoryPanel.getByRole('button',{name:'Разобрать категории загруженных операций',exact:true}).click();
     await expect(categoryPanel.getByText('Подбираем категории… Назначения обновляются по мере обработки.')).toBeVisible();
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     await expect(categoryPanel).toContainText('Обработано операций: 1.');
-    assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;
+    assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;await screen(page,'Анализатор');await idle();
     await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
     await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();

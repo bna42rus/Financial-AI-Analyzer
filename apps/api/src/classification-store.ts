@@ -75,9 +75,9 @@ export async function runClassificationStage(pool:Pool,provider:AssistantProvide
    if((await db.query("SELECT 1 FROM finance.classification_run WHERE user_id=$1 AND state IN ('sent','unknown') LIMIT 1",[userId])).rowCount){await db.query("UPDATE finance.classification_dispatch SET state='blocked' WHERE user_id=$1",[userId]);return null;}
    let plan=classificationPlan(loaded.graph,loaded.rules);await applyCached(db,userId,plan);
    const fresh=await loadFinance(db,userId);plan=classificationPlan(fresh.graph,fresh.rules);
-   const attempts=(await db.query('SELECT signature FROM finance.classification_cache WHERE user_id=$1',[userId])).rows;
+   const attempts=(await db.query('SELECT signature,decision FROM finance.classification_cache WHERE user_id=$1',[userId])).rows;
    const seen=new Set(attempts.map(r=>r.signature));const groups=plan.groups.filter(g=>!seen.has(g.signature)).slice(0,classificationBatchSize);
-   if(!groups.length){await db.query("UPDATE finance.classification_dispatch SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1",[userId]);return null;}
+   if(!groups.length){const blocked=plan.groups.some(g=>attempts.some(a=>a.signature===g.signature&&a.decision===null));await db.query('UPDATE finance.classification_dispatch SET state=$2,updated_at=clock_timestamp() WHERE user_id=$1',[userId,blocked?'blocked':'completed']);return null;}
    return {plan,groups,generation:workspace.generation,keyVersion:workspace.key_version,revision:fresh.state.revision};
   });
   if(!planned)return true;

@@ -41,6 +41,7 @@ test('real RLS/ledger pipeline groups repeated merchants, assigns categories and
  assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);
  const budgets=(await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows;assert.ok(budgets.every(r=>BigInt(r.spent_atoms)===0n&&BigInt(r.reserved_atoms)===0n));
  assert.ok(BigInt((await pg.owner.query('SELECT spent_atoms FROM commerce.ai_project_budget')).rows[0].spent_atoms)>0n);
+ const history=(await pg.owner.query('SELECT before_facets,after_facets FROM finance.classification_assignment')).rows;assert.equal(history.length,3);assert.ok(history.every(r=>r.before_facets.category.value===null&&r.after_facets.category.value===category));
  assert.equal((outgoing[0] as any).operations.length,1);
  for(const privateValue of ['first@example.test',account,ids[0]!, '12345','Synthetic safe source'])assert.ok(!JSON.stringify(outgoing).includes(privateValue));
 });
@@ -62,7 +63,7 @@ test('unknown delivery retains the reservation and cannot be sent again, includi
 });
 test('malformed answer is still paid, never applied and never automatically re-sent',async()=>{
  behavior='invalid';await queue();await runClassificationStage(pg.finance,provider());assert.equal((await pg.owner.query('SELECT state FROM commerce.ai_cost_reservation')).rows[0].state,'settled');
- assert.ok((await state()).operations.every(o=>o.classification.category.value===null));await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,1);
+ assert.ok((await state()).operations.every(o=>o.classification.category.value===null));await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,1);assert.equal((await within(db=>classificationStatus(db,'first',{},provider()))).state,'blocked');
 });
 test('concurrent workers dispatch once; an exhausted project budget dispatches nothing',async()=>{
  await queue();await Promise.all([runClassificationStage(pg.finance,provider()),runClassificationStage(pg.finance,provider())]);assert.equal(calls,1);

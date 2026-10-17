@@ -1,3 +1,13 @@
+-- Count reservations across tenants without granting access to their receipts.
+LOCK TABLE commerce.ai_cost_reservation IN SHARE ROW EXCLUSIVE MODE;
+ALTER TABLE commerce.ai_project_budget ADD COLUMN dispatch_count integer NOT NULL DEFAULT 0 CHECK(dispatch_count>=0);
+UPDATE commerce.ai_project_budget p SET dispatch_count=(SELECT count(*) FROM commerce.ai_cost_reservation r WHERE r.project_id=p.project_id AND r.project_period_start=p.period_start);
+CREATE FUNCTION commerce.count_ai_dispatch() RETURNS trigger LANGUAGE plpgsql SET search_path=pg_catalog AS $$ BEGIN
+ UPDATE commerce.ai_project_budget SET dispatch_count=dispatch_count+1 WHERE project_id=NEW.project_id AND period_start=NEW.project_period_start;
+ RETURN NEW;END $$;
+CREATE TRIGGER count_ai_dispatch AFTER INSERT ON commerce.ai_cost_reservation FOR EACH ROW EXECUTE FUNCTION commerce.count_ai_dispatch();
+REVOKE ALL ON FUNCTION commerce.count_ai_dispatch() FROM PUBLIC,finance_api,control_api,mail_finance,mail_control;
+
 -- Operator-funded categorization is distinct from customer Analyzer task quota.
 ALTER TABLE commerce.analyzer_request DROP CONSTRAINT analyzer_request_step_check;
 ALTER TABLE commerce.analyzer_request ADD CONSTRAINT analyzer_request_step_check
