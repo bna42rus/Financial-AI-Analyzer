@@ -9,7 +9,7 @@ import {assistantRuntimeManifest} from './analyzer-assistant-manifest.ts';
 import {createStagingAssistantProvider} from './analyzer-assistant-provider.ts';
 import {prepareFinance} from './finance.ts';
 import {reserveCost,settleCost} from './analyzer-cost.ts';
-import {classificationPlan,classificationPrompt,classificationSchema,parseClassification,digest} from './classification-plan.ts';
+import {classificationPlan,classificationVersion,classificationPrompt,classificationRequestSchema,parseClassification,digest} from './classification-plan.ts';
 import {initialSemantics} from '../../../packages/finance-core/src/model.ts';
 import type {Graph} from '../../../packages/finance-core/src/model.ts';
 import type {Usage} from '../../../packages/analyzer/src/cost.ts';
@@ -59,12 +59,13 @@ async function main(){
   for(const name of ['known-merchants','taxi-without-category']){
    phase=name+':prepare';console.log(JSON.stringify({case:name,status:'START'}));
    const sample=structuredClone(graph);if(name==='taxi-without-category'){sample.categories=sample.categories.filter(c=>c.id!=='taxi');sample.operations=sample.operations.filter(o=>o.source.merchantText==='Яндекс Go');}
+   else sample.operations=sample.operations.filter(o=>o.source.merchantText!=='Яндекс Go'); // service is not identified by this broad merchant label
    const plan=classificationPlan(sample),id=randomUUID(),input={catalog:plan.catalog,operations:plan.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))},model=provider.forRequest();let sent=false,usage:Usage|undefined;
    expected={name,input};await archive.save(name+'-input.json',input);
    const settle=async(value?:Usage)=>within(db=>settleCost(db,user.id,id,'classification',value));
    try{
     phase=name+':transport';
-    const result=await model.complete({phase:'understand',prompt:classificationPrompt,input,schema:classificationSchema},async()=>{
+    const result=await model.complete({phase:'understand',protocol:classificationVersion,prompt:classificationPrompt,input,schema:classificationRequestSchema(plan,plan.groups)},async()=>{
      phase=name+':reservation';
      await within(async db=>{await db.query("SET LOCAL lock_timeout='3s'");await prepareFinance(db,user.id);await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['cloud-task-dispatch:'+user.id]);
       if(continuation){

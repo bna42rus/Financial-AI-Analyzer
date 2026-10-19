@@ -8,7 +8,7 @@ import {isAssistantProvider} from './analyzer-assistant-provider.ts';
 import type {AssistantProvider} from './analyzer-assistant-provider.ts';
 import {reserveCost,settleCost} from './analyzer-cost.ts';
 import {HttpError} from './types.ts';
-import {classificationPlan,classificationVersion,classificationBatchSize,classificationPrompt,classificationSchema,parseClassification,applyClassification,digest} from './classification-plan.ts';
+import {classificationPlan,classificationVersion,classificationBatchSize,classificationPrompt,classificationRequestSchema,parseClassification,applyClassification,digest} from './classification-plan.ts';
 import type {Decision,ClassificationPlan} from './classification-plan.ts';
 
 export async function enqueueClassification(db:PoolClient,userId:string){
@@ -89,7 +89,7 @@ export async function runClassificationStage(pool:Pool,provider:AssistantProvide
    return violation;
   });
   try{
-   const completed=await model.complete({phase:'understand',prompt:classificationPrompt,input,schema:classificationSchema},async()=>{
+   const completed=await model.complete({phase:'understand',protocol:classificationVersion,prompt:classificationPrompt,input,schema:classificationRequestSchema(planned.plan,planned.groups)},async()=>{
     if(sent)throw Error('CLASSIFICATION_DUPLICATE_DISPATCH');
     await transaction(pool,userId,async db=>{
      const workspace=await scope(db,userId,provider);

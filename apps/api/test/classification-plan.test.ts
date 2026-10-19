@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {classificationPlan,parseClassification,applyClassification,classificationSignal} from '../src/classification-plan.ts';
+import {classificationPlan,parseClassification,applyClassification,classificationSignal,classificationRequestSchema,digest,classificationVersion,classificationPrompt} from '../src/classification-plan.ts';
+import {createCloudAssistantModel} from '../src/assistant-transport.ts';
 import {initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,Operation} from '../../../packages/finance-core/src/model.ts';
 import {reconcile} from '../../../packages/finance-core/src/graph.ts';
@@ -38,4 +39,45 @@ test('a confident category resolves only its confidence reason and preserves ind
  const o=op();o.reviewReasons=['low_category_confidence','possible_duplicate','unlinked_refund'];
  assert.deepEqual(applyClassification(o,{categoryId:'food',subcategoryId:null,confidence:95}).reviewReasons,['possible_duplicate','unlinked_refund']);
  assert.ok(applyClassification(o,{categoryId:'food',subcategoryId:null,confidence:75}).reviewReasons.includes('low_category_confidence'));
+});
+test('exact visible names resolve within role and parent; unknown, ambiguous, hidden and ref/name collisions fail closed',()=>{
+ const named=(category:unknown,subcategory:unknown=null)=>({decisions:[{ref:'r1',category,subcategory,confidence:96}]});
+ let g=graph(),plan=classificationPlan(g);
+ assert.deepEqual(parseClassification(named('Продукты','Супермаркеты'),plan,plan.groups)[0],{categoryId:'food',subcategoryId:'leaf',confidence:96});
+ for(const category of ['продукты',' Продукты','Единороги','Зарплата'])assert.throws(()=>parseClassification(named(category),plan,plan.groups));
+ g.categories.push({id:'duplicate',name:'Продукты',role:'expense',parentId:null,hidden:false});plan=classificationPlan(g);
+ assert.throws(()=>parseClassification(named('Продукты'),plan,plan.groups),/CATEGORY_AMBIGUOUS/);
+ g.categories.at(-1)!.hidden=true;plan=classificationPlan(g);assert.equal(parseClassification(named('Продукты'),plan,plan.groups)[0]!.categoryId,'food');
+ g.categories.at(-1)!.hidden=false;g.categories.at(-1)!.name=plan.catalog.find(c=>c.name==='Продукты')!.ref;plan=classificationPlan(g);
+ const ref=plan.catalog[plan.categories.findIndex(c=>c.id==='food')]!.ref;
+ g.categories.at(-1)!.name=ref;plan=classificationPlan(g);
+ assert.throws(()=>parseClassification(named(ref),plan,plan.groups),/CATEGORY_AMBIGUOUS/);
+});
+test('a repeated subcategory name is resolved only under the selected parent',()=>{
+ const g=graph();g.categories.push({id:'other-root',name:'Другие расходы',role:'expense',parentId:null,hidden:false},{id:'other-leaf',name:'Супермаркеты',role:'expense',parentId:'other-root',hidden:false});
+ const plan=classificationPlan(g),value={decisions:[{ref:'r1',category:'Продукты',subcategory:'Супермаркеты',confidence:96}]};
+ assert.equal(parseClassification(value,plan,plan.groups)[0]!.subcategoryId,'leaf');
+ value.decisions[0]!.subcategory=plan.catalog[plan.categories.findIndex(c=>c.id==='other-leaf')]!.ref;
+ assert.throws(()=>parseClassification(value,plan,plan.groups),/CATEGORY_MISMATCH/);
+});
+test('the synthetic rejected wire is replayed in its original item order and exact labels preserve unknown services',()=>{
+ const categories=[{id:'food',name:'Продукты'},{id:'electronics',name:'Электроника'},{id:'taxi',name:'Такси'},{id:'public',name:'Общественный транспорт'}].map(c=>({...c,role:'expense' as const,parentId:null,hidden:false}));
+ const g=graph();g.categories=categories;g.operations=['Пятёрочка','DNS','Яндекс Go','Ozon'].map((merchant,i)=>{const value=op(String(i));value.source.merchantText=merchant;value.semantics=initialSemantics('purchase',merchant);return value;});
+ const plan=classificationPlan(g),oldVersion='cashneuro-category-classification/1',catalogHash=digest({version:oldVersion,categories:plan.categories});
+ const originalGroups=[...plan.groups].sort((a,b)=>digest({version:oldVersion,catalogHash,signal:a.signal}).localeCompare(digest({version:oldVersion,catalogHash,signal:b.signal})));
+ assert.deepEqual(originalGroups.map(g=>g.signal.merchant),['DNS','Яндекс Go','Ozon','Пятёрочка']);
+ const wire={decisions:[{ref:'r1',category:'Электроника',subcategory:null,confidence:95},{ref:'r2',category:null,subcategory:null,confidence:0},{ref:'r3',category:null,subcategory:null,confidence:0},{ref:'r4',category:'Продукты',subcategory:null,confidence:95}]};
+ assert.deepEqual(parseClassification(wire,plan,originalGroups).map(d=>d.categoryId),['electronics',null,null,'food']);
+});
+test('classification HTTP uses its own protocol and a schema bound to catalog values and operation refs',async()=>{
+ const g=graph();g.categories.push({id:'hidden',name:'Невидимая',role:'expense',parentId:null,hidden:true});const plan=classificationPlan(g),schema=classificationRequestSchema(plan,plan.groups);
+ assert.deepEqual(schema.properties.decisions.items.properties.ref.enum,['r1']);assert.equal(schema.properties.decisions.minItems,1);assert.equal(schema.properties.decisions.maxItems,1);
+ assert.ok(schema.properties.decisions.items.properties.category.enum.includes('Продукты'));assert.ok(!schema.properties.decisions.items.properties.category.enum.includes('Невидимая'));
+ let reserves=0,posts=0;
+ const model=createCloudAssistantModel({apiKey:'synthetic-key-for-tests-only'},async(_url,options)=>{
+  posts++;assert.equal(reserves,1);const body=JSON.parse(String(options?.body));assert.ok(body.messages[0].content.startsWith('Protocol '+classificationVersion+'\n'));assert.ok(!body.messages[0].content.includes('cashneuro-assistant-plan/'));
+  return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:50,completion_tokens:30,total_tokens:80},choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({decisions:[{ref:'r1',category:'Продукты',subcategory:null,confidence:96}]})}}]}));
+ });
+ const answer=await model.complete({phase:'understand',protocol:classificationVersion,prompt:classificationPrompt,input:{catalog:plan.catalog,operations:plan.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))},schema},async()=>{reserves++;});
+ assert.equal(parseClassification(answer.value,plan,plan.groups)[0]!.categoryId,'food');assert.equal(posts,1);
 });

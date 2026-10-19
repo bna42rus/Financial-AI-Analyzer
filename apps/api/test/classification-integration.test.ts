@@ -16,7 +16,7 @@ const fetcher:typeof fetch=async(_url,options)=>{
  assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM commerce.ai_cost_reservation WHERE state='reserved'")).rows[0].n),1);
  await afterDispatch?.();if(behavior==='unknown')throw Error('synthetic timeout');
  const cat=input.catalog.find((c:any)=>c.name==='Продукты'&&c.parent===null).ref;
- return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:600,completion_tokens:60,total_tokens:660},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify(behavior==='invalid'?{decisions:[]}:{decisions:input.operations.map((o:any)=>({ref:o.ref,category:cat,subcategory:null,confidence:96}))})}}]}));
+ return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:600,completion_tokens:60,total_tokens:660},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify(behavior==='invalid'?{decisions:[]}:{decisions:input.operations.map((o:any)=>({ref:o.ref,category:behavior==='named'?'Продукты':cat,subcategory:null,confidence:96}))})}}]}));
 };
 const provider=(limit='45')=>createTestAssistantProvider(pg.finance,fetcher,{projectId:'test/classification',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:limit});
 async function within<T>(action:(db:PoolClient)=>Promise<T>,user='first'){const db=await pg.finance.connect();try{await db.query('BEGIN');await prepareFinance(db,user);const value=await action(db);await db.query('COMMIT');return value;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
@@ -51,6 +51,11 @@ test('repeat run and a later import of the same merchant reuse only this users s
  await within(async db=>{const more=await syntheticOperations(db,'first',1,account,category,'Пятёрочка');await db.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['first',more[0],JSON.stringify(initialSemantics('purchase','Пятёрочка'))]);});
  await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,1);assert.ok((await state()).operations.every(o=>o.classification.category.value===category));
  const second=await seed('second',1);await within(db=>enqueueClassification(db,'second'),'second');await runClassificationStage(pg.finance,provider());assert.equal(calls,2);assert.notEqual(second.category,category);
+});
+test('an exact model category label is resolved to the tenant category and applied with the same ledger and manual protection',async()=>{
+ behavior='named';await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,1);
+ assert.ok((await state()).operations.every(o=>o.classification.category.value===category&&o.classification.category.source==='ai'));
+ assert.equal((await pg.owner.query('SELECT state FROM commerce.ai_cost_reservation')).rows[0].state,'settled');
 });
 test('manual decisions made during HTTP win over the stale model response',async()=>{
  afterDispatch=()=>within(async db=>{const semantics=initialSemantics('purchase','Пятёрочка');semantics.category=facet(category,'user',true);await db.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=ANY($2::uuid[])',['first',ids,JSON.stringify(semantics)]);});
