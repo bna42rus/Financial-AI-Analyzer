@@ -17,6 +17,7 @@ on:
       - 'scripts/*assistant-staging*'
       - 'scripts/*connected-web*'
       - 'scripts/*staging-release*'
+      - 'scripts/*classification*'
       - '.github/scripts/start-isolated-postgres.sh'
       - 'docs/architecture/branch-consolidation-20261016.json'
       - 'apps/web/vite.config.ts'
@@ -59,6 +60,7 @@ jobs:
         run: >-
           node --experimental-transform-types --test
           apps/api/test/classification-plan.test.ts
+          apps/api/test/classification-smoke-support.test.ts
           apps/api/test/assistant-workflow.test.ts
           apps/api/test/assistant-durability.test.ts
           apps/api/test/assistant-trial.test.ts
@@ -74,7 +76,9 @@ jobs:
           bash -n scripts/prepare-assistant-staging.sh
           node scripts/check-branch-consolidation.mjs
           python3 scripts/test-update-staging-release.py
+          python3 scripts/test-diagnose-classification-staging.py
           bash -n scripts/prepare-staging-release.sh
+          bash -n scripts/run-classification-check.sh
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
 

@@ -8,6 +8,7 @@ import {prepareFinance,financeView,acceptAccount,importEpoch} from '../src/finan
 import {initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
 import {createTestAssistantProvider} from '../src/analyzer-assistant-provider.ts';
 import {enqueueClassification,runClassificationStage,classificationStatus} from '../src/classification-store.ts';
+import {classificationPilotTotals} from '../src/classification-smoke-support.ts';
 let pg:Awaited<ReturnType<typeof postgresFixture>>,calls=0,behavior='normal',outgoing:unknown[],afterDispatch:(()=>Promise<void>)|undefined;
 let ids:string[],category:string,account:string;
 const fetcher:typeof fetch=async(_url,options)=>{
@@ -87,4 +88,18 @@ test('private cache is inaccessible to other tenants and Control; scheduler expo
  await assert.rejects(pg.control.query('SELECT * FROM finance.classification_cache'),/permission denied/);
  const columns=(await pg.owner.query("SELECT column_name FROM information_schema.columns WHERE table_schema='finance' AND table_name='classification_dispatch' ORDER BY ordinal_position")).rows.map(r=>r.column_name);
  assert.deepEqual(columns,['user_id','generation','state','updated_at']);
+});
+test('standalone continuation reads global settled cost and dispatch counts across tenants and periods without exposing customer receipts',async()=>{
+ await queue();await runClassificationStage(pg.finance,provider());
+ const first=await within(db=>classificationPilotTotals(db,'test/classification'));assert.equal(first.calls,1);assert.equal(first.reservedAtoms,'0');
+ await runClassificationStage(pg.finance,provider()); // finish the first tenant's queue metadata
+ await seed('second',1);await within(db=>enqueueClassification(db,'second'),'second');await runClassificationStage(pg.finance,provider());
+ const both=await within(db=>classificationPilotTotals(db,'test/classification'));assert.equal(both.calls,2);assert.equal(BigInt(both.spentAtoms),BigInt(first.spentAtoms)*2n);
+ assert.equal((await within(db=>db.query('SELECT * FROM commerce.ai_cost_reservation'))).rowCount,1);
+ // A later continuation must carry all earlier periods, not reset the cap.
+ await pg.owner.query("INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms,spent_atoms,reserved_atoms,dispatch_count) VALUES('test/classification','2021-01-01','2100-01-01',1000000000,17,19,3)");
+ const carried=await within(db=>classificationPilotTotals(db,'test/classification'));assert.equal(carried.calls,5);assert.equal(BigInt(carried.spentAtoms),BigInt(both.spentAtoms)+17n);assert.equal(carried.reservedAtoms,'19');
+ await pg.owner.query("UPDATE commerce.ai_project_budget SET blocked=true WHERE project_id='test/classification' AND period_start='2021-01-01'");
+ assert.equal((await within(db=>classificationPilotTotals(db,'test/classification'))).blocked,true);
+ await assert.rejects(within(db=>classificationPilotTotals(db,'test/nonexistent')),/PREVIOUS_BUDGET_REQUIRED/);
 });
