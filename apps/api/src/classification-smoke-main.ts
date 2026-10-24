@@ -13,7 +13,8 @@ import {classificationVersion,classificationPrompt,classificationRequestSchema,p
 import {classificationSmokeCase,classificationSmokeNames} from './classification-smoke-cases.ts';
 import type {Usage} from '../../../packages/analyzer/src/cost.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
-import {continuedClassificationSettings,classificationFailure,syntheticClassificationArchive,syntheticClassificationFetch,classificationPilotTotals} from './classification-smoke-support.ts';
+import {classificationRuntimeAdmission} from './classification-admission.ts';
+import {classificationFailure,syntheticClassificationArchive,syntheticClassificationFetch,classificationPilotTotals} from './classification-smoke-support.ts';
 import type {AssistantStagingSettings} from './analyzer-assistant-settings.ts';
 import {verifyClassificationTariff} from './classification-tariff.ts';
 let phase='arguments';
@@ -41,7 +42,8 @@ async function main(){
    if(!(await lock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[lockName])).rows[0].locked)throw Error('CLASSIFICATION_CHECK_IN_PROGRESS');
    phase='tariff_preflight';console.log(JSON.stringify({phase,status:'START',paidCalls:0}));
    const tariff=await verifyClassificationTariff(fetch);
-   settings=continuedClassificationSettings(original,await totals(lock),sourceSha256,tariff);
+   phase='admission';
+   settings=classificationRuntimeAdmission(original,await totals(lock),sourceSha256,tariff);
    console.log(JSON.stringify({phase,status:'OK',tariffCheckedAt:tariff.checkedAt,tariffDocumentSha256:tariff.documentSha256,maximumCallsRemaining:settings.maximumCalls,activeConfigurationChanged:false}));
   }
   archive=await syntheticClassificationArchive('/var/lib/cashneuro',settings.apiKey);

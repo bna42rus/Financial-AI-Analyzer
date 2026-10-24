@@ -22,6 +22,9 @@ test('runtime admission carries every previous paid call, preserves original cei
  assert.equal(later.admission.calls,52);assert.equal(later.maximumCalls,8);assert.equal(later.admission.spentAtoms,'1300000000');
  const unexpired=classificationRuntimeAdmission(next,{calls:1,spentAtoms:'1000',reservedAtoms:'0',blocked:false},'e'.repeat(64),tariff,now);
  assert.deepEqual({...unexpired,sourceSha256:next.sourceSha256},next);
+ assert.equal(unexpired.expiresAt,next.expiresAt);assert.equal(unexpired.maximumCalls,next.maximumCalls);
+ assert.equal(unexpired.cost.projectPeriodStart,next.cost.projectPeriodStart);assert.deepEqual(unexpired.admission,next.admission);
+ assert.deepEqual(unexpired.cost,next.cost);
  assert.throws(()=>classificationRuntimeAdmission(old,{calls:1,spentAtoms:'0',reservedAtoms:'1',blocked:false},'d'.repeat(64),tariff,now),/RECONCILIATION_REQUIRED/);
 });
 async function archive(t:any){
