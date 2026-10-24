@@ -31,3 +31,25 @@ export function linkIntent(id:string,kind:Link['kind'],status:Link['status'],amo
  if(source.id===target.id)throw new Error('Выберите две разные операции.');
  return {kind:'link',id,link:{kind,status,amountMinor,sourceId:source.id,targetId:target.id,sourceComponentId:sourceEndpoint.componentId,targetComponentId:targetEndpoint.componentId,sourceAllocationId:sourceEndpoint.allocationId,targetAllocationId:targetEndpoint.allocationId}};
 }
+
+/** Everyday purchases expose unsigned amounts while persisted bank/component
+ * values keep their original sign. More complex economic parts use the existing editor. */
+export function canSplitPurchase(detail:FinanceDetail){return detail.semantics.kind.value==='purchase'&&detail.semantics.role.value==='expense'&&BigInt(detail.projection.amountMinor)<0n&&detail.components.every(c=>c.type==='other'&&c.role.value==='expense'&&BigInt(c.amountMinor)<0n);}
+export function newPurchasePart():ComponentDraft{return {...newComponent(),role:'expense',categoryConfirmed:true,subcategoryConfirmed:true};}
+export function purchaseDrafts(detail:FinanceDetail):ComponentDraft[]{return componentDrafts(detail).map(d=>({...d,amount:minorToRubles((-BigInt(rublesToMinor(d.amount))).toString()),role:'expense'}));}
+export function purchaseBalance(detail:FinanceDetail,drafts:ComponentDraft[]){
+ const total=-BigInt(detail.projection.amountMinor);let assigned=0n,invalid=false;
+ for(const d of drafts){if(!d.amount.trim())continue;try{const n=BigInt(rublesToMinor(d.amount));if(n<=0n)invalid=true;assigned+=n;}catch{invalid=true;}}
+ return {total:total.toString(),assigned:assigned.toString(),remaining:(total-assigned).toString(),invalid};
+}
+export function purchaseRemainder(detail:FinanceDetail,drafts:ComponentDraft[],id:string){
+ const balance=purchaseBalance(detail,drafts.filter(d=>d.id!==id));
+ if(balance.invalid||BigInt(balance.remaining)<=0n)throw new Error('Проверьте суммы остальных частей: положительного остатка нет.');
+ return minorToRubles(balance.remaining);
+}
+export function purchaseSplitIntent(detail:FinanceDetail,drafts:ComponentDraft[]):RelationIntent{
+ if(!canSplitPurchase(detail))throw new Error('Для этой операции используйте редактор частей.');
+ if(!drafts.length)return componentsIntent(detail,[]);
+ const signed=drafts.map(d=>{const n=BigInt(rublesToMinor(d.amount));if(n<=0n)throw new Error('Сумма каждой части должна быть больше нуля, без знака минус.');return {...d,type:'other' as const,role:'expense' as const,amount:minorToRubles((-n).toString())};});
+ return componentsIntent(detail,signed);
+}

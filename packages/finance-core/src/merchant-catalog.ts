@@ -49,7 +49,7 @@ export const merchantCatalog:readonly MerchantEntry[]=[
  entry('Яндекс Маркет',['yandex market','яндекс маркет'],'marketplace','https://market.yandex.ru/'),
  entry('Яндекс Go',['yandex go','яндекс go','яндекс го'],'unknown','https://go.yandex/'),
  entry('Сервисы Яндекса',['сервисы яндекса','yandex services'],'unknown','https://yandex.ru/all'),
- entry('Таймвэб',['timeweb.cloud','timeweb cloud','timeweb','таймвэб'],'cloud','https://timeweb.cloud/'),
+ entry('TimeWeb',['timeweb.cloud','timeweb cloud','timeweb','таймвэб'],'cloud','https://timeweb.cloud/'),
  entry('DNS',['dns','днс'],'electronics','https://www.dns-shop.ru/'),
  entry('М.Видео',['м видео','m video','мвидео','mvideo'],'electronics','https://www.mvideo.ru/'),
  entry('Спортмастер',['спортмастер','sportmaster'],'fitness','https://www.sportmaster.ru/',{review:true}),

@@ -21,3 +21,10 @@ test('vending scope covers both alphabets and compounds; merchant rules survive 
  const shop={...rule,conditions:{merchantEquals:'SPAR'}};op.semantics.merchant.value='SPAR';assert.equal(ruleMatches(op,account,shop),true);op.semantics.merchant.value='SPARK';assert.equal(ruleMatches(op,account,shop),false);
  op.semantics.merchant.value='SPAR';assert.equal(ruleMatches(op,account,{...shop,conditions:{merchantEquals:'SPAR 349 Moscow Rus'}}),false);
 });
+
+test('the owner-approved TimeWeb display spelling preserves an existing personal rule using the earlier name',()=>{
+ const account:Account={id:'account',bankId:'tbank',name:'Счёт',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null};
+ const op:Operation={id:'op',source:{accountId:'account',operationDate:{precision:'day',date:'2026-10-01'},postedDate:null,amountMinor:'-100',currency:'RUB',merchantText:'timeweb.cloud',description:'Покупка timeweb.cloud',bankCategory:'',bankRefHmac:null,versions:{}},corrections:{},semantics:initialSemantics('purchase','TimeWeb'),comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]};
+ const rule={id:'rule',name:'Старое правило',enabled:true,priority:100,conditions:{merchantEquals:'Таймвэб'},assignments:{categoryId:'services'}};
+ assert.equal(ruleMatches(op,account,rule),true);assert.equal(ruleMatches(op,account,{...rule,conditions:{merchantContains:'Таймвэб'}}),true);
+});

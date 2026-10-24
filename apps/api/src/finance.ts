@@ -26,7 +26,7 @@ import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {reconcile,aggregate} from '../../../packages/finance-core/src/graph.ts';
 import type {Filter} from '../../../packages/finance-core/src/graph.ts';
-import {starterCategories} from '../../../packages/finance-core/src/starter.ts';
+import {starterCategories,isMarketplaceName} from '../../../packages/finance-core/src/starter.ts';
 import {applyRules,validateRule} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
@@ -64,7 +64,14 @@ export async function prepareFinance(db:PoolClient,userId:string){
   const parent=randomUUID();await db.query('INSERT INTO finance.category(user_id,id,name,role) VALUES($1,$2,$3,$4)',[userId,parent,names[0],role]);
   for(const name of names.slice(1))await db.query('INSERT INTO finance.category(user_id,id,parent_id,name,role) VALUES($1,$2,$3,$4,$5)',[userId,randomUUID(),parent,name,role]);
  }
- return (await db.query('SELECT * FROM finance.workspace WHERE user_id=$1 FOR UPDATE',[userId])).rows[0] as {generation:string;revision:string;loan_mode:'cashflow'|'economic';key_version:string;interface_epoch:string;config_revision:string};
+ let workspace=(await db.query('SELECT * FROM finance.workspace WHERE user_id=$1 FOR UPDATE',[userId])).rows[0];
+ if(!workspace.marketplace_catalog_initialized){
+  const categories=(await db.query("SELECT name FROM finance.category WHERE user_id=$1 AND role IN ('expense','both')",[userId])).rows;
+  const missing=!categories.some(c=>isMarketplaceName(c.name));
+  if(missing)await db.query("INSERT INTO finance.category(user_id,id,name,role) VALUES($1,$2,'Маркетплейсы','expense')",[userId,randomUUID()]);
+  workspace=(await db.query('UPDATE finance.workspace SET marketplace_catalog_initialized=true,revision=revision+$2 WHERE user_id=$1 RETURNING *',[userId,missing?1:0])).rows[0];
+ }
+ return workspace as {generation:string;revision:string;loan_mode:'cashflow'|'economic';key_version:string;interface_epoch:string;config_revision:string};
 }
 export async function loadFinance(db:PoolClient,userId:string){
  const orm=drizzle(db),a=await orm.select().from(tables.accounts).where(eq(tables.accounts.userId,userId)).orderBy(tables.accounts.id),c=await orm.select().from(tables.categories).where(eq(tables.categories.userId,userId)).orderBy(tables.categories.id),t=await orm.select().from(tables.transactions).where(eq(tables.transactions.userId,userId)).orderBy(tables.transactions.id),o=await orm.select().from(tables.observations).where(eq(tables.observations.userId,userId)).orderBy(tables.observations.id),p=await orm.select().from(tables.components).where(eq(tables.components.userId,userId)).orderBy(tables.components.id),l=await orm.select().from(tables.links).where(eq(tables.links.userId,userId)).orderBy(tables.links.id);
