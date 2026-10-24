@@ -155,7 +155,10 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     ]);
     await expect(page.getByText('Загрузка принята сервером. Результат сохранён в истории загрузок.')).toBeVisible({timeout:30000});
     assert.equal(prepared.length,1);
-    for(const secret of ['Private','%PDF','00000000000000000001','filename'])assert.equal(prepared[0]!.includes(secret),false);
+    // The approved profile retains ordinary names in bank descriptions, while
+    // filenames, raw files and actual identifiers remain forbidden.
+    assert.equal(prepared[0]!.includes('Private Person'),true);
+    for(const secret of ['Private.csv','Private.xlsx','Private.pdf','Private-Identifier','%PDF','00000000000000000001','filename'])assert.equal(prepared[0]!.includes(secret),false);
     assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_batch WHERE user_id='task-browser'")).rows[0].n,'1');
     for(let i=0;i<15;i++) {
       if(!(await pg.owner.query("SELECT 1 FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rowCount)break;
