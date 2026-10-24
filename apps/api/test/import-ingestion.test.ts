@@ -370,3 +370,16 @@ test('a new counterparty binding on an original merged source targets its canoni
  await command({kind:'counterparty',id:partyId,create:true,patch:{name:'Synthetic source party'}});const e=await context();await within('first',db=>acceptCounterpartyObservation(db,'first',{generation:e.generation,keyVersion:e.keyVersion},{observationId,counterpartyId:partyId,aliasId:null}));
  assert.equal((await request('/finance/state')).json().counterpartySources[0].transactionId,pair.leftId);assert.equal((await previewCommand({kind:'undo',id:randomUUID(),value:saved.result.actionId})).statusCode,409);
 });
+
+test('richer bank text upgrades exact file instances without duplicates or overwriting manual edits; cancellation restores earlier evidence',async()=>{
+ const raw='Покупка Аптека Ромашка карта 4111111111111111',bytes='same synthetic source bytes';
+ const rows=[row({bankReference:undefined,localDescription:raw,safeSource:{event:'purchase',merchant:null},parser:'tbank-table/1',localMcc:'5912',localBankCategory:'Здоровье'})];
+ const prepare=async(profile:'bank-source/3'|'bank-source/4')=>{const local=await createLocalPreparation(await context(),undefined,localBankAdapter,profile);try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}};
+ const old=await prepare('bank-source/3');await accept(old);await drain(old.batchId);const first=await importedOperation();assert.equal(first.source.description,'Покупка');
+ await command({kind:'operation',id:first.id,patch:{merchant:'Моя аптека',comment:'Ручной комментарий'}});
+ const enriched=await prepare('bank-source/4');await accept(enriched);const result=await drain(enriched.batchId);assert.equal(result.counts.created,0);assert.equal(result.counts.updated,1);assert.equal((await counts()).transaction,1);
+ const upgraded=await detail(first.id);assert.equal(upgraded.source.description,'Покупка Аптека Ромашка [скрыто]');assert.equal(upgraded.source.sourceMcc,'5912');assert.equal(upgraded.source.bankCategory,'Здоровье');assert.equal(upgraded.semantics.merchant.value,'Моя аптека');assert.equal(upgraded.comment,'Ручной комментарий');assert.equal(upgraded.source.amountMinor,first.source.amountMinor);
+ const page=await request('/finance/operations-page',{query:{filter:{search:'Ромашка'}}});assert.equal(page.statusCode,200,page.body);assert.equal(page.json().operations[0].description,upgraded.source.description);
+ const legacy=await prepare('bank-source/3');await accept(legacy);await drain(legacy.batchId);assert.equal((await detail(first.id)).source.description,upgraded.source.description);assert.equal((await counts()).transaction,1);
+ await command({kind:'cancel_import',batchId:legacy.batchId});await command({kind:'cancel_import',batchId:enriched.batchId});const restored=await detail(first.id);assert.equal(restored.source.description,'Покупка');assert.equal(restored.source.sourceMcc,undefined);assert.equal(restored.semantics.merchant.value,'Моя аптека');assert.equal(restored.comment,'Ручной комментарий');
+});

@@ -28,7 +28,7 @@ async function archive(t:any){
  const directory=await mkdtemp(join(tmpdir(),'classification-admission-test-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  for(const name of classificationSmokeNames){
   const sample=classificationSmokeCase(name),decisions=sample.plan.groups.map((g,i)=>{
-   const id=name==='taxi-without-category'?null:({'DNS':'electronics','Пятёрочка':'food',Ozon:null} as Record<string,string|null>)[g.signal.merchant!];
+   const id=name==='taxi-without-category'?null:sample.expectedCategories[g.signal.merchant!];
    return {ref:'r'+(i+1),category:id?sample.plan.catalog[sample.plan.categories.findIndex(c=>c.id===id)]!.ref:null,subcategory:null,confidence:id?95:0};
   });
   const values={input:sample.input,answer:{httpStatus:200,modelMatches:true,finishReason:'stop',role:'assistant',content:JSON.stringify({decisions}),usage:{input:668,output:395,total:1063}},usage:{inputTokens:668,outputTokens:395,modelVersion:'openai/gpt-oss-120b'}};

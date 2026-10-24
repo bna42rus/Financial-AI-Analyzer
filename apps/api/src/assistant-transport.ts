@@ -15,7 +15,7 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
   });
   let running = false;
   return { bound: transport.bound, async complete(input, beforeDispatch) {
-    if(input.protocol!==undefined&&input.protocol!=='cashneuro-category-classification/2')throw Error('ASSISTANT_TRANSPORT_CHANGED');
+    if(input.protocol!==undefined&&input.protocol!=='cashneuro-category-classification/3')throw Error('ASSISTANT_TRANSPORT_CHANGED');
     if (running) throw Error('ASSISTANT_CONCURRENT_DISPATCH'); running = true; expected = input;
     try { const r = await transport.complete(input.prompt, input.input, input.schema, beforeDispatch); return { value: r.value, usage: r.usage }; }
     finally { expected = undefined; running = false; }

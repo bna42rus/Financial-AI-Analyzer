@@ -81,3 +81,13 @@ test('classification HTTP uses its own protocol and a schema bound to catalog va
  const answer=await model.complete({phase:'understand',protocol:classificationVersion,prompt:classificationPrompt,input:{catalog:plan.catalog,operations:plan.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))},schema},async()=>{reserves++;});
  assert.equal(parseClassification(answer.value,plan,plan.groups)[0]!.categoryId,'food');assert.equal(posts,1);
 });
+
+test('versioned sanitized descriptions admit unfamiliar merchants and distinguish services at the same brand',()=>{
+ const g=graph(),a=g.operations[0]!;
+ a.source={...a.source,merchantText:'Кофейня Север',description:'Покупка Кофейня Север',bankCategory:'Кафе',sourceMcc:'5814',versions:{sourceSanitizer:'bank-source/4'}};
+ const plan=classificationPlan(g);assert.equal(plan.groups.length,1);assert.equal(plan.groups[0]!.signal.merchant,'Кофейня Север');
+ assert.equal(plan.groups[0]!.signal.description,'Покупка Кофейня Север');assert.equal(plan.groups[0]!.signal.mcc,'5814');
+ const b=structuredClone(a);b.id='second';b.source.description='Покупка Кофейня Север продукты';b.source.sourceMcc='5411';g.operations.push(b);assert.equal(classificationPlan(g).groups.length,2);
+ a.source.versions={};assert.equal(classificationSignal(a,g),null);
+ a.source.versions={sourceSanitizer:'bank-source/4'};a.source.description='Покупка card 4111111111111111';assert.equal(classificationSignal(a,g),null);
+});

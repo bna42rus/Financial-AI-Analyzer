@@ -176,6 +176,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         if sql("SELECT to_regclass('finance.classification_run') IS NOT NULL") == 'f':
             migration = (source / 'packages/database/migrations/0028_ai_classification.sql').read_text()
             sql('BEGIN;\n' + migration + '\nCOMMIT;')
+        if sql("SELECT position('details' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") == 'f':
+            sql('BEGIN;\n' + (source / 'packages/database/migrations/0029_bank_description.sql').read_text() + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД.' if enable_classification else '1/3: сохранена конфигурация отката; ключ, лимиты и БД остаются прежними.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
