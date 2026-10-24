@@ -24,7 +24,8 @@ export function recognizeMerchant(merchant:string,description=''):MerchantRecogn
  if(!key||/\b(?:perevod|transfer|sbp)\b/.test(merchantKey(description))&&!merchant)return base;
  const found=catalogPatterns.filter(e=>e.patterns.some(pattern=>pattern.test(key))).map(e=>e.entry);
  // Specific Yandex services win over the broad platform; unrelated brands conflict.
- const unique=[...new Map(found.map(e=>[e.name,e])).values()];
+ const specific=found.filter(e=>!found.some(other=>other.parentBrand===e.name));
+ const unique=[...new Map(specific.map(e=>[e.name,e])).values()];
  if(unique.length>1){return {...base,conflict:true};}
  const entry=unique[0];
  const tokens=words(clean),full=merchantKey(description+' '+merchant);
@@ -39,13 +40,14 @@ export function recognizeMerchant(merchant:string,description=''):MerchantRecogn
   ['pharmacy',['аптека','apteka','pharmacy']],['fitness',['фитнес','fitness','fitnes','спортзал','тренажерный зал']],
   ['fuel',['азс','azs','бензин','автозаправка']],['medical',['клиника','klinika','стоматология','stomatologiya','лаборатория']],
   ['cinema',['кинотеатр','kinoteatr','cinema']],['books',['книжный магазин','knizhnyy magazin']],
-  ['pets',['зоомагазин','zoomagazin','ветклиника','vetklinika']],['beauty',['парикмахерская','parikmaherskaya','barbershop','барбершоп','салон красоты']],
+  ['pets',['зоомагазин','zoomagazin']],['veterinary',['ветклиника','vetklinika','ветеринарная клиника','veterinarnaya klinika','ветеринар','veterinar']],['beauty',['парикмахерская','parikmaherskaya','barbershop','барбершоп','салон красоты']],
   ['clothing',['магазин одежды','magazin odezhdy','обувной магазин']],['home',['мебельный магазин','строительный магазин']],
   ['education',['учебный центр','школа языков','образовательные курсы']],['hotel',['отель','otel','hotel','гостиница']],
   ['rail',['жд билеты','железнодорожные билеты']],['air',['авиабилеты']],
   ['public_transport',['общественный транспорт','городской автобус']],['carsharing',['каршеринг','carsharing']],
  ];
- const matches=services.filter(([,aliases])=>aliases.some(a=>contains(key,a)));
+ const activityMatches=services.filter(([,aliases])=>aliases.some(a=>contains(key,a)));
+ const matches=activityMatches.some(([service])=>service==='veterinary')?activityMatches.filter(([service])=>service!=='medical'):activityMatches;
  if(matches.length===1)return {...base,service:matches[0]![0],confidence:95,delivery,matched:true};
  if(matches.length>1)return {...base,conflict:true};
  // Vending can be embedded in a compound trade name, but is only a Review suggestion.
@@ -64,7 +66,7 @@ const routes:Record<MerchantService,{roots:string[];leaves:string[]}>= {
  marketplace:{roots:['Маркетплейсы','Покупки на маркетплейсах','Прочие расходы'],leaves:['Маркетплейсы']},cloud:{roots:['Подписки и цифровые сервисы','Цифровые сервисы'],leaves:['Облачные сервисы','Хостинг']},
  pharmacy:{roots:['Здоровье и спорт','Здоровье','Аптеки'],leaves:['Аптеки']},fuel:{roots:['Транспорт','Автомобиль','Топливо'],leaves:['Топливо','Бензин']},
  cinema:{roots:['Развлечения и хобби','Развлечения'],leaves:['Кино и мероприятия','Кино']},books:{roots:['Развлечения и хобби','Книги'],leaves:['Книги']},
- pets:{roots:['Питомцы','Домашние животные'],leaves:['Корм и товары']},home:{roots:['Жильё и дом','Дом'],leaves:['Товары для дома']},
+ veterinary:{roots:['Питомцы','Домашние животные'],leaves:['Ветеринар','Ветеринарные услуги']},pets:{roots:['Питомцы','Домашние животные'],leaves:['Корм и товары']},home:{roots:['Жильё и дом','Дом'],leaves:['Товары для дома']},
  clothing:{roots:['Одежда и аксессуары','Одежда'],leaves:['Одежда']},electronics:{roots:['Электроника','Техника'],leaves:[]},
  beauty:{roots:['Красота и уход','Красота'],leaves:['Парикмахерские и салоны']},medical:{roots:['Здоровье и спорт','Здоровье'],leaves:['Врачи']},
  rail:{roots:['Путешествия'],leaves:['Ж/д билеты']},air:{roots:['Путешествия'],leaves:['Авиабилеты']},hotel:{roots:['Путешествия'],leaves:['Отели']},

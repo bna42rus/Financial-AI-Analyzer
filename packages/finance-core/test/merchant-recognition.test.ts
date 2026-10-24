@@ -45,3 +45,15 @@ test('the public catalog has no conflicting aliases and each route uses the user
  const duplicate=categories.concat([{id:'duplicate',name:'Продукты',parentId:null,hidden:false,role:'expense'}]);assert.equal(classify('SPAR','',duplicate),null);
  const other=operation('SPAR');other.semantics.role=facet('neutral');assert.equal(applyMerchantRecognition(other,categories).semantics.category.value,null);
 });
+
+test('a verified specialist brand wins over its general parent; unrelated merchants still conflict',()=>{
+ for(const text of ['Магнит Косметик','MAGNIT KOSMETIK MOSCOW RUS','М.Косметик']){
+  const r=recognizeMerchant(text);assert.equal(r.name,'М.Косметик');assert.equal(classify(text)?.subcategoryId,'Красота и уход/Косметика и уход');
+ }
+ assert.equal(classify('Магнит')?.categoryId,'Продукты');assert.equal(classify('Магнит DNS'),null);
+});
+test('veterinary services never receive the pet-food subcategory, even when the veterinary leaf is absent',()=>{
+ for(const text of ['Ветклиника Север','VETKLINIKA SEVER','Ветеринарная клиника Уют'])assert.equal(classify(text)?.subcategoryId,'Питомцы/Ветеринар');
+ const withoutLeaf=categories.filter(c=>c.name!=='Ветеринар');assert.equal(classify('Ветклиника Север','',withoutLeaf)?.subcategoryId,null);
+ assert.equal(classify('Зоомагазин Север')?.subcategoryId,'Питомцы/Корм и товары');
+});

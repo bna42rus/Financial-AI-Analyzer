@@ -2,9 +2,9 @@
  * Aliases are matching forms, not claims that every bank emits that spelling.
  * Category routes are separate and always resolved against the owner's catalog. */
 export const merchantCatalogVersion='merchant-catalog/1';
-export type MerchantService='grocery'|'cafe'|'fitness'|'telecom'|'public_transport'|'carsharing'|'powerbank'|'marketplace'|'cloud'|'pharmacy'|'fuel'|'cinema'|'books'|'pets'|'home'|'clothing'|'electronics'|'beauty'|'medical'|'rail'|'air'|'hotel'|'education'|'cosmetics'|'laboratory'|'unknown';
-export type MerchantEntry={name:string;aliases:string[];service:MerchantService;source:string;review?:boolean;delivery?:boolean};
-const entry=(name:string,aliases:string[],service:MerchantService,source:string,options:Partial<Pick<MerchantEntry,'review'|'delivery'>>={}):MerchantEntry=>({name,aliases,service,source,...options});
+export type MerchantService='grocery'|'cafe'|'fitness'|'telecom'|'public_transport'|'carsharing'|'powerbank'|'marketplace'|'cloud'|'pharmacy'|'fuel'|'cinema'|'books'|'pets'|'home'|'clothing'|'electronics'|'beauty'|'medical'|'rail'|'air'|'hotel'|'education'|'cosmetics'|'laboratory'|'veterinary'|'unknown';
+export type MerchantEntry={name:string;aliases:string[];service:MerchantService;source:string;review?:boolean;delivery?:boolean;parentBrand?:string};
+const entry=(name:string,aliases:string[],service:MerchantService,source:string,options:Partial<Pick<MerchantEntry,'review'|'delivery'|'parentBrand'>>={}):MerchantEntry=>({name,aliases,service,source,...options});
 export const merchantCatalog:readonly MerchantEntry[]=[
  entry('Пятёрочка',['пятерочка','pyaterochka','pyatyorochka','piaterochka','5ka'],'grocery','https://www.x5.ru/ru/consumer/'),
  entry('Перекрёсток',['перекресток','perekrestok'],'grocery','https://www.x5.ru/ru/consumer/'),
@@ -13,6 +13,7 @@ export const merchantCatalog:readonly MerchantEntry[]=[
  entry('ВкусВилл',['вкусвилл','vkusvill','vkus vill'],'grocery','https://vkusvill.ru/'),
  entry('SPAR',['spar','спар','eurospar','евроспар'],'grocery','https://www.spar.ru/'),
  entry('Магнит',['магнит','magnit'],'grocery','https://magnit.ru/'),
+ entry('М.Косметик',['магнит косметик','magnit kosmetik','м косметик','m kosmetik'],'cosmetics','https://magnit.ru/shops',{parentBrand:'Магнит'}),
  entry('Лента',['лента','lenta'],'grocery','https://lenta.com/'),
  entry('Ашан',['ашан','auchan'],'grocery','https://www.auchan.ru/'),
  entry('Дикси',['дикси','dixy','diksi'],'grocery','https://dixy.ru/'),
