@@ -3,11 +3,14 @@ set -euo pipefail
 repo=${1:?checkout required}
 sha=${2:?commit required}
 extra=()
-if [[ ${3:-} == --enable-classification ]]; then
-  extra+=(--enable-classification)
-elif [[ -n ${3:-} ]]; then
-  exit 2
-fi
+shift 2
+while (($#)); do
+  case "$1" in
+    --enable-classification) extra+=("$1"); shift ;;
+    --classification-evidence|--tested-runtime-sha) test "$#" -ge 2; extra+=("$1" "$2"); shift 2 ;;
+    *) exit 2 ;;
+  esac
+done
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
 test "$(git -C "$repo" rev-parse "$sha^{commit}")" = "$sha"
 test "$(node -p 'process.versions.node.split(".")[0]')" = 24

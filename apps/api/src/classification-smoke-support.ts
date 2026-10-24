@@ -9,10 +9,10 @@ import {classificationTariffDocumentSha256} from './classification-tariff.ts';
 import type {ClassificationTariffVerification} from './classification-tariff.ts';
 
 export type PilotTotals={calls:number;spentAtoms:string;reservedAtoms:string;blocked:boolean};
-export async function classificationPilotTotals(db:Pool|PoolClient,projectId:string):Promise<PilotTotals>{
+export async function classificationPilotTotals(db:Pool|PoolClient,projectId:string,since?:string):Promise<PilotTotals>{
  const r=(await db.query(`SELECT count(*) AS epochs,COALESCE(sum(dispatch_count),0)::text AS calls,
   COALESCE(sum(spent_atoms),0)::text AS spent,COALESCE(sum(reserved_atoms),0)::text AS reserved,
-  COALESCE(bool_or(blocked),false) AS blocked FROM commerce.ai_project_budget WHERE project_id=$1`,[projectId])).rows[0];
+  COALESCE(bool_or(blocked),false) AS blocked FROM commerce.ai_project_budget WHERE project_id=$1 AND ($2::timestamptz IS NULL OR period_start>=$2::timestamptz)`,[projectId,since??null])).rows[0];
  if(Number(r.epochs)<1)throw Error('CLASSIFICATION_PREVIOUS_BUDGET_REQUIRED');
  return {calls:Number(r.calls),spentAtoms:r.spent as string,reservedAtoms:r.reserved as string,blocked:r.blocked as boolean};
 }

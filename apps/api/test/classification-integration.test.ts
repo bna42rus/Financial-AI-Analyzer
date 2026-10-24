@@ -9,6 +9,8 @@ import {initialSemantics,facet} from '../../../packages/finance-core/src/model.t
 import {createTestAssistantProvider} from '../src/analyzer-assistant-provider.ts';
 import {enqueueClassification,runClassificationStage,classificationStatus} from '../src/classification-store.ts';
 import {classificationPilotTotals} from '../src/classification-smoke-support.ts';
+import {confirmClassificationPaidReceipt} from '../src/classification-admission.ts';
+import {reserveCost,settleCost} from '../src/analyzer-cost.ts';
 let pg:Awaited<ReturnType<typeof postgresFixture>>,calls=0,behavior='normal',outgoing:unknown[],afterDispatch:(()=>Promise<void>)|undefined;
 let ids:string[],category:string,account:string;
 const fetcher:typeof fetch=async(_url,options)=>{
@@ -102,9 +104,24 @@ test('standalone continuation reads global settled cost and dispatch counts acro
  const both=await within(db=>classificationPilotTotals(db,'test/classification'));assert.equal(both.calls,2);assert.equal(BigInt(both.spentAtoms),BigInt(first.spentAtoms)*2n);
  assert.equal((await within(db=>db.query('SELECT * FROM commerce.ai_cost_reservation'))).rowCount,1);
  // A later continuation must carry all earlier periods, not reset the cap.
- await pg.owner.query("INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms,spent_atoms,reserved_atoms,dispatch_count) VALUES('test/classification','2021-01-01','2100-01-01',1000000000,17,19,3)");
+ await pg.owner.query("INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms,spent_atoms,reserved_atoms,dispatch_count) VALUES('test/classification','2021-01-01T00:00:00Z','2100-01-01T00:00:00Z',1000000000,17,19,3)");
  const carried=await within(db=>classificationPilotTotals(db,'test/classification'));assert.equal(carried.calls,5);assert.equal(BigInt(carried.spentAtoms),BigInt(both.spentAtoms)+17n);assert.equal(carried.reservedAtoms,'19');
- await pg.owner.query("UPDATE commerce.ai_project_budget SET blocked=true WHERE project_id='test/classification' AND period_start='2021-01-01'");
+ const since=await within(db=>classificationPilotTotals(db,'test/classification','2021-01-01T00:00:00Z'));assert.equal(since.calls,3);assert.equal(since.spentAtoms,'17');assert.equal(since.reservedAtoms,'19');
+ await pg.owner.query("UPDATE commerce.ai_project_budget SET blocked=true WHERE project_id='test/classification' AND period_start='2021-01-01T00:00:00Z'");
  assert.equal((await within(db=>classificationPilotTotals(db,'test/classification'))).blocked,true);
  await assert.rejects(within(db=>classificationPilotTotals(db,'test/nonexistent')),/PREVIOUS_BUDGET_REQUIRED/);
+});
+test('deployment evidence requires the exact settled synthetic receipt and cannot borrow another tenants receipt',async()=>{
+ const id=randomUUID(),fingerprint='e'.repeat(64),p=provider(),usage={inputTokens:668,outputTokens:395,modelVersion:'openai/gpt-oss-120b'},from=new Date(Date.now()-60000),through=new Date(Date.now()+60000);
+ await within(async db=>{
+  await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES('first',$1,'classification',$2,'sent','cashneuro-category-smoke/1',$3,$4,$4,'not_sent')`,[id,fingerprint,usage.modelVersion,p.policy.projectPeriodStart]);
+  await reserveCost(db,{userId:'first',requestId:id,step:'classification',anchorAt:p.policy.projectPeriodStart,periodStart:p.policy.projectPeriodStart},p.policy,p.model.bound);
+  await settleCost(db,'first',id,'classification',usage);await db.query("UPDATE commerce.analyzer_request SET state='completed' WHERE user_id='first' AND request_id=$1",[id]);
+ });
+ assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first',p.policy.projectId,fingerprint,usage,from,through)),true);
+ assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first','foreign/project',fingerprint,usage,from,through)),false);
+ assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first',p.policy.projectId,fingerprint,{...usage,outputTokens:396},from,through)),false);
+ assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first',p.policy.projectId,fingerprint,usage,from,through),'second'),false);
+ await pg.owner.query("UPDATE commerce.analyzer_request SET usage_state='unknown' WHERE request_id=$1",[id]);
+ assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first',p.policy.projectId,fingerprint,usage,from,through)),false);
 });

@@ -15,6 +15,21 @@ spec.loader.exec_module(m)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_renewed_rollback_and_candidate_share_one_carried_budget_and_cannot_expand_authority(self):
+        previous = {'realm':'staging/finance','apiKey':'synthetic-only','allowedEmails':['owner@example.test'],'modelMetadataSha256':'b'*64,'tariffSource':'fixed',
+                    'maximumCalls':14,'admission':{'stageCapAtoms':'10000000000','stageMaximumCalls':60,'spentAtoms':'100','calls':46},'cost':{'projectId':'staging/test','price':{'input':'15.86'}}}
+        candidate = json.loads(json.dumps(previous))
+        candidate.update(sourceSha256='d'*64,maximumCalls=10)
+        candidate['admission'].update(spentAtoms='200',calls=50)
+        fallback = {**candidate,'sourceSha256':'a'*64}
+        m.validate_admission_pair(previous,candidate,fallback,'a'*64,'d'*64)
+        for field,value in [('apiKey','foreign-key'),('allowedEmails',['other@example.test']),('maximumCalls',15)]:
+            bad={**candidate,field:value}
+            with self.assertRaises(m.m.InstallationError):
+                m.validate_admission_pair(previous,bad,{**bad,'sourceSha256':'a'*64},'a'*64,'d'*64)
+        with self.assertRaises(m.m.InstallationError):
+            m.validate_admission_pair(previous,candidate,{**fallback,'maximumCalls':14},'a'*64,'d'*64)
+
     def test_classification_rebind_preserves_key_call_ceiling_expiry_and_accounting(self):
         previous = {'sourceSha256': 'a'*64, 'apiKey': 'synthetic-only', 'maximumCalls': 14, 'admission': {'calls': 46}, 'expiresAt': '2026-10-17T16:35:30Z', 'cost': {'projectLimitRub': '5.5'}}
         changed = m.rebind_classification_settings(previous, 'a'*64, 'b'*64)

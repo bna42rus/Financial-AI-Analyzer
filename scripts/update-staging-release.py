@@ -98,7 +98,23 @@ def restore(backup):
         m.run(['systemctl', 'start', WORKER])
 
 
-def install(source, sha, enable_classification=False):
+def validate_admission_pair(previous, next_settings, fallback, installed_sha, tested_sha):
+    if next_settings.get('sourceSha256') != tested_sha or fallback.get('sourceSha256') != installed_sha or {**fallback, 'sourceSha256': tested_sha} != next_settings:
+        raise m.InstallationError('CLASSIFICATION_ADMISSION_BINDING_CHANGED')
+    for key in ['realm', 'apiKey', 'allowedEmails', 'modelMetadataSha256', 'tariffSource']:
+        if previous.get(key) != next_settings.get(key):
+            raise m.InstallationError('CLASSIFICATION_ADMISSION_AUTHORITY_CHANGED')
+    old, new = previous['admission'], next_settings['admission']
+    if any(old[key] != new[key] for key in ['stageCapAtoms', 'stageMaximumCalls']) or int(new['spentAtoms']) < int(old['spentAtoms']) or new['calls'] < old['calls'] or next_settings['maximumCalls'] > previous['maximumCalls']:
+        raise m.InstallationError('CLASSIFICATION_ADMISSION_ACCOUNTING_CHANGED')
+    if previous['cost']['projectId'] != next_settings['cost']['projectId'] or previous['cost']['price'] != next_settings['cost']['price']:
+        raise m.InstallationError('CLASSIFICATION_ADMISSION_PROJECT_CHANGED')
+
+
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None):
+    if bool(evidence) != bool(tested_sha) or evidence and (not enable_classification or not re.fullmatch('[a-f0-9]{64}', tested_sha)):
+        raise m.InstallationError('CLASSIFICATION_EVIDENCE_ARGUMENTS_INVALID')
+    print('Подготовка: проверяем релиз и резервную копию Staging.', flush=True)
     if not re.fullmatch('[a-f0-9]{40}', sha):
         raise m.InstallationError('RELEASE_INVALID')
     config = settings()
@@ -114,13 +130,15 @@ def install(source, sha, enable_classification=False):
     original_settings = json.loads(m.CONFIG.read_text())
     binding = original_settings['sourceSha256']
     identity = json.loads(m.run(['/usr/bin/node', '--experimental-transform-types', source / 'apps/api/src/assistant-staging-main.ts', '--prepare']))
+    if evidence and identity['sourceSha256'] != tested_sha:
+        raise m.InstallationError('CLASSIFICATION_TESTED_RELEASE_CHANGED')
     if identity['sourceSha256'] != binding:
         if not enable_classification:
             raise m.InstallationError('API_SOURCE_CHANGED_REQUIRES_SEPARATE_ADMISSION')
         installed = json.loads(m.run(['/usr/bin/node', '--experimental-transform-types', current / 'apps/api/src/assistant-staging-main.ts', '--prepare']))
         rebind_classification_settings(original_settings, installed['sourceSha256'], identity['sourceSha256'])
     rebound = rebind_classification_settings(original_settings, binding, identity['sourceSha256'])
-    if enable_classification:
+    if enable_classification and not evidence:
         # Explicit feature opt-in changes only source identity. No new key,
         # ceiling, accounting period, tariff or expiration is manufactured.
         validation = 'import {checkAssistantStagingSettings} from ' + json.dumps((source / 'apps/api/src/analyzer-assistant-settings.ts').as_uri()) + ';import {readFileSync} from "node:fs";checkAssistantStagingSettings(JSON.parse(readFileSync(0,"utf8")));'
@@ -140,6 +158,8 @@ def install(source, sha, enable_classification=False):
     metadata = {name: snapshot(backup, name, path) for name, path in [('caddy', m.CADDY), ('dropin', m.DROPIN), ('workerUnit', WORKER_UNIT), ('workerEnv', WORKER_ENV)]}
     if enable_classification:
         metadata['assistantConfig'] = snapshot(backup, 'assistantConfig', m.CONFIG)
+        if evidence:
+            m.private_write(backup / 'assistantConfig.original', m.CONFIG.read_bytes())
     services = m.run(['systemctl', 'list-units', '--all', '--plain', '--no-legend', '--type=service', 'cashneuro*import*']).decode().splitlines()
     existing = [line.split()[0] for line in services if len(line.split()) > 3 and line.split()[2] == 'active']
     metadata['workerManaged'] = not existing or existing == [WORKER]
@@ -156,7 +176,7 @@ def install(source, sha, enable_classification=False):
         if sql("SELECT to_regclass('finance.classification_run') IS NOT NULL") == 'f':
             migration = (source / 'packages/database/migrations/0028_ai_classification.sql').read_text()
             sql('BEGIN;\n' + migration + '\nCOMMIT;')
-    print('1/3: сохранена конфигурация отката; ключ, лимиты и БД остаются прежними.', flush=True)
+    print('1/3: сохранены настройки отката и резервная копия тестовой БД.' if enable_classification else '1/3: сохранена конфигурация отката; ключ, лимиты и БД остаются прежними.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
         for name in ['.'] + dirs + files:
@@ -171,13 +191,27 @@ def install(source, sha, enable_classification=False):
     m.run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
     rollback = 'sudo /usr/bin/python3 ' + shlex.quote(str(release / 'scripts/update-staging-release.py')) + ' --rollback ' + shlex.quote(str(backup))
     print('Откат: ' + rollback, flush=True)
+    if evidence:
+        print('Проверяем два сохранённых ответа и оплаченные квитанции; новых модельных запросов: 0.', flush=True)
+        next_path, fallback_path = backup / 'assistantConfig.next', backup / 'assistantConfig.rollbackFresh'
+        m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-admit-main.ts', '--prepare', evidence, next_path, fallback_path, tested_sha, binding], output=sys.stdout.buffer, timeout=60)
+        rebound = json.loads(next_path.read_text())
+        fallback = json.loads(fallback_path.read_text())
+        validate_admission_pair(original_settings, rebound, fallback, binding, tested_sha)
+        # Original expired settings remain in assistantConfig.original. The
+        # service rollback uses fresh authority bound to the previous runtime,
+        # with the same carried costs/call ceiling as the candidate.
+        m.atomic_replace(backup / 'assistantConfig', fallback_path.read_bytes(), 0o600)
     print('2/3: подключение собранного интерфейса к API и проверка обработчика импорта.', flush=True)
     try:
         new_dropin = old_dropin.replace(str(current).encode(), str(release).encode())
         if enable_classification:
             m.atomic_replace(m.CONFIG, json.dumps(rebound).encode(), 0o600)
-            print('Проверка категоризации: два платных запроса на синтетике в пределах прежнего лимита.', flush=True)
-            m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-smoke-main.ts', '--live'], output=sys.stdout.buffer, timeout=180)
+            if evidence:
+                print('Категоризация: два сохранённых PASS приняты на проверенном runtime; повторных POST нет.', flush=True)
+            else:
+                print('Проверка категоризации: два платных запроса на синтетике в пределах прежнего лимита.', flush=True)
+                m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-smoke-main.ts', '--live'], output=sys.stdout.buffer, timeout=180)
             new_dropin += b'\n[Service]\nEnvironment=CLASSIFICATION_ENABLED=1\n'
         m.atomic_replace(m.DROPIN, new_dropin)
         if metadata['workerManaged']:
@@ -206,7 +240,7 @@ def install(source, sha, enable_classification=False):
         restore(backup)
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
-    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'unchanged', 'paidCalls': 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'continued_with_prior_usage' if evidence else 'unchanged', 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
 
 
 def main():
@@ -218,6 +252,8 @@ def main():
     parser.add_argument('--sha')
     parser.add_argument('--rollback')
     parser.add_argument('--enable-classification', action='store_true')
+    parser.add_argument('--classification-evidence')
+    parser.add_argument('--tested-runtime-sha')
     args = parser.parse_args()
     if args.inspect_api_origin:
         print(validate_origin(settings()['API_BASE_URL']))
@@ -227,7 +263,7 @@ def main():
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha, args.enable_classification)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

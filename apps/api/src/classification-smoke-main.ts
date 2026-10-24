@@ -9,9 +9,8 @@ import {assistantRuntimeManifest} from './analyzer-assistant-manifest.ts';
 import {createStagingAssistantProvider} from './analyzer-assistant-provider.ts';
 import {prepareFinance} from './finance.ts';
 import {reserveCost,settleCost} from './analyzer-cost.ts';
-import {classificationPlan,classificationVersion,classificationPrompt,classificationRequestSchema,parseClassification,digest} from './classification-plan.ts';
-import {initialSemantics} from '../../../packages/finance-core/src/model.ts';
-import type {Graph} from '../../../packages/finance-core/src/model.ts';
+import {classificationVersion,classificationPrompt,classificationRequestSchema,parseClassification,digest} from './classification-plan.ts';
+import {classificationSmokeCase,classificationSmokeNames} from './classification-smoke-cases.ts';
 import type {Usage} from '../../../packages/analyzer/src/cost.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
 import {continuedClassificationSettings,classificationFailure,syntheticClassificationArchive,syntheticClassificationFetch,classificationPilotTotals} from './classification-smoke-support.ts';
@@ -32,7 +31,7 @@ async function main(){
   phase='configuration';
   const original=await privateJson('/etc/cashneuro/ai/assistant-staging.json') as AssistantStagingSettings;
   const originalHash=digest(original),sourceSha256=(await assistantRuntimeManifest()).sourceSha256;
-  const totals=(db:import('pg').Pool|import('pg').PoolClient)=>classificationPilotTotals(db,original.cost.projectId);
+  const totals=(db:import('pg').Pool|import('pg').PoolClient)=>classificationPilotTotals(db,original.cost.projectId,original.cost.projectPeriodStart);
   let settings=original;
   if(continuation){
    phase='continuation';
@@ -57,13 +56,9 @@ async function main(){
   phase='test_account';
   const user=(await pool.query('SELECT id FROM identity.auth_user WHERE email=ANY($1::text[]) AND email_verified ORDER BY id LIMIT 1',[(settings as {allowedEmails:string[]}).allowedEmails])).rows[0];if(!user)throw Error('TEST_ACCOUNT_REQUIRED');
   async function within<T>(action:(db:import('pg').PoolClient)=>Promise<T>){const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[user.id]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
-  const categories=[{id:'food',name:'Продукты'},{id:'electronics',name:'Электроника'},{id:'taxi',name:'Такси'},{id:'public',name:'Общественный транспорт'}].map(c=>({...c,role:'expense' as const,parentId:null,hidden:false}));
-  const graph:Graph={accounts:[{id:'synthetic',bankId:'tbank',name:'Synthetic',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null}],categories,components:[],links:[],loanMode:'cashflow',operations:['Пятёрочка','DNS','Яндекс Go','Ozon'].map((merchant,i)=>({id:'synthetic-'+i,source:{accountId:'synthetic',operationDate:{precision:'day',date:'2026-10-01'},postedDate:null,amountMinor:'-10000',currency:'RUB',merchantText:merchant,description:'',bankCategory:'',bankRefHmac:null,versions:{}},semantics:initialSemantics('purchase',merchant),corrections:{},comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]}))};
-  for(const name of ['known-merchants','taxi-without-category']){
+  for(const name of classificationSmokeNames){
    phase=name+':prepare';console.log(JSON.stringify({case:name,status:'START'}));
-   const sample=structuredClone(graph);if(name==='taxi-without-category'){sample.categories=sample.categories.filter(c=>c.id!=='taxi');sample.operations=sample.operations.filter(o=>o.source.merchantText==='Яндекс Go');}
-   else sample.operations=sample.operations.filter(o=>o.source.merchantText!=='Яндекс Go'); // service is not identified by this broad merchant label
-   const plan=classificationPlan(sample),id=randomUUID(),input={catalog:plan.catalog,operations:plan.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))},model=provider.forRequest();let sent=false,usage:Usage|undefined;
+   const sample=classificationSmokeCase(name),{plan,input}=sample,id=randomUUID(),model=provider.forRequest();let sent=false,usage:Usage|undefined;
    expected={name,input};await archive.save(name+'-input.json',input);
    const settle=async(value?:Usage)=>within(db=>settleCost(db,user.id,id,'classification',value));
    try{
@@ -86,8 +81,7 @@ async function main(){
     await archive.save(name+'-usage.json',usage);phase=name+':schema';
     const decisions=parseClassification(result.value,plan,plan.groups);
     phase=name+':receipt';await within(db=>db.query("UPDATE commerce.analyzer_request SET state='completed',usage_state='reported' WHERE user_id=$1 AND request_id=$2 AND step='classification'",[user.id,id]));
-    const checks=plan.groups.map((g,i)=>({merchant:g.signal.merchant,category:decisions[i]!.categoryId,confidence:decisions[i]!.confidence}));
-    const passed=checks.every(c=>{const expected=name==='taxi-without-category'?null:({'Пятёрочка':'food',DNS:'electronics','Яндекс Go':'taxi',Ozon:null} as Record<string,string|null>)[c.merchant!];return c.category===expected&&(expected===null||c.confidence>=90);});
+    const checks=sample.checks(decisions),passed=sample.passed(decisions);
     phase=name+':meaning';console.log(JSON.stringify({case:name,status:passed?'PASS':'FAIL',decisions:checks,inputTokens:usage.inputTokens,outputTokens:usage.outputTokens,customerQuotaUsed:0}));
     if(!passed)throw Error('CLASSIFICATION_SMOKE_FAILED');
    }catch(error){

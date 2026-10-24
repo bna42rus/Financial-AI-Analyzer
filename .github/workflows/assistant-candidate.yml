@@ -61,6 +61,7 @@ jobs:
           node --experimental-transform-types --test
           apps/api/test/classification-plan.test.ts
           apps/api/test/classification-smoke-support.test.ts
+          apps/api/test/classification-admission.test.ts
           apps/api/test/assistant-workflow.test.ts
           apps/api/test/assistant-durability.test.ts
           apps/api/test/assistant-trial.test.ts
