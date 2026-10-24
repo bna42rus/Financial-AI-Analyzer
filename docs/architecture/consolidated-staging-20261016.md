@@ -47,6 +47,9 @@ Control, mail, backend-current, доступ пользователей, миг�
 
 Если не найден активный CashNeuro import service, устанавливается отдельный
 cashneuro-staging-import.service с DynamicUser и scoped finance_api DB URL.
+Служба входит в `cashneuro-staging-code`, как работающие Finance API/import:
+без этой группы закрытые родительские папки релизов вызывают `200/CHDIR`.
+Общие права папок и ACL не расширяются.
 Worker получает только APP_ENV/API_PROFILE/DATABASE_URL. Auth secret, KMS и
 AI credential ему не передаются. При наличии другого активного import service
 он сохраняется. Код worker уже присутствовал в исходной общей версии.
@@ -56,3 +59,7 @@ import service. База, технические квитанции стоимо
 переписываются. Переключение выполняет GET-проверки и не отправляет model POST.
 Ручная проверка опубликованного сайта остаётся отдельным этапом после команды
 на сервере; CI не подтверждает состояние удалённого VPS.
+
+Python inspection выполняется без bytecode cache: root не оставляет свой
+`__pycache__` во временной сборке обычного пользователя. Ошибки systemctl
+показывают операцию, имя службы и exit code, сохраняя stdout/stderr закрытыми.

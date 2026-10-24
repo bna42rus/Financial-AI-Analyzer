@@ -167,6 +167,8 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   const issues=(await db.query("SELECT 1 FROM finance.ingestion_file f LEFT JOIN finance.ingestion_row r ON (r.user_id,r.file_id)=(f.user_id,f.id) WHERE f.user_id=$1 AND f.batch_id=$2 AND f.cancelled_at IS NULL AND (f.blocked OR r.status='issue') LIMIT 1",[userId,batchId])).rowCount;
   await db.query('UPDATE finance.ingestion_batch SET status=$3,finished_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,batchId,issues?'partial':'completed']);
   await db.query('DELETE FROM finance.ingestion_dispatch WHERE user_id=$1 AND batch_id=$2',[userId,batchId]);
+  await db.query(`INSERT INTO finance.classification_dispatch(user_id,generation) SELECT user_id,generation FROM finance.workspace WHERE user_id=$1
+    ON CONFLICT(user_id) DO UPDATE SET generation=EXCLUDED.generation,state='queued',updated_at=clock_timestamp()`,[userId]);
  }else await db.query("UPDATE finance.ingestion_dispatch SET next_attempt_at=clock_timestamp()+interval '10 milliseconds',attempts=0 WHERE user_id=$1 AND batch_id=$2",[userId,batchId]);
 }
 

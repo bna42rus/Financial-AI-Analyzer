@@ -15,7 +15,7 @@ import { assertClosedSchema } from '../../../packages/analyzer/src/closed-schema
 
 export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/6';
 export type Phase = 'understand' | 'repair' | 'check_changes' | 'categories' | 'explain';
-export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown };
+export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown; protocol?: 'cashneuro-category-classification/2' };
 export type ModelReply = { value: unknown; usage: Usage };
 export type AssistantModel = { bound: DispatchBound; complete(input: CompletionInput, beforeDispatch: () => Promise<void>): Promise<ModelReply> };
 export type CallReceipt = { fingerprint: string; phase: Phase; state: 'sent' | 'received' | 'unknown' | 'failed'; value?: unknown; usage?: Usage; code?: string };

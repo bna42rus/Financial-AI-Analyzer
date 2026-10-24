@@ -18,18 +18,23 @@ import type { Config } from '../src/types.ts';
 import { syntheticCsv, syntheticXlsx } from '../../../packages/imports/test/tabular-fixtures.ts';
 import { syntheticPdf } from '../../../packages/imports/test/synthetic-pdf.ts';
 import { syntheticLayout } from '../../../packages/imports/test/synthetic-layout.ts';
+import {runClassificationStage} from '../src/classification-store.ts';
+import type {AssistantProvider} from '../src/analyzer-assistant-provider.ts';
+import {initialSemantics} from '../../../packages/finance-core/src/model.ts';
 import { runImportStage } from '../src/import-ingestion.ts';
 
 const expect = playwrightExpect.configure({ timeout: 20000 });
 const web = 'http://127.0.0.1:5185', api = 'http://127.0.0.1:3035', password = 'Synthetic task browser password 123!';
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, child: ChildProcess;
 let calls = 0, blockNext = false;
+let categoryProvider:AssistantProvider;
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; }
 let barrier = deferred(), reached = deferred();
 const fetcher = (async (_url, options) => {
   const request = JSON.parse(String(options?.body)), input = JSON.parse(request.messages[1].content);
   calls++;
   if (blockNext) { blockNext = false; reached.resolve(); await barrier.promise; }
+  if(input.operations){const cat=input.catalog.find((c:any)=>c.name==='Продукты'&&c.parent===null).ref;return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:500,completion_tokens:50,total_tokens:550},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify({decisions:input.operations.map((o:any)=>({ref:o.ref,category:cat,subcategory:null,confidence:96}))})}}]}));}
   const plan = input.candidate ?? { version: assistantVersion, topic: 'personal_finance', action: 'read',
     context: { mode: input.question.includes('сентябрь 2026') ? 'new' : 'continue' },
     changes: input.question.includes('сентябрь 2026') ? [{ field: 'metric', op: 'set', value: 'expenses' }, { field: 'period', op: 'set', value: 'сентябрь 2026' }] : [] };
@@ -41,6 +46,7 @@ before(async () => {
   pg = await postgresFixture();
   const config: Config = { profile: 'finance', pool: pg.finance, baseURL: api, origin: web, authSecret: token(), wrappingKey: randomBytes(32), environment: 'test',
     assistantProvider: createTestAssistantProvider(pg.finance, fetcher, { projectId: 'test/task-browser', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' }) };
+  config.classificationEnabled=true;categoryProvider=config.assistantProvider!;
   server = await createServer(config); await server.app.listen(3035, '127.0.0.1');
   const cwd = new URL('../../../', import.meta.url), env = { ...process.env, VITE_API_ORIGIN: api };
   if(process.env.ASSISTANT_UI_ASSET_MODE==='built') {
@@ -68,7 +74,7 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
   await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('task-browser','Synthetic task browser','task-browser@example.test',true,now(),now())");
   await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('task-browser',true)");
   await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('task-browser-account','task-browser','task-browser','credential',$1,now(),now())", [await hashPassword(password)]);
-  await within(async db => { const state = await financeView(db, 'task-browser'), account = randomUUID(); await acceptAccount(db, 'task-browser', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic task UI account', type: 'bank_account' }); await syntheticOperations(db, 'task-browser', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id); });
+  await within(async db => { const state = await financeView(db, 'task-browser'), account = randomUUID(); await acceptAccount(db, 'task-browser', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic task UI account', type: 'bank_account' }); const ids=await syntheticOperations(db, 'task-browser', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id,'Пятёрочка');await db.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['task-browser',ids[0],JSON.stringify(initialSemantics('purchase','Пятёрочка'))]); });
   await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('task-browser',clock_timestamp()-interval '1 day','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":20}')");
   const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--disable-dev-shm-usage'] });
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 }, locale: 'ru-RU', timezoneId: 'Pacific/Honolulu' }), page = await context.newPage();
@@ -81,6 +87,14 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Продолжить', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
     await expect(page.getByText('Часовой пояс анализа: Pacific/Honolulu', { exact: true })).toBeVisible();
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
+    await screen(page,'Операции');
+    const categoryPanel=page.getByRole('region',{name:'Категории с помощью AI'});
+    await categoryPanel.getByRole('button',{name:'Разобрать категории загруженных операций',exact:true}).click();
+    await expect(categoryPanel.getByText('Подбираем категории… Назначения обновляются по мере обработки.')).toBeVisible();
+    assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
+    assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
+    await expect(categoryPanel).toContainText('Обработано операций: 1.');
+    assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;await screen(page,'Анализатор');await idle();
     await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
     await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();
