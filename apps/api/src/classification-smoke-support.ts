@@ -5,9 +5,9 @@ import {join} from 'node:path';
 import {checkAssistantStagingSettings} from './analyzer-assistant-settings.ts';
 import {digest} from './classification-plan.ts';
 import type {Pool,PoolClient} from 'pg';
+import {classificationTariffDocumentSha256} from './classification-tariff.ts';
+import type {ClassificationTariffVerification} from './classification-tariff.ts';
 
-// Official current tariff checked 2026-10-19, rows 271/272. Prices unchanged.
-export const classificationTariffCheckedAt='2026-10-19T13:15:02Z';
 export type PilotTotals={calls:number;spentAtoms:string;reservedAtoms:string;blocked:boolean};
 export async function classificationPilotTotals(db:Pool|PoolClient,projectId:string):Promise<PilotTotals>{
  const r=(await db.query(`SELECT count(*) AS epochs,COALESCE(sum(dispatch_count),0)::text AS calls,
@@ -17,18 +17,19 @@ export async function classificationPilotTotals(db:Pool|PoolClient,projectId:str
  return {calls:Number(r.calls),spentAtoms:r.spent as string,reservedAtoms:r.reserved as string,blocked:r.blocked as boolean};
 }
 const money=(n:bigint)=>(n/1_000_000_000n)+'.'+(n%1_000_000_000n).toString().padStart(9,'0');
-export function continuedClassificationSettings(raw:unknown,totals:PilotTotals,sourceSha256:string,now=new Date()){
+export function continuedClassificationSettings(raw:unknown,totals:PilotTotals,sourceSha256:string,tariff:ClassificationTariffVerification,now=new Date()){
  const r=raw as Record<string,any>;
  const historical=new Date(Math.max(Date.parse(r?.tariffCheckedAt),Date.parse(r?.cost?.projectPeriodStart))+1);
- const old=checkAssistantStagingSettings(raw,historical),at=now.getTime(),checked=Date.parse(classificationTariffCheckedAt);
- if(at<Date.parse(old.expiresAt)||at<checked||at-checked>=86400000)throw Error('CLASSIFICATION_CONTINUATION_NOT_AVAILABLE');
+ const old=checkAssistantStagingSettings(raw,historical),at=now.getTime(),checked=Date.parse(tariff?.checkedAt);
+ if(!Number.isFinite(checked)||tariff.documentSha256!==classificationTariffDocumentSha256||at<checked||at-checked>=86400000)throw Error('CLASSIFICATION_TARIFF_VERIFICATION_REQUIRED');
+ if(at<Date.parse(old.expiresAt))throw Error('CLASSIFICATION_CONTINUATION_NOT_AVAILABLE');
  if(!Number.isSafeInteger(totals.calls)||totals.calls<0||![totals.spentAtoms,totals.reservedAtoms].every(n=>/^(0|[1-9]\d{0,29})$/.test(n)))throw Error('CLASSIFICATION_ACCOUNTING_INVALID');
  if(totals.blocked||BigInt(totals.reservedAtoms)!==0n)throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
  const spent=BigInt(old.admission.spentAtoms)+BigInt(totals.spentAtoms),calls=old.admission.calls+totals.calls;
  const remaining=BigInt(old.admission.stageCapAtoms)-spent,maximumCalls=old.admission.stageMaximumCalls-calls;
  if(remaining<=0n||maximumCalls<1)throw Error('CLASSIFICATION_ORIGINAL_LIMIT_EXHAUSTED');
  const expiresAt=new Date(Math.min(at+7200000,checked+86400000)).toISOString();
- return checkAssistantStagingSettings({...old,sourceSha256,maximumCalls,expiresAt,tariffCheckedAt:classificationTariffCheckedAt,
+ return checkAssistantStagingSettings({...old,sourceSha256,maximumCalls,expiresAt,tariffCheckedAt:tariff.checkedAt,
   admission:{...old.admission,spentAtoms:spent.toString(),calls,budgetSha256:digest({previous:old.admission.budgetSha256,totals})},
   cost:{...old.cost,projectPeriodStart:now.toISOString(),projectPeriodEnd:expiresAt,projectLimitRub:money(remaining)}},now);
 }

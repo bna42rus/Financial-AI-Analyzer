@@ -16,6 +16,7 @@ import type {Usage} from '../../../packages/analyzer/src/cost.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
 import {continuedClassificationSettings,classificationFailure,syntheticClassificationArchive,syntheticClassificationFetch,classificationPilotTotals} from './classification-smoke-support.ts';
 import type {AssistantStagingSettings} from './analyzer-assistant-settings.ts';
+import {verifyClassificationTariff} from './classification-tariff.ts';
 let phase='arguments';
 let archive:Awaited<ReturnType<typeof syntheticClassificationArchive>>|undefined;
 async function main(){
@@ -39,8 +40,10 @@ async function main(){
    if(identity?.role!=='finance_api'||identity.name!=='finance_staging')throw Error('ASSISTANT_DATABASE_DENIED');
    lock=await pool.connect();lockName='classification-continuation:'+original.cost.projectId;
    if(!(await lock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[lockName])).rows[0].locked)throw Error('CLASSIFICATION_CHECK_IN_PROGRESS');
-   settings=continuedClassificationSettings(original,await totals(lock),sourceSha256);
-   console.log(JSON.stringify({phase,status:'OK',maximumCallsRemaining:settings.maximumCalls,activeConfigurationChanged:false}));
+   phase='tariff_preflight';console.log(JSON.stringify({phase,status:'START',paidCalls:0}));
+   const tariff=await verifyClassificationTariff(fetch);
+   settings=continuedClassificationSettings(original,await totals(lock),sourceSha256,tariff);
+   console.log(JSON.stringify({phase,status:'OK',tariffCheckedAt:tariff.checkedAt,tariffDocumentSha256:tariff.documentSha256,maximumCallsRemaining:settings.maximumCalls,activeConfigurationChanged:false}));
   }
   archive=await syntheticClassificationArchive('/var/lib/cashneuro',settings.apiKey);
   console.log(JSON.stringify({phase:'archive',directory:archive.directory}));
