@@ -1,6 +1,8 @@
+import {applyMerchantRecognition,merchantCatalogVersion} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
 import type {Pool,PoolClient} from 'pg';
+import {applyRules} from '../../../packages/finance-core/src/rules.ts';
 import {object} from '../../../packages/finance-core/src/model.ts';
 import type {Usage} from '../../../packages/analyzer/src/cost.ts';
 import {prepareFinance,loadFinance} from './finance.ts';
@@ -23,7 +25,7 @@ export async function classificationStatus(db:PoolClient,userId:string,input:unk
  const enabled=!!provider&&isAssistantProvider(provider)&&provider.allowed(email??'');
  if(r.start){if(!enabled)throw new HttpError(503,'CLASSIFICATION_UNAVAILABLE');await enqueueClassification(db,userId);}
  const dispatch=(await db.query('SELECT state FROM finance.classification_dispatch WHERE user_id=$1',[userId])).rows[0];
- const stats=(await db.query(`SELECT count(*)::int AS calls,COALESCE(sum(applied),0)::int AS applied,
+ const stats=(await db.query(`SELECT count(*) FILTER(WHERE engine LIKE 'cashneuro-category-classification/%')::int AS calls,COALESCE(sum(applied),0)::int AS applied,
  count(*) FILTER(WHERE state IN ('sent','unknown'))::int AS uncertain FROM finance.classification_run WHERE user_id=$1`,[userId])).rows[0];
  return {enabled,state:dispatch?.state??'idle',...stats};
 }
@@ -36,6 +38,24 @@ async function scope(db:PoolClient,userId:string,provider:AssistantProvider){
  const user=(await db.query('SELECT email FROM identity.auth_user WHERE id=$1',[userId])).rows[0];
  if(!user||!provider.allowed(user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
  return workspace;
+}
+async function applyKnownMerchants(db:PoolClient,userId:string,graph:Awaited<ReturnType<typeof loadFinance>>['graph'],rules:Awaited<ReturnType<typeof loadFinance>>['rules'],generation:string){
+ const changes=graph.operations.filter(op=>op.source.versions.sourceSanitizer==='bank-source/4'&&!graph.components.some(c=>c.transactionId===op.id)).map(op=>{
+  const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId));
+  // Apply current personal rules before common merchant logic, including rules added while queued.
+  const ruled=account?applyRules(op,account,rules):op;
+  for(const key of ['kind','role','merchant','category','subcategory','counterparty'] as const)if(['kind','role','counterparty'].includes(key)||op.semantics[key].source==='user'||op.semantics[key].userVerified)(ruled.semantics as Record<string,unknown>)[key]=op.semantics[key];
+  return {op,next:applyMerchantRecognition(ruled,graph.categories)};
+ }).filter(({op,next})=>!isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons));
+ if(!changes.length)return false;
+ const batch=changes.slice(0,250);
+ const id=randomUUID();await db.query("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,applied) VALUES($1,$2,$3,$4,$5,'completed',$6)",[userId,id,generation,merchantCatalogVersion,digest(graph.categories),batch.length]);
+ for(const {op,next} of batch){
+  await db.query('INSERT INTO finance.classification_assignment(user_id,id,transaction_id,run_id,before_facets,after_facets) VALUES($1,$2,$3,$4,$5,$6)',[userId,randomUUID(),op.id,id,JSON.stringify(op.semantics),JSON.stringify(next.semantics)]);
+  await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,op.id,JSON.stringify(next.semantics),JSON.stringify(next.reviewReasons)]);
+ }
+ await db.query('UPDATE finance.workspace SET revision=revision+1 WHERE user_id=$1',[userId]);
+ return changes.length>batch.length;
 }
 async function applyCached(db:PoolClient,userId:string,plan:ClassificationPlan){
  const cached=(await db.query<{signature:string;decision:Decision;run_id:string}>(`SELECT signature,decision,run_id FROM finance.classification_cache WHERE user_id=$1 AND decision IS NOT NULL`,[userId])).rows;
@@ -73,7 +93,8 @@ export async function runClassificationStage(pool:Pool,provider:AssistantProvide
   const planned=await transaction(pool,userId,async db=>{
    const workspace=await scope(db,userId,provider),loaded=await loadFinance(db,userId);
    if((await db.query("SELECT 1 FROM finance.classification_run WHERE user_id=$1 AND state IN ('sent','unknown') LIMIT 1",[userId])).rowCount){await db.query("UPDATE finance.classification_dispatch SET state='blocked' WHERE user_id=$1",[userId]);return null;}
-   let plan=classificationPlan(loaded.graph,loaded.rules);await applyCached(db,userId,plan);
+   if(await applyKnownMerchants(db,userId,loaded.graph,loaded.rules,workspace.generation))return null;
+   const known=await loadFinance(db,userId);let plan=classificationPlan(known.graph,known.rules);await applyCached(db,userId,plan);
    const fresh=await loadFinance(db,userId);plan=classificationPlan(fresh.graph,fresh.rules);
    const attempts=(await db.query('SELECT signature,decision FROM finance.classification_cache WHERE user_id=$1',[userId])).rows;
    const seen=new Set(attempts.map(r=>r.signature));const groups=plan.groups.filter(g=>!seen.has(g.signature)).slice(0,classificationBatchSize);

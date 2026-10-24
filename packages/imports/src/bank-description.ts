@@ -8,7 +8,8 @@ const hidden='[скрыто]';
 export function cleanBankText(value:unknown,max=1000):string{
  if(typeof value!=='string'||value.length>4000)return '';
  const source=value.normalize('NFKC').replace(/\p{Cf}/gu,'').replace(/[\r\n\t]/g,' ').replace(/(?:https?|ftp):\/\/\S+|www\.\S+/giu,hidden);
- const text=sanitizeText(source)
+ const labelled=source.replace(/(?<![\p{L}\p{N}])(?:договор(?:а|у|ом|е|ов)?|контракт(?:а|у|ом|е)?|contract|agreement)\s*(?:(?:№|номер|number|no\.?|n|:|=|#)\s*|(?=[\p{L}\p{N}._\/-]*\d))(?!\[)(?:[\p{L}\p{N}][\p{L}\p{N}._\/-]{0,127})(?:[ -]+\d[\d._\/-]*)*/giu,hidden);
+ const text=sanitizeText(labelled)
   .replace(/(?<![\p{L}\p{N}])(?:ИНН|БИК|СНИЛС|inn|bic|snils)\s*(?:№|:|=|#)?\s*\d[\d -]{2,}\d/giu,hidden)
   .replace(/(?<![\p{L}\p{N}])(?:карт[аы]|сч[её]т(?:а)?|договор|телефон|паспорт|card|account|contract|phone|passport)\s*(?:№|номер|number|:|=|#)?\s*(?=[+\d*хХxX])(?:[+\d*хХxX() -]{3,})/giu,hidden+' ')
   .replace(/(?:\b(?:rrn|arn|auth|authorization|ref|reference|terminal|tid|mid|inn|snils|iban|bic|swift)\b|ИНН|СНИЛС|БИК|РРН|терминал|идентификатор|документ|код авторизации|авторизаци(?:я|и)|номер операции|номер документа|номер договора|номер сч[её]та|номер карты|код операции)\s*(?:№|:|=|#)?\s*[\p{L}\p{N}._\/-]+/giu,hidden)

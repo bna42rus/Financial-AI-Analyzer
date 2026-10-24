@@ -1,3 +1,4 @@
+import {applyMerchantRecognition,recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {sourceFields} from '../../../packages/imports/src/safe-source.ts';
 import {createHash,randomUUID} from 'node:crypto';
 import type {Pool,PoolClient} from 'pg';
@@ -129,8 +130,8 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,...source,bankCategory:source.bankCategory??prior?.bank_category??'',bankRefHmac:row.bankRefHmac,versions:{sourceStorage:'direct-evidence/1',dedupe:Object.hasOwn(row,'descriptionHmac')?'strict-bank-description/2':'strict-bank-source/1',parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:row.safeSource?(['bank-source/3','bank-source/4'].includes(batch.versions.sanitizer)?'bank-signals/2':'bank-signals/1'):prior?.versions.classification??'unclassified/1',sourceSanitizer:row.safeSource?batch.versions.sanitizer:prior?.versions.sourceSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer,merchantSanitizer:row.safeSource?.merchant||row.safeSource?.details?.merchantText?batch.versions.sanitizer:prior?.versions.merchantSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer}};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
-   const semantics=initialSemantics(fact.sourceKind!,fact.merchantText);if(fact.sourceKind==='other')semantics.kind=facet('other','bank',false,0);
-   const op=applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules);
+   const semantics=initialSemantics(fact.sourceKind!,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);if(fact.sourceKind==='other')semantics.kind=facet('other','bank',false,0);
+   const op=applyMerchantRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories);
    graph.operations.push(op);
    await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,transactionId,observationId,JSON.stringify(op.semantics),op.analyticsOverride,JSON.stringify(op.reviewReasons)]);
   }
@@ -147,7 +148,7 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
     }
     if(op.semantics.merchant.source==='bank'&&!op.semantics.merchant.userVerified&&(fact.merchantText||prior.source_kind!==fact.sourceKind))op.semantics.merchant=fresh.merchant;
    }
-   const classified=applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules);
+   const classified=applyMerchantRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories);
    graph.operations[graph.operations.indexOf(current)]=classified;
    await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
   }

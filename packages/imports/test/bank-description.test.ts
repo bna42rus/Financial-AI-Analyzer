@@ -58,3 +58,10 @@ test('owner-approved display preserves FIO, IP names, ordinary numbers, mixed sh
  for(const raw of ['https://user@example.test/private?token=ABCD','www.example.test/card/1234567890123456','ftp://example.test/document/ABCDEF'])assert.equal(cleanBankText(raw),'[скрыто]');
  for(const raw of ['номер операции ABCDEF-123','код авторизации ABCDEF','терминал TERM-ABCDEF','ИНН 1234567890','БИК 044525225','договор ABCD123456','паспорт 12 34 567890','телефон +7 (900) 123-45-67','ИНН 123 456 7890','карта ****1234','номер договора ABCDEF-XYZ','номер счета 1234 5678'])assert.ok(!cleanBankText(raw).match(/ABCDEF|TERM-|1234567890|044525225|567890|900|1234/));
 });
+
+test('contract number inflections are hidden without erasing transfer meaning or normal contract wording',()=>{
+ for(const raw of ['Перевод с договора 12345678','Перевод по договору № ABCD-9876','Перевод с договора N 12345/67','Оплата договором 1234-5678','договоре: XY-123456','договор № ABCDEF','contract # ABCDEF']){
+  const value=cleanBankText(raw);assert.ok(value.includes('[скрыто]'),raw);assert.ok(!/123|9876|5678|ABCDEF|XY-/u.test(value),value);assert.equal(cleanBankText(value),value);
+ }
+ for(const text of ['Перевод Иванову 1500 рублей за 2 билета','договор на услуги','договор подписан'])assert.equal(cleanBankText(text),text);
+});
