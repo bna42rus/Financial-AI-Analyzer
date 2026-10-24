@@ -42,10 +42,13 @@ export function classificationFailure(error:unknown){
  return {code,responsePhase};
 }
 
-export async function syntheticClassificationArchive(parent:string,apiKey:string){
+export async function syntheticClassificationArchive(parent:string,apiKey:string,existing?:string){
  const info=await lstat(parent);
  if(!info.isDirectory()||info.uid!==process.getuid?.()||info.mode&0o022||await realpath(parent)!==parent)throw Error('CLASSIFICATION_ARCHIVE_DIRECTORY_INVALID');
- const directory=await mkdtemp(join(parent,'classification-check-'));
+ if(existing&&(!/^classification-check-[A-Za-z0-9]+$/.test(existing.slice(parent.length+1))||!existing.startsWith(parent+'/')))throw Error('CLASSIFICATION_ARCHIVE_DIRECTORY_INVALID');
+ const directory=existing??await mkdtemp(join(parent,'classification-check-'));
+ const own=await lstat(directory);
+ if(!own.isDirectory()||own.uid!==process.getuid?.()||(own.mode&0o777)!==0o700||await realpath(directory)!==directory)throw Error('CLASSIFICATION_ARCHIVE_DIRECTORY_INVALID');
  async function save(name:string,value:unknown){
   if(!/^[a-z0-9-]+\.json$/.test(name))throw Error('CLASSIFICATION_ARCHIVE_NAME_INVALID');
   const text=JSON.stringify(value)+'\n';

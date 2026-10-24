@@ -69,7 +69,7 @@ export function parseBankTable(fileId:string,bytes:Uint8Array,table:string[][]):
   row.currency=['RUB','RUR','643','₽','руб.'].includes(r[currency]!.trim())?'RUB':r[currency];
   // A per-row account must agree with explicit file metadata when both are present.
   if(accountMeta.length&&accountColumn>=0&&norm(r[accountColumn]??'')!==norm(accountMeta[0]!))row.account.value=undefined;
-  row.localDescription=r[description];row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,localSourceSanitizer);return row;
+  row.localMcc=r[idx(['mcc','код mcc'])];row.localBankCategory=r[idx(['категория','категория банка'])];row.localMerchant=r[idx(['магазин','название магазина','торговая точка'])];row.localDescription=r[description];row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,localSourceSanitizer);return row;
  });
  return {fileId,bank,bytes,rows};
 }

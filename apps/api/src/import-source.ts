@@ -13,11 +13,11 @@ export async function sourceEvidence(db:PoolClient,userId:string){
 export function resolveSourceText(fact:BankFact,transactionId:string,selectedId:string,rows:Awaited<ReturnType<typeof sourceEvidence>>):BankFact{
  const own=rows.filter(r=>r.transaction_id===transactionId),selected=own.find(r=>r.id===selectedId);
  if(!selected?.evidence_recorded)return fact;
- let text=sourceFields(null);
+ let text=sourceFields(null),detailed=false;
  for(const row of own){
-  if(!row.evidence_recorded)text={sourceKind:row.source_kind,merchantText:row.merchant_text,description:row.description};
-  else if(row.source_evidence){const next=sourceFields(row.source_evidence);if(!next.merchantText&&text.sourceKind===next.sourceKind)next.merchantText=text.merchantText;text=next;}
+  if(!row.evidence_recorded){detailed=false;text={sourceKind:row.source_kind,merchantText:row.merchant_text,description:row.description};}
+  else if(row.source_evidence){const next=sourceFields(row.source_evidence);if(detailed&&!row.source_evidence.details&&text.sourceKind===next.sourceKind){next.description=text.description;next.bankCategory=text.bankCategory;next.sourceMcc=text.sourceMcc;}else detailed=!!row.source_evidence.details;if(text.sourceKind===next.sourceKind){if(!next.merchantText)next.merchantText=text.merchantText;if(!next.bankCategory)next.bankCategory=text.bankCategory;if(!next.sourceMcc)next.sourceMcc=text.sourceMcc;}text=next;}
   if(row.id===selectedId)break;
  }
- return {...fact,...text};
+ return {...fact,...text,versions:{...fact.versions,...(detailed?{sourceSanitizer:'bank-source/4'}:{})}};
 }

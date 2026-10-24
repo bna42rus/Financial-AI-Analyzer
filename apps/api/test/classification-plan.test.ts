@@ -75,9 +75,19 @@ test('classification HTTP uses its own protocol and a schema bound to catalog va
  assert.ok(schema.properties.decisions.items.properties.category.enum.includes('Продукты'));assert.ok(!schema.properties.decisions.items.properties.category.enum.includes('Невидимая'));
  let reserves=0,posts=0;
  const model=createCloudAssistantModel({apiKey:'synthetic-key-for-tests-only'},async(_url,options)=>{
-  posts++;assert.equal(reserves,1);const body=JSON.parse(String(options?.body));assert.ok(body.messages[0].content.startsWith('Protocol '+classificationVersion+'\n'));assert.ok(!body.messages[0].content.includes('cashneuro-assistant-plan/'));
+  posts++;assert.equal(reserves,1);assert.equal(model.bound.outputTokens,4096);const body=JSON.parse(String(options?.body));assert.equal(body.max_completion_tokens,model.bound.outputTokens);assert.ok(body.messages[0].content.startsWith('Protocol '+classificationVersion+'\n'));assert.ok(!body.messages[0].content.includes('cashneuro-assistant-plan/'));
   return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:50,completion_tokens:30,total_tokens:80},choices:[{finish_reason:'stop',message:{role:'assistant',content:JSON.stringify({decisions:[{ref:'r1',category:'Продукты',subcategory:null,confidence:96}]})}}]}));
- });
+ },'classification');
  const answer=await model.complete({phase:'understand',protocol:classificationVersion,prompt:classificationPrompt,input:{catalog:plan.catalog,operations:plan.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))},schema},async()=>{reserves++;});
  assert.equal(parseClassification(answer.value,plan,plan.groups)[0]!.categoryId,'food');assert.equal(posts,1);
+});
+
+test('versioned sanitized descriptions admit unfamiliar merchants and distinguish services at the same brand',()=>{
+ const g=graph(),a=g.operations[0]!;
+ a.source={...a.source,merchantText:'Кофейня Север',description:'Покупка Кофейня Север',bankCategory:'Кафе',sourceMcc:'5814',versions:{sourceSanitizer:'bank-source/4'}};
+ const plan=classificationPlan(g);assert.equal(plan.groups.length,1);assert.equal(plan.groups[0]!.signal.merchant,'Кофейня Север');
+ assert.equal(plan.groups[0]!.signal.description,'Покупка Кофейня Север');assert.equal(plan.groups[0]!.signal.mcc,'5814');
+ const b=structuredClone(a);b.id='second';b.source.description='Покупка Кофейня Север продукты';b.source.sourceMcc='5411';g.operations.push(b);assert.equal(classificationPlan(g).groups.length,2);
+ a.source.versions={};assert.equal(classificationSignal(a,g),null);
+ a.source.versions={sourceSanitizer:'bank-source/4'};a.source.description='Покупка card 4111111111111111';assert.equal(classificationSignal(a,g),null);
 });
