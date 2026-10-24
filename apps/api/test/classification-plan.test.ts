@@ -91,3 +91,14 @@ test('versioned sanitized descriptions admit unfamiliar merchants and distinguis
  a.source.versions={};assert.equal(classificationSignal(a,g),null);
  a.source.versions={sourceSanitizer:'bank-source/4'};a.source.description='Покупка card 4111111111111111';assert.equal(classificationSignal(a,g),null);
 });
+
+test('observed broad-service error is blocked despite confidence 95; source-specific evidence can resolve ambiguity',()=>{
+ const g=graph();g.categories=[{id:'fuel',name:'Автомобиль',role:'expense',parentId:null,hidden:false}];
+ const o=g.operations[0]!;o.source.merchantText='Яндекс Go';o.source.description='';o.semantics=initialSemantics('purchase','Яндекс Go');
+ let plan=classificationPlan(g);const wire={decisions:[{ref:'r1',category:plan.catalog[0]!.ref,subcategory:null,confidence:95}]};
+ const before=structuredClone(o),decision=parseClassification(wire,plan,plan.groups)[0]!;
+ assert.deepEqual(decision,{categoryId:null,subcategoryId:null,confidence:0});const applied=applyClassification(o,decision);assert.equal(applied.semantics.category.value,null);assert.equal(applied.semantics.category.userVerified,false);assert.deepEqual(applied.source,before.source);
+ for(const merchant of ['Ozon','Wildberries','Яндекс Маркет']){o.source.merchantText=merchant;o.semantics=initialSemantics('purchase',merchant);plan=classificationPlan(g);assert.equal(parseClassification(wire,plan,plan.groups)[0]!.categoryId,null);}
+ o.source={...o.source,merchantText:'Яндекс Go',description:'Покупка Яндекс Go такси',bankCategory:'Такси',sourceMcc:'4121',versions:{sourceSanitizer:'bank-source/4'}};o.semantics=initialSemantics('purchase','Яндекс Go');g.categories=[{id:'taxi',name:'Такси',role:'expense',parentId:null,hidden:false}];plan=classificationPlan(g);
+ assert.equal(parseClassification(wire,plan,plan.groups)[0]!.categoryId,'taxi');
+});

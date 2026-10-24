@@ -20,7 +20,8 @@ import {verifyClassificationTariff} from './classification-tariff.ts';
 let phase='arguments';
 let archive:Awaited<ReturnType<typeof syntheticClassificationArchive>>|undefined;
 async function main(){
- const argv=process.argv.slice(2),resume=argv.length===4&&argv[2]==='--resume-archive'?argv[3]:undefined;
+ const argv=process.argv.slice(2),resume=argv.length===4&&['--resume-archive','--replay-archive'].includes(argv[2]!)?argv[3]:undefined;
+ const replayAll=argv[2]==='--replay-archive';
  if(resume)argv.splice(2);
  const args=argv.join(' '),continuation=args==='--live --continue-expired-pilot';
  if(args==='--prepare'){console.log(JSON.stringify({cases:2,...await assistantRuntimeManifest()}));return;}
@@ -45,8 +46,9 @@ async function main(){
    phase='tariff_preflight';console.log(JSON.stringify({phase,status:'START',paidCalls:0}));
    const tariff=await verifyClassificationTariff(fetch);
    phase='admission';
-   settings=classificationRuntimeAdmission(original,await totals(lock),sourceSha256,tariff);
-   console.log(JSON.stringify({phase,status:'OK',tariffCheckedAt:tariff.checkedAt,tariffDocumentSha256:tariff.documentSha256,maximumCallsRemaining:settings.maximumCalls,activeConfigurationChanged:false}));
+   const priorTotals=await totals(lock);
+   settings=classificationRuntimeAdmission(original,priorTotals,sourceSha256,tariff);
+   console.log(JSON.stringify({phase,status:'OK',tariffCheckedAt:tariff.checkedAt,tariffDocumentSha256:tariff.documentSha256,maximumCallsRemaining:Math.min(settings.maximumCalls,original.admission.stageMaximumCalls-original.admission.calls-priorTotals.calls),activeConfigurationChanged:false}));
   }
   archive=await syntheticClassificationArchive('/var/lib/cashneuro',settings.apiKey,resume);
   console.log(JSON.stringify({phase:'archive',directory:archive.directory}));
@@ -62,11 +64,11 @@ async function main(){
   async function within<T>(action:(db:import('pg').PoolClient)=>Promise<T>){const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[user.id]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
   if(resume){
    phase='replay';
-   await within(db=>validateClassificationEvidence(resume,(fingerprint,usage,from,through)=>confirmClassificationPaidReceipt(db,user.id,settings.cost.projectId,fingerprint,usage,from,through),['known-merchants']));
-   console.log(JSON.stringify({case:'known-merchants',status:'PASS',replayed:true,newCalls:0,archiveChanged:false,note:'Categories correct; medium confidence stays in Review.'}));
+   await within(db=>validateClassificationEvidence(resume,(fingerprint,usage,from,through)=>confirmClassificationPaidReceipt(db,user.id,settings.cost.projectId,fingerprint,usage,from,through),replayAll?classificationSmokeNames:['known-merchants']));
+   console.log(JSON.stringify({case:replayAll?'both-cases':'known-merchants',status:'PASS',replayed:true,newCalls:0,archiveChanged:false,note:replayAll?'Application evidence guard rejects unsupported service assignment. Original model error is preserved.':'Categories correct; medium confidence stays in Review.'}));
   }
   for(const name of classificationSmokeNames){
-   if(resume&&name==='known-merchants')continue;
+   if(resume&&(replayAll||name==='known-merchants'))continue;
    phase=name+':prepare';console.log(JSON.stringify({case:name,status:'START'}));
    const sample=classificationSmokeCase(name),{plan,input}=sample,id=randomUUID(),model=provider.forRequest('classification');let sent=false,usage:Usage|undefined;
    expected={name,input};await archive.save(name+'-input.json',input);

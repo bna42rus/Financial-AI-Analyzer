@@ -6,7 +6,7 @@ sha=${2:?commit required}
 extra=()
 if (($#>2)); then
  test "$#" = 4
- test "$3" = --resume-archive
+ [[ "$3" = --resume-archive || "$3" = --replay-archive ]]
  [[ "$4" =~ ^/var/lib/cashneuro/classification-check-[A-Za-z0-9]+$ ]]
  extra=("$3" "$4")
 fi
@@ -19,7 +19,13 @@ trap 'rm -rf -- "$build"' EXIT
 echo '1/2: подготовка отдельного теста; работающий сайт не переключается.'
 git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
 (cd "$build" && pnpm install --frozen-lockfile --ignore-scripts)
-echo '2/2: максимум два модельных запроса на синтетике; прежний расход и вызовы учтены.'
+if [[ "${extra[0]:-}" = --replay-archive ]]; then
+ echo '2/2: только проверка сохранённых ответов; новых модельных запросов: 0.'
+elif [[ "${extra[0]:-}" = --resume-archive ]]; then
+ echo '2/2: повтор первого ответа и максимум один новый модельный запрос.'
+else
+ echo '2/2: максимум два модельных запроса на синтетике; прежний расход и вызовы учтены.'
+fi
 sudo -n /usr/bin/flock -n /run/lock/cashneuro-assistant-install.lock \
   /usr/bin/node --experimental-transform-types \
   "$build/apps/api/src/classification-smoke-main.ts" --live --continue-expired-pilot "${extra[@]}"

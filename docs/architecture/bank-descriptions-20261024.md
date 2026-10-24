@@ -110,3 +110,20 @@ revalidates the fixed first input, closed answer, usage and complete settled pai
 receipt before reuse. It appends only the missing taxi case, with at most one new
 POST. Existing input/answer/usage/failure files cannot be overwritten; the old FAIL
 remains historical evidence. Full installer admission still requires both cases.
+
+### Unsupported platform assignment guard
+
+The taxi case returned «Автомобиль» at 95% from the broad merchant «Яндекс Go»
+without any service evidence. This is a genuine model semantic error, not a test
+threshold problem. A server evidence policy now converts proposed categories for
+broad platforms (Yandex Go/Market, Ozon, Wildberries) to null/0 when there is no
+specific source MCC, non-generic bank category or explicit service/product clue.
+Such operations stay in Review; user/rule/verified decisions remain protected.
+This bounded policy does not prove all evidence-rich model decisions correct.
+
+The policy has its own cache identity; legacy unsupported unverified AI assignments
+can be reconsidered. Ordering of request items stays stable, so saved exact inputs
+can be replayed. `--replay-archive` verifies BOTH saved fixed inputs, raw answers,
+usage and settled receipts with zero completion POSTs. A passing replay means the
+application guard prevented an unsupported assignment; it does not mean the model
+answered the taxi case correctly. Its original failed answer remains unchanged.
