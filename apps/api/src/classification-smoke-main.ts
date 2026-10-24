@@ -13,14 +13,16 @@ import {classificationVersion,classificationPrompt,classificationRequestSchema,p
 import {classificationSmokeCase,classificationSmokeNames} from './classification-smoke-cases.ts';
 import type {Usage} from '../../../packages/analyzer/src/cost.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
-import {classificationRuntimeAdmission} from './classification-admission.ts';
+import {validateClassificationEvidence,confirmClassificationPaidReceipt,classificationRuntimeAdmission} from './classification-admission.ts';
 import {classificationFailure,syntheticClassificationArchive,syntheticClassificationFetch,classificationPilotTotals} from './classification-smoke-support.ts';
 import type {AssistantStagingSettings} from './analyzer-assistant-settings.ts';
 import {verifyClassificationTariff} from './classification-tariff.ts';
 let phase='arguments';
 let archive:Awaited<ReturnType<typeof syntheticClassificationArchive>>|undefined;
 async function main(){
- const args=process.argv.slice(2).join(' '),continuation=args==='--live --continue-expired-pilot';
+ const argv=process.argv.slice(2),resume=argv.length===4&&argv[2]==='--resume-archive'?argv[3]:undefined;
+ if(resume)argv.splice(2);
+ const args=argv.join(' '),continuation=args==='--live --continue-expired-pilot';
  if(args==='--prepare'){console.log(JSON.stringify({cases:2,...await assistantRuntimeManifest()}));return;}
  if(args!=='--live'&&!continuation||process.getuid?.()!==0)throw Error('EXPLICIT_OPERATOR_REQUIRED');
  phase='environment';console.log(JSON.stringify({phase,status:'START',paidCalls:0}));
@@ -46,7 +48,7 @@ async function main(){
    settings=classificationRuntimeAdmission(original,await totals(lock),sourceSha256,tariff);
    console.log(JSON.stringify({phase,status:'OK',tariffCheckedAt:tariff.checkedAt,tariffDocumentSha256:tariff.documentSha256,maximumCallsRemaining:settings.maximumCalls,activeConfigurationChanged:false}));
   }
-  archive=await syntheticClassificationArchive('/var/lib/cashneuro',settings.apiKey);
+  archive=await syntheticClassificationArchive('/var/lib/cashneuro',settings.apiKey,resume);
   console.log(JSON.stringify({phase:'archive',directory:archive.directory}));
   let expected:{name:string;input:unknown}|undefined;
   const fetcher=syntheticClassificationFetch(fetch,async(name,value)=>{
@@ -58,7 +60,13 @@ async function main(){
   phase='test_account';
   const user=(await pool.query('SELECT id FROM identity.auth_user WHERE email=ANY($1::text[]) AND email_verified ORDER BY id LIMIT 1',[(settings as {allowedEmails:string[]}).allowedEmails])).rows[0];if(!user)throw Error('TEST_ACCOUNT_REQUIRED');
   async function within<T>(action:(db:import('pg').PoolClient)=>Promise<T>){const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[user.id]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
+  if(resume){
+   phase='replay';
+   await within(db=>validateClassificationEvidence(resume,(fingerprint,usage,from,through)=>confirmClassificationPaidReceipt(db,user.id,settings.cost.projectId,fingerprint,usage,from,through),['known-merchants']));
+   console.log(JSON.stringify({case:'known-merchants',status:'PASS',replayed:true,newCalls:0,archiveChanged:false,note:'Categories correct; medium confidence stays in Review.'}));
+  }
   for(const name of classificationSmokeNames){
+   if(resume&&name==='known-merchants')continue;
    phase=name+':prepare';console.log(JSON.stringify({case:name,status:'START'}));
    const sample=classificationSmokeCase(name),{plan,input}=sample,id=randomUUID(),model=provider.forRequest('classification');let sent=false,usage:Usage|undefined;
    expected={name,input};await archive.save(name+'-input.json',input);

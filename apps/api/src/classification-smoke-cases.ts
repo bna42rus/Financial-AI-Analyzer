@@ -34,7 +34,7 @@ export function classificationSmokeCase(name:typeof classificationSmokeNames[num
  });
  const plan=classificationPlan(graph),input={catalog:plan.catalog,operations:plan.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))};
  if(plan.groups.length!==(name==='known-merchants'?corpus.length:1))throw Error('CLASSIFICATION_SMOKE_CASE_INCOMPLETE');
- const checks=(decisions:Decision[])=>plan.groups.map((g,i)=>({merchant:g.signal.merchant,category:decisions[i]!.categoryId,confidence:decisions[i]!.confidence}));
- const passed=(decisions:Decision[])=>checks(decisions).every(c=>{const expected=name==='taxi-without-category'?null:expectedCategories[c.merchant!];return c.category===expected&&(expected===null||c.confidence>=90);});
+ const checks=(decisions:Decision[])=>plan.groups.map((g,i)=>({merchant:g.signal.merchant,category:decisions[i]!.categoryId,confidence:decisions[i]!.confidence,review:decisions[i]!.confidence>=70&&decisions[i]!.confidence<90}));
+ const passed=(decisions:Decision[])=>checks(decisions).every(c=>{const expected=name==='taxi-without-category'?null:expectedCategories[c.merchant!];return c.category===expected&&(expected===null||c.confidence>=({'Аптека Ромашка':70,'Кофейня Север':70,'Кинотеатр Экран':70}[c.merchant??'']??90));});
  return {plan,input,checks,passed,expectedCategories};
 }

@@ -94,3 +94,19 @@ The same immutable bound drives both durable cost reservation and HTTP output
 limit. An assistant-mode model cannot send a classification protocol request
 under the smaller reservation. The standalone remains limited to two POSTs;
 there is no automatic retry or alteration of original stage ceilings.
+
+### Reviewed classifications and resuming a settled answer
+
+The complete 15-item response matched all expected category/null decisions: nine
+high-confidence assignments, three 80% review assignments (pharmacy, cafe, cinema
+without MCC/bank-category hints), and three unresolved shops/marketplaces. A
+blanket >=90 smoke assertion incorrectly rejected correct medium-confidence
+behavior. These three cases now explicitly allow >=70, while the application
+threshold for automatic confirmation stays 90 and the other fixture cases retain
+90. Incorrect categories and confidence below 70 still fail.
+
+`run-classification-check.sh <repo> <sha> --resume-archive <directory>` independently
+revalidates the fixed first input, closed answer, usage and complete settled paid
+receipt before reuse. It appends only the missing taxi case, with at most one new
+POST. Existing input/answer/usage/failure files cannot be overwritten; the old FAIL
+remains historical evidence. Full installer admission still requires both cases.

@@ -64,3 +64,13 @@ test('capture rejects a different request or endpoint before any HTTP and does n
  await fetcher('https://foundation-models.api.cloud.ru/v1/chat/completions',{method:'POST',body:JSON.stringify({messages:[{}, {content:JSON.stringify(input)}]})});
  assert.equal(calls,1);assert.deepEqual(saved,[{httpStatus:200,bodyIsJson:false}]);
 });
+
+ test('resume appends a new case without overwriting a previous answer',async()=>{
+ const parent=await mkdtemp(join(tmpdir(),'classification-resume-'));
+ try{const first=await syntheticClassificationArchive(parent,'synthetic-key-not-in-data');await first.save('known-merchants-answer.json',{preserved:true});
+ const before=await readFile(join(first.directory,'known-merchants-answer.json'),'utf8');
+ const resumed=await syntheticClassificationArchive(parent,'synthetic-key-not-in-data',first.directory);await resumed.save('taxi-without-category-input.json',{newCase:true});
+ assert.equal(await readFile(join(first.directory,'known-merchants-answer.json'),'utf8'),before);
+ await assert.rejects(resumed.save('known-merchants-answer.json',{rewritten:true}));
+ }finally{await rm(parent,{recursive:true,force:true});}
+});

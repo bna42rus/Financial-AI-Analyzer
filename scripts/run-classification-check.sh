@@ -3,6 +3,13 @@
 set -euo pipefail
 repo=${1:?checkout required}
 sha=${2:?commit required}
+extra=()
+if (($#>2)); then
+ test "$#" = 4
+ test "$3" = --resume-archive
+ [[ "$4" =~ ^/var/lib/cashneuro/classification-check-[A-Za-z0-9]+$ ]]
+ extra=("$3" "$4")
+fi
 [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
 test "$(git -C "$repo" rev-parse "$sha^{commit}")" = "$sha"
 test "$(node -p 'process.versions.node.split(".")[0]')" = 24
@@ -15,4 +22,4 @@ git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
 echo '2/2: максимум два модельных запроса на синтетике; прежний расход и вызовы учтены.'
 sudo -n /usr/bin/flock -n /run/lock/cashneuro-assistant-install.lock \
   /usr/bin/node --experimental-transform-types \
-  "$build/apps/api/src/classification-smoke-main.ts" --live --continue-expired-pilot
+  "$build/apps/api/src/classification-smoke-main.ts" --live --continue-expired-pilot "${extra[@]}"

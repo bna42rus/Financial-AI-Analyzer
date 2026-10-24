@@ -51,3 +51,17 @@ test('foreign inputs and wrong category meaning cannot be used as deployment evi
  const answerPath=join(directory,'known-merchants-answer.json'),wire=JSON.parse(await readFile(answerPath,'utf8'));wire.content=JSON.stringify({decisions:classificationSmokeCase('known-merchants').plan.groups.map((_g,i)=>({ref:'r'+(i+1),category:null,subcategory:null,confidence:0}))});
  await writeFile(answerPath,JSON.stringify(wire));await assert.rejects(validateClassificationEvidence(directory,async()=>true),/EVIDENCE_FAILED/);
 });
+
+ test('diverse category meanings accept explicit review cases without lowering the automatic threshold',()=>{
+ const sample=classificationSmokeCase('known-merchants');
+ const decisions=sample.plan.groups.map(g=>{const id=sample.expectedCategories[g.signal.merchant!];return {categoryId:id??null,subcategoryId:null,confidence:id?(['Аптека Ромашка','Кофейня Север','Кинотеатр Экран'].includes(g.signal.merchant!)?80:95):0};});
+ assert.equal(sample.passed(decisions),true);assert.equal(sample.checks(decisions).filter(c=>c.review).length,3);
+ const pharmacy=sample.plan.groups.findIndex(g=>g.signal.merchant==='Аптека Ромашка');decisions[pharmacy]!.confidence=60;assert.equal(sample.passed(decisions),false);decisions[pharmacy]!.confidence=80;
+ decisions[pharmacy]!.categoryId='electronics';assert.equal(sample.passed(decisions),false);
+});
+ test('one-case replay still verifies its paid receipt and cannot turn an empty selection into evidence',async t=>{
+ const directory=await archive(t);let confirmations=0;
+ assert.equal((await validateClassificationEvidence(directory,async()=>{confirmations++;return true;},['known-merchants'])).cases,1);assert.equal(confirmations,1);
+ await assert.rejects(validateClassificationEvidence(directory,async()=>true,[]),/CASES_INVALID/);
+ await assert.rejects(validateClassificationEvidence(directory,async()=>false,['known-merchants']),/LEDGER_REQUIRED/);
+});
