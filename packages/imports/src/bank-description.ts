@@ -3,22 +3,17 @@ import {sanitizeText,safeText} from '../../privacy/src/text.ts';
 export type BankDescription={description:string;merchantText:string;bankCategory:string;mcc:string|null};
 const hidden='[скрыто]';
 /** Device-side before transmission; repeated independently by the server. Raw
- * files and identity HMAC inputs remain device-only. No recipient is a merchant. */
+ * files and identity HMAC inputs remain device-only. Names and ordinary numbers
+ * stay readable; retaining a transfer description does not make it a merchant. */
 export function cleanBankText(value:unknown,max=1000):string{
  if(typeof value!=='string'||value.length>4000)return '';
- let text=sanitizeText(value.replace(/[\r\n\t]/g,' '))
-  .replace(/https?:\/\/\S+|www\.\S+/giu,hidden)
-  .replace(/(?:\b(?:rrn|arn|auth|authorization|ref|reference|terminal|tid|mid|inn|snils|iban|bic|swift)\b|ИНН|СНИЛС|БИК|РРН|терминал|идентификатор|документ|авторизация|номер операции|код операции)\s*(?:№|:|=|#)?\s*[\p{L}\p{N}._\/-]+/giu,hidden)
-  .replace(/(?:получатель|отправитель|плательщик|владелец|держатель|recipient|sender|cardholder)\s*[:=-]?\s*[^,;]+/giu,hidden)
-  .replace(/(?<![\p{L}])[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]*(?:вич|вна|ична)(?![\p{L}])/gu,hidden)
-  .replace(/(?:(?<![\p{L}])ИП\s+)[А-ЯЁ][а-яё]+(?:\s+[А-ЯЁ][а-яё]+){1,2}/gu,hidden)
-  .replace(/(?<![\p{L}\p{N}])[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.\s*(?:[А-ЯЁ]\.)?/gu,hidden)
-  .replace(/[\p{L}\p{N}_/-]{6,}/gu,token=>/\d/u.test(token)?hidden:token)
-  .replace(/\d+/g,hidden)
+ const source=value.normalize('NFKC').replace(/\p{Cf}/gu,'').replace(/[\r\n\t]/g,' ').replace(/(?:https?|ftp):\/\/\S+|www\.\S+/giu,hidden);
+ const text=sanitizeText(source)
+  .replace(/(?<![\p{L}\p{N}])(?:ИНН|БИК|СНИЛС|inn|bic|snils)\s*(?:№|:|=|#)?\s*\d[\d -]{2,}\d/giu,hidden)
+  .replace(/(?<![\p{L}\p{N}])(?:карт[аы]|сч[её]т(?:а)?|договор|телефон|паспорт|card|account|contract|phone|passport)\s*(?:№|номер|number|:|=|#)?\s*(?=[+\d*хХxX])(?:[+\d*хХxX() -]{3,})/giu,hidden+' ')
+  .replace(/(?:\b(?:rrn|arn|auth|authorization|ref|reference|terminal|tid|mid|inn|snils|iban|bic|swift)\b|ИНН|СНИЛС|БИК|РРН|терминал|идентификатор|документ|код авторизации|авторизаци(?:я|и)|номер операции|номер документа|номер договора|номер сч[её]та|номер карты|код операции)\s*(?:№|:|=|#)?\s*[\p{L}\p{N}._\/-]+/giu,hidden)
   .replace(/\[реквизиты скрыты\]/g,hidden).replace(/(?:\[скрыто\]\s*){2,}/g,hidden+' ')
   .replace(/\s+/g,' ').trim();
- // Transfers can contain unlabelled names. Keep the event, never its recipient.
- if(/перевод|transfer|\bSBP\b|СБП/iu.test(text))text=/возврат/iu.test(text)?'Возврат перевода':/входящ|получен/iu.test(text)?'Входящий перевод':/исходящ|отправлен/iu.test(text)?'Исходящий перевод':'Перевод';
  return text.slice(0,max).trim();
 }
 export function bankDescription(description:unknown,merchant:unknown='',bankCategory:unknown='',mcc:unknown=null):BankDescription{

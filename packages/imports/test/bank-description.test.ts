@@ -17,16 +17,16 @@ test('bank wording and unfamiliar shops survive locally sanitized profile, old p
  }
  assert.equal(sourceFields(extractSafeSource('Нестандартная запись банка','-100',descriptionSourceSanitizer)).sourceKind,'other');
 });
-test('identifiers, URLs, unlabelled transfer recipients and mixed scripts do not survive the bank display boundary',()=>{
- const secrets=['00000000000000000001','4111111111111111','+7 (900) 123-45-67','user@example.test','ABCD-123456','123456','https://example.test/private?token=secret','Иванов Иван Иванович'];
- const raw='Покупка Аптека Ромашка карта '+secrets[1]+' счет '+secrets[0]+' телефон '+secrets[2]+' '+secrets[3]+' RRN '+secrets[4]+' auth '+secrets[5]+' '+secrets[6]+' '+secrets[7];
+test('targeted identifiers and complete URLs are removed while names and transfer descriptions survive',()=>{
+ const secrets=['00000000000000000001','4111111111111111','+7 (900) 123-45-67','user@example.test','ABCD-123456','123456','https://example.test/private?token=secret'];
+ const raw='Покупка Аптека Ромашка карта '+secrets[1]+' счет '+secrets[0]+' телефон '+secrets[2]+' '+secrets[3]+' RRN '+secrets[4]+' auth '+secrets[5]+' '+secrets[6]+' Иванов Иван Иванович';
  const clean=cleanBankText(raw);for(const secret of secrets)assert.ok(!clean.includes(secret),secret);
- assert.ok(clean.includes('Аптека Ромашка'));assert.equal(cleanBankText(clean),clean);
+ assert.ok(clean.includes('Аптека Ромашка'));assert.ok(clean.includes('Иванов Иван Иванович'));assert.equal(cleanBankText(clean),clean);
  for(const raw of ['Исходящий перевод Иван Петров','Входящий перевод Анна Сидорова','СБП ИВАНОВ ИВАН','Transfer Alice Smith']){
-  const details=bankDescription(raw);assert.equal(details.merchantText,'');for(const name of ['Иван','Петров','Анна','Сидорова','ИВАН','Alice'])assert.ok(!details.description.includes(name));
+  const details=bankDescription(raw);assert.equal(details.merchantText,'');assert.equal(details.description,raw);
  }
  const details=bankDescription('Покупка Аптека','', 'Здоровье','5912');assert.deepEqual(parseBankDescription(details),details);
- for(const patch of [{description:'card 4111111111111111'},{merchantText:'Shop 12345678'},{bankCategory:'user@example.test'},{mcc:'1'},{mcc:'0000'},{raw:'hidden'}])assert.throws(()=>parseBankDescription({...details,...patch}));
+ for(const patch of [{description:'card 4111111111111111'},{merchantText:'Shop карта 4111111111111111'},{bankCategory:'user@example.test'},{mcc:'1'},{mcc:'0000'},{raw:'hidden'}])assert.throws(()=>parseBankDescription({...details,...patch}));
 });
 test('browser preparation /4 keeps description identity, emits only sanitized details and independently rejects wire tampering',async()=>{
  const context={contextId:randomUUID(),generation:randomUUID(),keyVersion:randomUUID(),key:Buffer.alloc(32,17).toString('base64url'),expiresAt:new Date(Date.now()+60000).toISOString()};
@@ -48,4 +48,13 @@ test('only explicit card MCC can upgrade unfamiliar debit text, and OCR cannot f
   assert.equal(batch.files[0]!.rows[1]!.safeSource!.details!.merchantText,'APTEKA ROMASHKA');
   assert.equal(batch.files[0]!.rows[3]!.descriptionHmac,null);
  }finally{local.dispose();}
+});
+
+test('owner-approved display preserves FIO, IP names, ordinary numbers, mixed shop names and SBP wording',()=>{
+ for(const text of ['Иванов Иван Иванович','ИП Иванов Иван Иванович','Получатель: Петров Пётр Петрович','Иванов И. И.','Магазин24','Аптека 36,6','Покупка 5ka магазин 123','Перевод Иванову 1500 рублей за 2 билета','Оплата через СБП Магазин24','Transfer Alice Smith 25']){
+  assert.equal(cleanBankText(text),text);assert.equal(cleanBankText(cleanBankText(text)),text);assert.equal(parseBankDescription(bankDescription(text)).description,text);
+ }
+ assert.equal(cleanBankText('Карта ****1234 магазин 24'),'[скрыто] магазин 24');
+ for(const raw of ['https://user@example.test/private?token=ABCD','www.example.test/card/1234567890123456','ftp://example.test/document/ABCDEF'])assert.equal(cleanBankText(raw),'[скрыто]');
+ for(const raw of ['номер операции ABCDEF-123','код авторизации ABCDEF','терминал TERM-ABCDEF','ИНН 1234567890','БИК 044525225','договор ABCD123456','паспорт 12 34 567890','телефон +7 (900) 123-45-67','ИНН 123 456 7890','карта ****1234','номер договора ABCDEF-XYZ','номер счета 1234 5678'])assert.ok(!cleanBankText(raw).match(/ABCDEF|TERM-|1234567890|044525225|567890|900|1234/));
 });
