@@ -22,13 +22,16 @@ test('runtime admission carries every previous paid call, preserves original cei
  assert.equal(later.admission.calls,52);assert.equal(later.maximumCalls,8);assert.equal(later.admission.spentAtoms,'1300000000');
  const unexpired=classificationRuntimeAdmission(next,{calls:1,spentAtoms:'1000',reservedAtoms:'0',blocked:false},'e'.repeat(64),tariff,now);
  assert.deepEqual({...unexpired,sourceSha256:next.sourceSha256},next);
+ assert.equal(unexpired.expiresAt,next.expiresAt);assert.equal(unexpired.maximumCalls,next.maximumCalls);
+ assert.equal(unexpired.cost.projectPeriodStart,next.cost.projectPeriodStart);assert.deepEqual(unexpired.admission,next.admission);
+ assert.deepEqual(unexpired.cost,next.cost);
  assert.throws(()=>classificationRuntimeAdmission(old,{calls:1,spentAtoms:'0',reservedAtoms:'1',blocked:false},'d'.repeat(64),tariff,now),/RECONCILIATION_REQUIRED/);
 });
 async function archive(t:any){
  const directory=await mkdtemp(join(tmpdir(),'classification-admission-test-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  for(const name of classificationSmokeNames){
   const sample=classificationSmokeCase(name),decisions=sample.plan.groups.map((g,i)=>{
-   const id=name==='taxi-without-category'?null:({'DNS':'electronics','Пятёрочка':'food',Ozon:null} as Record<string,string|null>)[g.signal.merchant!];
+   const id=name==='taxi-without-category'?null:sample.expectedCategories[g.signal.merchant!];
    return {ref:'r'+(i+1),category:id?sample.plan.catalog[sample.plan.categories.findIndex(c=>c.id===id)]!.ref:null,subcategory:null,confidence:id?95:0};
   });
   const values={input:sample.input,answer:{httpStatus:200,modelMatches:true,finishReason:'stop',role:'assistant',content:JSON.stringify({decisions}),usage:{input:668,output:395,total:1063}},usage:{inputTokens:668,outputTokens:395,modelVersion:'openai/gpt-oss-120b'}};
@@ -47,4 +50,18 @@ test('foreign inputs and wrong category meaning cannot be used as deployment evi
  await writeFile(path,JSON.stringify({...JSON.parse(saved),operations:[]}));await assert.rejects(validateClassificationEvidence(directory,async()=>true),/EVIDENCE_CHANGED/);await writeFile(path,saved);
  const answerPath=join(directory,'known-merchants-answer.json'),wire=JSON.parse(await readFile(answerPath,'utf8'));wire.content=JSON.stringify({decisions:classificationSmokeCase('known-merchants').plan.groups.map((_g,i)=>({ref:'r'+(i+1),category:null,subcategory:null,confidence:0}))});
  await writeFile(answerPath,JSON.stringify(wire));await assert.rejects(validateClassificationEvidence(directory,async()=>true),/EVIDENCE_FAILED/);
+});
+
+ test('diverse category meanings accept explicit review cases without lowering the automatic threshold',()=>{
+ const sample=classificationSmokeCase('known-merchants');
+ const decisions=sample.plan.groups.map(g=>{const id=sample.expectedCategories[g.signal.merchant!];return {categoryId:id??null,subcategoryId:null,confidence:id?(['Аптека Ромашка','Кофейня Север','Кинотеатр Экран'].includes(g.signal.merchant!)?80:95):0};});
+ assert.equal(sample.passed(decisions),true);assert.equal(sample.checks(decisions).filter(c=>c.review).length,3);
+ const pharmacy=sample.plan.groups.findIndex(g=>g.signal.merchant==='Аптека Ромашка');decisions[pharmacy]!.confidence=60;assert.equal(sample.passed(decisions),false);decisions[pharmacy]!.confidence=80;
+ decisions[pharmacy]!.categoryId='electronics';assert.equal(sample.passed(decisions),false);
+});
+ test('one-case replay still verifies its paid receipt and cannot turn an empty selection into evidence',async t=>{
+ const directory=await archive(t);let confirmations=0;
+ assert.equal((await validateClassificationEvidence(directory,async()=>{confirmations++;return true;},['known-merchants'])).cases,1);assert.equal(confirmations,1);
+ await assert.rejects(validateClassificationEvidence(directory,async()=>true,[]),/CASES_INVALID/);
+ await assert.rejects(validateClassificationEvidence(directory,async()=>false,['known-merchants']),/LEDGER_REQUIRED/);
 });

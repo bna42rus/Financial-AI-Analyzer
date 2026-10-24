@@ -314,8 +314,8 @@ export async function createServer(config: Config) {
   // A closed 1000-row profile with instants and all HMAC fields exceeds 512 KiB.
   // Keep this allowance scoped to imports; schema limits still bound every field.
   if(finance)for(const url of ['/finance/analyzer-context','/finance/analyzer-query','/finance/overview','/finance/operations-page','/finance/operations-selection'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:256*1024,handler:requestHandler});
-  if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:1024*1024,handler:requestHandler});
-  if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:1024*1024,handler:requestHandler});
+  if(importValidation)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-validation',bodyLimit:8*1024*1024,handler:requestHandler});
+  if(importIngestion)fastify.route({method:['GET','POST','OPTIONS'],url:'/finance/import-accept',bodyLimit:8*1024*1024,handler:requestHandler});
   await app.init();
   fastify.setErrorHandler((error, _request, reply) => {
     // Parser/oversize failures must never reflect raw request fragments or tokens.

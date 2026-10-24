@@ -1,5 +1,5 @@
 import {localBankAdapter,localParserVersions} from './bank-table.ts';
-import {parseSafeSource,sourceSanitizer,localSourceSanitizer,sourceProfiles} from './safe-source.ts';
+import {parseSafeSource,descriptionSourceSanitizer,sourceSanitizer,localSourceSanitizer,sourceProfiles} from './safe-source.ts';
 import type {SafeSource} from './safe-source.ts';
 import {dateFact,object,uuid} from '../../finance-core/src/model.ts';
 import type {BankDate} from '../../finance-core/src/model.ts';
@@ -33,7 +33,7 @@ class InvalidRow extends Error {readonly code:IssueCode;constructor(code:IssueCo
 function rowDate(value:unknown){try{return dateFact(value);}catch{throw new InvalidRow('INVALID_DATE');}}
 function rowAmount(value:unknown):string{try{if(typeof value!=='string'||value.length>20)throw new Error();parsePersistedMinor(value);return value;}catch{throw new InvalidRow('INVALID_AMOUNT');}}
 function parseRow(value:unknown,profile:ProcessingVersions['sanitizer'],local=false):PreparedRow{
- const structured=profile!=='text-free/1',identity=profile===sourceSanitizer||profile===localSourceSanitizer;
+ const structured=profile!=='text-free/1',identity=profile===sourceSanitizer||profile===localSourceSanitizer||profile===descriptionSourceSanitizer;
  const r=allowed(value,['ordinal','operationDate','postedDate','amountMinor','currency','direction','account','bankRefHmac',...(structured?['safeSource']:[]),...(identity?['descriptionHmac']:[]),...(local?['parser']:[])]);
  const ordinal=count(r.ordinal,1),operationDate=rowDate(r.operationDate),postedDate=r.postedDate===null||r.postedDate===undefined?null:rowDate(r.postedDate),amountMinor=rowAmount(r.amountMinor);
  if(!r.account||typeof r.account!=='object'||Array.isArray(r.account))throw new InvalidRow('INVALID_ACCOUNT');
@@ -50,7 +50,7 @@ function parseRow(value:unknown,profile:ProcessingVersions['sanitizer'],local=fa
 export function validatePreparedBatch(input:unknown){
  const r=closed(input,['schemaVersion','versions','context','batchId','files']),v=closed(r.versions,Object.keys(versions));
  if(r.schemaVersion!==1||Object.entries(versions).some(([k,value])=>k==='adapter'?!adapterVersions.includes(v[k] as ProcessingVersions['adapter']):k==='sanitizer'?![versions.sanitizer,...sourceProfiles].includes(v[k] as ProcessingVersions['sanitizer']):v[k]!==value))throw new ImportContractError();
- const structured=v.sanitizer!=='text-free/1',identity=v.sanitizer===sourceSanitizer||v.sanitizer===localSourceSanitizer;if(structured&&!(v.sanitizer===localSourceSanitizer?v.adapter===localBankAdapter:identity?v.adapter==='bank-pdf/2':v.adapter==='bank-pdf/1'))throw new ImportContractError();
+ const structured=v.sanitizer!=='text-free/1',identity=v.sanitizer===sourceSanitizer||v.sanitizer===localSourceSanitizer||v.sanitizer===descriptionSourceSanitizer;if(structured&&!((v.sanitizer===localSourceSanitizer||v.sanitizer===descriptionSourceSanitizer)?v.adapter===localBankAdapter:identity?v.adapter==='bank-pdf/2':v.adapter==='bank-pdf/1'))throw new ImportContractError();
  const local=v.adapter===localBankAdapter;
  if(local&&!identity)throw new ImportContractError();
  const context=parseContext(r.context),batchId=id(r.batchId);

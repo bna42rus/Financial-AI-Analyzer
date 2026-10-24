@@ -2,7 +2,7 @@ import {localBankAdapter,csvTable,parseBankTable} from '../../../packages/import
 import {readLocalXlsx} from '../../../packages/imports/src/xlsx-reader.ts';
 import {pdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
 import type {PDFPageProxy} from 'pdfjs-dist';
-import {sourceSanitizer,localSourceSanitizer,extractSafeSource} from '../../../packages/imports/src/safe-source.ts';
+import {sourceSanitizer,descriptionSourceSanitizer,extractSafeSource} from '../../../packages/imports/src/safe-source.ts';
 import {createLocalPreparation} from '../../../packages/imports/src/local.ts';
 import type {LocalContext,ExtractedFile} from '../../../packages/imports/src/local.ts';
 import {bankPdfAdapter,BankPdfError,MAX_PDF_BYTES} from '../../../packages/imports/src/bank-pdf.ts';
@@ -14,7 +14,7 @@ import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 /** Device-only entry point. No File/filename/password/layout can be passed to a server client. */
 export async function prepareLocalBankFiles(context:LocalContext,batchId:string,inputs:{fileId:string;file:File;password?:string}[],signal?:AbortSignal,legacyPdfOnly=false){
  if(inputs.length<1||inputs.length>10)throw new BankPdfError('LOCAL_LIMIT');
- const session=await createLocalPreparation(context,signal,legacyPdfOnly?bankPdfAdapter:localBankAdapter,legacyPdfOnly?sourceSanitizer:localSourceSanitizer),files:ExtractedFile[]=[],issues:{fileId:string;code:PdfFailure}[]=[];
+ const session=await createLocalPreparation(context,signal,legacyPdfOnly?bankPdfAdapter:localBankAdapter,legacyPdfOnly?sourceSanitizer:descriptionSourceSanitizer),files:ExtractedFile[]=[],issues:{fileId:string;code:PdfFailure}[]=[];
  try{
   const pdf=await import('pdfjs-dist');pdf.GlobalWorkerOptions.workerSrc=workerUrl;
   for(const input of inputs){
@@ -39,7 +39,7 @@ export async function prepareLocalBankFiles(context:LocalContext,batchId:string,
        finally{signal?.removeEventListener('abort',abort);context.clearRect(0,0,canvas.width,canvas.height);canvas.width=0;canvas.height=0;}
       });
       else throw new BankPdfError('UNKNOWN_FORMAT');
-      if(!legacyPdfOnly)for(const row of extracted.rows){row.parser??=pdfParserVersions[extracted.bank as keyof typeof pdfParserVersions];if(!(row.parser as string).includes('-ocr/'))row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,localSourceSanitizer);}
+      if(!legacyPdfOnly)for(const row of extracted.rows){row.parser??=pdfParserVersions[extracted.bank as keyof typeof pdfParserVersions];if(!(row.parser as string).includes('-ocr/'))row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,descriptionSourceSanitizer);}
       files.push(extracted);
      }
     catch(error){if(!(error instanceof BankPdfError)||error.code==='PREPARATION_CLOSED')throw error;

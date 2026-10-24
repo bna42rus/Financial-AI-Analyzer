@@ -28,12 +28,13 @@ export function classificationRuntimeAdmission(original:AssistantStagingSettings
  return checkAssistantStagingSettings({...next,expiresAt,cost:{...next.cost,projectPeriodEnd:expiresAt}},now);
 }
 
-export async function validateClassificationEvidence(directory:string,confirm:(fingerprint:string,usage:Usage,from:Date,through:Date)=>Promise<boolean>){
+export async function validateClassificationEvidence(directory:string,confirm:(fingerprint:string,usage:Usage,from:Date,through:Date)=>Promise<boolean>,names:readonly typeof classificationSmokeNames[number][]=classificationSmokeNames){
  if(resolve(directory)!==directory||await realpath(directory)!==directory)throw Error('CLASSIFICATION_EVIDENCE_DIRECTORY_INVALID');
  const info=await lstat(directory);
  if(!info.isDirectory()||info.uid!==process.getuid?.()||(info.mode&0o777)!==0o700)throw Error('CLASSIFICATION_EVIDENCE_DIRECTORY_INVALID');
+ if(!names.length||new Set(names).size!==names.length||names.some(n=>!classificationSmokeNames.includes(n)))throw Error('CLASSIFICATION_EVIDENCE_CASES_INVALID');
  const hashes=[];
- for(const name of classificationSmokeNames){
+ for(const name of names){
   const path=(kind:string)=>join(directory,name+'-'+kind+'.json');
   const input=await readAssistantPrivateFile(path('input')),wire=await readAssistantPrivateFile(path('answer')),usage=await readAssistantPrivateFile(path('usage'));
   const sample=classificationSmokeCase(name);
@@ -45,5 +46,5 @@ export async function validateClassificationEvidence(directory:string,confirm:(f
   if(!await confirm(digest(input),usage,from,through))throw Error('CLASSIFICATION_EVIDENCE_LEDGER_REQUIRED');
   hashes.push({name,input:digest(input),answer:digest(wire),usage:digest(usage)});
  }
- return {cases:2,evidenceSha256:digest(hashes),paidCalls:0};
+ return {cases:names.length,evidenceSha256:digest(hashes),paidCalls:0};
 }

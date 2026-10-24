@@ -22,11 +22,11 @@ const fetcher:typeof fetch=async(_url,options)=>{
 };
 const provider=(limit='45')=>createTestAssistantProvider(pg.finance,fetcher,{projectId:'test/classification',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:limit});
 async function within<T>(action:(db:PoolClient)=>Promise<T>,user='first'){const db=await pg.finance.connect();try{await db.query('BEGIN');await prepareFinance(db,user);const value=await action(db);await db.query('COMMIT');return value;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
-async function seed(user='first',count=3){return within(async db=>{
+async function seed(user='first',count=3,merchant='Пятёрочка'){return within(async db=>{
  const state=await financeView(db,user);const account=randomUUID();await acceptAccount(db,user,importEpoch(state),{id:account,bankId:'tbank',systemName:'Synthetic category account',type:'bank_account'});
  const category=state.categories.find(c=>c.name==='Продукты'&&!c.parentId)!.id;
- const ids=await syntheticOperations(db,user,count,account,category,'Пятёрочка');
- await db.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',[user,JSON.stringify(initialSemantics('purchase','Пятёрочка'))]);
+ const ids=await syntheticOperations(db,user,count,account,category,merchant);
+ await db.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',[user,JSON.stringify(initialSemantics('purchase',merchant))]);
 return {ids,category,account};
  },user);}
 const state=()=>within(db=>financeView(db,'first'));
@@ -124,4 +124,12 @@ test('deployment evidence requires the exact settled synthetic receipt and canno
  assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first',p.policy.projectId,fingerprint,usage,from,through),'second'),false);
  await pg.owner.query("UPDATE commerce.analyzer_request SET usage_state='unknown' WHERE request_id=$1",[id]);
  assert.equal(await within(db=>confirmClassificationPaidReceipt(db,'first',p.policy.projectId,fingerprint,usage,from,through)),false);
+});
+
+test('an unsupported high-confidence platform category becomes unresolved in storage and stays in Review',async()=>{
+ await seed('second',1,'Яндекс Go');await within(db=>enqueueClassification(db,'second'),'second');
+ assert.equal(await runClassificationStage(pg.finance,provider()),true);assert.equal(calls,1);
+ const result=await within(db=>financeView(db,'second'),'second');assert.equal(result.operations.length,1);
+ const op=result.operations[0]!;assert.equal(op.classification.category.value,null);assert.equal(op.classification.category.confidence,0);assert.equal(op.classification.category.userVerified,false);assert.ok(op.reviewReasons.includes('low_category_confidence'));
+ const cached=(await pg.owner.query("SELECT decision FROM finance.classification_cache WHERE user_id='second'")).rows;assert.equal(cached[0].decision.categoryId,null);
 });

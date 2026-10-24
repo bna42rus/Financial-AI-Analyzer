@@ -81,7 +81,7 @@ export async function runClassificationStage(pool:Pool,provider:AssistantProvide
    return {plan,groups,generation:workspace.generation,keyVersion:workspace.key_version,revision:fresh.state.revision};
   });
   if(!planned)return true;
-  const id=randomUUID(),model=provider.forRequest(),input={catalog:planned.plan.catalog,operations:planned.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))};
+  const id=randomUUID(),model=provider.forRequest('classification'),input={catalog:planned.plan.catalog,operations:planned.groups.map((g,i)=>({ref:'r'+(i+1),...g.signal}))};
   let sent=false,knownUsage:Usage|undefined;
   const settle=async(usage?:Usage)=>transaction(pool,userId,async db=>{
    const violation=await settleCost(db,userId,id,'classification',usage);

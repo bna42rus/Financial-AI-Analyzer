@@ -14,6 +14,8 @@ on:
       - 'packages/analyzer/**'
       - 'packages/finance-core/**'
       - 'packages/privacy/**'
+      - 'packages/imports/**'
+      - 'packages/database/migrations/0029_bank_description.sql'
       - 'scripts/*assistant-staging*'
       - 'scripts/*connected-web*'
       - 'scripts/*staging-release*'
@@ -59,6 +61,7 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/imports/test/bank-description.test.ts
           apps/api/test/classification-plan.test.ts
           apps/api/test/classification-smoke-support.test.ts
           apps/api/test/classification-admission.test.ts
@@ -109,11 +112,11 @@ jobs:
       - name: Verify the assistant HTTP and PostgreSQL boundary without paid calls
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/import-ingestion.test.ts test/import-validation.test.ts
       - name: Install Chromium for the assistant interface check
         run: pnpm --filter @finance/api exec playwright install --with-deps chromium
       - name: Verify the connected desktop and mobile interface
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
           ASSISTANT_UI_ASSET_MODE: built
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts test/operations-browser.test.ts
