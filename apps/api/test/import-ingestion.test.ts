@@ -383,3 +383,18 @@ test('richer bank text upgrades exact file instances without duplicates or overw
  const legacy=await prepare('bank-source/3');await accept(legacy);await drain(legacy.batchId);assert.equal((await detail(first.id)).source.description,upgraded.source.description);assert.equal((await counts()).transaction,1);
  await command({kind:'cancel_import',batchId:legacy.batchId});await command({kind:'cancel_import',batchId:enriched.batchId});const restored=await detail(first.id);assert.equal(restored.source.description,'Покупка');assert.equal(restored.source.sourceMcc,undefined);assert.equal(restored.semantics.merchant.value,'Моя аптека');assert.equal(restored.comment,'Ручной комментарий');
 });
+
+ test('owner-approved bank display retains names and ordinary digits while targeted secrets never reach stored observations',async()=>{
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,'bank-source/4');
+ let b:PreparedBatch;try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic targeted description file'),rows:[
+  row({bankReference:undefined,parser:'tbank-table/1',localDescription:'Исходящий перевод Иванов Иван Иванович 1500 рублей за 2 билета'}),
+  row({bankReference:undefined,parser:'tbank-table/1',localDescription:'Покупка Магазин24 карта ****1234 номер операции ABCDEF-123'}),
+  row({bankReference:undefined,parser:'tbank-table/1',localDescription:'Оплата через СБП Магазин24',localMcc:'5912'})
+ ]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);
+ const descriptions=(await pg.owner.query("SELECT description,source_kind FROM finance.source_observation WHERE user_id='first' ORDER BY description")).rows;
+ assert.equal(descriptions.length,3);assert.ok(descriptions.some(r=>r.description==='Исходящий перевод Иванов Иван Иванович 1500 рублей за 2 билета'&&r.source_kind==='transfer_out'));
+ assert.ok(descriptions.some(r=>r.description==='Оплата через СБП Магазин24'&&r.source_kind==='other'));assert.ok(descriptions.some(r=>r.description.includes('Магазин24')&&r.source_kind==='purchase'));
+ assert.ok(!JSON.stringify(descriptions).includes('1234'));assert.ok(!JSON.stringify(descriptions).includes('ABCDEF'));
+ const again=await request('/finance/operation',{id:(await pg.owner.query("SELECT transaction_id FROM finance.source_observation WHERE user_id='first' AND source_kind='transfer_out'")).rows[0].transaction_id});assert.equal(again.statusCode,200,again.body);assert.equal(again.json().semantics.merchant.value,'');
+ });
