@@ -60,7 +60,7 @@ async function main(){
   async function within<T>(action:(db:import('pg').PoolClient)=>Promise<T>){const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[user.id]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
   for(const name of classificationSmokeNames){
    phase=name+':prepare';console.log(JSON.stringify({case:name,status:'START'}));
-   const sample=classificationSmokeCase(name),{plan,input}=sample,id=randomUUID(),model=provider.forRequest();let sent=false,usage:Usage|undefined;
+   const sample=classificationSmokeCase(name),{plan,input}=sample,id=randomUUID(),model=provider.forRequest('classification');let sent=false,usage:Usage|undefined;
    expected={name,input};await archive.save(name+'-input.json',input);
    const settle=async(value?:Usage)=>within(db=>settleCost(db,user.id,id,'classification',value));
    try{

@@ -83,3 +83,14 @@ prior paid calls, spend, held reservations and stricter stage ceilings are retai
 No automatic paid retries, no Production switch. Then re-read the same statement
 through the new browser import and check readable descriptions, stable operation
 count and preserved manual edits before starting category assignment.
+
+### Output bound correction
+
+The first 15-item model run ended with `finish_reason=length` at 1200 tokens;
+its incomplete JSON is rejected and its reported usage stays settled in the
+ledger. It is not evidence of category accuracy. Classification requests now
+explicitly select a 4096-token output bound and compact JSON; chat keeps 1200.
+The same immutable bound drives both durable cost reservation and HTTP output
+limit. An assistant-mode model cannot send a classification protocol request
+under the smaller reservation. The standalone remains limited to two POSTs;
+there is no automatic retry or alteration of original stage ceilings.
