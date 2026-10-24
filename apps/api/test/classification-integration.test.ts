@@ -133,3 +133,19 @@ test('an unsupported high-confidence platform category becomes unresolved in sto
  const op=result.operations[0]!;assert.equal(op.classification.category.value,null);assert.equal(op.classification.category.confidence,0);assert.equal(op.classification.category.userVerified,false);assert.ok(op.reviewReasons.includes('low_category_confidence'));
  const cached=(await pg.owner.query("SELECT decision FROM finance.classification_cache WHERE user_id='second'")).rows;assert.equal(cached[0].decision.categoryId,null);
 });
+
+test('known sanitized merchants use a recorded local pass with zero POSTs; current personal decisions remain protected',async()=>{
+ await pg.owner.query("UPDATE finance.source_observation SET merchant_text='SPAR 349 Moscow Rus',description='Покупка SPAR 349 Moscow Rus',versions=versions || '{\"sourceSanitizer\":\"bank-source/4\"}'::jsonb WHERE user_id='first'");
+ await pg.owner.query("UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1",['first',JSON.stringify(initialSemantics('purchase','SPAR 349 Moscow Rus'))]);
+ const protectedValue=initialSemantics('purchase','Мой магазин');protectedValue.merchant=facet('Мой магазин','user',true);protectedValue.category=facet(null,'user',true);
+ await pg.owner.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['first',ids[0],JSON.stringify(protectedValue)]);
+ const before=await state();await queue();await runClassificationStage(pg.finance,provider());const after=await state();
+ assert.equal(calls,0);assert.equal(after.operations.find(o=>o.id===ids[0])!.classification.merchant.value,'Мой магазин');assert.equal(after.operations.find(o=>o.id===ids[0])!.classification.category.value,null);
+ for(const op of after.operations.filter(o=>o.id!==ids[0])){assert.equal(op.classification.merchant.value,'SPAR');assert.equal(op.classification.category.source,'global_rule');assert.equal(op.classification.category.value,category);assert.ok(op.description.includes('SPAR 349 Moscow Rus'));}
+ assert.equal(after.summary.netExpensesMinor,before.summary.netExpensesMinor);
+ assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
+ const history=(await pg.owner.query('SELECT r.engine,a.before_facets,a.after_facets FROM finance.classification_assignment a JOIN finance.classification_run r ON (r.user_id,r.id)=(a.user_id,a.run_id)')).rows;
+ assert.equal(history.length,2);assert.ok(history.every(r=>r.engine==='merchant-catalog/1'&&r.before_facets.merchant.value==='SPAR 349 Moscow Rus'&&r.after_facets.merchant.value==='SPAR'));
+ const status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.calls,0);assert.equal(status.applied,2);
+ await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_assignment')).rows[0].n,2);
+});

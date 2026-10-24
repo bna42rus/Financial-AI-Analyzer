@@ -11,7 +11,7 @@ import {createLocalPreparation} from '../../../packages/imports/src/local.ts';
 import type {ExtractedRow,LocalContext} from '../../../packages/imports/src/local.ts';
 import type {PreparedBatch} from '../../../packages/imports/src/contract.ts';
 import {sourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
-import {localSourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
+import {descriptionSourceSanitizer,localSourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
 import {localBankAdapter,parseBankTable,csvTable} from '../../../packages/imports/src/bank-table.ts';
 import {parseBankPdf,pdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
 import {syntheticLayout} from '../../../packages/imports/test/synthetic-layout.ts';
@@ -398,3 +398,20 @@ test('richer bank text upgrades exact file instances without duplicates or overw
  assert.ok(!JSON.stringify(descriptions).includes('1234'));assert.ok(!JSON.stringify(descriptions).includes('ABCDEF'));
  const again=await request('/finance/operation',{id:(await pg.owner.query("SELECT transaction_id FROM finance.source_observation WHERE user_id='first' AND source_kind='transfer_out'")).rows[0].transaction_id});assert.equal(again.statusCode,200,again.body);assert.equal(again.json().semantics.merchant.value,'');
  });
+
+test('sanitized merchant recognition separates bank text, delivery and normalized shop on import',async()=>{
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,descriptionSourceSanitizer);
+ let prepared:PreparedBatch;try{prepared=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic delivery recognition'),rows:[row({bankReference:undefined,localDescription:'Покупка DOSTAVKA PYATEROCHKA MOSCOW RUS',safeSource:{event:'purchase',merchant:null},parser:'tbank-table/1'}),row({bankReference:undefined,localDescription:'Покупка VIPVENDING Москва Рус',safeSource:{event:'purchase',merchant:null},parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(prepared!);await drain(prepared!.batchId);const state=(await request('/finance/state')).json();
+ const delivery=state.operations.find((o:any)=>o.description.includes('PYATEROCHKA')),vending=state.operations.find((o:any)=>o.description.includes('VIPVENDING'));
+ assert.equal(delivery.classification.merchant.value,'Пятёрочка');assert.equal(state.categories.find((c:any)=>c.id===delivery.classification.subcategory.value).name,'Доставка продуктов');
+ assert.equal(vending.classification.category.confidence,75);assert.ok(vending.reviewReasons.includes('low_category_confidence'));
+});
+
+test('already stored inflected contract text is hidden in bank wording and merchant views without changing identity or money',async()=>{
+ const first=await batch();await accept(first);await drain(first.batchId);const op=await importedOperation(),id=op.id;
+ await pg.owner.query("UPDATE finance.source_observation SET description='Перевод с договора 12345678',merchant_text='Оплата по договору № TEST-1234',versions=versions || '{\"sourceSanitizer\":\"bank-source/4\"}'::jsonb WHERE user_id='first'");
+ await pg.owner.query("UPDATE finance.ingestion_row SET source_evidence=$2 WHERE user_id=$1",['first',JSON.stringify({event:'purchase',merchant:null,details:{description:'Перевод с договора 12345678',merchantText:'Оплата по договору № TEST-1234',bankCategory:'',mcc:null}})]);
+ const semantics=structuredClone(op.semantics);semantics.merchant.value='Оплата по договору № TEST-1234';await pg.owner.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['first',id,JSON.stringify(semantics)]);
+ const response=(await request('/finance/operation',{id})).json();assert.equal(response.id,id);assert.equal(response.source.amountMinor,op.source.amountMinor);assert.ok(!JSON.stringify(response).includes('12345678'));assert.ok(!JSON.stringify(response).includes('TEST-1234'));assert.ok(response.source.description.includes('[скрыто]'));
+});

@@ -1,3 +1,4 @@
+import {merchantKey,recognizeMerchant} from './merchant-recognition.ts';
 import {effective,facet,object,choice,uuid,kinds} from './model.ts';
 import type {Operation,Account,Role,Kind} from './model.ts';
 import {parsePersistedMinor} from './money.ts';
@@ -20,7 +21,9 @@ export function validateRule(value:unknown):Omit<Rule,'id'> {
 /** The same closed predicate is used for future imports and explicit historical selection. */
 export function ruleMatches(operation:Operation,account:Account,rule:Rule):boolean {
  const f=effective(operation),amount=BigInt(f.amountMinor),text=(s:string)=>s.toLocaleLowerCase('ru-RU'),c=rule.conditions;
- return (!c.merchantEquals||text(operation.semantics.merchant.value)===text(c.merchantEquals))&&(!c.merchantContains||text(operation.semantics.merchant.value).includes(text(c.merchantContains)))&&(!c.descriptionContains||text(f.description).includes(text(c.descriptionContains)))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.kind||c.kind===operation.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
+ const sameMerchant=(value:string)=>{if(text(operation.semantics.merchant.value)===text(value)||text(f.merchantText)===text(value))return true;const left=recognizeMerchant(operation.semantics.merchant.value),right=recognizeMerchant(value);return left.matched&&right.matched&&!left.conflict&&!right.conflict&&text(value)===text(right.name)&&left.name===right.name;};
+ const descriptionMatches=(value:string)=>text(f.description).includes(text(value))||['вендинг','vending'].includes(text(value))&&merchantKey(f.description).includes('vending');
+ return (!c.merchantEquals||sameMerchant(c.merchantEquals))&&(!c.merchantContains||text(operation.semantics.merchant.value).includes(text(c.merchantContains)))&&(!c.descriptionContains||descriptionMatches(c.descriptionContains))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.kind||c.kind===operation.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
 }
 /** Updating a rule never calls this on old operations; history needs a separate preview command. */
 export function applyRules(operation:Operation,account:Account,rules:Rule[]):Operation {

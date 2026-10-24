@@ -1,5 +1,6 @@
 import type {PoolClient} from 'pg';
 import type {BankFact} from '../../../packages/finance-core/src/model.ts';
+import {bankDescription,cleanBankText} from '../../../packages/imports/src/bank-description.ts';
 import {sourceFields} from '../../../packages/imports/src/safe-source.ts';
 import type {SafeSource} from '../../../packages/imports/src/safe-source.ts';
 
@@ -12,12 +13,13 @@ export async function sourceEvidence(db:PoolClient,userId:string){
 }
 export function resolveSourceText(fact:BankFact,transactionId:string,selectedId:string,rows:Awaited<ReturnType<typeof sourceEvidence>>):BankFact{
  const own=rows.filter(r=>r.transaction_id===transactionId),selected=own.find(r=>r.id===selectedId);
- if(!selected?.evidence_recorded)return fact;
+ const clean=(source:BankFact):BankFact=>source.versions.sourceSanitizer==='bank-source/4'?{...source,description:cleanBankText(source.description),merchantText:cleanBankText(source.merchantText,160),bankCategory:cleanBankText(source.bankCategory,160)}:source;
+ if(!selected?.evidence_recorded)return clean(fact);
  let text=sourceFields(null),detailed=false;
  for(const row of own){
   if(!row.evidence_recorded){detailed=false;text={sourceKind:row.source_kind,merchantText:row.merchant_text,description:row.description};}
-  else if(row.source_evidence){const next=sourceFields(row.source_evidence);if(detailed&&!row.source_evidence.details&&text.sourceKind===next.sourceKind){next.description=text.description;next.bankCategory=text.bankCategory;next.sourceMcc=text.sourceMcc;}else detailed=!!row.source_evidence.details;if(text.sourceKind===next.sourceKind){if(!next.merchantText)next.merchantText=text.merchantText;if(!next.bankCategory)next.bankCategory=text.bankCategory;if(!next.sourceMcc)next.sourceMcc=text.sourceMcc;}text=next;}
+  else if(row.source_evidence){const safe=row.source_evidence.details?{...row.source_evidence,details:bankDescription(row.source_evidence.details.description,row.source_evidence.details.merchantText,row.source_evidence.details.bankCategory,row.source_evidence.details.mcc)}:row.source_evidence;const next=sourceFields(safe);if(detailed&&!row.source_evidence.details&&text.sourceKind===next.sourceKind){next.description=text.description;next.bankCategory=text.bankCategory;next.sourceMcc=text.sourceMcc;}else detailed=!!row.source_evidence.details;if(text.sourceKind===next.sourceKind){if(!next.merchantText)next.merchantText=text.merchantText;if(!next.bankCategory)next.bankCategory=text.bankCategory;if(!next.sourceMcc)next.sourceMcc=text.sourceMcc;}text=next;}
   if(row.id===selectedId)break;
  }
- return {...fact,...text,versions:{...fact.versions,...(detailed?{sourceSanitizer:'bank-source/4'}:{})}};
+ return clean({...fact,...text,versions:{...fact.versions,...(detailed?{sourceSanitizer:'bank-source/4'}:{})}});
 }
