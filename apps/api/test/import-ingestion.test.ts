@@ -404,7 +404,7 @@ test('sanitized merchant recognition separates bank text, delivery and normalize
  let prepared:PreparedBatch;try{prepared=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic delivery recognition'),rows:[row({bankReference:undefined,localDescription:'Покупка DOSTAVKA PYATEROCHKA MOSCOW RUS',safeSource:{event:'purchase',merchant:null},parser:'tbank-table/1'}),row({bankReference:undefined,localDescription:'Покупка VIPVENDING Москва Рус',safeSource:{event:'purchase',merchant:null},parser:'tbank-table/1'})]}]);}finally{local.dispose();}
  await accept(prepared!);await drain(prepared!.batchId);const state=(await request('/finance/state')).json();
  const delivery=state.operations.find((o:any)=>o.description.includes('PYATEROCHKA')),vending=state.operations.find((o:any)=>o.description.includes('VIPVENDING'));
- assert.equal(delivery.classification.merchant.value,'Пятёрочка');assert.equal(state.categories.find((c:any)=>c.id===delivery.classification.subcategory.value).name,'Доставка продуктов');
+ assert.equal(delivery.classification.merchant.value,'PYATEROCHKA');assert.equal(state.categories.find((c:any)=>c.id===delivery.classification.subcategory.value).name,'Доставка продуктов');
  assert.equal(vending.classification.category.confidence,75);assert.ok(vending.reviewReasons.includes('low_category_confidence'));
 });
 
@@ -414,4 +414,16 @@ test('already stored inflected contract text is hidden in bank wording and merch
  await pg.owner.query("UPDATE finance.ingestion_row SET source_evidence=$2 WHERE user_id=$1",['first',JSON.stringify({event:'purchase',merchant:null,details:{description:'Перевод с договора 12345678',merchantText:'Оплата по договору № TEST-1234',bankCategory:'',mcc:null}})]);
  const semantics=structuredClone(op.semantics);semantics.merchant.value='Оплата по договору № TEST-1234';await pg.owner.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['first',id,JSON.stringify(semantics)]);
  const response=(await request('/finance/operation',{id})).json();assert.equal(response.id,id);assert.equal(response.source.amountMinor,op.source.amountMinor);assert.ok(!JSON.stringify(response).includes('12345678'));assert.ok(!JSON.stringify(response).includes('TEST-1234'));assert.ok(response.source.description.includes('[скрыто]'));
+});
+
+test('same-file reimport preserves a manual purchase split and bank identity, while a new Ozon purchase stays unsplit',async()=>{
+ async function prepare(rows:ExtractedRow[],bytes:string){const local=await createLocalPreparation(await context(),undefined,localBankAdapter,descriptionSourceSanitizer);try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}}
+ const item=row({amountMinor:'-1000000',localDescription:'Покупка Ozon',parser:'tbank-table/1',safeSource:{event:'purchase',merchant:'ozon'}}),first=await prepare([item],'Synthetic Ozon statement overlap');await accept(first);await drain(first.batchId);const original=await importedOperation();
+ const state=(await request('/finance/state')).json(),food=state.categories.find((c:any)=>c.name==='Продукты'&&!c.parentId).id,clothes=state.categories.find((c:any)=>c.name==='Одежда и аксессуары'&&!c.parentId).id;
+ assert.equal(state.categories.find((c:any)=>c.id===original.semantics.category.value).name,'Маркетплейсы');const a=randomUUID(),b=randomUUID();
+ await command({kind:'components',id:original.id,parts:[{id:a,type:'other',amountMinor:'-500000',role:'expense',categoryId:food},{id:b,type:'other',amountMinor:'-500000',role:'expense',categoryId:clothes}]});const saved=await detail(original.id);
+ const repeat=await prepare([item],'Synthetic Ozon statement overlap');await accept(repeat);await drain(repeat.batchId);const same=await detail(original.id);assert.equal((await counts()).transaction,1);assert.deepEqual(same.source,saved.source);assert.deepEqual(same.components,saved.components);assert.equal(same.semantics.merchant.value,'Ozon');assert.equal(same.projection.amountMinor,'-1000000');
+ const next=await prepare([row({...item,amountMinor:'-20000',bankReference:'synthetic-new-ozon-reference',operationDate:{precision:'day',date:'2026-10-02'}})],'Synthetic next Ozon purchase');await accept(next);await drain(next.batchId);
+ const operations=(await request('/finance/state')).json().operations;assert.equal(operations.length,2);const added=operations.find((o:any)=>o.id!==original.id);assert.equal(added.classification.merchant.value,'Ozon');assert.equal(added.decompositionActive,false);assert.equal(added.amountMinor,'-20000');assert.equal((await detail(original.id)).components.length,2);
+ await command({kind:'cancel_import',batchId:repeat.batchId});assert.equal((await detail(original.id)).components.length,2);assert.equal((await counts()).transaction,2);
 });

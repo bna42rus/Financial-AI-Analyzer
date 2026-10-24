@@ -101,7 +101,7 @@ test('bulk preview cannot commit after a new import or access expiry and does no
 });
 
 test('new workspace has starter categories, no invented transactions and scoped runtime roles',async()=>{
- const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,30);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
+ const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,31);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
  for(const pool of [pg.control,pg.mailControl,pg.mailFinance])await assert.rejects(pool.query('SELECT * FROM finance.transaction'),{code:'42501'});
  assert.equal((await control.fastify.inject({method:'GET',url:'/finance/state',headers:{cookie,origin:'https://admin.example.test'}})).statusCode,404);
 });
@@ -290,4 +290,32 @@ test('category editor metadata covers retired duplicate operations and inactive 
  const c=randomUUID(),part=randomUUID(),a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId;await command({kind:'category',id:c,create:true,patch:{name:'Synthetic retired category',role:'income',parentId:null}});await command({kind:'operation',id:a,patch:{role:'income',categoryId:c}});await command({kind:'components',id:b,parts:[{id:part,type:'other',amountMinor:'-2000',role:'income',categoryId:c}]});await command({kind:'components',id:b,parts:[]});await pg.owner.query("UPDATE finance.transaction SET merged_into_id=$2 WHERE user_id='first' AND id=$1",[a,b]);const s=await view(),facts=(await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows;
  assert.equal(s.operations.length,1);assert.ok(s.categoryOperations.some((o:{id:string;retired:boolean;categoryId:string})=>o.id===a&&o.retired&&o.categoryId===c));assert.ok(s.categoryComponents.some((p:{id:string;retired:boolean;categoryId:string})=>p.id===part&&p.retired&&p.categoryId===c));assert.ok(!JSON.stringify(s.categoryOperations).includes('bankRefHmac'));
  const blocked=await request('/finance/preview',{actionId:randomUUID(),generation:s.generation,revision:s.revision,intent:{kind:'migrate_category',id:c,parentId:null,role:'expense'}});assert.equal(blocked.json().code,'CATEGORY_ROLE_DECISION_REQUIRED');const result=await command({kind:'migrate_category',id:c,parentId:null,role:'expense',roleDecisions:[{kind:'operation',id:a,role:'expense'},{kind:'component',id:part,role:'expense'}]});assert.equal(result.preview.impact.details.financialOperationsDeleted,0);let after=await view();assert.equal(after.categoryOperations.find((o:{id:string})=>o.id===a).role,'expense');assert.equal(after.categoryComponents.find((p:{id:string})=>p.id===part).role,'expense');await command({kind:'undo',id:randomUUID(),value:result.actionId});after=await view();assert.equal(after.categoryComponents.find((p:{id:string})=>p.id===part).role,'income');assert.equal(after.categoryOperations.find((o:{id:string})=>o.id===a).role,'income');assert.deepEqual((await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,facts);
+});
+
+test('marketplace starter addition is one-time, tenant scoped and reuses hidden or nested user categories',async()=>{
+ let state=await view();const market=state.categories.filter((c:any)=>c.name==='Маркетплейсы');assert.equal(market.length,1);assert.equal(market[0].role,'expense');
+ await pg.owner.query("DELETE FROM finance.category WHERE user_id='first' AND id=$1",[market[0].id]);
+ assert.equal((await view()).categories.some((c:any)=>c.name==='Маркетплейсы'),false);
+ // Simulate an existing workspace from before the additive migration.
+ await pg.owner.query("UPDATE finance.workspace SET marketplace_catalog_initialized=false WHERE user_id='first'");
+ state=await view();assert.equal(state.categories.filter((c:any)=>c.name==='Маркетплейсы').length,1);
+ const current=state.categories.find((c:any)=>c.name==='Маркетплейсы');await pg.owner.query("UPDATE finance.category SET hidden=true WHERE user_id='first' AND id=$1",[current.id]);await pg.owner.query("UPDATE finance.workspace SET marketplace_catalog_initialized=false WHERE user_id='first'");
+ state=await view();assert.equal(state.categories.filter((c:any)=>c.name==='Маркетплейсы').length,1);assert.equal(state.categories.find((c:any)=>c.id===current.id).hidden,true);
+ const parent=state.categories.find((c:any)=>c.name==='Прочие расходы'&&!c.parentId);await pg.owner.query("UPDATE finance.category SET hidden=false,parent_id=$2 WHERE user_id='first' AND id=$1",[current.id,parent.id]);await pg.owner.query("UPDATE finance.workspace SET marketplace_catalog_initialized=false WHERE user_id='first'");state=await view();assert.equal(state.categories.filter((c:any)=>c.name==='Маркетплейсы').length,1);assert.equal(state.categories.find((c:any)=>c.id===current.id).parentId,parent.id);
+ assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM finance.category WHERE user_id='second'")).rows[0].n,0);
+});
+test('a purchase split keeps one bank operation, categories count only their parts, a partial refund targets its chosen part, and Undo restores the whole purchase',async()=>{
+ const purchase=(await append('-1000000')).transactionId,state=await view(),market=state.categories.find((c:any)=>c.name==='Маркетплейсы').id,food=state.categories.find((c:any)=>c.name==='Продукты'&&!c.parentId).id,clothes=state.categories.find((c:any)=>c.name==='Одежда и аксессуары'&&!c.parentId).id;
+ await command({kind:'operation',id:purchase,patch:{categoryId:market,merchant:'Ozon'}});
+ const originals=(await pg.owner.query('SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id=$1',['first'])).rows;
+ const a=randomUUID(),b=randomUUID(),split=await command({kind:'components',id:purchase,parts:[{id:a,type:'other',amountMinor:'-500000',role:'expense',categoryId:food},{id:b,type:'other',amountMinor:'-500000',role:'expense',categoryId:clothes}]});
+ assert.equal((await view()).summary.netExpensesMinor,'1000000');assert.equal((await view()).operations.length,1);assert.equal((await request('/finance/summary',{categoryIds:[market]})).json().summary.netExpensesMinor,'0');
+ for(const cat of [food,clothes])assert.equal((await request('/finance/summary',{categoryIds:[cat]})).json().summary.netExpensesMinor,'500000');
+ const list=(await request('/finance/operations-page',{query:{filter:{merchant:'Ozon',categoryIds:[food]},group:'none',sort:'date',direction:'desc'}})).json();assert.equal(list.total,1);assert.equal(list.summary.netExpensesMinor,'500000');
+ let detail=(await request('/finance/operation',{id:purchase})).json();assert.equal(detail.semantics.merchant.value,'Ozon');assert.equal(detail.source.amountMinor,'-1000000');
+ const refund=(await append('300000','refund')).transactionId;await command({...link(refund,purchase,'300000'),link:{...link(refund,purchase,'300000').link,targetComponentId:a}});
+ assert.equal((await request('/finance/summary',{categoryIds:[food]})).json().summary.netExpensesMinor,'200000');assert.equal((await request('/finance/summary',{categoryIds:[clothes]})).json().summary.netExpensesMinor,'500000');assert.equal((await view()).summary.netExpensesMinor,'700000');
+ assert.deepEqual((await pg.owner.query('SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id=$1 AND transaction_id=$2',['first',purchase])).rows,originals);
+ // Removing the split must preview the dependency conflict instead of guessing a refund category.
+ const removal=await command({kind:'components',id:purchase,parts:[]});assert.ok(removal.preview.impact.dependencyConflicts.length>0);await command({kind:'undo',id:randomUUID(),value:removal.actionId});detail=(await request('/finance/operation',{id:purchase})).json();assert.equal(detail.components.length,2);assert.equal(detail.semantics.merchant.value,'Ozon');assert.equal((await view()).summary.netExpensesMinor,'700000');
 });

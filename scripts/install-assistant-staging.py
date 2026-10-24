@@ -240,6 +240,8 @@ def install(args):
     print('4/5: аддитивные миграции одной транзакцией.', flush=True)
     migrations = sorted((release / 'packages/database/migrations').glob('*.sql'))
     selected = [next(p for p in migrations if p.name.startswith(str(n).zfill(4) + '_')) for n in range(24 + start, 28)]
+    if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='marketplace_catalog_initialized')") == 'f':
+        selected.append(next(p for p in migrations if p.name.startswith('0030_')))
     # Do not replace an existing account quota or change its entitlement.
     quota_sql = ''
     if user['quota'] is None:

@@ -1,3 +1,4 @@
+import {isMarketplaceName} from './starter.ts';
 import {facet} from './model.ts';
 import type {Operation,Category} from './model.ts';
 import {merchantCatalog,merchantCatalogVersion} from './merchant-catalog.ts';
@@ -15,7 +16,19 @@ const boundaryPattern=(alias:string)=>{
 const catalogPatterns=merchantCatalog.map(entry=>({entry,patterns:entry.aliases.map(boundaryPattern)}));
 const genericPrefixes=/^(?:(?:покупка(?: в)?|оплата(?: товаров и услуг| покупки| по карте| картой| в)?|возврат покупки|purchase|card payment|sber[ _-]*\d*(?:[,.]\d+)?|сбер[ _-]*\d*(?:[,.]\d+)?)[ :.*_-]+)+/iu;
 const locationTail=/(?:[ ,_*.-]+(?:moscow|moskva|москва|sankt[ -]?peterburg|saint[ -]?petersburg|санкт[ -]?петербург|innopolis|иннополис|rus|рус|russia|россия))+(?:[ ,_*.-]*)$/iu;
-export type MerchantRecognition={name:string;service:MerchantService|null;confidence:number;delivery:boolean;matched:boolean;conflict:boolean};
+/** Preserve the spelling/alphabet of the bank's matched brand. Canonical
+ * category identity remains independent; only TimeWeb is owner-approved here. */
+function bankBrandName(clean:string,entry:typeof merchantCatalog[number]):string{
+ if(entry.name==='TimeWeb')return 'TimeWeb';
+ if(entry.service==='unknown')return clean;
+ for(const alias of [...entry.aliases].sort((a,b)=>b.length-a.length)){
+  const pattern=alias.normalize('NFKC').split(/[ ._-]+/u).map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[ ._-]*').replace(/е/gu,'[её]');
+  const found=new RegExp('(?:^|[^\\p{L}\\p{N}])('+pattern+')(?=$|[^\\p{L}]|[0-9])','iu').exec(clean);
+  if(found?.[1])return found[1];
+ }
+ return clean;
+}
+export type MerchantRecognition={name:string;service:MerchantService|null;confidence:number;delivery:boolean;matched:boolean;conflict:boolean;brand?:string};
 /** Only merchant/service text: no dates, amounts, IDs or bank-city assumptions. */
 export function recognizeMerchant(merchant:string,description=''):MerchantRecognition{
  const original=merchant.trim()||description.trim().replace(genericPrefixes,'');
@@ -33,7 +46,7 @@ export function recognizeMerchant(merchant:string,description=''):MerchantRecogn
  if(entry){
   // Telecom brands also sell hardware; explicit different product evidence wins by abstention.
   const contradictory=entry.service==='telecom'&&/\b(?:smartfon|smartphone|noutbuk|notebook|televizor|strahovanie|kredit)\b/.test(full);
-  return {name:entry.name,service:contradictory?null:entry.service,confidence:contradictory?0:entry.review?80:96,delivery:delivery||!!entry.delivery,matched:true,conflict:contradictory};
+  return {name:bankBrandName(clean,entry),brand:entry.name,service:contradictory?null:entry.service,confidence:contradictory?0:entry.review?80:96,delivery:delivery||!!entry.delivery,matched:true,conflict:contradictory};
  }
  const services:Array<[MerchantService,string[]]>=[
   ['cafe',['кафе','cafe','kafe','кофейня','kofeynya','столовая','stolovaya','stolovaja','ресторан','restaurant','restoran','кафетерий','закусочная','пиццерия','pizzeria']],
@@ -77,12 +90,17 @@ export function merchantCategory(recognition:MerchantRecognition,categories:Cate
  if(!recognition.service||recognition.conflict)return null;
  const available=categories.filter(c=>!c.hidden&&(c.role==='expense'||c.role==='both'));
  const choose=(names:string[],parent:string|null)=>{for(const name of names){const found=available.filter(c=>c.parentId===parent&&merchantKey(c.name)===merchantKey(name));if(found.length>1)return null;if(found[0])return found[0];}return null;};
+ if(recognition.service==='marketplace'){
+  const matches=available.filter(c=>isMarketplaceName(c.name)&&(c.parentId===null||available.some(p=>p.id===c.parentId&&p.parentId===null)));
+  if(matches.length>1)return null;
+  if(matches[0]){const c=matches[0];return {categoryId:c.parentId??c.id,subcategoryId:c.parentId?c.id:null,confidence:recognition.confidence};}
+ }
  const route=routes[recognition.service],category=choose(route.roots,null);if(!category)return null;
  let leaves=route.leaves;
  if(recognition.service==='grocery')leaves=recognition.confidence<90?['Прочие продукты']:recognition.delivery?['Доставка продуктов']:route.leaves;
  if(recognition.service==='cafe'&&recognition.delivery)leaves=['Доставка готовой еды'];
- else if(recognition.service==='cafe'&&!['Маковка','Буханка','Кофемания','Шоколадница','Кофикс','Даблби'].includes(recognition.name)&&!/kofeyn|coffee/u.test(merchantKey(recognition.name)))leaves=['Рестораны и кафе','Кафе и рестораны'];
- if(recognition.name==='Спортмастер')leaves=['Спортивные товары'];
+ else if(recognition.service==='cafe'&&!['Маковка','Буханка','Кофемания','Шоколадница','Кофикс','Даблби'].includes(recognition.brand??recognition.name)&&!/kofeyn|coffee/u.test(merchantKey(recognition.name)))leaves=['Рестораны и кафе','Кафе и рестораны'];
+ if(recognition.brand==='Спортмастер'||recognition.name==='Спортмастер')leaves=['Спортивные товары'];
  const sub=choose(leaves,category.id);
  return {categoryId:category.id,subcategoryId:sub?.id??null,confidence:recognition.confidence};
 }

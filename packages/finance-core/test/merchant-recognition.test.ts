@@ -9,11 +9,11 @@ const categories:Category[]=starterCategories.expense.flatMap(([name,...leaves])
 const classify=(merchant:string,description='Покупка '+merchant,c=categories)=>merchantCategory(recognizeMerchant(merchant,description),c);
 const operation=(merchant:string):Operation=>({id:'op',source:{accountId:'account',operationDate:{precision:'day',date:'2026-10-01'},postedDate:null,amountMinor:'-10000',currency:'RUB',merchantText:merchant,description:'Покупка '+merchant,bankCategory:'',bankRefHmac:null,versions:{sourceSanitizer:'bank-source/4'}},corrections:{},semantics:initialSemantics('purchase',merchant),comment:'Комментарий',analyticsOverride:'default',decomposition:false,reviewReasons:['possible_duplicate']});
 test('short names retain original source and recognizable Russian spelling, significant digits and unknown services',()=>{
- for(const [raw,name] of [['SPAR 349 Moscow Rus','SPAR'],['MAGNOLIYA MOSCOW RUS','Магнолия'],['Мострансспорт Москва Рус','Мостранспорт'],['SBER54,11 SAMOKAT SANKT-PETERBURG RUS','Самокат'],['timeweb.cloud Innopolis Rus','Таймвэб'],['Аптека 36,6 Москва Рус','Аптека 36,6'],['Яндекс Драйв Москва Рус','Яндекс Драйв'],['Сервисы Яндекса','Сервисы Яндекса'],['Незнакомый24','Незнакомый24']])assert.equal(recognizeMerchant(raw).name,name,raw);
+ for(const [raw,name] of [['SPAR 349 Moscow Rus','SPAR'],['MAGNOLIYA MOSCOW RUS','MAGNOLIYA'],['Мострансспорт Москва Рус','Мострансспорт'],['SBER54,11 SAMOKAT SANKT-PETERBURG RUS','SAMOKAT'],['timeweb.cloud Innopolis Rus','TimeWeb'],['Аптека 36,6 Москва Рус','Аптека 36,6'],['Яндекс Драйв Москва Рус','Яндекс Драйв'],['Сервисы Яндекса','Сервисы Яндекса'],['Незнакомый24','Незнакомый24']])assert.equal(recognizeMerchant(raw).name,name,raw);
  const op=operation('SPAR 349 Moscow Rus'),before=structuredClone(op),after=applyMerchantRecognition(op,categories);assert.deepEqual(op,before);assert.deepEqual(after.source,before.source);assert.equal(after.semantics.merchant.value,'SPAR');assert.equal(after.semantics.category.value,'Продукты');
 });
 test('shop identity is shared by deliveries and stores, delivery remains a separate category',()=>{
- for(const text of ['Доставка Пятёрочка','DOSTAVKA PYATEROCHKA','Покупка PYATEROCHKA DELIVERY']){const match=recognizeMerchant('',text);assert.equal(match.name,'Пятёрочка');assert.equal(merchantCategory(match,categories)?.subcategoryId,'Продукты/Доставка продуктов');}
+ for(const text of ['Доставка Пятёрочка','DOSTAVKA PYATEROCHKA','Покупка PYATEROCHKA DELIVERY']){const match=recognizeMerchant('',text);assert.ok(['Пятёрочка','PYATEROCHKA'].includes(match.name));assert.equal(merchantCategory(match,categories)?.subcategoryId,'Продукты/Доставка продуктов');}
  assert.equal(classify('Пятёрочка')?.subcategoryId,'Продукты/Магазины');assert.equal(classify('Самокат')?.subcategoryId,'Продукты/Доставка продуктов');assert.equal(classify('Доставка'),null);
 });
 test('activity synonyms and transliteration generalize beyond named brands; fuzzy words require review',()=>{
@@ -30,7 +30,7 @@ test('broad transport does not guess metro, operator and vending remain review s
  assert.equal(classify('МТС','Покупка МТС смартфон'),null);
 });
 test('marketplace catalog is user specific; broad Yandex and contradictory brands abstain',()=>{
- assert.equal(classify('Ozon')?.categoryId,'Прочие расходы');const custom=categories.concat([{id:'market',name:'Маркетплейсы',parentId:null,role:'expense',hidden:false}]);assert.equal(classify('Ozon','',custom)?.categoryId,'market');
+ assert.equal(classify('Ozon')?.categoryId,'Маркетплейсы');const custom=categories.filter(c=>c.name!=='Маркетплейсы').concat([{id:'market',name:'Маркетплейсы',parentId:null,role:'expense',hidden:false}]);assert.equal(classify('Ozon','',custom)?.categoryId,'market');
  for(const merchant of ['Сервисы Яндекса','Яндекс Go','SPARK','Магнитофон','Ozon DNS','Ресторан Аптека'])assert.equal(classify(merchant),null,merchant);
  assert.equal(classify('SPAR','',categories.map(c=>({...c,hidden:true}))),null);
 });
@@ -48,7 +48,7 @@ test('the public catalog has no conflicting aliases and each route uses the user
 
 test('a verified specialist brand wins over its general parent; unrelated merchants still conflict',()=>{
  for(const text of ['Магнит Косметик','MAGNIT KOSMETIK MOSCOW RUS','М.Косметик']){
-  const r=recognizeMerchant(text);assert.equal(r.name,'М.Косметик');assert.equal(classify(text)?.subcategoryId,'Красота и уход/Косметика и уход');
+  const r=recognizeMerchant(text);assert.ok(['Магнит Косметик','MAGNIT KOSMETIK','М.Косметик'].includes(r.name));assert.equal(classify(text)?.subcategoryId,'Красота и уход/Косметика и уход');
  }
  assert.equal(classify('Магнит')?.categoryId,'Продукты');assert.equal(classify('Магнит DNS'),null);
 });
@@ -56,4 +56,14 @@ test('veterinary services never receive the pet-food subcategory, even when the 
  for(const text of ['Ветклиника Север','VETKLINIKA SEVER','Ветеринарная клиника Уют'])assert.equal(classify(text)?.subcategoryId,'Питомцы/Ветеринар');
  const withoutLeaf=categories.filter(c=>c.name!=='Ветеринар');assert.equal(classify('Ветклиника Север','',withoutLeaf)?.subcategoryId,null);
  assert.equal(classify('Зоомагазин Север')?.subcategoryId,'Питомцы/Корм и товары');
+});
+
+test('bank alphabet and spelling survive simplification; TimeWeb is the explicit owner exception',()=>{
+ for(const [raw,expected] of [['PYATEROCHKA MOSCOW RUS','PYATEROCHKA'],['Пятёрочка Москва Рус','Пятёрочка'],['World Class Moscow Rus','World Class'],['DDX-FITNESS MOSCOW RUS','DDX-FITNESS'],['Timeweb.cloud Innopolis Rus','TimeWeb']])assert.equal(recognizeMerchant(raw).name,expected);
+ const without=categories.filter(c=>c.name!=='Маркетплейсы');assert.equal(classify('Ozon','',without)?.categoryId,'Прочие расходы');
+ const nested=without.concat([{id:'market-leaf',name:'Маркетплейсы',parentId:'Прочие расходы',hidden:false,role:'expense'}]);assert.deepEqual(classify('Ozon','',nested),{categoryId:'Прочие расходы',subcategoryId:'market-leaf',confidence:96});
+});
+
+test('simplification retains a concrete service on a broad platform and never transliterates an unfamiliar name',()=>{
+ assert.equal(recognizeMerchant('Yandex Go Taxi MOSCOW RUS').name,'Yandex Go Taxi');assert.equal(recognizeMerchant('UnknownBrand Москва Рус').name,'UnknownBrand');
 });
