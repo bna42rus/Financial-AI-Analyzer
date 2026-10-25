@@ -15,11 +15,11 @@ const protectedSources=new Set(['user','personal_rule','global_rule']);
 const brands=new Set<string>(Object.values(merchantNames));
 export type Decision={categoryId:string|null;subcategoryId:string|null;confidence:number};
 export type ClassificationPlan=ReturnType<typeof classificationPlan>;
-export const classificationEvidencePolicy='category-service-evidence/2';
+export const classificationEvidencePolicy='category-service-evidence/3';
 /** Broad platforms do not identify a purchased service. Generic retail MCCs
  * add no such evidence. Source clues can resolve ambiguity; model confidence cannot. */
 export function serviceEvidenceMissing(signal:{merchant:string|null;description?:string;bankCategory?:string;mcc?:string|null}){
- if(recognizeMerchant(signal.merchant??'',signal.description??'').conflict)return true;
+ if(recognizeMerchant(signal.merchant??'',signal.description??'',signal).conflict)return true;
  const name=signal.merchant?.normalize('NFKC').toLowerCase().replace(/ё/g,'е').trim()??'';
  if(!['яндекс go','ozon','wildberries','яндекс маркет'].some(base=>name===base||name.startsWith(base+' ')))return false;
  const specificMcc=signal.mcc&&!['0000','5311','5399','5999','5262'].includes(signal.mcc);
