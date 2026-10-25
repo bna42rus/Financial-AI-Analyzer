@@ -62,6 +62,9 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/finance-core/test/merchant-recognition.test.ts
+          packages/finance-core/test/grocery-recognition.test.ts
+          packages/analyzer/test/merchant-rule.test.ts
           packages/imports/test/bank-description.test.ts
           apps/api/test/classification-plan.test.ts
           apps/api/test/classification-smoke-support.test.ts

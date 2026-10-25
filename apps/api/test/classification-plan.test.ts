@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {classificationPlan,parseClassification,applyClassification,classificationSignal,classificationRequestSchema,digest,classificationVersion,classificationPrompt} from '../src/classification-plan.ts';
 import {createCloudAssistantModel} from '../src/assistant-transport.ts';
+import {applyMerchantRecognition} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,Operation} from '../../../packages/finance-core/src/model.ts';
 import {reconcile} from '../../../packages/finance-core/src/graph.ts';
@@ -101,4 +102,21 @@ test('observed broad-service error is blocked despite confidence 95; source-spec
  for(const merchant of ['Ozon','Wildberries','Яндекс Маркет']){o.source.merchantText=merchant;o.semantics=initialSemantics('purchase',merchant);plan=classificationPlan(g);assert.equal(parseClassification(wire,plan,plan.groups)[0]!.categoryId,null);}
  o.source={...o.source,merchantText:'Яндекс Go',description:'Покупка Яндекс Go такси',bankCategory:'Такси',sourceMcc:'4121',versions:{sourceSanitizer:'bank-source/4'}};o.semantics=initialSemantics('purchase','Яндекс Go');g.categories=[{id:'taxi',name:'Такси',role:'expense',parentId:null,hidden:false}];plan=classificationPlan(g);
  assert.equal(parseClassification(wire,plan,plan.groups)[0]!.categoryId,'taxi');
+});
+
+test('grocery homonyms and contradictory activities cannot be accepted from a confident model or old cache',()=>{
+ for(const [merchant,description,mcc] of [['Победа','Авиакомпания','4511'],['Гулливер','Магазин детской одежды','5641'],['METRO','Проезд','4111'],['Линия','',''],['Магнит','Аптека','5912']] as const){
+  const g=graph(),o=g.operations[0]!;o.source={...o.source,merchantText:merchant,description,sourceMcc:mcc||null,versions:{sourceSanitizer:'bank-source/4'}};o.semantics=initialSemantics('purchase',merchant);
+  const plan=classificationPlan(g);assert.equal(plan.groups.length,1,merchant);
+  assert.deepEqual(parseClassification(response(plan),plan,plan.groups)[0],{categoryId:null,subcategoryId:null,confidence:0},merchant);
+  o.semantics.category=facet('food','ai',false,99);assert.ok(classificationSignal(o,g),merchant);
+ }
+});
+
+test('structured food MCC resolves a homonym and is also respected by the deterministic pass',()=>{
+ for(const merchant of ['Гулливер','METRO','Победа','Линия','В1']){
+  const g=graph(),o=g.operations[0]!;o.source={...o.source,merchantText:merchant,description:'Покупка',sourceMcc:'5411',versions:{sourceSanitizer:'bank-source/4'}};o.semantics=initialSemantics('purchase',merchant);
+  const plan=classificationPlan(g);assert.equal(parseClassification(response(plan),plan,plan.groups)[0]!.categoryId,'food',merchant);
+  assert.equal(applyMerchantRecognition(o,g.categories).semantics.category.value,'food',merchant);
+ }
 });

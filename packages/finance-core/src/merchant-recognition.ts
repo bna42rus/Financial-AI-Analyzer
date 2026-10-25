@@ -1,3 +1,5 @@
+import {brandKeys,brandPattern} from './merchant-aliases.ts';
+import {groceryEvidence} from './grocery-evidence.ts';
 import {isMarketplaceName} from './starter.ts';
 import {facet} from './model.ts';
 import type {Operation,Category} from './model.ts';
@@ -8,34 +10,29 @@ const letters:Record<string,string>={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',�
 export const merchantKey=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/[а-яё]/gu,c=>letters[c]!).replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
 const words=(text:string)=>new Set(merchantKey(text).split(' '));
 const contains=(text:string,alias:string)=>(' '+text+' ').includes(' '+merchantKey(alias)+' ');
-const boundaryPattern=(alias:string)=>{
- const key=merchantKey(alias),escaped=key.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- // Branch digits may follow a complete brand. Never match SPAR inside SPARK.
- return new RegExp('(?:^| )'+escaped+'(?=$| |[0-9])');
-};
-const catalogPatterns=merchantCatalog.map(entry=>({entry,patterns:entry.aliases.map(boundaryPattern)}));
+const catalogPatterns=merchantCatalog.map(entry=>({entry,pattern:brandPattern(entry.aliases)}));
 const genericPrefixes=/^(?:(?:покупка(?: в)?|оплата(?: товаров и услуг| покупки| по карте| картой| в)?|возврат покупки|purchase|card payment|sber[ _-]*\d*(?:[,.]\d+)?|сбер[ _-]*\d*(?:[,.]\d+)?)[ :.*_-]+)+/iu;
 const locationTail=/(?:[ ,_*.-]+(?:moscow|moskva|москва|sankt[ -]?peterburg|saint[ -]?petersburg|санкт[ -]?петербург|innopolis|иннополис|rus|рус|russia|россия))+(?:[ ,_*.-]*)$/iu;
+const displayPatterns=new Map(merchantCatalog.map(entry=>{
+ const aliases=[...entry.aliases].sort((a,b)=>b.length-a.length).map(alias=>alias.normalize('NFKC').split(/[ ._-]+/u).map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[ ._-]*').replace(/[её]/gu,'[её]'));
+ return [entry,new RegExp('(?:^|[^\\p{L}\\p{N}])('+aliases.join('|')+')(?=$|[^\\p{L}\\p{N}]|[0-9]+(?=$|[^\\p{L}\\p{N}]))','iu')] as const;
+}));
 /** Preserve the spelling/alphabet of the bank's matched brand. Canonical
  * category identity remains independent; only TimeWeb is owner-approved here. */
 function bankBrandName(clean:string,entry:typeof merchantCatalog[number]):string{
  if(entry.name==='TimeWeb')return 'TimeWeb';
  if(entry.service==='unknown')return clean;
- for(const alias of [...entry.aliases].sort((a,b)=>b.length-a.length)){
-  const pattern=alias.normalize('NFKC').split(/[ ._-]+/u).map(w=>w.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[ ._-]*').replace(/е/gu,'[её]');
-  const found=new RegExp('(?:^|[^\\p{L}\\p{N}])('+pattern+')(?=$|[^\\p{L}]|[0-9])','iu').exec(clean);
-  if(found?.[1])return found[1];
- }
- return clean;
+ return displayPatterns.get(entry)?.exec(clean)?.[1]??clean;
 }
 export type MerchantRecognition={name:string;service:MerchantService|null;confidence:number;delivery:boolean;matched:boolean;conflict:boolean;brand?:string};
 /** Only merchant/service text: no dates, amounts, IDs or bank-city assumptions. */
-export function recognizeMerchant(merchant:string,description=''):MerchantRecognition{
+export function recognizeMerchant(merchant:string,description='',context:{mcc?:string|null;bankCategory?:string}={}):MerchantRecognition{
  const original=merchant.trim()||description.trim().replace(genericPrefixes,'');
  const clean=original.replace(genericPrefixes,'').replace(locationTail,'').trim(),key=merchantKey(clean);
  const base:MerchantRecognition={name:clean||original,service:null,confidence:0,delivery:false,matched:false,conflict:false};
  if(!key||/\b(?:perevod|transfer|sbp)\b/.test(merchantKey(description))&&!merchant)return base;
- const found=catalogPatterns.filter(e=>e.patterns.some(pattern=>pattern.test(key))).map(e=>e.entry);
+ const keys=brandKeys(clean);
+ const found=catalogPatterns.filter(e=>keys.some(k=>e.pattern.test(k))).map(e=>e.entry);
  // Specific Yandex services win over the broad platform; unrelated brands conflict.
  const specific=found.filter(e=>!found.some(other=>other.parentBrand===e.name));
  const unique=[...new Map(specific.map(e=>[e.name,e])).values()];
@@ -44,6 +41,10 @@ export function recognizeMerchant(merchant:string,description=''):MerchantRecogn
  const tokens=words(clean),full=merchantKey(description+' '+merchant);
  const delivery=/(?:^| )(?:dostavka|dostavki|delivery|dostavkaiz)(?: |$)/u.test(full);
  if(entry){
+  if(entry.service==='grocery'&&entry.groceryStore){
+   const evidence=groceryEvidence(entry,clean,description,context,!merchant.trim());
+   if(!evidence)return {...base,name:bankBrandName(clean,entry),brand:entry.name,matched:true,conflict:true};
+  }
   // Telecom brands also sell hardware; explicit different product evidence wins by abstention.
   const contradictory=entry.service==='telecom'&&/\b(?:smartfon|smartphone|noutbuk|notebook|televizor|strahovanie|kredit)\b/.test(full);
   return {name:bankBrandName(clean,entry),brand:entry.name,service:contradictory?null:entry.service,confidence:contradictory?0:entry.review?80:96,delivery:delivery||!!entry.delivery,matched:true,conflict:contradictory};
@@ -110,7 +111,7 @@ const protectedFacet=(f:{userVerified:boolean;source:string})=>f.userVerified||[
 export function applyMerchantRecognition(operation:Operation,categories:Category[]):Operation{
  const next=structuredClone(operation);
  if(next.source.versions.sourceSanitizer!=='bank-source/4')return next;
- const recognition=recognizeMerchant(next.source.merchantText,next.source.description);
+ const recognition=recognizeMerchant(next.source.merchantText,next.source.description,{mcc:next.source.sourceMcc,bankCategory:next.source.bankCategory});
  if(!protectedFacet(next.semantics.merchant)&&recognition.name&&next.source.merchantText)next.semantics.merchant=facet(recognition.name,'deterministic_system_rule',false,recognition.matched?recognition.confidence:80);
  const category=next.semantics.category,sub=next.semantics.subcategory;
  if(next.semantics.role.value!=='expense'||next.decomposition||protectedFacet(category)||protectedFacet(sub)||category.value!==null&&category.source==='deterministic_system_rule')return next;

@@ -145,7 +145,26 @@ test('known sanitized merchants use a recorded local pass with zero POSTs; curre
  assert.equal(after.summary.netExpensesMinor,before.summary.netExpensesMinor);
  assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
  const history=(await pg.owner.query('SELECT r.engine,a.before_facets,a.after_facets FROM finance.classification_assignment a JOIN finance.classification_run r ON (r.user_id,r.id)=(a.user_id,a.run_id)')).rows;
- assert.equal(history.length,2);assert.ok(history.every(r=>r.engine==='merchant-catalog/1'&&r.before_facets.merchant.value==='SPAR 349 Moscow Rus'&&r.after_facets.merchant.value==='SPAR'));
+ assert.equal(history.length,2);assert.ok(history.every(r=>r.engine==='merchant-catalog/2'&&r.before_facets.merchant.value==='SPAR 349 Moscow Rus'&&r.after_facets.merchant.value==='SPAR'));
  const status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.calls,0);assert.equal(status.applied,2);
  await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_assignment')).rows[0].n,2);
+});
+
+test('a declined food-shop name with structured grocery evidence is assigned locally without a model or source rewrite',async()=>{
+ await pg.owner.query("UPDATE finance.source_observation SET merchant_text='в Гулливере',description='Покупка в Гулливере',bank_category='Супермаркет',versions=versions || '{\"sourceSanitizer\":\"bank-source/4\"}'::jsonb WHERE user_id='first'");
+ await pg.owner.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',['first',JSON.stringify(initialSemantics('purchase','в Гулливере'))]);
+ const sourceBefore=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ const before=await state();await queue();await runClassificationStage(pg.finance,provider());const after=await state();
+ assert.equal(calls,0);assert.ok(after.operations.every(o=>o.classification.category.value===category&&o.classification.category.source==='global_rule'));
+ assert.equal(after.summary.netExpensesMinor,before.summary.netExpensesMinor);
+ assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,sourceBefore);
+ assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
+});
+
+test('a clothing-store homonym cannot receive the models confident food category',async()=>{
+ await pg.owner.query("UPDATE finance.source_observation SET merchant_text='Гулливер',description='Магазин детской одежды',bank_category='Одежда',versions=versions || '{\"sourceSanitizer\":\"bank-source/4\"}'::jsonb WHERE user_id='first'");
+ await pg.owner.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',['first',JSON.stringify(initialSemantics('purchase','Гулливер'))]);
+ await queue();await runClassificationStage(pg.finance,provider());const result=await state();
+ assert.equal(calls,1);assert.ok(result.operations.every(o=>o.classification.category.value===null&&o.reviewReasons.includes('low_category_confidence')));
+ assert.ok((await pg.owner.query("SELECT decision FROM finance.classification_cache WHERE user_id='first'")).rows.every(r=>r.decision.categoryId===null));
 });
