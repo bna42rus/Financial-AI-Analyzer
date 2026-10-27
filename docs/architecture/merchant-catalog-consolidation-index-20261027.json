@@ -1,5 +1,5 @@
 {
-  "schema": "cashneuro-catalog-consolidation/1",
+  "schema": "cashneuro-catalog-consolidation/2",
   "date": "2026-10-27",
   "baseline_commit": "d23fe6f27c58644db4acfe19f7af02f30e529bdc",
   "scope": "documentary inventory and traceability; no runtime/model tests",
@@ -233,46 +233,51 @@
       "section": "SPORT",
       "name": "Фитнес, спорт и спортивные товары",
       "inventory": "FS001–FS083; 832 формы",
-      "record_status": "PARTIAL_RECORD",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
       "document": "merchant-catalog-master-20261025.md",
       "locator": "Фитнес, спорт",
-      "note": "Состав/формы/FS-U01–U22 приняты. ST01–ST48 подготовлены, отдельная запись финального согласования не найдена."
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
     },
     {
       "section": "FREELANCE",
       "name": "Биржи фриланса и площадки исполнителей",
       "inventory": "FR01–FR10",
-      "record_status": "PARTIAL_RECORD",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
       "document": "merchant-catalog-master-20261025.md",
       "locator": "Межраздельный реестр бирж фриланса",
-      "note": "Исправление платформы ≠ ремонт/доход зафиксировано; FR-U01–U14 и FR-T01–T18 подготовлены, полное финальное согласование по записи не установлено."
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
     },
     {
       "section": "HOME",
       "name": "Жильё, ремонт и домашние услуги",
       "inventory": "HOME001–HOME061",
-      "record_status": "PARTIAL_RECORD",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
       "document": "merchant-catalog-master-20261025.md",
       "locator": "Жильё, ремонт",
-      "note": "Есть формы/24 правила/20 C и два плана: HOME-T01–T44, HT-HOME01–32. Сохраняются оба; подробная сверка ниже."
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
     },
     {
       "section": "FASHION",
       "name": "Одежда, обувь, аксессуары",
       "inventory": "FASH001–FASH097",
-      "record_status": "PARTIAL_RECORD",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
       "document": "merchant-catalog-master-20261025.md",
       "locator": "Одежда, обувь",
-      "note": "Все четыре части подготовлены: 28 U/34 C/48 T; master оставил проектные статусы и открытые решения. Не объявлять отсутствием работы."
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
     },
     {
       "section": "BEAUTY",
       "name": "Красота, косметика и уход",
       "inventory": "BEA001–BEA056",
-      "record_status": "PARTIAL_RECORD",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
       "document": "merchant-catalog-beauty-categories-20261026.md",
       "locator": "Предлагаемые категории по всем 56 записям",
-      "note": "Состав/формы в master; отдельный companion уже содержит 28 U/30 C/48 T. Старое «категории/тесты впереди» неверно как инвентарь."
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
     },
     {
       "section": "CONNECTIVITY",
@@ -354,6 +359,42 @@
       "document": "merchant-catalog-financial-events-20261027.md",
       "locator": "Все четыре пункта",
       "note": "24 E/42 U/44 C/96 T/14 P; 4 OPEN интеграции, 2 PEND. Принят «Ок дальше» 27.10.2026."
+    },
+    {
+      "section": "LOG",
+      "name": "Почта, курьерские службы и грузоперевозки",
+      "inventory": "LOG001–LOG022; 136 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-logistics-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    },
+    {
+      "section": "SVC",
+      "name": "Бытовые мастерские, химчистки и ремонт техники",
+      "inventory": "SVC001–SVC016; 90 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-household-services-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    },
+    {
+      "section": "PRF",
+      "name": "Юридические, бухгалтерские и документальные услуги",
+      "inventory": "PRF001–PRF016; 97 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-professional-services-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    },
+    {
+      "section": "OFF",
+      "name": "Офис, полиграфия, коворкинги и реклама",
+      "inventory": "OFF001–OFF027; 168 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-office-advertising-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
     }
   ],
   "approvals_recorded_now": [
@@ -946,8 +987,213 @@
       "constraint": "Категория продавца не меняет kind/role/link. Category confidence не доказывает владение, состав или экономический смысл."
     }
   ],
-  "pending_extraction_scope": "Only primary PEND rows in MP/ENT/EDU/TRV/PET/GFT/FIN source sections. Not the total PEND of all catalog documents; HIST/INT/conditional and old PEND remain in originals.",
-  "pending_profiles_scoped": [
+  "pending_extraction_scope": "Исторический снимок, не текущий backlog. Все явные PEND и HOME источники имеют конечные состояния в source-dispositions.",
+  "runtime_changes": false,
+  "paid_calls": 0,
+  "product_test_status": "NOT_RUN",
+  "external_personal_context": "Ранее недоступен; дополнительный поиск не нужен для нового решения по прямому поручению 27.10.2026.",
+  "compiled_corpus": {
+    "path": "docs/architecture/merchant-catalog-complete-20261027.md",
+    "source_count": 28,
+    "bytes": 2979585,
+    "sha256": "45cf1fb6626037375a10760bfb3e76a11f639bb160818b0dabf739b2a75197af",
+    "sources": [
+      {
+        "number": 1,
+        "path": "docs/architecture/merchant-catalog-master-20261025.md",
+        "bytes": 1101790,
+        "sha256": "7b1c42ba4e0a6a5429545b4aff26615f92f84474a6e540ad1898c6b28aff2350"
+      },
+      {
+        "number": 2,
+        "path": "docs/architecture/merchant-catalog-beauty-categories-20261026.md",
+        "bytes": 62016,
+        "sha256": "740423ce969d9cf85e85986b30ea9387dc6c4fe6d4e05924d98704b358aaf095"
+      },
+      {
+        "number": 3,
+        "path": "docs/architecture/merchant-catalog-telecom-20261026.md",
+        "bytes": 25099,
+        "sha256": "1e60429aafed997223810b1a2015b2d62606cda7c598db9e2b8c5af52e263049"
+      },
+      {
+        "number": 4,
+        "path": "docs/architecture/merchant-catalog-connectivity-list-20261026.md",
+        "bytes": 71792,
+        "sha256": "97ff69c25819885832dd06fc674cc653a03511e249c7ecab77175d2a4f6efdfd"
+      },
+      {
+        "number": 5,
+        "path": "docs/architecture/merchant-catalog-connectivity-spellings-20261026.md",
+        "bytes": 24204,
+        "sha256": "8e95fdf5a60d971d04dd60b747ec9ae39769446a03453c009847ea165c01a5b6"
+      },
+      {
+        "number": 6,
+        "path": "docs/architecture/merchant-catalog-connectivity-categories-20261026.md",
+        "bytes": 27851,
+        "sha256": "a7b00b1075665786e2caea7887dbb4534b2844d534ef77251f04d0c943df3a4a"
+      },
+      {
+        "number": 7,
+        "path": "docs/architecture/merchant-catalog-connectivity-checks-20261026.md",
+        "bytes": 34801,
+        "sha256": "c426678fc45dfc24f002695147ceefb7c01e9719d4b105a0a60a1d9274de7d87"
+      },
+      {
+        "number": 8,
+        "path": "docs/architecture/merchant-catalog-digital-list-20261026.md",
+        "bytes": 33410,
+        "sha256": "4c4a151289f8e89d720c821daf16bcc867bbd4fddffbf5a017d9ee489a1def80"
+      },
+      {
+        "number": 9,
+        "path": "docs/architecture/merchant-catalog-digital-spellings-20261027.md",
+        "bytes": 46422,
+        "sha256": "8a2330cdb77db6d7be316c0f2a86d0c57c0dd89367e816535e4086459f63c45d"
+      },
+      {
+        "number": 10,
+        "path": "docs/architecture/merchant-catalog-digital-categories-20261027.md",
+        "bytes": 57910,
+        "sha256": "ff2ee90ce90e0c0810aa6954d0bc5094977b5893cc14a74c56527b328527aec8"
+      },
+      {
+        "number": 11,
+        "path": "docs/architecture/merchant-catalog-digital-checks-20261027.md",
+        "bytes": 52632,
+        "sha256": "cffa6fe003bb254fc6844827d57e24a78fcfe905cbae771d4502a885756ed55c"
+      },
+      {
+        "number": 12,
+        "path": "docs/architecture/merchant-catalog-marketplaces-20261027.md",
+        "bytes": 168188,
+        "sha256": "f4f4f9489cc73d3db4f32f91e6489df9c8451f317d11a8f350c683f96fb3e369"
+      },
+      {
+        "number": 13,
+        "path": "docs/architecture/merchant-catalog-entertainment-20261027.md",
+        "bytes": 182256,
+        "sha256": "4bef0dbfbf5e2de2987b247bd172a001cc782d2f635d0e50ba1b123a9ae4d44c"
+      },
+      {
+        "number": 14,
+        "path": "docs/architecture/merchant-catalog-education-family-20261027.md",
+        "bytes": 158386,
+        "sha256": "421abef5b68f10cdcdafb14ea3a10fb609d02994d72c15cc282b395b3ce09d99"
+      },
+      {
+        "number": 15,
+        "path": "docs/architecture/merchant-catalog-travel-20261027.md",
+        "bytes": 172402,
+        "sha256": "c6539074bd63e012e34f5bdac3adf46457050b7653b72c45697e0b68b372f562"
+      },
+      {
+        "number": 16,
+        "path": "docs/architecture/merchant-catalog-animals-20261027.md",
+        "bytes": 162421,
+        "sha256": "7e878d7bed74083b970627d23227049d25b7482107725b3df11142a2ed6735f0"
+      },
+      {
+        "number": 17,
+        "path": "docs/architecture/merchant-catalog-gifts-charity-20261027.md",
+        "bytes": 152973,
+        "sha256": "7e3655429b248bbd3d39b65fe7f9e66f3bb22645a8453c32fea8d11402bb1361"
+      },
+      {
+        "number": 18,
+        "path": "docs/architecture/merchant-catalog-financial-events-20261027.md",
+        "bytes": 121983,
+        "sha256": "4b2b089ba6f20171adf8abfc0e6dd2c45b74627f5cc03fcf2e8cb82311632501"
+      },
+      {
+        "number": 19,
+        "path": "docs/architecture/categorization-owner-review-20261024.md",
+        "bytes": 15423,
+        "sha256": "8a4200eea87b5516a7bdad5a255c1cde96f7f320ae59f06c2ae21ff5a2a3eef8"
+      },
+      {
+        "number": 20,
+        "path": "docs/architecture/purchase-category-split-20261024.md",
+        "bytes": 8924,
+        "sha256": "2585e61957aa23177cc0872bc1866611334ac083874fdcd2095fb2ec7239a012"
+      },
+      {
+        "number": 21,
+        "path": "docs/architecture/merchant-recognition-20261024.md",
+        "bytes": 14130,
+        "sha256": "984af77b99f2191afb1d53f6a0e358211bab0b1aa7ee3d2f580d4f390dea2515"
+      },
+      {
+        "number": 22,
+        "path": "docs/architecture/merchant-recognition-audit-20261024.md",
+        "bytes": 10090,
+        "sha256": "f39877cba97e11edf80ee5aede2c77f1c6e3cb3277e3c85f6d98d3d450f3c626"
+      },
+      {
+        "number": 23,
+        "path": "docs/architecture/category-counterparty-structure.md",
+        "bytes": 13218,
+        "sha256": "d07fccb04aeeb6e681d214f580ff5a833c2f2daabc09540f23ae6100b02909de"
+      },
+      {
+        "number": 24,
+        "path": "docs/architecture/merchant-catalog-logistics-20261027.md",
+        "bytes": 42985,
+        "sha256": "c86bc1360481e1ea9b3f4c1187c6f4157b27ecbaac45ade93111d96a2b098a4a"
+      },
+      {
+        "number": 25,
+        "path": "docs/architecture/merchant-catalog-household-services-20261027.md",
+        "bytes": 38846,
+        "sha256": "f5973dfa9de2ba5f8301c35931f42b007e8e709f708e0f816d584e71918e6575"
+      },
+      {
+        "number": 26,
+        "path": "docs/architecture/merchant-catalog-professional-services-20261027.md",
+        "bytes": 40979,
+        "sha256": "9f445557e4d4590c8976412b280b32f890a0b07a1256afcade1f8eb08f522ab2"
+      },
+      {
+        "number": 27,
+        "path": "docs/architecture/merchant-catalog-office-advertising-20261027.md",
+        "bytes": 46457,
+        "sha256": "907002b4dcda56a9b4e84a94584f8a464ca85889ea47c63ce7ed336ab2f95dd8"
+      },
+      {
+        "number": 28,
+        "path": "docs/architecture/merchant-catalog-release-decisions-20261027.md",
+        "bytes": 66830,
+        "sha256": "6be598246a1b94a5d89b3ba603d5c75e8892223a181630dac8719c8a2c5e3d24"
+      }
+    ],
+    "status": "DOCUMENT_ONLY_NOT_RUNTIME",
+    "product_tests": "NOT_RUN"
+  },
+  "release_parent_commit": "a76d8c762a4b5c2bbeb4f98acd020e2bf14e9d2c",
+  "previous_record_statuses": {
+    "GROCERY": "APPROVED_BASELINE",
+    "DELIVERY": "APPROVED",
+    "FOOD": "APPROVED",
+    "TRANSPORT": "APPROVED",
+    "POWERBANK": "APPROVED",
+    "HEALTH": "APPROVED",
+    "SPORT": "PARTIAL_RECORD",
+    "FREELANCE": "PARTIAL_RECORD",
+    "HOME": "PARTIAL_RECORD",
+    "FASHION": "PARTIAL_RECORD",
+    "BEAUTY": "PARTIAL_RECORD",
+    "CONNECTIVITY": "APPROVED",
+    "DIGITAL": "APPROVED",
+    "MARKETPLACES": "APPROVED",
+    "ENTERTAINMENT": "APPROVED",
+    "EDUCATION": "APPROVED",
+    "TRAVEL": "APPROVED",
+    "PETS": "APPROVED",
+    "GIFTS": "APPROVED",
+    "FINANCIAL": "APPROVED"
+  },
+  "historical_pending_profiles_scoped": [
     {
       "profile": "MP033",
       "name": "Корпорация Центр",
@@ -1061,156 +1307,44 @@
       "activation": "BLOCKED"
     }
   ],
-  "runtime_changes": false,
-  "paid_calls": 0,
-  "product_test_status": "NOT_RUN",
-  "external_personal_context": "unavailable; no additional approval inferred",
-  "compiled_corpus": {
-    "path": "docs/architecture/merchant-catalog-complete-20261027.md",
-    "source_count": 23,
-    "bytes": 2715163,
-    "sha256": "569b8704570e8a2b1f0db854365f8d2f6a54fdfd022fef14bc5cc63bbeca66e6",
-    "sources": [
-      {
-        "number": 1,
-        "path": "docs/architecture/merchant-catalog-master-20261025.md",
-        "bytes": 1097571,
-        "sha256": "c0c82a9451723babee780e9257a5c12eb015260f9e41f6e637bad979c8003c09"
-      },
-      {
-        "number": 2,
-        "path": "docs/architecture/merchant-catalog-beauty-categories-20261026.md",
-        "bytes": 61292,
-        "sha256": "13d094961a23d336b37e562aa31dc704d76a9b40d234610e4db9b36ec9da758d"
-      },
-      {
-        "number": 3,
-        "path": "docs/architecture/merchant-catalog-telecom-20261026.md",
-        "bytes": 24341,
-        "sha256": "cfb3f5e0b7e258d2bfa17d0ee0a1870fdf18c76e03d95c92eed0420e89a74342"
-      },
-      {
-        "number": 4,
-        "path": "docs/architecture/merchant-catalog-connectivity-list-20261026.md",
-        "bytes": 71034,
-        "sha256": "9a7489a08c973b0c59212735d2a24bf563951138968db3e59b5ae98a836c54c6"
-      },
-      {
-        "number": 5,
-        "path": "docs/architecture/merchant-catalog-connectivity-spellings-20261026.md",
-        "bytes": 23446,
-        "sha256": "a66bded470f74e8d2c18ac0170c98d5bdf8e6dd194347620f9e6d664bc4e9390"
-      },
-      {
-        "number": 6,
-        "path": "docs/architecture/merchant-catalog-connectivity-categories-20261026.md",
-        "bytes": 27093,
-        "sha256": "a5bb2814aba429fefe561cf9ebe7474795f183e962cb826d93740c2ff5d4e38e"
-      },
-      {
-        "number": 7,
-        "path": "docs/architecture/merchant-catalog-connectivity-checks-20261026.md",
-        "bytes": 34043,
-        "sha256": "84c32e8be5ffd1b5fcf50147e63a17d3f88f932f36d2637d312a77842d888e75"
-      },
-      {
-        "number": 8,
-        "path": "docs/architecture/merchant-catalog-digital-list-20261026.md",
-        "bytes": 32652,
-        "sha256": "31915a86c69ef9185811bfd26f7275ea2274e4159c7e961f8a0effd00fe16d9e"
-      },
-      {
-        "number": 9,
-        "path": "docs/architecture/merchant-catalog-digital-spellings-20261027.md",
-        "bytes": 45664,
-        "sha256": "540fd7046c2fcb953aca11a82148997d16408595f4833e4da29d3eb952caa4ca"
-      },
-      {
-        "number": 10,
-        "path": "docs/architecture/merchant-catalog-digital-categories-20261027.md",
-        "bytes": 57152,
-        "sha256": "0376fc96e21494d4b6a67f1ffbdf04f4d9183376b42f32fde2c8f4cda7827124"
-      },
-      {
-        "number": 11,
-        "path": "docs/architecture/merchant-catalog-digital-checks-20261027.md",
-        "bytes": 51874,
-        "sha256": "099eab82b1be0fb7d7d0ce65af56cc19e4c23864195f24650c87e7cfde5fef25"
-      },
-      {
-        "number": 12,
-        "path": "docs/architecture/merchant-catalog-marketplaces-20261027.md",
-        "bytes": 167430,
-        "sha256": "8c29fbf348eabc161c029e07ab66f6d6feb1c5f7ae3bc80dabec1b5f70ecb6b1"
-      },
-      {
-        "number": 13,
-        "path": "docs/architecture/merchant-catalog-entertainment-20261027.md",
-        "bytes": 181498,
-        "sha256": "5bff657347b104a2a60b73599b3514bbf2c20c0573ee86b67edc2091b44e58d0"
-      },
-      {
-        "number": 14,
-        "path": "docs/architecture/merchant-catalog-education-family-20261027.md",
-        "bytes": 157628,
-        "sha256": "379f125c0ce655d204813c68f0d4bb6deefb51ea982f6991e8dd66707875a60e"
-      },
-      {
-        "number": 15,
-        "path": "docs/architecture/merchant-catalog-travel-20261027.md",
-        "bytes": 171644,
-        "sha256": "6fce00f84ca9509846714fa624b7ceb149dd9a123be80ae96aa2e16868d05758"
-      },
-      {
-        "number": 16,
-        "path": "docs/architecture/merchant-catalog-animals-20261027.md",
-        "bytes": 161663,
-        "sha256": "b48f06dc4ad75d8e4275e8ad9e543457c8c70f275d4818713baab19c004f3c6d"
-      },
-      {
-        "number": 17,
-        "path": "docs/architecture/merchant-catalog-gifts-charity-20261027.md",
-        "bytes": 152215,
-        "sha256": "d867b5e3da3b831ea49bebf16bbb71a9894255be55d1f1c8beb817dd5702d23d"
-      },
-      {
-        "number": 18,
-        "path": "docs/architecture/merchant-catalog-financial-events-20261027.md",
-        "bytes": 121225,
-        "sha256": "0bfa9ea6f3b56a06420aefd48ab672f0fbfbc361cd0b91e9eaefae82bcee84a7"
-      },
-      {
-        "number": 19,
-        "path": "docs/architecture/categorization-owner-review-20261024.md",
-        "bytes": 14665,
-        "sha256": "872969369e776df4698aa8cf22b5d99c22a536dbfbb30327cb7c42b474237c07"
-      },
-      {
-        "number": 20,
-        "path": "docs/architecture/purchase-category-split-20261024.md",
-        "bytes": 8166,
-        "sha256": "ebaf9b5993e19bc7938da83c412383f823d7cddb4a6b7b166a2b2622268013bf"
-      },
-      {
-        "number": 21,
-        "path": "docs/architecture/merchant-recognition-20261024.md",
-        "bytes": 13372,
-        "sha256": "655bcfc2997a334d2a34b57247201a4e3519f4459e040f8145ddea8312c8c0c9"
-      },
-      {
-        "number": 22,
-        "path": "docs/architecture/merchant-recognition-audit-20261024.md",
-        "bytes": 9332,
-        "sha256": "b1cb543546d246f7008e2a17f5737dc3977d84341c9d76e00e18d0668bf80253"
-      },
-      {
-        "number": 23,
-        "path": "docs/architecture/category-counterparty-structure.md",
-        "bytes": 12460,
-        "sha256": "1fdb90f5fd46640d3af66969fb9da0dbb1abcdf0e04ca27a0c640af61779f634"
-      }
+  "source_dispositions": {
+    "path": "docs/architecture/merchant-catalog-source-dispositions-20261027.json",
+    "records": 129,
+    "counts": {
+      "GENERIC_ACTIVITY_ONLY": 1,
+      "PROFILE_CONTEXT_ONLY": 33,
+      "PROFILE_CONFIRMED": 59,
+      "HISTORICAL_CONTEXT_ONLY": 6,
+      "EXCLUDED_FROM_ACTIVE_V1": 27,
+      "REF_PROFILE": 3
+    },
+    "decision_status": "ALL_ENUMERATED_RECORDS_RESOLVED",
+    "new_block_profiles": 81,
+    "sha256": "ed406829461c7b17411572e493f76c6a08a3250d5da8afcc1db1ab89983250c6"
+  },
+  "owner_scope_exclusions": [
+    {
+      "scope": "new_broker_and_investment_organization_catalog",
+      "status": "OUT_OF_SCOPE_BY_OWNER",
+      "date": "2026-10-27"
+    },
+    {
+      "scope": "expansion_of_existing_insurer_catalog",
+      "status": "OUT_OF_SCOPE_BY_OWNER",
+      "date": "2026-10-27"
+    }
+  ],
+  "record_resolution": {
+    "date": "2026-10-27",
+    "answer": "Нужно все закрыть не должно быть никаких пробелов, закрой.",
+    "sections": [
+      "SPORT",
+      "FREELANCE",
+      "HOME",
+      "FASHION",
+      "BEAUTY"
     ],
-    "status": "DOCUMENT_ONLY_NOT_RUNTIME",
-    "product_tests": "NOT_RUN"
+    "state": "RESOLVED_BY_OWNER_INSTRUCTION",
+    "historical_approval_not_invented": true
   }
 }
