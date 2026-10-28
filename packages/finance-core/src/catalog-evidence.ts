@@ -1,9 +1,10 @@
+import {extendedCatalogEvidence} from './extended-catalog.ts';
 import {merchantCatalog} from './merchant-catalog.ts';
 import type {MerchantEntry} from './merchant-catalog.ts';
 import {groceryEvidence} from './grocery-evidence.ts';
 import {literalIndex,catalogFold,hasLiteral,literalNegated} from './catalog-lexical.ts';
 export type CatalogInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null};
-export type CatalogEvidence={status:'recognized';entry:MerchantEntry;literal:string;target:string|null;parentOnly:boolean;provisional:boolean}|{status:'none'|'conflict'|'needs_context';reason:string};
+export type CatalogEvidence={status:'recognized';entry:MerchantEntry;literal:string;target:string|null;parentOnly:boolean;provisional:boolean;profileId?:string}|{status:'none'|'conflict'|'needs_context';reason:string};
 const aliases=literalIndex(merchantCatalog.map(entry=>({value:entry,forms:entry.aliases})));
 const serviceTargets:Readonly<Record<string,string>>={grocery:'grocery',cafe:'cafe',fitness:'fitness',public_transport:'public',carsharing:'carshare',powerbank:'powerbank',marketplace:'marketplace',cloud:'cloud',pharmacy:'pharmacy',fuel:'fuel',cinema:'events',books:'books',pets:'pet_goods',home:'home_goods',clothing:'clothes',electronics:'electronics',beauty:'salon',medical:'doctors',rail:'rail',air:'air',hotel:'hotel',education:'courses',cosmetics:'cosmetics',laboratory:'diagnostics',veterinary:'vet'};
 /** The already-active finite catalog only. New prose profiles stay inactive until
@@ -15,7 +16,10 @@ export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
  const entries=[...new Map(found.map(h=>[h.value.name,h.value])).values()];
  const specific=entries.filter(e=>!entries.some(other=>other.parentBrand===e.name));
  if(specific.length>1)return {status:'conflict',reason:'MULTIPLE_MERCHANT_PROFILES'};
- const entry=specific[0];if(!entry)return {status:'none',reason:'NO_CATALOG_PROFILE'};
+ const extended=extendedCatalogEvidence(input);
+ const entry=specific[0];if(!entry)return extended;
+ if(extended.status==='conflict'||extended.status==='needs_context')return extended;
+ if(extended.status==='recognized')return {status:'conflict',reason:'LEGACY_AND_EXTENDED_PROFILE_CONFLICT'};
  const literal=found.find(h=>h.value===entry)!.form;
  if(entry.groceryStore&&!groceryEvidence(entry,text,input.description,input,false))return {status:'conflict',reason:'GROCERY_PROFILE_CONTEXT_CONFLICT'};
  if(entry.name==='Энерго'&&!hasLiteral(text+' '+input.description,['пауэрбанк','powerbank','аренда зарядки','прокат зарядки']))return {status:'needs_context',reason:'ENERGO_SERVICE_NOT_ESTABLISHED'};
@@ -29,7 +33,7 @@ export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
 }
 /** Additional explicitly agreed broad service profiles. They do not identify a
  * company/payee or rename a merchant, and unknown Yandex is not Go. */
-export function serviceProfileDefault(text:string):{target:string;provisional:boolean}|null{
+export function serviceProfileDefault(text:string):{target:string;provisional:boolean;profileId?:string}|null{
  const positive=(forms:readonly string[])=>literalIndex([{value:true,forms}])(text).some(h=>!literalNegated(text,h));
  if(positive(['яндекс заправки','yandex zapravki']))return {target:'fuel',provisional:true};
  if(positive(['парковки россии','parkovki rossii']))return {target:'parking',provisional:true};

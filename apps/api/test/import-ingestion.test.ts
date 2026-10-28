@@ -506,3 +506,22 @@ test('/5 future Latin imports retain existing Cyrillic private predicates ahead 
  try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic existing private predicate'),rows:[row({localDescription:'Покупка PYATEROCHKA MOSCOW RUS',localMerchant:'PYATEROCHKA MOSCOW RUS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
  await accept(b!);await drain(b!.batchId);const op=await importedOperation();assert.equal(op.semantics.category.value,custom);assert.equal(op.semantics.category.source,'personal_rule');assert.equal(op.source.merchantText,'PYATEROCHKA MOSCOW RUS');assert.equal(op.semantics.merchant.value,'PYATEROCHKA MOSCOW RUS');assert.equal(op.source.description,'Покупка PYATEROCHKA MOSCOW RUS');
 });
+
+test('/5 NAME is a read-only view shared by state, detail, search and saved operation rows',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic NAME projection'),rows:[row({localDescription:'Покупка WORLDCLASS',localMerchant:'WORLDCLASS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);const original=await importedOperation(),observations=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,epoch=(await request('/finance/epoch')).json();
+ assert.equal(original.displayName.title,'World Class');assert.equal(original.semantics.merchant.value,'WORLDCLASS');assert.equal(original.source.merchantText,'WORLDCLASS');assert.equal(original.source.description,'Покупка WORLDCLASS');
+ const state=(await request('/finance/state')).json(),page=await request('/finance/operations-page',{query:{filter:{search:'World Class'}}});assert.equal(page.statusCode,200,page.body);assert.equal(page.json().total,1);
+ assert.deepEqual(state.operations[0].displayName,original.displayName);assert.deepEqual(page.json().operations[0].displayName,original.displayName);assert.equal(original.displayName.safeBankDescriptionRef.operationId,original.id);
+ assert.deepEqual((await request('/finance/epoch')).json(),epoch);assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,observations);
+ await command({kind:'operation',id:original.id,patch:{merchant:'Мой зал 24'}});const manual=await detail(original.id);assert.equal(manual.displayName.title,'Мой зал 24');assert.deepEqual(manual.source,original.source);
+ assert.equal((await request('/finance/operations-page',{query:{filter:{search:'Мой зал 24'}}})).json().total,1);
+ await command({kind:'delete_financial',scope:{kind:'operations',operationIds:[original.id]}});assert.equal((await request('/finance/operation',{id:original.id})).statusCode,404);assert.equal((await request('/finance/operations-page',{query:{filter:{search:'World Class'}}})).json().total,0);
+});
+test('/5 extended logistics assigns the actual separate service without disguising the bank wording as goods',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic parcel service'),rows:[row({localDescription:'Покупка B2CPL отправка посылки',localMerchant:'B2CPL',localMcc:'4215',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);const item=await importedOperation(),state=(await request('/finance/state')).json();assert.equal(state.categories.find((c:any)=>c.id===item.semantics.subcategory.value)?.name,'Прочий транспорт');assert.equal(item.displayName.title,'B2CPL');assert.equal(item.source.merchantText,'B2CPL');assert.equal(item.components.length,0);assert.equal(item.semantics.role.value,'expense');
+});

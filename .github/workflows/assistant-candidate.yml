@@ -63,6 +63,8 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/finance-core/test/operation-name.test.ts
+          packages/finance-core/test/extended-catalog.test.ts
           packages/finance-core/test/activity-recognition.test.ts
           packages/finance-core/test/rule-source-compatibility.test.ts
           packages/finance-core/test/merchant-recognition.test.ts
@@ -87,6 +89,7 @@ jobs:
           python3 scripts/compile-merchant-catalog.py --check
           python3 scripts/test-compile-merchant-catalog.py
           python3 scripts/compile-activity-runtime.py --check
+          python3 scripts/compile-name-runtime.py --check
       - name: Check Staging installation and rollback without changing a service
         run: |
           python3 scripts/test-inspect-assistant-staging.py

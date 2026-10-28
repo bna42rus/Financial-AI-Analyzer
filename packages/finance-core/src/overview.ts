@@ -80,8 +80,8 @@ export function calculateWidget(w:Widget,rows:OperationRow[],catalog:OverviewCat
     case 'kind':key=op.classification.kind.value;label=key;context={...f,kind:key};break;
     case 'role':key=p.role;label=key;context={...f,role:key};break;
     case 'counterparty':key=op.classification.counterparty.value??'no_counterparty';label=parties.get(key)??'Без контрагента';context={...f,...(op.classification.counterparty.value?{counterpartyIds:[key]}:{noCounterparty:true})};break;
-    case 'merchant':key=op.classification.merchant.value;label=key||'Без получателя';context={...f,merchant:key,merchantExact:true};break;
-    case 'operation':key=op.id;label=op.classification.merchant.value||'Операция';context={...f,operationIds:[key]};break;
+    case 'merchant':key=op.classification.merchant.value;label=op.displayName?.title||key||'Без получателя';context={...f,merchant:key,merchantExact:true};break;
+    case 'operation':key=op.id;label=op.displayName?.compositeLabel||op.classification.merchant.value||'Операция';context={...f,operationIds:[key]};break;
     case 'none':break;
    }
    insert(key,label,op,p,context);

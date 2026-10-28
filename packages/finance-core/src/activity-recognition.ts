@@ -7,7 +7,7 @@ import type {LiteralHit} from './catalog-lexical.ts';
 import {resolveOwnCategory,privateCategoryTarget} from './category-resolution.ts';
 import type {CategoryResolution,CategoryBindings} from './category-resolution.ts';
 import {recognizeCatalogEvidence,serviceProfileDefault} from './catalog-evidence.ts';
-export const activityEngineVersion='cashneuro-activity-catalog/1';
+export const activityEngineVersion='cashneuro-activity-catalog/2';
 export {activityDataSha256};
 export type ActivityInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null;kind:string;role:string};
 export type ActivityRecognition={status:'recognized'|'unrecognized'|'needs_context'|'conflict'|'delegate_fin';activityIds:string[];targetKey:string|null;confidence:number;provisional:boolean;parentOnly:boolean;fulfillment:'delivery'|'pickup'|'unspecified'|'conflict';reason:string;profileKey:string|null;privateLabels?:readonly string[]};
@@ -104,7 +104,7 @@ function route(a:ActivityDefinition,c:Context,all:readonly ActivityDefinition[],
 export function recognizeActivity(i:ActivityInput):ActivityRecognition{
  const c=sourceContext(i),method=fulfillment(c),result=(status:ActivityRecognition['status'],reason:string,ids:string[]=[],key:string|null=null,provisional=false,parentOnly=false,profileKey:string|null=null,privateLabels?:readonly string[]):ActivityRecognition=>({status,reason,activityIds:ids,targetKey:key,confidence:status==='recognized'?(provisional?80:96):0,provisional,parentOnly,fulfillment:method,profileKey,...(privateLabels?{privateLabels}:{})});
  if(i.role!=='expense'||['refund','reversal','transfer_in','transfer_out','own_transfer','credit_card_repayment','loan_payment','loan_disbursement','interest'].includes(i.kind))return result('delegate_fin','FINANCIAL_CONTEXT_REQUIRED');
- const catalog=recognizeCatalogEvidence({...i,merchantText:subjectText(i.merchantText),description:subjectText(i.description)}),profile=catalog.status==='recognized'?catalog:null,profileKey=profile?'legacy-catalog:'+profile.entry.name:null;
+ const catalog=recognizeCatalogEvidence({...i,merchantText:subjectText(i.merchantText),description:subjectText(i.description)}),profile=catalog.status==='recognized'?catalog:null,profileKey=profile?(profile.profileId?'catalog-v1:'+profile.profileId:'legacy-catalog:'+profile.entry.name):null;
  if(catalog.status==='conflict')return result('conflict',catalog.reason);
  const primary=find(subjectText(i.merchantText)),body=find(subjectText(i.description));
  const positive=(h:LiteralHit<ActivityDefinition>,text:string)=>{
@@ -153,7 +153,7 @@ export function recognizeActivity(i:ActivityInput):ActivityRecognition{
  const specific=serviceProfileDefault(subjectText(i.merchantText));
  if(specific){let key=specific.target;if(method==='delivery'&&key==='grocery')key='grocery_delivery';return result('recognized','KNOWN_SERVICE_PROFILE',[],key,specific.provisional,method==='conflict',profileKey);}
  if(profile?.target){let key=profile.target;if(profile.entry.delivery&&method!=='pickup'&&method!=='conflict'||method==='delivery'){if(key==='grocery')key='grocery_delivery';if(key==='cafe')key='meal_delivery';}return result('recognized','KNOWN_MERCHANT_PROFILE',[],key,profile.provisional,profile.parentOnly||method==='conflict',profileKey);}
- if(primary.length||body.length||find(i.merchantText).length||find(i.description).length||catalog.status==='needs_context')return result('needs_context','LITERAL_REQUIRES_CONTEXT');
+ if(profile||primary.length||body.length||find(i.merchantText).length||find(i.description).length||catalog.status==='needs_context')return result('needs_context','LITERAL_REQUIRES_CONTEXT');
  return result('unrecognized','NO_ACTIVITY_EVIDENCE');
 }
 const specialTargets={telecom_root:{key:'telecom_root',path:['Связь и интернет'],labels:['Связь и интернет','Связь']},telecom_other:{key:'telecom_other',path:['Связь и интернет','Прочая связь'],labels:['Прочая связь','Телефония']},education:{key:'education',path:['Образование','Обучение'],labels:['Обучение']},subscription_other:{key:'subscription_other',path:['Подписки и цифровые сервисы','Прочие подписки'],labels:['Прочие подписки']}};

@@ -13,7 +13,7 @@ export function cleanBankText(value:unknown,max=1000):string{
  const text=sanitizeText(labelled)
   .replace(/(?<![\p{L}\p{N}])(?:ИНН|БИК|СНИЛС|inn|bic|snils)\s*(?:№|:|=|#)?\s*\d[\d -]{2,}\d/giu,hidden)
   .replace(/(?<![\p{L}\p{N}])(?:карт[аы]|сч[её]т(?:а)?|договор|телефон|паспорт|card|account|contract|phone|passport)\s*(?:№|номер|number|:|=|#)?\s*(?=[+\d*хХxX])(?:[+\d*хХxX() -]{3,})/giu,hidden+' ')
-  .replace(/(?:\b(?:rrn|arn|auth|authorization|ref|reference|terminal|tid|mid|inn|snils|iban|bic|swift)\b|ИНН|СНИЛС|БИК|РРН|терминал|идентификатор|документ|код авторизации|авторизаци(?:я|и)|номер операции|номер документа|номер договора|номер сч[её]та|номер карты|код операции)\s*(?:№|:|=|#)?\s*[\p{L}\p{N}._\/-]+/giu,hidden)
+  .replace(/(?<![\p{L}\p{N}_])(?:\b(?:rrn|arn|auth|authorization|ref|reference|terminal|tid|mid|inn|snils|iban|bic|swift)\b|ИНН|СНИЛС|БИК|РРН|терминал|идентификатор|документ|код авторизации|авторизаци(?:я|и)|номер операции|номер документа|номер договора|номер сч[её]та|номер карты|код операции)(?=$|[^\p{L}_])\s*(?:№|no\.?|номер|number|:|=|#)?\s*[\p{L}\p{N}._\/-]+/giu,hidden)
   .replace(/\[реквизиты скрыты\]/g,hidden).replace(/(?:\[скрыто\]\s*){2,}/g,hidden+' ')
   .replace(/\s+/g,' ').trim();
  return text.slice(0,max).trim();

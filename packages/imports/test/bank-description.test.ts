@@ -65,3 +65,8 @@ test('contract number inflections are hidden without erasing transfer meaning or
  }
  for(const text of ['Перевод Иванову 1500 рублей за 2 билета','договор на услуги','договор подписан'])assert.equal(cleanBankText(text),text);
 });
+
+test('identifier labels require a word boundary and never eat ordinary Иннополис or bank-name words',()=>{
+ for(const name of ['Столовая Иннополис','Кафе Бикини 24','Иннополис','Документалистика','Терминалитет','FAMILY24'])assert.equal(cleanBankText(name),name);
+ for(const text of ['ИНН1234567890','ИНН: 1234567890','БИК 123456789','auth: ABC12345','терминал № SYN123456']){const clean=cleanBankText(text);assert.ok(clean.includes('[скрыто]'),text);assert.ok(!clean.includes('123456'),text);}
+});
