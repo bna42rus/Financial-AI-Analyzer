@@ -100,3 +100,13 @@
 :global([data-density="compact"]) .stat { padding:12px; }
 :global([data-density="compact"]) .topRow { padding:9px 0; }
 :global([data-density="compact"]) .chartRows { gap:10px; }
+/* CashNeuro: quiet surfaces, clear actions and readable financial data. */
+.header{padding-top:20px;gap:18px}.main{max-width:1280px;padding-top:30px}
+.button,.primaryButton,.iconButton{border-radius:var(--radius-control);min-height:42px;font-weight:550}
+.button:hover:not(:disabled),.iconButton:hover:not(:disabled){border-color:var(--color-primary);background:var(--color-soft)}
+.primaryButton:hover:not(:disabled){filter:brightness(.94)}
+.nav{gap:12px;padding-top:8px}.nav a,.nav button{padding:12px 14px;border-radius:10px 10px 0 0}.nav a[aria-current]{background:var(--color-soft)}
+.panel,.stat{border-radius:var(--radius-panel)}.panel{box-shadow:0 2px 10px var(--color-shadow)}
+.stat strong{font-variant-numeric:tabular-nums;letter-spacing:-.04em}.titleLine h1{font-weight:700;letter-spacing:-.04em}
+.dialog{border-radius:20px;max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain}.dialogHead{align-items:flex-start}.dialogHead h2{overflow-wrap:anywhere}
+@media(max-width:700px){.header{padding:14px 16px 0;gap:12px}.main{padding:20px 16px}.nav{gap:0;justify-content:space-between}.nav a{gap:5px;padding:12px 7px;font-size:13px}.button,.primaryButton,.iconButton{min-height:44px}.dialog{max-width:calc(100vw - 24px);padding:20px}}

@@ -1,6 +1,7 @@
+import {Brand} from './Brand';
 import { useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ArrowRight, ChartNoAxesCombined, CircleAlert, History, LayoutDashboard, List, Settings2, Sparkles, Upload, UserRound, X } from 'lucide-react';
+import { ArrowRight, CircleAlert, History, LayoutDashboard, List, Settings2, Sparkles, Upload, UserRound, X } from 'lucide-react';
 import { barPercent, createOverview, emptyFilters, formatDate, formatMoney, weekBuckets } from './demo/overview';
 import type { DemoOperation, OverviewFilters } from './demo/overview';
 import styles from './App.module.css';
@@ -88,7 +89,7 @@ export function App() {
   return <div className={styles.app}>
     <a className={styles.skip} href={`#${screen}`}>Перейти к содержимому</a>
     <header className={styles.header}>
-      <a href="#overview" onClick={event=>{event.preventDefault();navigate("overview");}} className={styles.brand}><span className={styles.brandMark}><ChartNoAxesCombined size={19} aria-hidden="true" /></span><span>Финансовый анализатор<span className={styles.brandNote}>Первая версия интерфейса</span></span></a>
+      <a href="#overview" className={styles.brand} onClick={event=>{event.preventDefault();navigate('overview');}} aria-label="CashNeuro — Финансовый анализатор"><Brand/></a>
       <div className={styles.headerActions}><a className={styles.button} href="#access">Получить доступ</a><button className={styles.primaryButton} onClick={()=>setModal('upload')} aria-label="Загрузить файлы"><Upload size={17} aria-hidden="true" /><span className={styles.uploadLabel}>Загрузить файлы</span></button><button className={styles.button} onClick={()=>setModal('profile')} aria-label="Профиль"><UserRound size={17} aria-hidden="true" /></button></div>
       <nav className={styles.nav} aria-label="Разделы сайта">
         <a href="#overview" onClick={event=>{event.preventDefault();navigate("overview");}} aria-current={screen==='overview'?'page':undefined}><LayoutDashboard size={17} aria-hidden="true" />Обзор</a>

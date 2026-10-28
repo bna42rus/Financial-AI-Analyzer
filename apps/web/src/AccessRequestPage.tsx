@@ -1,3 +1,4 @@
+import {Brand} from './Brand';
 import { useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Mail, ShieldCheck } from 'lucide-react';
 import { claimPayment, createAccessRequest, dateLabel, durationLabel, emptyAccessStore, moneyLabel, recordVerifiedEmail } from '../../../packages/access/src/model';
@@ -13,7 +14,7 @@ export function AccessRequestPage() {
   const visible = demoTariffs.filter(t => t.active && t.publicVisible && t.availableForNew);
   function reset() { setStore(emptyAccessStore()); setTariff(null); setError(''); setExample(false); }
   return <div className={styles.page}>
-    <header className={styles.header}><a href="#overview" className={styles.brand}>Финансовый анализатор</a><a href="#overview" className={styles.back}><ArrowLeft size={16} aria-hidden="true" /> К экранам приложения</a></header>
+    <header className={styles.header}><a href="#overview" className={styles.brand} aria-label="CashNeuro — Финансовый анализатор"><Brand/></a><a href="#overview" className={styles.back}><ArrowLeft size={16} aria-hidden="true" /> К экранам приложения</a></header>
     <main>
       <div className={styles.intro}><span className={styles.eyebrow}>Доступ по приглашению</span><h1>Начните с простой заявки</h1><p>Выберите период, подтвердите почту и отправьте заявку. После ручной проверки оплаты вы получите приглашение для регистрации.</p></div>
       <div className={styles.notice}><ShieldCheck size={21} aria-hidden="true" /><div><strong>Предварительный просмотр</strong><p>Заявки и письма ещё не подключены. Можно пройти тестовый сценарий: данные остаются в памяти страницы, оплата и отправка писем не выполняются. Цены и лимиты в примере не являются предложением.</p></div>{example && <button onClick={reset} className={styles.secondary}>Закрыть пример</button>}</div>

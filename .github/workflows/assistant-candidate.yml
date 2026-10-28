@@ -147,3 +147,13 @@ jobs:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
           ASSISTANT_UI_ASSET_MODE: built
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts test/operations-browser.test.ts test/catalog-settings-browser.test.ts
+      - name: Preserve synthetic interface evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cashneuro-workspace-previews
+          path: |
+            apps/api/workspace-previews/
+            apps/api/operations-previews/
+          if-no-files-found: ignore
+          retention-days: 7
