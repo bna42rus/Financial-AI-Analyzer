@@ -244,6 +244,8 @@ def install(args):
         selected.append(next(p for p in migrations if p.name.startswith('0030_')))
     if sql("SELECT position('textEvidence' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") != 't':
         selected.append(next(p for p in migrations if p.name.startswith('0031_')))
+    if sql("SELECT to_regclass('finance.category_binding') IS NOT NULL") != 't':
+        selected.append(next(p for p in migrations if p.name.startswith('0032_')))
     # Do not replace an existing account quota or change its entitlement.
     quota_sql = ''
     if user['quota'] is None:

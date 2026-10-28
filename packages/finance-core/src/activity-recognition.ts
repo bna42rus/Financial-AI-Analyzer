@@ -164,20 +164,20 @@ export function resolveActivityCategory(e:ActivityRecognition,categories:readonl
  return resolveOwnCategory(e.targetKey,categories,'expense',{bindings,parentOnly:e.parentOnly,...(target?{target}:{})});
 }
 const protectedFacet=(v:{userVerified:boolean;source:string})=>v.userVerified||['user','personal_rule','global_rule'].includes(v.source);
-export function activityDecision(operation:Operation,categories:readonly Category[]){
+export function activityDecision(operation:Operation,categories:readonly Category[],bindings?:CategoryBindings){
  const s=operation.source;
  if(s.versions.sourceSanitizer!=='bank-source/5')return null;
  if(s.versions.sourceTextEvidence!=='intact')return {evidence:null,resolution:{status:'missing',reason:'UNTRUSTED_LITERAL_BOUNDARIES'} as CategoryResolution};
  if(installmentPaymentEvidence(s))return {evidence:null,resolution:{status:'missing',reason:'INSTALLMENT_REQUIRES_FINANCIAL_MODEL'} as CategoryResolution};
  const evidence=recognizeActivity({merchantText:s.merchantText,description:s.description,bankCategory:s.bankCategory,mcc:s.sourceMcc,kind:operation.semantics.kind.value,role:operation.semantics.role.value});
- return {evidence,resolution:resolveActivityCategory(evidence,categories)};
+ return {evidence,resolution:resolveActivityCategory(evidence,categories,bindings)};
 }
 /** Only category facets of eligible whole operations. Source, money, merchant,
  * roles, user decisions and parts remain byte-equivalent. */
-export function applyActivityRecognition(operation:Operation,categories:readonly Category[]):Operation{
+export function applyActivityRecognition(operation:Operation,categories:readonly Category[],bindings?:CategoryBindings):Operation{
  const next=structuredClone(operation),s=next.semantics;
  if(next.decomposition||next.semantics.role.value!=='expense'||protectedFacet(s.category)||protectedFacet(s.subcategory)||s.category.value!==null&&s.category.source==='deterministic_system_rule')return next;
- const decision=activityDecision(next,categories);if(!decision?.evidence||decision.evidence.status!=='recognized'||decision.resolution.status!=='resolved')return next;
+ const decision=activityDecision(next,categories,bindings);if(!decision?.evidence||decision.evidence.status!=='recognized'||decision.resolution.status!=='resolved')return next;
  const {evidence,resolution}=decision;
  next.semantics.category=facet(resolution.categoryId,'global_rule',false,evidence.confidence);next.semantics.subcategory=facet(resolution.subcategoryId,'global_rule',false,evidence.confidence);
  if(evidence.provisional)next.reviewReasons=[...new Set([...next.reviewReasons,'low_category_confidence'])];else next.reviewReasons=next.reviewReasons.filter(r=>r!=='low_category_confidence');

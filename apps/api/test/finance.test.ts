@@ -28,6 +28,14 @@ async function append(amount:string,kind:Kind='purchase',transactionId:string|nu
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
+test('category binding preview is read-only, confirms/undoes atomically, remaps merges and rejects hidden targets',async()=>{
+ let w=await view();const root=w.categories.find((c:any)=>c.name==='Здоровье и спорт'&&!c.parentId),leaf=w.categories.find((c:any)=>c.name==='Аптеки'&&c.parentId===root.id),actionId=randomUUID(),input={actionId,generation:w.generation,revision:w.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:root.id,subcategoryId:leaf.id}};
+ const preview=await request('/finance/preview',input);assert.equal(preview.statusCode,200,preview.body);assert.deepEqual((await view()).categoryBindings,{});const applied=await request('/finance/commit',{actionId});assert.equal(applied.statusCode,200,applied.body);assert.deepEqual((await view()).categoryBindings.pharmacy,{categoryId:root.id,subcategoryId:leaf.id});
+ await command({kind:'undo',id:randomUUID(),value:actionId});assert.deepEqual((await view()).categoryBindings,{});await command(input.intent);
+ const custom=randomUUID();await command({kind:'category',id:custom,create:true,patch:{name:'Моя медицина',role:'expense',parentId:null,hidden:false}});await command({kind:'merge_categories',id:custom,sourceIds:[root.id]});w=await view();assert.equal(w.categoryBindings.pharmacy.categoryId,custom);assert.equal(w.categoryBindings.pharmacy.subcategoryId,leaf.id);
+ await command({kind:'category',id:leaf.id,patch:{hidden:true}});w=await view();assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:custom,subcategoryId:leaf.id}})).json().code,'CATEGORY_BINDING_INVALID');
+ await command({kind:'set_category_binding',targetKey:'pharmacy',categoryId:null,subcategoryId:null});assert.deepEqual((await view()).categoryBindings,{});
+});
 test('selected catalog categories are present only in new starters; existing users get authorized read-only preview, atomic commit and Undo',async()=>{
  const additions=['Аренда пауэрбанков','Спортивное питание','Техника и электроника','Стоматология','Оптика','Медицинские изделия'];let w=await view();for(const name of additions)assert.ok(w.categories.some((c:any)=>c.name===name));
  await pg.owner.query("DELETE FROM finance.category WHERE user_id='first' AND name=ANY($1::text[])",[additions]);w=await view();assert.ok(additions.every(name=>!w.categories.some((c:any)=>c.name===name)));const before=structuredClone(w.categories),id=randomUUID(),keys=['powerbank','sport_nutrition','electronics','dentistry','optics','medical_devices'];
@@ -120,7 +128,7 @@ test('bulk preview cannot commit after a new import or access expiry and does no
 });
 
 test('new workspace has starter categories, no invented transactions and scoped runtime roles',async()=>{
- const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,31);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
+ const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,32);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
  for(const pool of [pg.control,pg.mailControl,pg.mailFinance])await assert.rejects(pool.query('SELECT * FROM finance.transaction'),{code:'42501'});
  assert.equal((await control.fastify.inject({method:'GET',url:'/finance/state',headers:{cookie,origin:'https://admin.example.test'}})).statusCode,404);
 });

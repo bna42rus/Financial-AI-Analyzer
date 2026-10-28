@@ -15,7 +15,7 @@ export type Operation={id:string;source:BankFact;accountAssignmentId?:string;cor
 export type Component={id:string;transactionId:string;type:'principal'|'interest'|'fee'|'insurance'|'other';amountMinor:string;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>};
 export const linkKinds=['own_transfer','credit_card_repayment','refund','reversal','expense_reimbursement','debt_repayment'] as const;
 export type Link={id:string;sourceId:string;targetId:string;sourceComponentId:string|null;targetComponentId:string|null;sourceAllocationId?:string|null;targetAllocationId?:string|null;kind:typeof linkKinds[number];amountMinor:string;status:'candidate'|'confirmed'|'rejected';confidence:number;createdBy:Source};
-export type Graph={accounts:Account[];categories:Category[];operations:Operation[];components:Component[];links:Link[];loanMode:'cashflow'|'economic'};
+export type Graph={accounts:Account[];categories:Category[];operations:Operation[];components:Component[];links:Link[];loanMode:'cashflow'|'economic';categoryBindings?:Readonly<Record<string,{categoryId:string;subcategoryId:string|null}>>};
 export function facet<T>(value:T,source:Source='deterministic_system_rule',userVerified=false,confidence=100):Facet<T>{return {value,source,userVerified,confidence};}
 export function defaultRole(kind:Kind,amountMinor?:string):Role {
  if(kind==='interest'){const amount=amountMinor===undefined?0n:parsePersistedMinor(amountMinor);return amount>0n?'income':amount<0n?'expense':'unresolved';}

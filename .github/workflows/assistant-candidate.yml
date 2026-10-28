@@ -18,6 +18,7 @@ on:
       - 'packages/database/migrations/0029_bank_description.sql'
       - 'packages/database/migrations/0030_marketplace_catalog.sql'
       - 'packages/database/migrations/0031_merchant_source.sql'
+      - 'packages/database/migrations/0032_category_bindings.sql'
       - 'scripts/*assistant-staging*'
       - 'scripts/*connected-web*'
       - 'scripts/*staging-release*'
@@ -63,6 +64,7 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/finance-core/test/category-bindings.test.ts
           packages/finance-core/test/selected-categories.test.ts
           packages/finance-core/test/installment-contract.test.ts
           packages/finance-core/test/bank-calendar.test.ts

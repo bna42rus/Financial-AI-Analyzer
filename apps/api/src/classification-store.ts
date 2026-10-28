@@ -46,11 +46,11 @@ async function applyKnownMerchants(db:PoolClient,userId:string,graph:Awaited<Ret
   // Apply current personal rules before common merchant logic, including rules added while queued.
   const ruled=account?applyRules(op,account,rules):op;
   for(const key of ['kind','role','merchant','category','subcategory','counterparty'] as const)if(['kind','role','counterparty'].includes(key)||op.semantics[key].source==='user'||op.semantics[key].userVerified)(ruled.semantics as Record<string,unknown>)[key]=op.semantics[key];
-  return {op,next:applyMerchantRecognition(ruled,graph.categories)};
+  return {op,next:applyMerchantRecognition(ruled,graph.categories,graph.categoryBindings)};
  }).filter(({op,next})=>!isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons));
  if(!changes.length)return false;
  const batch=changes.slice(0,250);
- const id=randomUUID();await db.query("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,applied) VALUES($1,$2,$3,$4,$5,'completed',$6)",[userId,id,generation,batch.some(({op})=>op.source.versions.sourceSanitizer==='bank-source/5')?activityEngineVersion:merchantCatalogVersion,digest(graph.categories),batch.length]);
+ const id=randomUUID();await db.query("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,applied) VALUES($1,$2,$3,$4,$5,'completed',$6)",[userId,id,generation,batch.some(({op})=>op.source.versions.sourceSanitizer==='bank-source/5')?activityEngineVersion:merchantCatalogVersion,digest({categories:graph.categories,bindings:graph.categoryBindings}),batch.length]);
  for(const {op,next} of batch){
   await db.query('INSERT INTO finance.classification_assignment(user_id,id,transaction_id,run_id,before_facets,after_facets) VALUES($1,$2,$3,$4,$5,$6)',[userId,randomUUID(),op.id,id,JSON.stringify(op.semantics),JSON.stringify(next.semantics)]);
   await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,op.id,JSON.stringify(next.semantics),JSON.stringify(next.reviewReasons)]);

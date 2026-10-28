@@ -46,7 +46,7 @@ export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[]){
  // Known evidence with missing/ambiguous own categories or context must not
  // fall through to the old fuzzy/model path. Only genuinely unknown residuals
  // are model eligible; locked application re-planning repeats this gate.
- const activity=activityDecision(op,graph.categories);
+ const activity=activityDecision(op,graph.categories,graph.categoryBindings);
  if(activity&&activity.evidence?.status!=='unrecognized')return null;
  let details:ReturnType<typeof parseBankDescription>|null=null;
  if(op.source.versions.sourceSanitizer==='bank-source/5'&&op.source.versions.sourceTextEvidence!=='intact')return null;
@@ -61,7 +61,7 @@ export function classificationPlan(graph:Graph,rules:Rule[]=[]){
  const categories=graph.categories.filter(c=>!c.hidden&&(c.parentId===null||graph.categories.some(p=>p.id===c.parentId&&!p.hidden))).sort((a,b)=>a.id.localeCompare(b.id));
  if(categories.length>300)throw Error('CLASSIFICATION_CATALOG_TOO_LARGE');
  const catalog=categories.map((c,i)=>({ref:'c'+(i+1),name:safeText(c.name,160),role:c.role,parent:c.parentId===null?null:'c'+(categories.findIndex(p=>p.id===c.parentId)+1)}));
- const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,extendedCatalogSha256,installmentPolicyVersion,categories});
+ const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,extendedCatalogSha256,installmentPolicyVersion,categories,bindings:graph.categoryBindings});
  const groups=new Map<string,{signature:string;sortKey:string;signal:NonNullable<ReturnType<typeof classificationSignal>>;operationIds:string[]}>();
  for(const op of graph.operations){const signal=classificationSignal(op,graph,rules);if(!signal)continue;
   const signature=digest({version:classificationVersion,catalogHash,signal});

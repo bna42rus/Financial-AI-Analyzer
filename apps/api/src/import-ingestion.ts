@@ -143,7 +143,7 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
    const semantics=initialBankSemantics(fact,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);
-   const op=applyMerchantRecognition(applyFinancialRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories),graph.categories);
+   const op=applyMerchantRecognition(applyFinancialRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories),graph.categories,graph.categoryBindings);
    graph.operations.push(op);
    await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,transactionId,observationId,JSON.stringify(op.semantics),op.analyticsOverride,JSON.stringify(op.reviewReasons)]);
   }
@@ -155,7 +155,7 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
    if(row.safeSource){
     op.semantics=refreshBankSemantics(op.semantics,fact);
    }
-   const classified=applyMerchantRecognition(applyFinancialRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories),graph.categories);
+   const classified=applyMerchantRecognition(applyFinancialRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories),graph.categories,graph.categoryBindings);
    graph.operations[graph.operations.indexOf(current)]=classified;
    await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
   }

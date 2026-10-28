@@ -182,6 +182,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0030_marketplace_catalog.sql').read_text() + '\nCOMMIT;')
     if sql("SELECT position('textEvidence' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") == 'f':
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0031_merchant_source.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('finance.category_binding') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0032_category_bindings.sql').read_text() + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
