@@ -63,6 +63,7 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/finance-core/test/selected-categories.test.ts
           packages/finance-core/test/installment-contract.test.ts
           packages/finance-core/test/bank-calendar.test.ts
           packages/finance-core/test/financial-evidence.test.ts
@@ -140,4 +141,4 @@ jobs:
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
           ASSISTANT_UI_ASSET_MODE: built
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts test/operations-browser.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts test/operations-browser.test.ts test/catalog-settings-browser.test.ts

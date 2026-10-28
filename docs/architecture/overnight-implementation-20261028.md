@@ -55,3 +55,10 @@
 - Закрытая форма `strict-source/2` сохраняет наблюдённый offset, capability negotiated; прежний /1 поддержан. Unknown instant явно показывается по UTC с причиной проверки, не по Москве/profile travel. Источники с разными offsets получают конфликт; удаление конфликтующего observation восстанавливает оставшийся календарь. HMAC/строгий descriptor и одна transaction сохраняются.
 - Добавлена конечная `BLOCKED_UNSUPPORTED_CONTRACT` для явного неподдержанного outgoing installment; existing bank loan/card + compatible actual account и пользовательские решения сохраняются. Brand/adverb/категорийный split не создают договор.
 - Локальный полный check: 488 root, 83 web, 218 API unit PASS; types/spec/build PASS. PostgreSQL/HTTP additions подготовлены; окончательный CI будет по опубликованному SHA.
+
+### Шесть выбранных узлов
+
+- Новый starter содержит все шесть принятых категорий. Существующий workspace не обновляется при входе, чтении или классификации.
+- В настройках добавлен выбор → preview → explicit commit. Чистый общий planner переиспользует видимые совместимые own nodes/синонимы и общие родители; hidden/ambiguous пропускаются с причиной. Новые UUID выделяются один раз в canonical intent; source/части/правила не изменяются.
+- Обычная серверная authority/lock/generation/revision, история и Undo; frontend не назначает права через IDs. HTTP проверки и отдельные desktop/mobile сценарии включены в CI.
+- Локальный полный check: 495 root, 83 web, 218 API unit PASS; spec/types/build PASS. Итоговый PostgreSQL/browser результат фиксируется по текущему опубликованному SHA.
