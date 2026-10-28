@@ -17,6 +17,7 @@ on:
       - 'packages/imports/**'
       - 'packages/database/migrations/0029_bank_description.sql'
       - 'packages/database/migrations/0030_marketplace_catalog.sql'
+      - 'packages/database/migrations/0031_merchant_source.sql'
       - 'scripts/*assistant-staging*'
       - 'scripts/*connected-web*'
       - 'scripts/*staging-release*'

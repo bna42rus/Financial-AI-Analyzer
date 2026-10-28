@@ -458,3 +458,26 @@ test('/5 HTTP source preserves a translation business and keeps a real incoming 
  assert.equal(business.source.merchantText,'Бюро переводов Север');assert.equal(transfer.source.merchantText,'');assert.equal(transfer.source.description,'Входящий перевод Иван Петров');assert.equal(transfer.semantics.role.value,'unresolved');
  assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
 });
+
+test('/5 capability and acceptance wait for the storage migration; old source formats remain supported',async()=>{
+ const {readFile}=await import('node:fs/promises'),{merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const legacyMigration=await readFile(new URL('../../../packages/database/migrations/0029_bank_description.sql',import.meta.url),'utf8');
+ const nextMigration=await readFile(new URL('../../../packages/database/migrations/0031_merchant_source.sql',import.meta.url),'utf8');
+ await pg.owner.query(legacyMigration);
+ try{
+  const c=await context();assert.equal(c.sourceProfiles?.includes(merchantSourceSanitizer),false);
+  const local=await createLocalPreparation(c,undefined,localBankAdapter,merchantSourceSanitizer);let prepared:PreparedBatch;
+  try{prepared=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic schema-capability test'),rows:[row({localDescription:'Покупка Аптека Ромашка',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+  const refused=await request('/finance/import-accept',prepared);assert.equal(refused.statusCode,503,refused.body);assert.equal(refused.json().code,'IMPORT_SOURCE_PROFILE_UNAVAILABLE');assert.equal((await counts()).ingestion_batch,0);
+  await pg.owner.query(nextMigration);assert.equal((await context()).sourceProfiles?.includes(merchantSourceSanitizer),true);
+  await accept(prepared);await drain(prepared.batchId);
+  const saved=(await pg.owner.query("SELECT id,source_evidence FROM finance.ingestion_row WHERE user_id='first' AND source_evidence IS NOT NULL")).rows[0];
+  for(const flag of [null,false,0,{},'safe','']){
+   const bad=structuredClone(saved.source_evidence);bad.details.textEvidence=flag;
+   await assert.rejects(pg.owner.query('UPDATE finance.ingestion_row SET source_evidence=$2 WHERE id=$1',[saved.id,JSON.stringify(bad)]),(e:any)=>e.code==='23514');
+  }
+  const extra={...saved.source_evidence,details:{...saved.source_evidence.details,raw:'forbidden'}};
+  await assert.rejects(pg.owner.query('UPDATE finance.ingestion_row SET source_evidence=$2 WHERE id=$1',[saved.id,JSON.stringify(extra)]),(e:any)=>e.code==='23514');
+  assert.deepEqual((await pg.owner.query('SELECT source_evidence FROM finance.ingestion_row WHERE id=$1',[saved.id])).rows[0].source_evidence,saved.source_evidence);
+ }finally{await pg.owner.query(nextMigration);}
+});

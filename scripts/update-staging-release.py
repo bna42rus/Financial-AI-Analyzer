@@ -180,7 +180,9 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             sql('BEGIN;\n' + (source / 'packages/database/migrations/0029_bank_description.sql').read_text() + '\nCOMMIT;')
     if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='marketplace_catalog_initialized')") == 'f':
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0030_marketplace_catalog.sql').read_text() + '\nCOMMIT;')
-    print('1/3: сохранены настройки отката и резервная копия тестовой БД.' if enable_classification else '1/3: сохранена конфигурация отката; ключ, лимиты и БД остаются прежними.', flush=True)
+    if sql("SELECT position('textEvidence' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") == 'f':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0031_merchant_source.sql').read_text() + '\nCOMMIT;')
+    print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
         for name in ['.'] + dirs + files:

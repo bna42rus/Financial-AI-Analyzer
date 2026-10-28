@@ -32,5 +32,17 @@
     "NAME-I05": "NEW_VERSION_5_SOURCE_FIX_NOT_HISTORICAL_REWRITE",
     "OTHER_NAME_FIN": "NOT_CLOSED_BY_THIS_STEP"
   },
-  "rollout_gate": "BACKEND_ROLLBACK_TARGET_MUST_SUPPORT_VERSION_5_OBSERVATIONS"
+  "rollout_gate": "BACKEND_ROLLBACK_TARGET_MUST_SUPPORT_VERSION_5_OBSERVATIONS",
+  "storage_migration": "0031_merchant_source.sql",
+  "storage_gate": "VERSION_5_NOT_ADVERTISED_OR_ACCEPTED_BEFORE_CLOSED_EVIDENCE_CONSTRAINT",
+  "first_ci": {
+    "run_id": 40667182044,
+    "software": "PASS",
+    "postgres_http": {
+      "passed": 179,
+      "failed_new_cases": 2,
+      "reason": "finite_source_evidence did not accept the new closed marker",
+      "correction": "Add 0031, include fixtures/installers, storage capability and negative SQL assertions; rerun required"
+    }
+  }
 }

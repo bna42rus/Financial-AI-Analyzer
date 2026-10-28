@@ -15,6 +15,7 @@ import {prepareFinance,loadFinance,withPreparedImport} from './finance.ts';
 import {canonicalAccount} from './finance-structure.ts';
 import {stableJSON} from './finance-history.ts';
 import {HttpError} from './types.ts';
+import {merchantSourceStorageAvailable} from './import-profiles.ts';
 
 export const IMPORT_CHUNK=50;
 const bankNames:Record<Bank,string>={tbank:'Т-Банк',ozon:'Ozon Банк',sber:'Сбербанк',other:'Другой банк'};
@@ -27,6 +28,7 @@ export async function acceptImport(db:PoolClient,userId:string,input:unknown){
   const state=await prepareFinance(db,userId);
   if(context.generation!==state.generation||context.keyVersion!==state.key_version)throw new HttpError(409,'IMPORT_CONTEXT_CHANGED');
   const {batch}=validatePreparedBatch(input);
+  if(batch.versions.sanitizer===merchantSourceSanitizer&&!await merchantSourceStorageAvailable(db))throw new HttpError(503,'IMPORT_SOURCE_PROFILE_UNAVAILABLE');
   const digest=createHash('sha256').update(stableJSON({...batch,context:{generation:context.generation,keyVersion:context.keyVersion}})).digest('hex');
   const previous=(await db.query('SELECT request_digest FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,batch.batchId])).rows[0];
   if(previous){if(previous.request_digest!==digest)throw new HttpError(409,'IMPORT_BATCH_REUSED');return importReport(db,userId,batch.batchId);}

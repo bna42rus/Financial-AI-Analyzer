@@ -242,6 +242,8 @@ def install(args):
     selected = [next(p for p in migrations if p.name.startswith(str(n).zfill(4) + '_')) for n in range(24 + start, 28)]
     if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='marketplace_catalog_initialized')") == 'f':
         selected.append(next(p for p in migrations if p.name.startswith('0030_')))
+    if sql("SELECT position('textEvidence' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") != 't':
+        selected.append(next(p for p in migrations if p.name.startswith('0031_')))
     # Do not replace an existing account quota or change its entitlement.
     quota_sql = ''
     if user['quota'] is None:
