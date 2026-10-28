@@ -2,11 +2,13 @@ import {assertComponentSum,parsePersistedMinor,sumMinor} from './money.ts';
 import {effective,operationDay} from './model.ts';
 import {allocationOrder,allocationParents} from './allocation-graph.ts';
 import {effectiveFinancialRole} from './financial-evidence.ts';
+import {calendarKnown} from './bank-calendar.ts';
+import {assessInstallmentContract} from './installment-contract.ts';
 import type {Graph,Operation,Facet,Role,Link} from './model.ts';
 
 type Node={id:string;operation:Operation;componentId:string|null;amount:bigint;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;allocationId?:string|null;basis?:string[]};
 export type Part={id:string;componentId:string|null;allocationId:string|null;amountMinor:string;role:Role;categoryId:string|null;subcategoryId:string|null;basis:string[];included:boolean};
-export type Projection={id:string;date:ReturnType<typeof effective>['operationDate'];accountId:string;amountMinor:string;analyticsRole:Role|'mixed';parts:Part[];reviewReasons:string[];decompositionActive:boolean;unresolvedMinor:string;neutralMinor:string;excludedMinor:string};
+export type Projection={id:string;date:ReturnType<typeof effective>['operationDate'];accountId:string;amountMinor:string;analyticsRole:Role|'mixed';parts:Part[];reviewReasons:string[];decompositionActive:boolean;unresolvedMinor:string;neutralMinor:string;excludedMinor:string;financialContract?:{status:'BLOCKED_UNSUPPORTED_CONTRACT';reason:'INSTALLMENT_MODEL_REQUIRED'}};
 export type LinkOutcome={id:string;active:boolean;reason:string|null};
 const abs=(n:bigint)=>n<0n?-n:n;
 const family=(l:Link)=>['refund','expense_reimbursement','reversal'].includes(l.kind)?'return':l.kind;
@@ -27,6 +29,12 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
  for(const op of graph.operations){
   const fact=effective(op),amount=parsePersistedMinor(fact.amountMinor),parts=components.get(op.id)??[];
   reasons.set(op.id,new Set(op.reviewReasons));
+  if(!calendarKnown(fact.operationDate))addReason(op.id,'source_timezone_unknown');
+  if(fact.postedDate&&!calendarKnown(fact.postedDate))addReason(op.id,'posted_timezone_unknown');
+  if(!op.corrections.operationDate&&op.source.versions.operationCalendarEvidence==='conflict')addReason(op.id,'source_timezone_conflict');
+  if(!Object.hasOwn(op.corrections,'postedDate')&&op.source.versions.postedCalendarEvidence==='conflict')addReason(op.id,'posted_timezone_conflict');
+  const contract=assessInstallmentContract(op,accounts.get(fact.accountId));
+  if(contract.status==='BLOCKED_UNSUPPORTED_CONTRACT')addReason(op.id,'unsupported_installment_contract');
   if(!accounts.has(fact.accountId))throw new TypeError('MISSING_ACCOUNT');
   let base:Node[];
   if(op.decomposition){
@@ -38,6 +46,7 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
    catch {addReason(op.id,'component_conflict');base=[{id:op.id+':root',operation:op,componentId:null,amount,role:{...op.semantics.role,value:'unresolved',userVerified:false},category:op.semantics.category,subcategory:op.semantics.subcategory}];}
   } else {
    let role=effectiveFinancialRole(op);
+   if(contract.status==='BLOCKED_UNSUPPORTED_CONTRACT')role={...role,value:'unresolved'};
    if(op.semantics.kind.value==='loan_payment'&&!role.userVerified&&(accounts.get(fact.accountId)!.loanMode??graph.loanMode)==='economic') {role={...role,value:'unresolved'};addReason(op.id,'incomplete_credit_data');}
    base=[{id:op.id+':root',operation:op,componentId:null,amount,role,category:op.semantics.category,subcategory:op.semantics.subcategory}];
   }
@@ -136,7 +145,8 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
   if(['transfer_in','transfer_out'].includes(op.semantics.kind.value)&&output.some(p=>p.role==='unresolved'))addReason(op.id,'unresolved_transfer');
   assertComponentSum(parsePersistedMinor(fact.amountMinor),output.map(p=>parsePersistedMinor(p.amountMinor)));
   const roles=[...new Set(output.map(p=>p.role))];
-  result.push({id:op.id,date:fact.operationDate,accountId:fact.accountId,amountMinor:fact.amountMinor,analyticsRole:roles.length>1?'mixed':roles[0]!,parts:output,reviewReasons:[...reasons.get(op.id)!].sort(),decompositionActive:op.decomposition||output.length>1,unresolvedMinor:unresolved.toString(),neutralMinor:neutral.toString(),excludedMinor:excluded.toString()});
+  const contract=assessInstallmentContract(op,accounts.get(fact.accountId));
+  result.push({id:op.id,date:fact.operationDate,accountId:fact.accountId,amountMinor:fact.amountMinor,analyticsRole:roles.length>1?'mixed':roles[0]!,parts:output,reviewReasons:[...reasons.get(op.id)!].sort(),decompositionActive:op.decomposition||output.length>1,unresolvedMinor:unresolved.toString(),neutralMinor:neutral.toString(),excludedMinor:excluded.toString(),...(contract.status==='BLOCKED_UNSUPPORTED_CONTRACT'?{financialContract:contract}:{})});
  }
  return {operations:result,links:graph.links.map(l=>({id:l.id,active:l.status==='confirmed'&&!invalid.has(l.id),reason:invalid.get(l.id)??null}))};
 }

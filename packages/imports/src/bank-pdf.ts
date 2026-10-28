@@ -36,7 +36,7 @@ function sourceDate(value:string,moscow:boolean):BankDate{
  const date=calendar(m[1]!);if(!m[2])return {precision:'day',date};
  const time=m[2].length===5?m[2]+':00':m[2];if(!/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(time))throw new TypeError('INVALID_DATE');
  if(!moscow)return {precision:'day',date};
- return dateFact({precision:'instant',instant:new Date(`${date}T${time}+03:00`).toISOString()});
+ return dateFact({precision:'instant',instant:new Date(`${date}T${time}+03:00`).toISOString(),sourceOffsetMinutes:180});
 }
 /** Exact decimal conversion. An absent amount never becomes zero. */
 export function pdfMoney(input:string,unsignedDebit=false){

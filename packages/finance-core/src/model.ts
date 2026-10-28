@@ -5,7 +5,7 @@ export type Kind=typeof kinds[number];
 export type Role='expense'|'income'|'neutral'|'unresolved';
 export type Source='user'|'personal_rule'|'deterministic_system_rule'|'global_rule'|'ai'|'bank';
 export type Facet<T>={value:T;source:Source;confidence:number;userVerified:boolean;ruleId?:string};
-export type BankDate={precision:'day';date:string}|{precision:'instant';instant:string};
+export type BankDate={precision:'day';date:string}|{precision:'instant';instant:string;sourceOffsetMinutes?:number|null};
 export type Account={id:string;bankId:string;name:string;type:'debit_card'|'credit_card'|'bank_account'|'loan'|'savings'|'deposit'|'other';analyticsEnabled:boolean;defaultVisible:boolean;loanMode:'cashflow'|'economic'|null;mergedIntoId?:string|null};
 export type Category={id:string;name:string;parentId:string|null;role:'expense'|'income'|'both';hidden:boolean};
 export type Semantics={kind:Facet<Kind>;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;merchant:Facet<string>;counterparty:Facet<string|null>};
@@ -31,12 +31,17 @@ export function object(value:unknown,keys:string[]):Record<string,unknown>{
 export function choice<const T extends string>(value:unknown,values:readonly T[]):T {if(typeof value!=='string'||!values.includes(value as T))throw new TypeError('INVALID_VALUE');return value as T;}
 export function uuid(value:unknown):string {if(typeof value!=='string'||!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value))throw new TypeError('INVALID_ID');return value.toLowerCase();}
 export function dateFact(value:unknown):BankDate {
- const r=object(value,['precision','date','instant']);
+ const r=object(value,['precision','date','instant','sourceOffsetMinutes']);
  if(r.precision==='day'&&Object.keys(r).length===2&&typeof r.date==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(r.date)&&Number.isFinite(Date.parse(r.date))&&new Date(r.date).toISOString().slice(0,10)===r.date)return {precision:'day',date:r.date};
- if(r.precision==='instant'&&Object.keys(r).length===2&&typeof r.instant==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(r.instant)&&Number.isFinite(Date.parse(r.instant))){const d=new Date(r.instant).toISOString();if(d===r.instant||d.replace('.000Z','Z')===r.instant)return {precision:'instant',instant:d};}
+ if(r.precision==='instant'&&!('date'in r)&&Object.keys(r).length===('sourceOffsetMinutes'in r?3:2)&&typeof r.instant==='string'&&/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(r.instant)&&Number.isFinite(Date.parse(r.instant))){
+  if('sourceOffsetMinutes'in r&&r.sourceOffsetMinutes!==null&&(typeof r.sourceOffsetMinutes!=='number'||!Number.isInteger(r.sourceOffsetMinutes)||Math.abs(r.sourceOffsetMinutes)>840))throw new TypeError('INVALID_DATE');
+  const d=new Date(r.instant).toISOString();if(d===r.instant||d.replace('.000Z','Z')===r.instant)return {precision:'instant',instant:d,...('sourceOffsetMinutes'in r?{sourceOffsetMinutes:r.sourceOffsetMinutes as number|null}:{})};
+ }
  throw new TypeError('INVALID_DATE');
 }
-export function operationDay(date:BankDate):string {return date.precision==='day'?date.date:new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(date.instant));}
+/** Source-local when known. Unknown-zone instants use an explicitly reviewable
+ * UTC reference day, never an invented Moscow/profile/travel timezone. */
+export function operationDay(date:BankDate):string {return date.precision==='day'?date.date:new Date(Date.parse(date.instant)+(date.sourceOffsetMinutes??0)*60000).toISOString().slice(0,10);}
 export function correction(value:unknown):Corrections {
  const r=object(value,['accountId','operationDate','postedDate','amountMinor']),out:Corrections={};
  if('accountId'in r)out.accountId=uuid(r.accountId);

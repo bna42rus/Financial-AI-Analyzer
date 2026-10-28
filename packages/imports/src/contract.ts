@@ -8,7 +8,8 @@ import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 /** A deliberately text-free first preparation profile, not a bank parser. */
 export const versions=Object.freeze({pipeline:'local-prepare/1',normalizer:'strict-source/1',sanitizer:'text-free/1',hmac:'namespaced-hmac/1',adapter:'source-adapter/1'} as const);
 export const adapterVersions=['source-adapter/1','bank-pdf/1','bank-pdf/2',localBankAdapter] as const;
-export type ProcessingVersions=Omit<typeof versions,'adapter'|'sanitizer'>&{adapter:typeof adapterVersions[number];sanitizer:typeof versions.sanitizer|typeof sourceProfiles[number]};
+export const normalizerVersions=['strict-source/1','strict-source/2'] as const;
+export type ProcessingVersions=Omit<typeof versions,'adapter'|'sanitizer'|'normalizer'>&{normalizer:typeof normalizerVersions[number]}&{adapter:typeof adapterVersions[number];sanitizer:typeof versions.sanitizer|typeof sourceProfiles[number]};
 export const banks=['tbank','ozon','sber','other'] as const;
 export type Bank=typeof banks[number];
 export const aliasKinds=['bank_account','card','loan_contract','bank_contract'] as const;
@@ -49,7 +50,7 @@ function parseRow(value:unknown,profile:ProcessingVersions['sanitizer'],local=fa
 /** The server independently validates; invalid facts become technical issues, never zero/date guesses. */
 export function validatePreparedBatch(input:unknown){
  const r=closed(input,['schemaVersion','versions','context','batchId','files']),v=closed(r.versions,Object.keys(versions));
- if(r.schemaVersion!==1||Object.entries(versions).some(([k,value])=>k==='adapter'?!adapterVersions.includes(v[k] as ProcessingVersions['adapter']):k==='sanitizer'?![versions.sanitizer,...sourceProfiles].includes(v[k] as ProcessingVersions['sanitizer']):v[k]!==value))throw new ImportContractError();
+ if(r.schemaVersion!==1||Object.entries(versions).some(([k,value])=>k==='adapter'?!adapterVersions.includes(v[k] as ProcessingVersions['adapter']):k==='sanitizer'?![versions.sanitizer,...sourceProfiles].includes(v[k] as ProcessingVersions['sanitizer']):k==='normalizer'?!normalizerVersions.includes(v[k] as ProcessingVersions['normalizer']):v[k]!==value))throw new ImportContractError();
  const structured=v.sanitizer!=='text-free/1',identity=v.sanitizer===sourceSanitizer||v.sanitizer===localSourceSanitizer||hasBankDescription(v.sanitizer);if(structured&&!((v.sanitizer===localSourceSanitizer||hasBankDescription(v.sanitizer))?v.adapter===localBankAdapter:identity?v.adapter==='bank-pdf/2':v.adapter==='bank-pdf/1'))throw new ImportContractError();
  const local=v.adapter===localBankAdapter;
  if(local&&!identity)throw new ImportContractError();
@@ -74,7 +75,7 @@ export function validatePreparedBatch(input:unknown){
    if(item.account&&typeof item.account==='object'&&!Array.isArray(item.account))allowed(item.account,['kind','hmac']);
    // Nested date fields also have a closed schema, including rows with a different invalid fact.
    for(const d of [item.operationDate,item.postedDate])if(d!==null&&typeof d==='object'&&!Array.isArray(d)){
-    const date=d as Record<string,unknown>;if(Object.keys(date).some(k=>!['precision','date','instant'].includes(k)))throw new ImportContractError();
+    const date=d as Record<string,unknown>;if(Object.keys(date).some(k=>!["precision","date","instant",...(v.normalizer==='strict-source/2'?['sourceOffsetMinutes']:[])].includes(k)))throw new ImportContractError();
    }
    if(structured){try{parseSafeSource(item.safeSource,undefined,v.sanitizer as typeof sourceProfiles[number]);}catch{throw new ImportContractError();}}
    if(local&&(!localParserVersions.includes(item.parser as typeof localParserVersions[number])||!(item.parser as string).startsWith(f.bank+'-')||(item.parser as string).includes('-ocr/')&&(item.safeSource!==null||item.descriptionHmac!==null||item.bankRefHmac!==null)))throw new ImportContractError();
@@ -86,5 +87,5 @@ export function validatePreparedBatch(input:unknown){
  });
  const reportFiles=files.map(f=>({fileId:f.fileId,status:f.status,error:f.error,rowsFound:f.rowsFound,validRows:f.rows.length,rowsNotPrepared:f.rowsFound-f.rows.length,issues:f.issues}));
  const report={schemaVersion:1 as const,batchId,stage:'validation_only' as const,files:reportFiles,counts:{files:files.length,blockedFiles:files.filter(f=>f.status==='blocked').length,rowsFound:totalRows,validRows:files.reduce((n,f)=>n+f.rows.length,0),rowsNotPrepared:files.reduce((n,f)=>n+f.rowsFound-f.rows.length,0)}};
- return {batch:{schemaVersion:1 as const,versions:{...versions,adapter:v.adapter as ProcessingVersions['adapter'],sanitizer:v.sanitizer as ProcessingVersions['sanitizer']},context,batchId,files},report};
+ return {batch:{schemaVersion:1 as const,versions:{...versions,normalizer:v.normalizer as ProcessingVersions['normalizer'],adapter:v.adapter as ProcessingVersions['adapter'],sanitizer:v.sanitizer as ProcessingVersions['sanitizer']},context,batchId,files},report};
 }

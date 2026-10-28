@@ -41,7 +41,9 @@ export function tableDate(value:string){
   // Validate the calendar independently: Date.parse can normalize 30 February.
   dateFact({precision:'day',date:s.slice(0,10)});
   if(!/T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d/.test(s))throw new Error('INVALID_DATE');
-  return dateFact({precision:'instant',instant:new Date(s).toISOString()});
+  const z=s.endsWith('Z')?0:(s.at(-6)==='-'?-1:1)*(Number(s.slice(-5,-3))*60+Number(s.slice(-2)));
+  if(Math.abs(z)>840||Number(s.slice(-2))>59&&!s.endsWith('Z'))throw new Error('INVALID_DATE');
+  return dateFact({precision:'instant',instant:new Date(s).toISOString(),sourceOffsetMinutes:z});
  }
  throw new Error('INVALID_DATE');
 }

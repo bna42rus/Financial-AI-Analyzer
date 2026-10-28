@@ -71,8 +71,8 @@ test('credit-card repayment capacity is independent of a purchase refund',()=>{
 test('excluding a purchase never silently excludes its refund, and a specific include wins',()=>{
  const g=graph();g.operations=[op('p','-1000'),op('r','1000','refund',null)];g.links=[link('l','r','p','1000')];g.operations[0]!.analyticsOverride='exclude';assert.equal(aggregate(reconcile(g).operations).netExpensesMinor,'-1000');g.accounts[0]!.analyticsEnabled=false;g.operations[0]!.analyticsOverride='include';assert.equal(aggregate(reconcile(g).operations).netExpensesMinor,'1000');assert.equal(aggregate(reconcile(g).operations,{includeExcluded:true}).netExpensesMinor,'0');
 });
-test('date-only sources retain precision, and instant periods use Moscow calendar dates',()=>{
- assert.deepEqual(dateFact({precision:'day',date:'2026-02-28'}),{precision:'day',date:'2026-02-28'});assert.throws(()=>dateFact({precision:'day',date:'2026-02-30'}));assert.equal(operationDay(dateFact({precision:'instant',instant:'2026-09-30T22:00:00Z'})),'2026-10-01');
+test('date-only sources retain precision, and explicit bank offset defines instant calendar',()=>{
+ assert.deepEqual(dateFact({precision:'day',date:'2026-02-28'}),{precision:'day',date:'2026-02-28'});assert.throws(()=>dateFact({precision:'day',date:'2026-02-30'}));assert.equal(operationDay(dateFact({precision:'instant',instant:'2026-09-30T22:00:00Z',sourceOffsetMinutes:180})),'2026-10-01');
 });
 test('money above JS safe integer stays exact through aggregation',()=>{
  const g=graph();g.operations=[op('p','-9007199254740993'),op('q','-9007199254740993')];assert.equal(aggregate(reconcile(g).operations).netExpensesMinor,'18014398509481986');

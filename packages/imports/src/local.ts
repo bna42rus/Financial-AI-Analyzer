@@ -7,7 +7,7 @@ import {aliasKinds,banks,MAX_FILES,MAX_ROWS,parseContext,validatePreparedBatch,v
 import type {AliasKind,Bank,Context,IssueCode,PreparedBatch,PreparedFile,PreparedRow,ProcessingVersions} from './contract.ts';
 import {adapterVersions} from './contract.ts';
 
-export type LocalContext=Context&{key:string;expiresAt:string;sourceProfiles?:readonly string[]};
+export type LocalContext=Context&{key:string;expiresAt:string;sourceProfiles?:readonly string[];normalizers?:readonly string[]};
 /** Adapter extraction only. Raw text, names and extra columns are never copied. Structured codes need an explicit sanitizer profile. */
 export type ExtractedRow={operationDate:unknown;postedDate?:unknown;amountMinor:unknown;currency:unknown;direction:unknown;account:{kind:AliasKind;value:unknown};bankReference?:unknown;[localOnly:string]:unknown};
 export type ExtractedFile={fileId:string;bank:Bank;bytes:Uint8Array;rows:ExtractedRow[];error?:'LOCAL_READ_FAILED';[localOnly:string]:unknown};
@@ -36,6 +36,8 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
  if(!adapterVersions.includes(adapter))throw new LocalPreparationError('INVALID_ADAPTER');
  if(signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');
  if(!globalThis.crypto?.subtle)throw new LocalPreparationError('LOCAL_CRYPTO_UNAVAILABLE');
+ const normalizer=input.normalizers?.includes('strict-source/2')?'strict-source/2':'strict-source/1';
+ const normalizeDate=(value:unknown)=>{const d=dateFact(value);return d.precision==='day'?d:normalizer==='strict-source/2'?{...d,sourceOffsetMinutes:d.sourceOffsetMinutes??null}:{precision:'instant' as const,instant:d.instant};};
  const context=parseContext({contextId:input.contextId,generation:input.generation,keyVersion:input.keyVersion}),expiresAt=Date.parse(input.expiresAt);
  if(!Number.isFinite(expiresAt)||expiresAt<=Date.now())throw new LocalPreparationError('PREPARATION_EXPIRED');
  const decoded=bytesFromKey(input.key);let key:CryptoKey|null;
@@ -62,7 +64,7 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
     try{
      if(!row||typeof row!=='object'||!row.account||!aliasKinds.includes(row.account.kind))throw new RowFailure('INVALID_ACCOUNT');
      let operationDate:PreparedRow['operationDate'],postedDate:PreparedRow['postedDate'];
-     try{operationDate=dateFact(row.operationDate);postedDate=row.postedDate===undefined||row.postedDate===null?null:dateFact(row.postedDate);}catch{throw new RowFailure('INVALID_DATE');}
+     try{operationDate=normalizeDate(row.operationDate);postedDate=row.postedDate===undefined||row.postedDate===null?null:normalizeDate(row.postedDate);}catch{throw new RowFailure('INVALID_DATE');}
      try{if(typeof row.amountMinor!=='string'||row.amountMinor.length>20)throw new Error();parsePersistedMinor(row.amountMinor);}catch{throw new RowFailure('INVALID_AMOUNT');}
      if(row.currency!=='RUB')throw new RowFailure('INVALID_CURRENCY');
      const amountMinor=row.amountMinor as string,direction=row.direction;
@@ -77,7 +79,7 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
    }
    prepared.push(result);
   }
-  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,adapter,sanitizer},context:{...context},batchId,files:prepared}).batch;
+  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,normalizer,adapter,sanitizer},context:{...context},batchId,files:prepared}).batch;
  }
  check();return {prepare,dispose};
 }

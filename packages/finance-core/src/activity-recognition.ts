@@ -1,4 +1,5 @@
 import type {Operation,Category} from './model.ts';
+import {installmentPaymentEvidence} from './installment-contract.ts';
 import {facet} from './model.ts';
 import {activityDefinitions,activityGuards,activitySpecificSenses,activityContainments,fulfillmentLexicon,activityDataSha256} from './catalog/generated/activity-v1.ts';
 import type {ActivityDefinition} from './catalog/generated/activity-v1.ts';
@@ -167,6 +168,7 @@ export function activityDecision(operation:Operation,categories:readonly Categor
  const s=operation.source;
  if(s.versions.sourceSanitizer!=='bank-source/5')return null;
  if(s.versions.sourceTextEvidence!=='intact')return {evidence:null,resolution:{status:'missing',reason:'UNTRUSTED_LITERAL_BOUNDARIES'} as CategoryResolution};
+ if(installmentPaymentEvidence(s))return {evidence:null,resolution:{status:'missing',reason:'INSTALLMENT_REQUIRES_FINANCIAL_MODEL'} as CategoryResolution};
  const evidence=recognizeActivity({merchantText:s.merchantText,description:s.description,bankCategory:s.bankCategory,mcc:s.sourceMcc,kind:operation.semantics.kind.value,role:operation.semantics.role.value});
  return {evidence,resolution:resolveActivityCategory(evidence,categories)};
 }
