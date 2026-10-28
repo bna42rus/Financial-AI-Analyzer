@@ -34,6 +34,8 @@ test('independent subjects, negative context, addresses and quoted content do no
  for(const text of ['Ресторан Аптека','Магнит DNS','Кафе и оптика'])assert.equal(match(text).status,'conflict',text);
  for(const text of ['Оборудование давление 5 bar','school gymnasium','Буфет мебельный','Сто рублей'])assert.notEqual(match(text).status,'recognized',text);
  assert.equal(match('Кафе на АЗС').targetKey,'cafe');
+ assert.notEqual(match('Товары для кафе').status,'recognized');assert.notEqual(match('Оборудование для аптеки').targetKey,'pharmacy');
+ assert.equal(match('Столовая мебель').targetKey,'home_goods');
  assert.equal(match('Неизвестный24','Покупка Неизвестный24; адрес: улица Аптека').status,'needs_context');
  assert.equal(match('Неизвестный24','Покупка Неизвестный24; комментарий: аптека').status,'needs_context');
  assert.notEqual(match('SPA hotel пакет отеля').targetKey,'care_other');assert.notEqual(match('не аптека').status,'recognized');
@@ -51,6 +53,7 @@ test('all merchant/body evidence is collected; an actual paid subject can refine
 test('confirmed service defaults are visible provisional suggestions; a clear carshare is not provisional',()=>{
  for(const [name,key]of [['Яндекс Go','taxi'],['Яндекс Заправки','fuel'],['Парковки России','parking']]){const e=match(name!);assert.equal(e.targetKey,key);assert.equal(e.provisional,true,name);}
  assert.equal(match('Яндекс Go заряд').targetKey,'powerbank');assert.equal(match('Яндекс Go заряд').provisional,true);
+ assert.equal(match('Яндекс Go','Яндекс Go доставка').targetKey,'logistics');assert.equal(match('Яндекс Go','Яндекс Go доставка').provisional,false);
  assert.equal(match('Яндекс Драйв').targetKey,'carshare');assert.equal(match('Яндекс Драйв').provisional,false);
  assert.notEqual(match('Сервисы Яндекса').status,'recognized');
 });

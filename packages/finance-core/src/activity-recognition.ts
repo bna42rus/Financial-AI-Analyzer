@@ -107,7 +107,12 @@ export function recognizeActivity(i:ActivityInput):ActivityRecognition{
  const catalog=recognizeCatalogEvidence({...i,merchantText:subjectText(i.merchantText),description:subjectText(i.description)}),profile=catalog.status==='recognized'?catalog:null,profileKey=profile?'legacy-catalog:'+profile.entry.name:null;
  if(catalog.status==='conflict')return result('conflict',catalog.reason);
  const primary=find(subjectText(i.merchantText)),body=find(subjectText(i.description));
- const positive=(h:LiteralHit<ActivityDefinition>,text:string)=>!literalNegated(text,h);
+ const positive=(h:LiteralHit<ActivityDefinition>,text:string)=>{
+  const chars=[...catalogFold(text)],before=chars.slice(0,h.from).join(''),after=chars.slice(h.through).join('');
+  if(literalNegated(text,h)||/(?:товары|товаров|оборудование|мебель|учебник|пособие)\s+для\s+$/u.test(before))return false;
+  if(h.value.id==='ACT-FOOD03'&&/^\s+(?:мебель|гарнитур|приборы|посуда)(?:$|[^\p{L}\p{N}_])/u.test(after))return false;
+  return true;
+ };
  const eligiblePrimary=primary.filter(h=>allowed(h,c)&&positive(h,subjectText(i.merchantText)));
  const eligibleBody=body.filter(h=>allowed(h,c)&&positive(h,subjectText(i.description)));
  const hits=[...eligiblePrimary,...eligibleBody];
@@ -144,6 +149,7 @@ export function recognizeActivity(i:ActivityInput):ActivityRecognition{
   if(profile?.entry.name==='Яндекс Go'&&selected.some(a=>a.key==='charge_context'))return result('recognized','Yandex_PORTABLE_SERVICE_NOT_EXPLICIT',[...ids],'powerbank',true,false,profileKey);
   return result('needs_context','ACTIVITY_CONTEXT_NOT_ESTABLISHED',[...ids]);
  }
+ if(profile?.entry.name==='Яндекс Go'&&method==='delivery')return result('recognized','EXPLICIT_GO_DELIVERY_SERVICE',[],'logistics',false,false,profileKey);
  const specific=serviceProfileDefault(subjectText(i.merchantText));
  if(specific){let key=specific.target;if(method==='delivery'&&key==='grocery')key='grocery_delivery';return result('recognized','KNOWN_SERVICE_PROFILE',[],key,specific.provisional,method==='conflict',profileKey);}
  if(profile?.target){let key=profile.target;if(profile.entry.delivery&&method!=='pickup'&&method!=='conflict'||method==='delivery'){if(key==='grocery')key='grocery_delivery';if(key==='cafe')key='meal_delivery';}return result('recognized','KNOWN_MERCHANT_PROFILE',[],key,profile.provisional,profile.parentOnly||method==='conflict',profileKey);}

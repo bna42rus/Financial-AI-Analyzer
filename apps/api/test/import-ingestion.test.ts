@@ -490,7 +490,7 @@ test('/5 import applies typed activity and own category resolution while retaini
  await accept(b!);const report=await drain(b!.batchId);assert.equal(report.counts.created,6);const state=(await request('/finance/state')).json(),details=await Promise.all(report.operationIds.map((id:string)=>detail(id)));
  const expected=['Аптеки',null,'Такси','Доставка продуктов','Рестораны и кафе',null];
  for(let i=0;i<merchants.length;i++){
-  const op=details.find((o:any)=>o.source.merchantText===merchants[i]!.replace('\u200b',''))!;assert.ok(op,merchants[i]);assert.equal(op.source.amountMinor,'-100');assert.equal(op.semantics.kind.value,'purchase');assert.equal(op.semantics.role.value,'expense');assert.equal(op.semantics.merchant.value,op.source.merchantText);assert.equal(op.components.length,0);
+  const op=details.find((o:any)=>o.source.merchantText===merchants[i]!.replace('\u200b',''))!;assert.ok(op,merchants[i]);assert.equal(op.source.amountMinor,'-100');assert.equal(op.semantics.kind.value,i===5?'other':'purchase');assert.equal(op.semantics.role.value,i===5?'unresolved':'expense');assert.equal(op.semantics.merchant.value,op.source.merchantText);assert.equal(op.components.length,0);
   const sub=state.categories.find((c:any)=>c.id===op.semantics.subcategory.value)?.name??null;assert.equal(sub,expected[i],merchants[i]);
   if(i===1)assert.equal(state.categories.find((c:any)=>c.id===op.semantics.category.value)?.name,'Здоровье и спорт');
   if(i===2)assert.equal(op.semantics.category.confidence,80);
