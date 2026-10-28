@@ -70,7 +70,10 @@ export function operationDisplayName(op:Operation,context:NameContext={}):Operat
    title=description.replace(/^(?:(?:входящий|исходящий|внутренний|денежный|банковский)\s+)?перевод(?:\s*[:—-]\s*|\s+)|^(?:(?:incoming|outgoing|bank|money|internal)\s+)?transfer\s*/iu,'').trim();
    if(title===description)title='';title=cleanBankText(title,160);
   }
-  if(!meaningful(title)&&description&&!/^(?:покупка|purchase|card payment|\[скрыто\])\s*[:.-]?$/iu.test(description))title=cleanBankText(description,160);
+  if(!meaningful(title)&&description){
+   const subject=description.replace(/^(?:оплата товаров и услуг|оплата покупки|покупка(?: в)?|оплата услуг|оплата в|оплата по карте|оплата картой|purchase|card payment|возврат покупки|возврат средств за покупку|возврат оплаты|purchase refund|refund)(?=$|[^\p{L}\p{N}_])\s*[:.-]?\s*/iu,'');
+   if(meaningful(subject))title=cleanBankText(subject,160);
+  }
   if(!meaningful(title)){title=kind==='purchase'?'Продавец не определён':events[kind]??'Операция';if(kind==='purchase')eventLabel='Покупка';}
   explanationCode='NAME-R12';
  }

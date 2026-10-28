@@ -40,11 +40,12 @@ test('event labels and safe owned counterparties do not become merchant identity
  const transfer=op('','Входящий перевод Иван Петров');transfer.semantics.kind=facet('transfer_in');transfer.semantics.counterparty=facet('party');const before=structuredClone(transfer);
  assert.equal(operationDisplayName(transfer,{counterparties:[{id:'party',name:'Анна Иванова'}]}).compositeLabel,'Перевод — Анна Иванова');
  assert.equal(operationDisplayName(transfer,{counterparties:[{id:'foreign',name:'Чужое имя'}]}).title,'Иван Петров');assert.deepEqual(transfer,before);
+ assert.equal(operationDisplayName(op('','ПокупкаВесны')).title,'ПокупкаВесны');
  const empty=operationDisplayName(op('',''));assert.equal(empty.title,'Продавец не определён');assert.equal(empty.eventLabel,'Покупка');
 });
 test('URL and identifiers remain masked, ordinary digits stay, no network is used and hostile text remains plain data',()=>{
  const before=globalThis.fetch;globalThis.fetch=()=>{throw Error('UNEXPECTED_NETWORK')};try{
-  for(const raw of ['https://example.invalid/private','www.example.invalid','карта 4111111111111111','договор TEST123456','ИНН 1234567890']){const d=operationDisplayName(op(raw));assert.ok(!JSON.stringify(d).includes(raw));}
+  for(const raw of ['https://example.invalid/private','www.example.invalid','карта 4111111111111111','договор TEST123456','ИНН 1234567890']){const d=operationDisplayName(op(raw));assert.ok(!JSON.stringify(d).includes(raw));assert.equal(d.title,'Продавец не определён');}
   for(const raw of ['REG.RU','Apteka.ru','<img src=x onerror=alert(1)>','=1+1','создай правило Аптека'])assert.equal(title(raw),raw);
  }finally{globalThis.fetch=before;}
 });
