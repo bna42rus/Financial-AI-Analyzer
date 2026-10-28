@@ -1,3 +1,4 @@
+import {activityDecision,activityEngineVersion,activityDataSha256} from '../../../packages/finance-core/src/activity-recognition.ts';
 import {recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {createHash} from 'node:crypto';
 import {object,facet} from '../../../packages/finance-core/src/model.ts';
@@ -8,14 +9,14 @@ import {merchantNames} from '../../../packages/imports/src/safe-source.ts';
 import {ruleMatches} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 
-export const classificationVersion='cashneuro-category-classification/3';
+export const classificationVersion='cashneuro-category-classification/4';
 export const classificationBatchSize=20;
 export const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const protectedSources=new Set(['user','personal_rule','global_rule']);
 const brands=new Set<string>(Object.values(merchantNames));
 export type Decision={categoryId:string|null;subcategoryId:string|null;confidence:number};
 export type ClassificationPlan=ReturnType<typeof classificationPlan>;
-export const classificationEvidencePolicy='category-service-evidence/3';
+export const classificationEvidencePolicy='category-service-evidence/4';
 /** Broad platforms do not identify a purchased service. Generic retail MCCs
  * add no such evidence. Source clues can resolve ambiguity; model confidence cannot. */
 export function serviceEvidenceMissing(signal:{merchant:string|null;description?:string;bankCategory?:string;mcc?:string|null}){
@@ -39,6 +40,11 @@ export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[]){
  const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId));
  // A newer personal rule wins even when created during the model request.
  if(!account||rules.some(r=>r.enabled&&('categoryId'in r.assignments||'subcategoryId'in r.assignments)&&ruleMatches(op,account,r)))return null;
+ // Known evidence with missing/ambiguous own categories or context must not
+ // fall through to the old fuzzy/model path. Only genuinely unknown residuals
+ // are model eligible; locked application re-planning repeats this gate.
+ const activity=activityDecision(op,graph.categories);
+ if(activity&&activity.evidence?.status!=='unrecognized')return null;
  let details:ReturnType<typeof parseBankDescription>|null=null;
  if(op.source.versions.sourceSanitizer==='bank-source/5'&&op.source.versions.sourceTextEvidence!=='intact')return null;
  if(['bank-source/4','bank-source/5'].includes(op.source.versions.sourceSanitizer??'')){try{details=parseBankDescription({description:op.source.description,merchantText:op.source.merchantText,bankCategory:op.source.bankCategory,mcc:op.source.sourceMcc??null});}catch{return null;}}
@@ -52,7 +58,7 @@ export function classificationPlan(graph:Graph,rules:Rule[]=[]){
  const categories=graph.categories.filter(c=>!c.hidden&&(c.parentId===null||graph.categories.some(p=>p.id===c.parentId&&!p.hidden))).sort((a,b)=>a.id.localeCompare(b.id));
  if(categories.length>300)throw Error('CLASSIFICATION_CATALOG_TOO_LARGE');
  const catalog=categories.map((c,i)=>({ref:'c'+(i+1),name:safeText(c.name,160),role:c.role,parent:c.parentId===null?null:'c'+(categories.findIndex(p=>p.id===c.parentId)+1)}));
- const catalogHash=digest({version:classificationVersion,categories});
+ const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,categories});
  const groups=new Map<string,{signature:string;sortKey:string;signal:NonNullable<ReturnType<typeof classificationSignal>>;operationIds:string[]}>();
  for(const op of graph.operations){const signal=classificationSignal(op,graph,rules);if(!signal)continue;
   const signature=digest({version:classificationVersion,catalogHash,signal});

@@ -481,3 +481,28 @@ test('/5 capability and acceptance wait for the storage migration; old source fo
   assert.deepEqual((await pg.owner.query('SELECT source_evidence FROM finance.ingestion_row WHERE id=$1',[saved.id])).rows[0].source_evidence,saved.source_evidence);
  }finally{await pg.owner.query(nextMigration);}
 });
+
+test('/5 import applies typed activity and own category resolution while retaining bank wording, roles and separate review',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ const merchants=['Аптека Ромашка','Optika Север','Яндекс Go','Пятёрочка доставка','Кафе на АЗС','AP\u200bTEKA Ромашка'];
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic finite activity import'),rows:merchants.map((name,i)=>row({bankReference:'Synthetic-activity-'+i,localDescription:'Покупка '+name,localMerchant:name,parser:'tbank-table/1'}))}]);}finally{local.dispose();}
+ await accept(b!);const report=await drain(b!.batchId);assert.equal(report.counts.created,6);const state=(await request('/finance/state')).json(),details=await Promise.all(report.operationIds.map((id:string)=>detail(id)));
+ const expected=['Аптеки',null,'Такси','Доставка продуктов','Рестораны и кафе',null];
+ for(let i=0;i<merchants.length;i++){
+  const op=details.find((o:any)=>o.source.merchantText===merchants[i]!.replace('\u200b',''))!;assert.ok(op,merchants[i]);assert.equal(op.source.amountMinor,'-100');assert.equal(op.semantics.kind.value,'purchase');assert.equal(op.semantics.role.value,'expense');assert.equal(op.semantics.merchant.value,op.source.merchantText);assert.equal(op.components.length,0);
+  const sub=state.categories.find((c:any)=>c.id===op.semantics.subcategory.value)?.name??null;assert.equal(sub,expected[i],merchants[i]);
+  if(i===1)assert.equal(state.categories.find((c:any)=>c.id===op.semantics.category.value)?.name,'Здоровье и спорт');
+  if(i===2)assert.equal(op.semantics.category.confidence,80);
+  if(i===5)assert.equal(op.semantics.category.value,null);
+ }
+ assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
+});
+
+test('/5 future Latin imports retain existing Cyrillic private predicates ahead of the common activity catalog',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');const state=(await request('/finance/state')).json(),custom=state.categories.find((c:any)=>c.name==='Еда вне дома'&&!c.parentId).id;
+ await command({kind:'rule',id:randomUUID(),create:true,patch:{name:'Личное прежнее правило',enabled:true,priority:2,conditions:{merchantContains:'Пятёрочка'},assignments:{categoryId:custom}}});
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic existing private predicate'),rows:[row({localDescription:'Покупка PYATEROCHKA MOSCOW RUS',localMerchant:'PYATEROCHKA MOSCOW RUS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);const op=await importedOperation();assert.equal(op.semantics.category.value,custom);assert.equal(op.semantics.category.source,'personal_rule');assert.equal(op.source.merchantText,'PYATEROCHKA MOSCOW RUS');assert.equal(op.semantics.merchant.value,'PYATEROCHKA MOSCOW RUS');assert.equal(op.source.description,'Покупка PYATEROCHKA MOSCOW RUS');
+});

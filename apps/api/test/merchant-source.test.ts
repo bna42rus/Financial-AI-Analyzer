@@ -38,10 +38,10 @@ test('rebuilding from sanitized evidence retains lost-boundary status, not a new
  assert.equal(classificationSignal(operation,graph),null);assert.deepEqual(applyMerchantRecognition(operation,[]),operation);
 });
 
-test('new source script is available to classification but automatic recognition cannot write a display name over matching',()=>{
+test('known /5 source is classified locally and automatic recognition cannot write a display name over matching',()=>{
  const operation:Operation={id:'o',source:structuredClone(fact),corrections:{},semantics:initialSemantics('purchase',fact.merchantText),comment:'Моя заметка',analyticsOverride:'default',decomposition:false,reviewReasons:['possible_duplicate']};
  const graph:Graph={accounts:[{id:'a',bankId:'tbank',name:'Счёт',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null}],categories:[{id:'food',name:'Продукты',parentId:null,hidden:false,role:'expense'}],operations:[operation],components:[],links:[],loanMode:'cashflow'};
- assert.equal(classificationSignal(operation,graph)!.merchant,'PYATEROCHKA MOSCOW RUS');
+ assert.equal(classificationSignal(operation,graph),null); // Known local evidence needs no model.
  const before=structuredClone(operation),recognized=applyMerchantRecognition(operation,graph.categories);
  assert.deepEqual(operation,before);assert.deepEqual(recognized.source,before.source);assert.deepEqual(recognized.semantics.merchant,before.semantics.merchant);assert.equal(recognized.semantics.category.value,'food');
  operation.semantics.category=facet('my-private','user',true);operation.semantics.merchant=facet('Моё имя','user',true);

@@ -168,3 +168,21 @@ test('a clothing-store homonym cannot receive the models confident food category
  assert.equal(calls,1);assert.ok(result.operations.every(o=>o.classification.category.value===null&&o.reviewReasons.includes('low_category_confidence')));
  assert.ok((await pg.owner.query("SELECT decision FROM finance.classification_cache WHERE user_id='first'")).rows.every(r=>r.decision.categoryId===null));
 });
+
+test('/5 activity pass records its own engine with zero model POSTs and preserves permitted bank text',async()=>{
+ const merchant='Аптека Ромашка';
+ await pg.owner.query("UPDATE finance.source_observation SET merchant_text=$1,description=$2,versions=versions || '{\"sourceSanitizer\":\"bank-source/5\",\"sourceTextEvidence\":\"intact\"}'::jsonb WHERE user_id='first'",[merchant,'Покупка '+merchant]);
+ await pg.owner.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',['first',JSON.stringify(initialSemantics('purchase',merchant))]);
+ const sourceBefore=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ await queue();await runClassificationStage(pg.finance,provider());const result=await state(),pharmacy=result.categories.find(c=>c.name==='Аптеки')!;
+ assert.equal(calls,0);assert.ok(result.operations.every(o=>o.classification.subcategory.value===pharmacy.id&&o.classification.category.source==='global_rule'&&o.classification.merchant.value===merchant));
+ assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,sourceBefore);
+ const runs=(await pg.owner.query('SELECT engine,applied FROM finance.classification_run')).rows;assert.deepEqual(runs,[{engine:'cashneuro-activity-catalog/1',applied:3}]);
+ assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
+ await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_assignment')).rows[0].n,3);
+});
+test('/5 context guard blocks a known unresolved subject before model dispatch even with available categories',async()=>{
+ await pg.owner.query("UPDATE finance.source_observation SET merchant_text='СТО',description='Покупка СТО',versions=versions || '{\"sourceSanitizer\":\"bank-source/5\",\"sourceTextEvidence\":\"intact\"}'::jsonb WHERE user_id='first'");
+ await pg.owner.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',['first',JSON.stringify(initialSemantics('purchase','СТО'))]);
+ await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.ok((await state()).operations.every(o=>o.classification.category.value===null));assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_run')).rows[0].n,0);
+});

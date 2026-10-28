@@ -1,3 +1,4 @@
+import {activityEngineVersion} from '../../../packages/finance-core/src/activity-recognition.ts';
 import {applyMerchantRecognition,merchantCatalogVersion} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {randomUUID} from 'node:crypto';
 import {isDeepStrictEqual} from 'node:util';
@@ -49,7 +50,7 @@ async function applyKnownMerchants(db:PoolClient,userId:string,graph:Awaited<Ret
  }).filter(({op,next})=>!isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons));
  if(!changes.length)return false;
  const batch=changes.slice(0,250);
- const id=randomUUID();await db.query("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,applied) VALUES($1,$2,$3,$4,$5,'completed',$6)",[userId,id,generation,merchantCatalogVersion,digest(graph.categories),batch.length]);
+ const id=randomUUID();await db.query("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,applied) VALUES($1,$2,$3,$4,$5,'completed',$6)",[userId,id,generation,batch.some(({op})=>op.source.versions.sourceSanitizer==='bank-source/5')?activityEngineVersion:merchantCatalogVersion,digest(graph.categories),batch.length]);
  for(const {op,next} of batch){
   await db.query('INSERT INTO finance.classification_assignment(user_id,id,transaction_id,run_id,before_facets,after_facets) VALUES($1,$2,$3,$4,$5,$6)',[userId,randomUUID(),op.id,id,JSON.stringify(op.semantics),JSON.stringify(next.semantics)]);
   await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,op.id,JSON.stringify(next.semantics),JSON.stringify(next.reviewReasons)]);

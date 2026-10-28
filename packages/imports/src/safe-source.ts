@@ -1,3 +1,7 @@
+import {merchantNames,legacySourceAliases as aliases} from '../../finance-core/src/legacy-source-merchant.ts';
+import type {MerchantCode} from '../../finance-core/src/legacy-source-merchant.ts';
+export {merchantNames};
+export type {MerchantCode};
 import {bankDescription,parseBankDescription,merchantBankDescription,parseMerchantBankDescription,financialTransferText} from './bank-description.ts';
 import type {BankDescription,MerchantBankDescription} from './bank-description.ts';
 import type {Kind} from '../../finance-core/src/model.ts';
@@ -11,11 +15,9 @@ export const merchantSourceSanitizer='bank-source/5' as const;
 export const sourceProfiles=[legacySourceSanitizer,sourceSanitizer,localSourceSanitizer,descriptionSourceSanitizer,merchantSourceSanitizer] as const;
 export const hasBankDescription=(profile:unknown)=>profile===descriptionSourceSanitizer||profile===merchantSourceSanitizer;
 const legacyMerchants=['ozon','wildberries','pyaterochka','magnit','perekrestok','lenta'];
-export const merchantNames={ozon:'Ozon',wildberries:'Wildberries',pyaterochka:'Пятёрочка',magnit:'Магнит',perekrestok:'Перекрёсток',lenta:'Лента',vkusvill:'ВкусВилл',auchan:'Ашан',metro:'METRO',dixy:'Дикси',fixprice:'Fix Price',samokat:'Самокат',lamoda:'Lamoda',dns:'DNS',mvideo:'М.Видео',sportmaster:'Спортмастер',hoff:'Hoff',leroymerlin:'Лемана ПРО',yandexmarket:'Яндекс Маркет',yandextaxi:'Яндекс Go'} as const;
-export type MerchantCode=keyof typeof merchantNames;
 export type SafeSource={event:'other'|'purchase'|'refund'|'fee'|'cash_withdrawal'|'cash_deposit'|'cashback'|'transfer_in'|'transfer_out';merchant:MerchantCode|null;details?:BankDescription|MerchantBankDescription};
 const labels={purchase:'Покупка',refund:'Возврат покупки',fee:'Комиссия банка',cash_withdrawal:'Снятие наличных',cash_deposit:'Внесение наличных',cashback:'Кешбэк',transfer_in:'Входящий перевод',transfer_out:'Исходящий перевод'} as const;
-const aliases:Record<MerchantCode,RegExp>={ozon:/^(?:ozon|озон)(?=$|[ ._*\d/-])/u,wildberries:/^(?:wildberries|вайлдберриз)(?=$|[ ._*\d/-])/u,pyaterochka:/^(?:пятерочка|pyaterochka)(?=$|[ ._*\d/-])/u,magnit:/^(?:магнит|magnit)(?=$|[ ._*\d/-])/u,perekrestok:/^(?:перекресток|perekrestok)(?=$|[ ._*\d/-])/u,lenta:/^(?:лента|lenta)(?=$|[ ._*\d/-])/u,vkusvill:/^(?:вкусвилл|vkusvill)(?=$|[ ._*\d/-])/u,auchan:/^(?:ашан|auchan)(?=$|[ ._*\d/-])/u,metro:/^metro(?=$|[ ._*\d/-])/u,dixy:/^(?:дикси|dixy)(?=$|[ ._*\d/-])/u,fixprice:/^(?:fix[ _-]?price|фикс прайс)(?=$|[ ._*\d/-])/u,samokat:/^(?:самокат|samokat)(?=$|[ ._*\d/-])/u,lamoda:/^(?:lamoda|ламода)(?=$|[ ._*\d/-])/u,dns:/^dns(?=$|[ ._*\d/-])/u,mvideo:/^(?:м[.]?видео|m[.]?video)(?=$|[ ._*\d/-])/u,sportmaster:/^(?:спортмастер|sportmaster)(?=$|[ ._*\d/-])/u,hoff:/^(?:hoff|хофф)(?=$|[ ._*\d/-])/u,leroymerlin:/^(?:лемана про|lemanapro|леруа мерлен|leroy merlin)(?=$|[ ._*\d/-])/u,yandexmarket:/^(?:яндекс[ ._-]+маркет|yandex[ ._-]+market)(?=$|[ ._*\d/-])/u,yandextaxi:/^(?:яндекс[ ._-]+(?:такси|go)|yandex[ ._-]+(?:taxi|go))(?=$|[ ._*\d/-])/u};
+
 export function parseSafeSource(value:unknown,amountMinor?:string,profile:typeof sourceProfiles[number]=sourceSanitizer):SafeSource|null{
  if(value===null)return null;
  if(!value||typeof value!=='object'||Array.isArray(value))throw new TypeError('INVALID_SAFE_SOURCE');

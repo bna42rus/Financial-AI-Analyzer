@@ -120,3 +120,13 @@ test('structured food MCC resolves a homonym and is also respected by the determ
   assert.equal(applyMerchantRecognition(o,g.categories).semantics.category.value,'food',merchant);
  }
 });
+
+test('/5 known activity conflicts and unavailable own targets cannot fall through to model/cache inference',()=>{
+ for(const name of ['Аптека Север','Optika Север','СТО','Вендинг','Ресторан Аптека','Яндекс Go']){
+  const g=graph(),o=g.operations[0]!;o.source.merchantText=name;o.source.description='Покупка '+name;o.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};o.semantics=initialSemantics('purchase',name);
+  assert.equal(classificationSignal(o,g),null,name);assert.equal(classificationPlan(g).groups.length,0,name);
+ }
+ const g=graph(),o=g.operations[0]!;o.source.merchantText='UnknownMerchant24';o.source.description='Покупка UnknownMerchant24';o.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};o.semantics=initialSemantics('purchase','UnknownMerchant24');
+ assert.equal(classificationSignal(o,g)?.merchant,'UnknownMerchant24');assert.equal(classificationPlan(g).groups.length,1);
+ o.source.versions.sourceTextEvidence='unknown';assert.equal(classificationPlan(g).groups.length,0);
+});
