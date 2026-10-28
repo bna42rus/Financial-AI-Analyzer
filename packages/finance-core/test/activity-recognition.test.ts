@@ -80,6 +80,8 @@ test('category resolution prefers the own specific node, never a sibling or the 
  assert.deepEqual(resolveOwnCategory('grocery',categories),{status:'resolved',categoryId:'Продукты',subcategoryId:'Продукты/Магазины',precision:'specific'});
  assert.deepEqual(resolveOwnCategory('grocery',categories.filter(c=>c.name!=='Магазины')),{status:'resolved',categoryId:'Продукты',subcategoryId:null,precision:'parent'});
  assert.equal(resolveOwnCategory('taxi',[own('Общественный транспорт')]).status,'missing');
+ assert.equal(resolveOwnCategory('public',[own('Авто')]).status,'missing');assert.equal(resolveOwnCategory('pharmacy',[own('Спорт')]).status,'missing');
+ assert.equal(resolveOwnCategory('charity',[own('Подарки')]).status,'missing');assert.equal(resolveOwnCategory('fine',[own('Налоги')]).status,'missing');
  assert.equal(resolveOwnCategory('optics',[own('Аптеки')]).status,'missing');
  assert.equal(resolveOwnCategory('pharmacy',[own('Питомцы'),own('Аптеки','Питомцы')]).status,'missing');
  assert.equal(resolveOwnCategory('pharmacy',[own('Здоровье'),own('Аптеки','Здоровье')]).status,'resolved');

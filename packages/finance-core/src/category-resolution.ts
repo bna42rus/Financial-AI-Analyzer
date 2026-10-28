@@ -31,7 +31,16 @@ export function resolveOwnCategory(key:string,categories:readonly Category[],rol
  }
  const target=options.target??targets.get(key);if(!target)return {status:'missing',reason:'UNKNOWN_CATEGORY_TARGET'};
  const rootName=target.path[0],leafName=target.path[1];
- const roots=new Set((rootName?(rootAliases[rootName]??[rootName]):[]).map(catalogFold)),labels=new Set([...target.labels,...(leafName?[leafName]:[])].map(catalogFold));
+ // A narrow root name is not a synonym of its entire mixed domain.
+ const aliases=rootName?(rootAliases[rootName]??[rootName]).filter(name=>{
+  if(['Авто','Автомобиль'].includes(name))return ['auto_service','fuel','parking'].includes(key);
+  if(name==='Спорт')return ['fitness','sport_goods','sport_nutrition'].includes(key);
+  if(name==='Подарки')return key==='gifts';
+  if(name==='Налоги')return key==='tax';
+  if(name==='Подписки')return key==='subscription_other';
+  return true;
+ }):[];
+ const roots=new Set(aliases.map(catalogFold)),labels=new Set([...target.labels,...(leafName?[leafName]:[])].map(catalogFold));
  const available=categories.filter(valid),matchingRoots=available.filter(c=>c.parentId===null&&roots.has(catalogFold(c.name)));
  const found=options.parentOnly?[]:available.filter(c=>{
   const name=catalogFold(c.name);if(!labels.has(name))return false;
