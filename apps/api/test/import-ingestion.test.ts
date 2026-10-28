@@ -427,3 +427,34 @@ test('same-file reimport preserves a manual purchase split and bank identity, wh
  const operations=(await request('/finance/state')).json().operations;assert.equal(operations.length,2);const added=operations.find((o:any)=>o.id!==original.id);assert.equal(added.classification.merchant.value,'Ozon');assert.equal(added.decompositionActive,false);assert.equal(added.amountMinor,'-20000');assert.equal((await detail(original.id)).components.length,2);
  await command({kind:'cancel_import',batchId:repeat.batchId});assert.equal((await detail(original.id)).components.length,2);assert.equal((await counts()).transaction,2);
 });
+
+test('/5 HTTP reimport keeps identity, immutable old observations, manual merchant and category parts through cancellation',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ async function prepare(profile:typeof merchantSourceSanitizer|typeof descriptionSourceSanitizer,bytes:string){
+  const local=await createLocalPreparation(await context(),undefined,localBankAdapter,profile);
+  try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows:[row({bankReference:undefined,operationDate:{precision:'instant',instant:'2026-10-01T12:00:00.000Z'},amountMinor:'-10000',localDescription:'Покупка PYATEROCHKA MOSCOW RUS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ }
+ assert.ok((await context()).sourceProfiles?.includes(merchantSourceSanitizer));
+ const first=await prepare(descriptionSourceSanitizer,'Synthetic old source');await accept(first);await drain(first.batchId);const original=await importedOperation();
+ const observations=(await pg.owner.query("SELECT id,merchant_text,description,versions FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ const state=(await request('/finance/state')).json(),food=state.categories.find((c:any)=>c.name==='Продукты'&&c.parentId===null).id;
+ await command({kind:'operation',id:original.id,patch:{merchant:'Моё личное имя',comment:'Моя заметка'}});
+ await command({kind:'components',id:original.id,parts:[{type:'other',amountMinor:'-6000',role:'expense',categoryId:food},{type:'other',amountMinor:'-4000',role:'expense',categoryId:food}]});
+ const parts=(await detail(original.id)).components;
+ const next=await prepare(merchantSourceSanitizer,'Synthetic new source');assert.equal(next.files[0]!.rows[0]!.descriptionHmac,first.files[0]!.rows[0]!.descriptionHmac);
+ await accept(next);const report=await drain(next.batchId);assert.equal(report.counts.updated,1);assert.equal(report.counts.created,0);assert.equal((await counts()).transaction,1);
+ const current=await detail(original.id);assert.equal(current.source.merchantText,'PYATEROCHKA MOSCOW RUS');assert.equal(current.semantics.merchant.value,'Моё личное имя');assert.equal(current.comment,'Моя заметка');assert.deepEqual(current.components,parts);
+ const oldRows=(await pg.owner.query("SELECT id,merchant_text,description,versions FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[observations.map(r=>r.id)])).rows;assert.deepEqual(oldRows,observations);
+ await command({kind:'cancel_import',batchId:next.batchId});const restored=await detail(original.id);assert.equal(restored.source.merchantText,'Пятёрочка');assert.equal(restored.source.versions.sourceSanitizer,descriptionSourceSanitizer);assert.equal(restored.semantics.merchant.value,'Моё личное имя');assert.deepEqual(restored.components,parts);
+});
+
+test('/5 HTTP source preserves a translation business and keeps a real incoming transfer as a separate event',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let prepared:PreparedBatch;
+ try{prepared=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic translation and money transfer'),rows:[row({bankReference:'Synthetic-business',localDescription:'Оплата услуг бюро переводов',localMerchant:'Бюро переводов Север',parser:'tbank-table/1'}),row({bankReference:'Synthetic-transfer',amountMinor:'100',direction:'credit',localDescription:'Входящий перевод Иван Петров',localMerchant:'Иван Петров',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(prepared);const report=await drain(prepared.batchId);assert.equal(report.counts.created,2);
+ const operations=await Promise.all(report.operationIds.map((id:string)=>detail(id)));
+ const business=operations.find(o=>o.source.sourceKind==='purchase')!,transfer=operations.find(o=>o.source.sourceKind==='transfer_in')!;
+ assert.equal(business.source.merchantText,'Бюро переводов Север');assert.equal(transfer.source.merchantText,'');assert.equal(transfer.source.description,'Входящий перевод Иван Петров');assert.equal(transfer.semantics.role.value,'unresolved');
+ assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
+});

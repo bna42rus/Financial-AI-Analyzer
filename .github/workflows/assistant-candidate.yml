@@ -66,6 +66,8 @@ jobs:
           packages/finance-core/test/grocery-recognition.test.ts
           packages/analyzer/test/merchant-rule.test.ts
           packages/imports/test/bank-description.test.ts
+          packages/imports/test/merchant-source.test.ts
+          apps/api/test/merchant-source.test.ts
           apps/api/test/classification-plan.test.ts
           apps/api/test/classification-smoke-support.test.ts
           apps/api/test/classification-admission.test.ts
@@ -77,6 +79,10 @@ jobs:
           apps/api/test/task-json-cache-audit.test.ts
           packages/analyzer/test/task-context.test.ts
           packages/analyzer/test/task-literals.test.ts
+      - name: Check the inactive complete catalog build and lossless source coverage
+        run: |
+          python3 scripts/compile-merchant-catalog.py --check
+          python3 scripts/test-compile-merchant-catalog.py
       - name: Check Staging installation and rollback without changing a service
         run: |
           python3 scripts/test-inspect-assistant-staging.py

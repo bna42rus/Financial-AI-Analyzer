@@ -40,7 +40,7 @@ async function scope(db:PoolClient,userId:string,provider:AssistantProvider){
  return workspace;
 }
 async function applyKnownMerchants(db:PoolClient,userId:string,graph:Awaited<ReturnType<typeof loadFinance>>['graph'],rules:Awaited<ReturnType<typeof loadFinance>>['rules'],generation:string){
- const changes=graph.operations.filter(op=>op.source.versions.sourceSanitizer==='bank-source/4'&&!graph.components.some(c=>c.transactionId===op.id)).map(op=>{
+ const changes=graph.operations.filter(op=>['bank-source/4','bank-source/5'].includes(op.source.versions.sourceSanitizer??'')&&!graph.components.some(c=>c.transactionId===op.id)).map(op=>{
   const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId));
   // Apply current personal rules before common merchant logic, including rules added while queued.
   const ruled=account?applyRules(op,account,rules):op;

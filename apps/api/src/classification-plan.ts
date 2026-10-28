@@ -40,7 +40,8 @@ export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[]){
  // A newer personal rule wins even when created during the model request.
  if(!account||rules.some(r=>r.enabled&&('categoryId'in r.assignments||'subcategoryId'in r.assignments)&&ruleMatches(op,account,r)))return null;
  let details:ReturnType<typeof parseBankDescription>|null=null;
- if(op.source.versions.sourceSanitizer==='bank-source/4'){try{details=parseBankDescription({description:op.source.description,merchantText:op.source.merchantText,bankCategory:op.source.bankCategory,mcc:op.source.sourceMcc??null});}catch{return null;}}
+ if(op.source.versions.sourceSanitizer==='bank-source/5'&&op.source.versions.sourceTextEvidence!=='intact')return null;
+ if(['bank-source/4','bank-source/5'].includes(op.source.versions.sourceSanitizer??'')){try{details=parseBankDescription({description:op.source.description,merchantText:op.source.merchantText,bankCategory:op.source.bankCategory,mcc:op.source.sourceMcc??null});}catch{return null;}}
  const merchant=details?.merchantText|| (brands.has(op.source.merchantText)?op.source.merchantText:null);
  if(!merchant&&!details?.description&&!details?.mcc&&!['fee','interest','insurance','cashback'].includes(s.kind.value))return null;
  const signal={merchant,kind:s.kind.value,role:s.role.value,...(details?{description:details.description,bankCategory:details.bankCategory,mcc:details.mcc}: {})};

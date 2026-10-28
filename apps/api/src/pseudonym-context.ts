@@ -3,6 +3,7 @@ import type {PoolClient} from 'pg';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
 import {HttpError} from './types.ts';
 import type {Sealer} from './types.ts';
+import {sourceProfiles} from '../../../packages/imports/src/safe-source.ts';
 
 export type ImportEpoch={generation:string;keyVersion:string};
 export type PreparedImportContext=ImportEpoch&{contextId:string};
@@ -35,7 +36,7 @@ export async function prepareImportContext(db:PoolClient,userId:string,state:Epo
  const record=(await db.query('SELECT * FROM finance.ensure_pseudonym_key($1,$2,$3)',[state.generation,state.key_version,sealPseudonymKey(seal,userId,state.key_version)])).rows[0];
  if(!existing)await db.query('INSERT INTO finance.ingestion_context(user_id,id,generation,key_version) VALUES($1,$2,$3,$4)',[userId,id,state.generation,state.key_version]);
  const key=openKey(seal,record.sealed_key,userId,state.key_version);
- return {contextId:id,generation:state.generation,keyVersion:state.key_version,key,algorithm:'HMAC-SHA-256',keyBytes:32,storage:'memory_only',expiresAt:(await db.query('SELECT expires_at FROM finance.ingestion_context WHERE user_id=$1 AND id=$2',[userId,id])).rows[0].expires_at};
+ return {contextId:id,generation:state.generation,keyVersion:state.key_version,key,algorithm:'HMAC-SHA-256',keyBytes:32,storage:'memory_only',sourceProfiles:[...sourceProfiles],expiresAt:(await db.query('SELECT expires_at FROM finance.ingestion_context WHERE user_id=$1 AND id=$2',[userId,id])).rows[0].expires_at};
 }
 export async function assertPreparedContext(db:PoolClient,userId:string,input:PreparedImportContext,state:EpochState){
  const r=object(input,['contextId','generation','keyVersion']),id=uuid(r.contextId);
