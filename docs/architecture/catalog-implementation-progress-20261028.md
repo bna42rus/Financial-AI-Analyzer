@@ -89,3 +89,31 @@ DTO подключён в state/detail/page/selection, Operations/карточк
 Проверки: отдельные finite-form coverage и синтетические guard cases, 48 NAME unit cases с immutable input/idempotence/privacy/правилами/группировкой, regression suites; HTTP fixtures для state/detail/page/search/manual rename/delete и отдельной логистики; desktop/mobile paged journey проверяет World Class рядом с исходным WORLDCLASS. 407 root + 83 web + 218 API unit проверены локально вместе с spec/types/build. PostgreSQL/browser acceptance — только фактический CI данного artifact. 86 document NAME scenarios и 153 ACT families не переписываются в глобальный PASS: часть требует ещё отсутствующих adapter relations/периодов/rollout.
 
 Оставшийся большой merchant prose inventory, explicit category bindings/settings и starter additions, FIN findings и единая окончательная acceptance/Staging не объявлены завершёнными. Никакого model POST или переключения работающего сайта/БД/admission этим шагом нет.
+
+
+## Продолжение IMPL-06: проценты и кредитные регрессии
+
+Основание: завершённый NAME commit `ae75236c97e17dbd2f4a3e83e9ab939ae0f9c103`, его CI 40704894376 PASS. PDF SHA256 и approved A-03/A-04/A-05 перечитаны: §§7–12, 33.7. Это адресная реализация FIN-I02 и проверка части FIN-I03, **не полная приёмка всех 96 FIN-семейств**. FIN-I01 (source-local instant/неизвестная зона) и FIN-I04 (фактический BNPL contract) этим изменением не закрываются.
+
+### Подтверждённая ошибка и изменение
+
+Две новые проверки сначала воспроизвели дефект: `defaultRole(interest)` всегда давал expense; автоматическая positive interest попадала в уменьшение расходов, а не в доход. Обычный prepared import передавал для незнакомых финансовых назначений `sourceKind=other`, и один только новый defaultRole не устранил бы импортный путь.
+
+- `defaultRole` / `initialSemantics` принимают signed integer minor amount. Для известного interest positive → income, negative → expense, zero/отсутствующее направление → unresolved. Остальные kinds не получают роль только из знака.
+- Версия `cashneuro-financial-evidence/1` распознаёт только целые явные заголовки начисления/выплаты процентов по вкладу/счёту либо уплаты по кредиту/займу/кредитной карте, при согласованном ненулевом знаке. Только intact `bank-source/5`, sourceKind other/interest. Прогнозы, отрицания, возвраты, principal/комиссия/страховка в составной строке и несовместимый знак не становятся одним interest. Название банка, категория, comments и доходная сумма сами по себе не доказательство.
+- Это отдельное deterministic решение kind/role; immutable `sourceKind`, source text, amount, HMAC и конечные события wire /1–/5 не переписываются/не расширяются. Не появляется продавец из банковского ФИО.
+- По явному предмету resolver выбирает только уникальный видимый узел собственной структуры с правильной ролью/parent: полученные проценты не попадают в одноимённый расходный узел. Нет создания/воскрешения категорий; populated/user/private/global/AI category/subcategory и parts защищены.
+- Init/повторный observation/reimport/cancellation используют общий initializer. Потеря единственного /5 доказательства при отмене возвращает оставшийся legacy source к unresolved, без ghost-interest. Ручные решения сохраняются, личные rules применяются с прежним приоритетом. Старые операции не запускаются массово на новую классификацию по одному открытию страницы.
+- `reconcile` вычисляет автоматическую роль **уже известного** interest по effective amount, включая correction и её сброс. Verified/user/private/global/AI role остаётся самостоятельным решением. Это read-only projection, без перезаписи исходного/сохранённого facet. Уже существующее активное decomposition продолжает считать собственные parts.
+
+### Фактический объём проверки
+
+Отдельные `financial-evidence.test.ts` и `financial-contracts.test.ts` проверяют известные/неизвестные направления, пределы явных назначений и provenance, защиту решений, ambiguity/hidden parent, read-only correction/reset и кредитную модель. Для `2500000 = 2000000 principal + 450000 interest + 50000 insurance` в копейках: Cashflow расход `2500000`, Economic `500000`; account override выше global. Parent не прибавляется. Некорректная сумма и неизвестный состав unresolved; credit-card purchase один expense, repayment/loan-disbursement neutral; refund относится к реальному месяцу и ограниченной общей capacity, candidate/rejected links не дают расходное уменьшение; NAME не меняет ни graph, ни итоги.
+
+Локально `pnpm run check` PASS: 455 root, 83 web и 218 API unit, spec/types/build. В 455 входят 48 новых финансовых проверок; их нельзя суммировать повторно как независимый второй набор.
+
+Новые PostgreSQL/HTTP случаи включены в действующий workflow: настоящий /5 local preparation → accept → worker → state/detail, обе процентные роли и собственные категории; repeat, immutable observations, correction reset, cancellation, private/manual, удаление единственного /5 evidence с сохранённым /4, full financial reset и свежий импорт; отдельный trusted bank-kind observation. Изменение только кода/тестов: новых миграций, paid POST и переключений сайта нет. Итоговый CI фиксируется в PR с точным SHA, а не переносится со старой сборки.
+
+### Следующая граница
+
+Продолжить FIN-I01 с версионированным сохранением source-local календаря/zone evidence и совместимостью строгого dedupe. Нельзя просто заменить Москву на текущую profile timezone или приписать неизвестному instant банковскую зону. Затем FIN-I04: совместимая **фактическая** договорная модель или конечный неподдерживаемый исход, без нового вида долга из бренда. Полные FIN-T01–T96/FIN-P01–P14, шесть starter additions/settings, оставшийся merchant inventory и Staging остаются в общем плане. Эти статусы не объявлены PASS текущим набором.

@@ -1,3 +1,4 @@
+import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
 import {applyMerchantRecognition,recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {sourceFields,hasBankDescription,merchantSourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
 import {createHash,randomUUID} from 'node:crypto';
@@ -7,7 +8,7 @@ import type {PreparedRow,Bank} from '../../../packages/imports/src/contract.ts';
 import {bankPdfAdapter,pdfParserVersions,legacyPdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
 import {matchSource,sameSource,strictSourceDescriptor} from '../../../packages/imports/src/matching.ts';
 import type {SourceCandidate} from '../../../packages/imports/src/matching.ts';
-import {object,uuid,initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
+import {object,uuid} from '../../../packages/finance-core/src/model.ts';
 import type {Operation,BankFact} from '../../../packages/finance-core/src/model.ts';
 import {applyRules} from '../../../packages/finance-core/src/rules.ts';
 import {reconcile} from '../../../packages/finance-core/src/graph.ts';
@@ -140,8 +141,8 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   }};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
-   const semantics=initialSemantics(fact.sourceKind!,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);if(fact.sourceKind==='other')semantics.kind=facet('other','bank',false,0);
-   const op=applyMerchantRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories);
+   const semantics=initialBankSemantics(fact,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);
+   const op=applyMerchantRecognition(applyFinancialRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories),graph.categories);
    graph.operations.push(op);
    await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,transactionId,observationId,JSON.stringify(op.semantics),op.analyticsOverride,JSON.stringify(op.reviewReasons)]);
   }
@@ -151,14 +152,9 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   if(prior&&!unchanged){
    const current=graph.operations.find(o=>o.id===transactionId)!,op=structuredClone(current);op.source=fact;
    if(row.safeSource){
-    const fresh=initialSemantics(fact.sourceKind!,fact.merchantText);
-    if(op.semantics.kind.source==='bank'&&!op.semantics.kind.userVerified){
-     const changed=op.semantics.kind.value!==fresh.kind.value;op.semantics.kind=fresh.kind;
-     if(changed&&op.semantics.role.source==='deterministic_system_rule'&&!op.semantics.role.userVerified)op.semantics.role=fresh.role;
-    }
-    if(op.semantics.merchant.source==='bank'&&!op.semantics.merchant.userVerified&&(fact.merchantText||prior.source_kind!==fact.sourceKind))op.semantics.merchant=fresh.merchant;
+    op.semantics=refreshBankSemantics(op.semantics,fact);
    }
-   const classified=applyMerchantRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories);
+   const classified=applyMerchantRecognition(applyFinancialRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories),graph.categories);
    graph.operations[graph.operations.indexOf(current)]=classified;
    await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
   }

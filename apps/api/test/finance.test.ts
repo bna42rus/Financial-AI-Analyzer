@@ -28,6 +28,11 @@ async function append(amount:string,kind:Kind='purchase',transactionId:string|nu
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
+test('FIN-T49/T50: trusted bank interest uses actual signed amount in initial and repeated observations and protects owner role',async()=>{
+ const received=(await append('450000','interest')).transactionId,paid=(await append('-50000','interest')).transactionId;let w=await view();assert.equal(w.operations.find((o:any)=>o.id===received).analyticsRole,'income');assert.equal(w.operations.find((o:any)=>o.id===paid).analyticsRole,'expense');assert.equal(w.summary.incomeMinor,'450000');assert.equal(w.summary.netExpensesMinor,'50000');
+ await append('450001','interest',received);w=await view();assert.equal(w.operations.find((o:any)=>o.id===received).classification.role.value,'income');
+ await command({kind:'operation',id:received,patch:{role:'neutral'}});await append('450002','interest',received);const manual=(await view()).operations.find((o:any)=>o.id===received);assert.equal(manual.analyticsRole,'neutral');assert.equal(manual.classification.role.userVerified,true);
+});
 test('HTTP financial text boundary rejects passport, email and invisible-identifier bypasses without writes or reflection',async()=>{
  const operationId=(await append('-1000')).transactionId;
  for(const raw of ['Паспорт 4510 123456','Email synthetic.private@example.test','Карта 1234\u200b5678\u20609012\u200e3456','Договор No TEST-123456']){

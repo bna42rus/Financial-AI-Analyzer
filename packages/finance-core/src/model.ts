@@ -17,13 +17,14 @@ export const linkKinds=['own_transfer','credit_card_repayment','refund','reversa
 export type Link={id:string;sourceId:string;targetId:string;sourceComponentId:string|null;targetComponentId:string|null;sourceAllocationId?:string|null;targetAllocationId?:string|null;kind:typeof linkKinds[number];amountMinor:string;status:'candidate'|'confirmed'|'rejected';confidence:number;createdBy:Source};
 export type Graph={accounts:Account[];categories:Category[];operations:Operation[];components:Component[];links:Link[];loanMode:'cashflow'|'economic'};
 export function facet<T>(value:T,source:Source='deterministic_system_rule',userVerified=false,confidence=100):Facet<T>{return {value,source,userVerified,confidence};}
-export function defaultRole(kind:Kind):Role {
- if(['purchase','loan_payment','interest','fee','insurance'].includes(kind))return 'expense';
+export function defaultRole(kind:Kind,amountMinor?:string):Role {
+ if(kind==='interest'){const amount=amountMinor===undefined?0n:parsePersistedMinor(amountMinor);return amount>0n?'income':amount<0n?'expense':'unresolved';}
+ if(['purchase','loan_payment','fee','insurance'].includes(kind))return 'expense';
  if(kind==='cashback')return 'income';
  if(['own_transfer','cash_withdrawal','cash_deposit','credit_card_repayment','loan_disbursement'].includes(kind))return 'neutral';
  return 'unresolved';
 }
-export function initialSemantics(kind:Kind,merchant=''):Semantics {return {kind:facet(kind,'bank'),role:facet(defaultRole(kind)),category:facet(null),subcategory:facet(null),merchant:facet(merchant,'bank'),counterparty:facet(null)};}
+export function initialSemantics(kind:Kind,merchant='',amountMinor?:string):Semantics {return {kind:facet(kind,'bank'),role:facet(defaultRole(kind,amountMinor)),category:facet(null),subcategory:facet(null),merchant:facet(merchant,'bank'),counterparty:facet(null)};}
 export function object(value:unknown,keys:string[]):Record<string,unknown>{
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)))throw new TypeError('INVALID_FIELDS');return value as Record<string,unknown>;
 }

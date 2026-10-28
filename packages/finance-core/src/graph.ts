@@ -1,6 +1,7 @@
 import {assertComponentSum,parsePersistedMinor,sumMinor} from './money.ts';
 import {effective,operationDay} from './model.ts';
 import {allocationOrder,allocationParents} from './allocation-graph.ts';
+import {effectiveFinancialRole} from './financial-evidence.ts';
 import type {Graph,Operation,Facet,Role,Link} from './model.ts';
 
 type Node={id:string;operation:Operation;componentId:string|null;amount:bigint;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;allocationId?:string|null;basis?:string[]};
@@ -36,7 +37,7 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
    });}
    catch {addReason(op.id,'component_conflict');base=[{id:op.id+':root',operation:op,componentId:null,amount,role:{...op.semantics.role,value:'unresolved',userVerified:false},category:op.semantics.category,subcategory:op.semantics.subcategory}];}
   } else {
-   let role=op.semantics.role;
+   let role=effectiveFinancialRole(op);
    if(op.semantics.kind.value==='loan_payment'&&!role.userVerified&&(accounts.get(fact.accountId)!.loanMode??graph.loanMode)==='economic') {role={...role,value:'unresolved'};addReason(op.id,'incomplete_credit_data');}
    base=[{id:op.id+':root',operation:op,componentId:null,amount,role,category:op.semantics.category,subcategory:op.semantics.subcategory}];
   }

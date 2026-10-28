@@ -525,3 +525,35 @@ test('/5 extended logistics assigns the actual separate service without disguisi
  try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic parcel service'),rows:[row({localDescription:'Покупка B2CPL отправка посылки',localMerchant:'B2CPL',localMcc:'4215',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
  await accept(b!);await drain(b!.batchId);const item=await importedOperation(),state=(await request('/finance/state')).json();assert.equal(state.categories.find((c:any)=>c.id===item.semantics.subcategory.value)?.name,'Прочий транспорт');assert.equal(item.displayName.title,'B2CPL');assert.equal(item.source.merchantText,'B2CPL');assert.equal(item.components.length,0);assert.equal(item.semantics.role.value,'expense');
 });
+
+async function interestBatch(bytes:string,rows:ExtractedRow[],profile:'bank-source/5'|'bank-source/4'='bank-source/5'){
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,profile);
+ try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}
+}
+test('FIN-T49/T50 HTTP: /5 incoming deposit interest and paid loan interest retain bank facts through repeat, corrections reset and cancellation',async()=>{
+ const input=[row({bankReference:'Synthetic-received-interest',localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'}),row({bankReference:'Synthetic-paid-interest',localDescription:'Уплата процентов по кредиту',amountMinor:'-50000',direction:'debit',parser:'tbank-table/1'})];
+ const first=await interestBatch('Synthetic interest first',input);await accept(first);await drain(first.batchId);const state=(await request('/finance/state')).json(),received=state.operations.find((o:any)=>o.amountMinor==='450000'),paid=state.operations.find((o:any)=>o.amountMinor==='-50000');
+ assert.equal(received.analyticsRole,'income');assert.equal(paid.analyticsRole,'expense');assert.equal(state.summary.incomeMinor,'450000');assert.equal(state.summary.netExpensesMinor,'50000');assert.equal(state.categories.find((c:any)=>c.id===received.classification.subcategory.value)?.name,'Проценты по счетам и вкладам');assert.equal(state.categories.find((c:any)=>c.id===paid.classification.subcategory.value)?.name,'Проценты');
+ const before=await detail(received.id);assert.equal(before.source.sourceKind,'other');assert.equal(before.semantics.kind.value,'interest');assert.equal(before.semantics.kind.source,'deterministic_system_rule');
+ const oldObservations=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ await command({kind:'operation',id:received.id,patch:{corrections:{amountMinor:'450001'},comment:'Мои проценты'}});assert.equal((await detail(received.id)).projection.analyticsRole,'income');await command({kind:'operation',id:received.id,patch:{corrections:{}}});assert.equal((await detail(received.id)).projection.amountMinor,'450000');
+ const again=await interestBatch('Synthetic interest repeat',input);await accept(again);assert.equal((await drain(again.batchId)).counts.existing,2);assert.equal((await counts()).transaction,2);
+ assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[oldObservations.map(o=>o.id)])).rows,oldObservations);
+ await command({kind:'cancel_import',batchId:again.batchId});const restored=await detail(received.id);assert.equal(restored.projection.analyticsRole,'income');assert.equal(restored.comment,'Мои проценты');assert.equal(restored.source.amountMinor,'450000');assert.equal(restored.source.sourceKind,'other');
+ assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
+});
+test('FIN-P04/P09 HTTP: private interest role and a later verified decision survive repeat and cancellation',async()=>{
+ await command({kind:'rule',id:randomUUID(),create:true,patch:{name:'Личное учётное решение',enabled:true,priority:1,conditions:{descriptionContains:'процентов по вкладу'},assignments:{role:'neutral'}}});
+ const rows=[row({localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'})],first=await interestBatch('Synthetic private interest',rows);await accept(first);await drain(first.batchId);let op=await importedOperation();assert.equal(op.semantics.role.source,'personal_rule');assert.equal(op.projection.analyticsRole,'neutral');
+ await command({kind:'operation',id:op.id,patch:{role:'income',merchant:'Мой вклад'}});const again=await interestBatch('Synthetic private interest repeat',rows);await accept(again);await drain(again.batchId);await command({kind:'cancel_import',batchId:again.batchId});op=await detail(op.id);assert.equal(op.semantics.role.userVerified,true);assert.equal(op.projection.analyticsRole,'income');assert.equal(op.semantics.merchant.value,'Мой вклад');
+});
+test('FIN-P09 HTTP: deleting the only /5 evidence removes inferred interest while retained legacy facts stay unresolved',async()=>{
+ const rows=[row({localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'})];
+ const current=await interestBatch('Synthetic current interest',rows);await accept(current);await drain(current.batchId);const id=(await importedOperation()).id;assert.equal((await detail(id)).semantics.kind.value,'interest');
+ const old=await interestBatch('Synthetic legacy retained',rows,'bank-source/4');await accept(old);await drain(old.batchId);await command({kind:'cancel_import',batchId:current.batchId});const restored=await detail(id);assert.equal(restored.source.versions.sourceSanitizer,'bank-source/4');assert.equal(restored.semantics.kind.value,'other');assert.equal(restored.projection.analyticsRole,'unresolved');assert.equal(restored.semantics.category.value,null);
+});
+test('FIN-P09 HTTP: a full financial reset and fresh import do not resurrect the wrong interest initializer',async()=>{
+ const rows=[row({localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'})],first=await interestBatch('Synthetic interest before reset',rows);await accept(first);await drain(first.batchId);const before=await importedOperation();
+ await command({kind:'reset_financial',keepCategories:true,keepRules:true,keepInterface:true});assert.equal((await counts()).transaction,0);
+ const fresh=await interestBatch('Synthetic interest after reset',rows);await accept(fresh);await drain(fresh.batchId);const after=await importedOperation();assert.notEqual(after.id,before.id);assert.equal(after.projection.analyticsRole,'income');assert.equal(after.source.amountMinor,'450000');assert.equal(after.source.description,before.source.description);
+});

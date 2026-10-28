@@ -1,3 +1,4 @@
+import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
 import {operationDisplayName} from '../../../packages/finance-core/src/operation-name.ts';
 import {cleanBankText} from '../../../packages/imports/src/bank-description.ts';
 import {parseOverviewIntent,applyOverviewIntent} from './overview.ts';
@@ -21,7 +22,7 @@ import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
-import {object,choice,uuid,dateFact,correction,initialSemantics,defaultRole,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
+import {object,choice,uuid,dateFact,correction,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
@@ -355,13 +356,11 @@ export async function acceptObservation(db:PoolClient,userId:string,epoch:Import
   return {transactionId:existing.transaction_id as string,observationId,projection:reconcile((await loadFinance(db,userId)).graph).operations.find(o=>o.id===existing.transaction_id)};
  }
  const {graph,rules}=await loadFinance(db,userId),account=canonicalAccount(graph,fact.accountId);
- const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialSemantics(kind,fact.merchantText);
+ const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialBankSemantics(fact);
  if(transactionId!==null){
-  const previous=await row(db,userId,'transaction',id);semantics=structuredClone(previous.semantics);
-  if(!semantics.kind.userVerified&&semantics.kind.source==='bank'){semantics.kind=facet(kind,'bank');if(!semantics.role.userVerified&&semantics.role.source==='deterministic_system_rule')semantics.role=facet(defaultRole(kind));}
-  if(!semantics.merchant.userVerified&&semantics.merchant.source==='bank')semantics.merchant=facet(fact.merchantText,'bank');
+  const previous=await row(db,userId,'transaction',id);semantics=refreshBankSemantics(previous.semantics,fact);
  }else{
-  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyRules(op,account,rules);
+  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyFinancialRecognition(applyRules(op,account,rules),graph.categories);
   semantics=classified.semantics;await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,observationId,JSON.stringify(semantics),classified.analyticsOverride,JSON.stringify(classified.reviewReasons)]);
  }
  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,merchant_text,description,bank_category,bank_ref_hmac,versions,source_kind,operation_amount_minor,operation_currency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[userId,observationId,id,fact.accountId,JSON.stringify(fact.operationDate),fact.postedDate===null?null:JSON.stringify(fact.postedDate),fact.amountMinor,fact.currency,fact.merchantText,fact.description,fact.bankCategory,fact.bankRefHmac,JSON.stringify(fact.versions),kind,fact.operationAmountMinor,fact.operationCurrency]);

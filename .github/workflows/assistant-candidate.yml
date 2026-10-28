@@ -63,6 +63,8 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/finance-core/test/financial-evidence.test.ts
+          packages/finance-core/test/financial-contracts.test.ts
           packages/finance-core/test/operation-name.test.ts
           packages/finance-core/test/extended-catalog.test.ts
           packages/finance-core/test/activity-recognition.test.ts
