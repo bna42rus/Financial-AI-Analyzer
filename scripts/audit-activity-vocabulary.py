@@ -106,7 +106,7 @@ def main():
         require(edge['specific'] in ids and edge['broad'] in ids and edge['specific'] != edge['broad'], 'Invalid sense reference')
         require(edge['condition'], 'Unconditional precedence')
     rule_ids = [v['id'] for v in data['rules']]
-    require(rule_ids == [f'ACT-U{i:02d}' for i in range(1,33)], 'Rule sequence drift')
+    require(rule_ids == [f'ACT-U{i:02d}' for i in range(1,41)], 'Rule sequence drift')
     for rule in data['rules']:
         require(rule['contract'] in text, 'Rule text differs from JSON')
     scenarios = data['scenario_families']
