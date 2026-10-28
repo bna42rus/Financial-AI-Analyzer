@@ -177,7 +177,7 @@ test('/5 activity pass records its own engine with zero model POSTs and preserve
  await queue();await runClassificationStage(pg.finance,provider());const result=await state(),pharmacy=result.categories.find(c=>c.name==='Аптеки')!;
  assert.equal(calls,0);assert.ok(result.operations.every(o=>o.classification.subcategory.value===pharmacy.id&&o.classification.category.source==='global_rule'&&o.classification.merchant.value===merchant));
  assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,sourceBefore);
- const runs=(await pg.owner.query('SELECT engine,applied FROM finance.classification_run')).rows;assert.deepEqual(runs,[{engine:'cashneuro-activity-catalog/2',applied:3}]);
+ const runs=(await pg.owner.query('SELECT engine,applied FROM finance.classification_run')).rows;assert.deepEqual(runs,[{engine:'cashneuro-activity-catalog/3',applied:3}]);
  assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
  await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_assignment')).rows[0].n,3);
 });

@@ -1,4 +1,5 @@
 import {extendedCatalogEvidence} from './extended-catalog.ts';
+import {fullCatalogEvidence,supersededLegacy} from './full-catalog.ts';
 import {merchantCatalog} from './merchant-catalog.ts';
 import type {MerchantEntry} from './merchant-catalog.ts';
 import {groceryEvidence} from './grocery-evidence.ts';
@@ -7,8 +8,7 @@ export type CatalogInput={merchantText:string;description:string;bankCategory?:s
 export type CatalogEvidence={status:'recognized';entry:MerchantEntry;literal:string;target:string|null;parentOnly:boolean;provisional:boolean;profileId?:string}|{status:'none'|'conflict'|'needs_context';reason:string};
 const aliases=literalIndex(merchantCatalog.map(entry=>({value:entry,forms:entry.aliases})));
 const serviceTargets:Readonly<Record<string,string>>={grocery:'grocery',cafe:'cafe',fitness:'fitness',public_transport:'public',carsharing:'carshare',powerbank:'powerbank',marketplace:'marketplace',cloud:'cloud',pharmacy:'pharmacy',fuel:'fuel',cinema:'events',books:'books',pets:'pet_goods',home:'home_goods',clothing:'clothes',electronics:'electronics',beauty:'salon',medical:'doctors',rail:'rail',air:'air',hotel:'hotel',education:'courses',cosmetics:'cosmetics',laboratory:'diagnostics',veterinary:'vet'};
-/** The already-active finite catalog only. New prose profiles stay inactive until
- * separately bound to typed source/period guards. No fuzzy or global transliteration. */
+/** Finite spelling data and typed guards; never execute restriction prose. */
 export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
  const text=input.merchantText.trim();if(!text)return {status:'none',reason:'NO_MERCHANT_FIELD'};
  const all=aliases(text),found=all.filter(h=>!literalNegated(text,h));
@@ -16,8 +16,17 @@ export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
  const entries=[...new Map(found.map(h=>[h.value.name,h.value])).values()];
  const specific=entries.filter(e=>!entries.some(other=>other.parentBrand===e.name));
  if(specific.length>1)return {status:'conflict',reason:'MULTIPLE_MERCHANT_PROFILES'};
- const extended=extendedCatalogEvidence(input);
- const entry=specific[0];if(!entry)return extended;
+ const extended=extendedCatalogEvidence(input),full=fullCatalogEvidence(input);
+ const entry=specific[0];
+ if(full.status==='recognized'){
+  if(extended.status==='recognized')return {status:'conflict',reason:'FULL_AND_EXTENDED_PROFILE_CONFLICT'};
+  if(!entry)return full;
+  if(entry.name===full.entry.name)return {...full,entry:{...full.entry,aliases:[...new Set([...full.entry.aliases,...entry.aliases])]}};
+  if((supersededLegacy[full.profileId??'']??[]).includes(entry.name))return full;
+  return {status:'conflict',reason:'LEGACY_AND_FULL_PROFILE_CONFLICT'};
+ }
+ if(full.status==='conflict')return full;
+ if(!entry)return extended.status==='none'?full:extended;
  if(extended.status==='conflict'||extended.status==='needs_context')return extended;
  if(extended.status==='recognized')return {status:'conflict',reason:'LEGACY_AND_EXTENDED_PROFILE_CONFLICT'};
  const literal=found.find(h=>h.value===entry)!.form;

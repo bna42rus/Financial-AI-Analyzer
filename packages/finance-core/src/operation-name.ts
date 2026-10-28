@@ -46,7 +46,7 @@ export function operationDisplayName(op:Operation,context:NameContext={}):Operat
    const ending=method==='delivery'?/(?:\s*[,;:—-]?\s+)(?:доставка(?: бесплатно)?|доставкой|delivery|home delivery|курьерская доставка)$/iu:/(?:\s*[,;:—-]?\s+)(?:самовывоз|самовывозом|pickup|pick-up|click and collect)$/iu;
    title=title.replace(ending,'').trim()||title;
   }
-  if(activity.profileKey==='legacy-catalog:Яндекс Go'&&activity.targetKey==='powerbank'){
+  if(['legacy-catalog:Яндекс Go','catalog-v1:R01'].includes(activity.profileKey??'')&&activity.targetKey==='powerbank'){
    const m=/^(.+?)(?:\s*:\s*|\s+)(аренда пауэрбанка|аренда зарядки)$/iu.exec(title);if(m){title=m[1]!;serviceQualifier='Аренда пауэрбанка';}
   }
   const evidence=recognizeCatalogEvidence({merchantText:title,description,bankCategory:source.bankCategory,mcc:source.sourceMcc});
@@ -54,7 +54,7 @@ export function operationDisplayName(op:Operation,context:NameContext={}):Operat
   // an unknown longer trade name does not authorize dropping the remainder.
   if(evidence.status==='recognized'&&evidence.entry.aliases.some(alias=>catalogFold(alias)===catalogFold(title))){
    const matchedTitle=title;
-   const key=styleKeys[evidence.profileId??evidence.entry.name]??evidence.entry.name,style=styles.get(key),alphabet=script(title);
+   const key=styleKeys[evidence.profileId??'']??styleKeys[evidence.entry.name]??evidence.entry.name,style=styles.get(key),alphabet=script(title);
    const label=style&&alphabet?style.labels[alphabet]:undefined;
    if(label){title=cleanBankText(label,160);explanationCode=style!.id;}
    if(evidence.entry.name==='TimeWeb'&&/cloud$/iu.test(matchedTitle)){serviceQualifier='Cloud';title='TimeWeb';explanationCode='NAME-S01';}

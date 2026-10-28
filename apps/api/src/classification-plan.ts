@@ -1,4 +1,5 @@
 import {extendedCatalogSha256} from '../../../packages/finance-core/src/extended-catalog.ts';
+import {fullCatalogDataSha256} from '../../../packages/finance-core/src/full-catalog.ts';
 import {assessInstallmentContract,installmentPolicyVersion} from '../../../packages/finance-core/src/installment-contract.ts';
 import {activityDecision,activityEngineVersion,activityDataSha256} from '../../../packages/finance-core/src/activity-recognition.ts';
 import {recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
@@ -61,7 +62,7 @@ export function classificationPlan(graph:Graph,rules:Rule[]=[]){
  const categories=graph.categories.filter(c=>!c.hidden&&(c.parentId===null||graph.categories.some(p=>p.id===c.parentId&&!p.hidden))).sort((a,b)=>a.id.localeCompare(b.id));
  if(categories.length>300)throw Error('CLASSIFICATION_CATALOG_TOO_LARGE');
  const catalog=categories.map((c,i)=>({ref:'c'+(i+1),name:safeText(c.name,160),role:c.role,parent:c.parentId===null?null:'c'+(categories.findIndex(p=>p.id===c.parentId)+1)}));
- const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,extendedCatalogSha256,installmentPolicyVersion,categories,bindings:graph.categoryBindings});
+ const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,extendedCatalogSha256,fullCatalogDataSha256,installmentPolicyVersion,categories,bindings:graph.categoryBindings});
  const groups=new Map<string,{signature:string;sortKey:string;signal:NonNullable<ReturnType<typeof classificationSignal>>;operationIds:string[]}>();
  for(const op of graph.operations){const signal=classificationSignal(op,graph,rules);if(!signal)continue;
   const signature=digest({version:classificationVersion,catalogHash,signal});

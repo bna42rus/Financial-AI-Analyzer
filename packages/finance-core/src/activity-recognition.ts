@@ -8,7 +8,7 @@ import type {LiteralHit} from './catalog-lexical.ts';
 import {resolveOwnCategory,privateCategoryTarget} from './category-resolution.ts';
 import type {CategoryResolution,CategoryBindings} from './category-resolution.ts';
 import {recognizeCatalogEvidence,serviceProfileDefault} from './catalog-evidence.ts';
-export const activityEngineVersion='cashneuro-activity-catalog/2';
+export const activityEngineVersion='cashneuro-activity-catalog/3';
 export {activityDataSha256};
 export type ActivityInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null;kind:string;role:string};
 export type ActivityRecognition={status:'recognized'|'unrecognized'|'needs_context'|'conflict'|'delegate_fin';activityIds:string[];targetKey:string|null;confidence:number;provisional:boolean;parentOnly:boolean;fulfillment:'delivery'|'pickup'|'unspecified'|'conflict';reason:string;profileKey:string|null;privateLabels?:readonly string[]};
