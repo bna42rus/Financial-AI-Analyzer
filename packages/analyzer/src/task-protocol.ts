@@ -6,7 +6,8 @@ import type { Catalog } from './yandex-contract.ts';
 import { conditionFields, parseTaskBinding, resolveTaskDecision } from './task-context.ts';
 import type { TaskBook, TaskScope, TaskDecision, ScalarEdit, Condition, GlobalSnapshot, ConditionEdit } from './task-context.ts';
 import type { Query, Relevance } from './registry.ts';
-import { registryVersion } from './registry.ts';
+// Historical task-protocol/1 is frozen independently of newer action tools.
+export const taskRegistryVersion='analyzer/3';
 import { periodLiteral, amountLiteral, questionQuote } from './task-literals.ts';
 import { assertClosedSchema } from './closed-schema.ts';
 
@@ -49,7 +50,7 @@ export const taskProposalSchema = closed({ status: enumString(['query', 'clarifi
   ] } },
 });
 export const taskCapabilities = {
-  version: taskProtocolVersion, registryVersion, tool: 'query_finances', metrics, groupings, comparisons,
+  version: taskProtocolVersion, registryVersion: taskRegistryVersion, tool: 'query_finances', metrics, groupings, comparisons,
   edits: ['keep', 'set', 'clear', 'use_current'], filterGroups: conditions, setGroups: Object.keys(setValues),
   money: { defaultNaturalLanguageBasis: 'absolute_operation', supported: ['signed_operation', 'absolute_operation'], metricPart: 'unsupported' },
   unsupported: ['writes', 'forecast', 'web', 'documents', 'merchant_grouping', 'arbitrary_sql', 'component_amount_threshold'],

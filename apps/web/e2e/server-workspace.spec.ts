@@ -224,3 +224,13 @@ test('refresh preserves an unsaved card name and requires a deliberate conflict 
  await expect(page.getByLabel('Название: Обновлено на другом устройстве',{exact:true})).toHaveValue('Обновлено на другом устройстве');
  expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);
 });
+
+test('start screen and default period follow device preferences and profile timezone while explicit links win',async({page})=>{
+ await setup(page);await page.clock.setFixedTime(new Date('2026-10-10T01:00:00Z'));await section(page,'Интерфейс');
+ await page.getByLabel('Стартовый экран',{exact:true}).selectOption('operations');await page.getByLabel('Начальный период',{exact:true}).selectOption('current_month');
+ await page.goto(base);await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
+ await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('2026-10-01');await expect(page.getByLabel('По дату',{exact:true})).toHaveValue('2026-10-09');
+ await page.getByRole('link',{name:'CashNeuro — Финансовый анализатор',exact:true}).click();await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();
+ await page.goto(base+'#analyzer');await expect(page.getByRole('heading',{name:'Анализатор',exact:true})).toBeVisible();
+ const stored=await page.evaluate(()=>localStorage.getItem('finance-navigation-v1'));expect(JSON.parse(stored!)).toEqual({startScreen:'operations',defaultPeriod:'current_month'});
+});

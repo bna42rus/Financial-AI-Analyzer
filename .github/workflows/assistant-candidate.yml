@@ -78,6 +78,8 @@ jobs:
           packages/finance-core/test/merchant-recognition.test.ts
           packages/finance-core/test/grocery-recognition.test.ts
           packages/analyzer/test/merchant-rule.test.ts
+          packages/analyzer/test/calculators.test.ts
+          packages/analyzer/test/assistant-changes.test.ts
           packages/imports/test/bank-description.test.ts
           packages/imports/test/merchant-source.test.ts
           apps/api/test/merchant-source.test.ts

@@ -130,7 +130,7 @@ def docker_database():
 def health(expected=False):
     with urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=3) as response:
         value = json.load(response)
-    return value.get('status') == 'ok' and value.get('profile') == 'finance' and (not expected or value.get('assistant') == 'cashneuro-assistant-workflow/6')
+    return value.get('status') == 'ok' and value.get('profile') == 'finance' and (not expected or value.get('assistant') == 'cashneuro-assistant-workflow/7')
 
 
 def wait_health(expected=False):
@@ -285,7 +285,7 @@ def install(args):
         print('Ошибка переключения. Выполняется откат.', flush=True)
         restore(backup)
         raise
-    print(json.dumps({'status': 'INSTALLED', 'sha': args.sha, 'assistant': 'cashneuro-assistant-workflow/6', 'paidCalls': 0, 'rollback': rollback_command}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'INSTALLED', 'sha': args.sha, 'assistant': 'cashneuro-assistant-workflow/7', 'paidCalls': 0, 'rollback': rollback_command}, ensure_ascii=False), flush=True)
 
 
 def main():

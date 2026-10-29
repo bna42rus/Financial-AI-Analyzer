@@ -1,3 +1,4 @@
+import {calculateFinancial} from '../../../packages/analyzer/src/calculators';
 import {test,expect} from '@playwright/test';
 import type {Page} from '@playwright/test';
 import {createServer} from 'vite';
@@ -9,7 +10,7 @@ import {calculateOverview,defaultOverview,parseOverviewView} from '../../../pack
 import {queryOperations,parseOperationsQuery} from '../../../packages/finance-core/src/operations';
 import type {FinanceState} from '../src/finance-client';
 import {interpret,registryVersion} from '../../../packages/analyzer/src/registry';
-import type {Chat} from '../../../packages/analyzer/src/types';
+import type {Chat,Message} from '../../../packages/analyzer/src/types';
 import {calculateWidget,parseWidget} from '../../../packages/finance-core/src/overview';
 let server:ViteDevServer,base:string;
 test.beforeAll(async()=>{server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),cacheDir:fileURLToPath(new URL('../node_modules/.vite-overview-'+process.pid,import.meta.url)),server:{host:'127.0.0.1',port:0},define:{'import.meta.env.VITE_API_ORIGIN':JSON.stringify('http://127.0.0.1:3000')}});await server.listen();base=server.resolvedUrls!.local[0]!;});
@@ -63,3 +64,18 @@ test('lost action acknowledgement retries the same tool and ID before a single c
 
 
 test('editing the next question while a request is in flight preserves the new draft',async({page})=>{const h=await setup(page);let release!:()=>void,seen!:()=>void,hold=true;const gate=new Promise<void>(r=>release=r),started=new Promise<void>(r=>seen=r);await page.route('http://127.0.0.1:3000/finance/analyzer-query',async route=>{if(route.request().method()==='OPTIONS')return route.fallback();if(hold){hold=false;seen();await gate;}return route.fallback();});await send(page,'Мои расходы');await started;const input=page.getByLabel('Ваш финансовый вопрос',{exact:true});try{await history(page);await page.getByLabel('Поиск диалогов',{exact:true}).filter({visible:true}).fill('Новый');await expect.poll(()=>h.calls.some(c=>c.path==='/finance/analyzer-state'&&c.body.search==='Новый')).toBe(true);await expect(page.locator('button[aria-current="true"]').filter({visible:true})).toHaveText('Новый диалог');if(page.viewportSize()!.width<700)await page.getByRole('button',{name:'Закрыть диалоги',exact:true}).click();await input.fill('А по категориям?');await expect(page.getByRole('button',{name:'Отправить вопрос',exact:true})).toBeDisabled();}finally{release();}await expect(log(page)).toContainText('300 ₽');await expect(page.getByRole('button',{name:'Отправить вопрос',exact:true})).toBeEnabled();await expect(input).toHaveValue('А по категориям?');await page.getByRole('button',{name:'Отправить вопрос',exact:true}).click();await expect(log(page).getByRole('table')).toContainText('Synthetic food');});
+
+
+test('calculator answers show the exact assumptions and natural proposals require explicit confirmation',async({page})=>{
+ const h=await setup(page),chat={id:crypto.randomUUID(),title:'Расчёты и настройки',pinned:false,createdAt:new Date().toISOString(),modifiedAt:new Date().toISOString(),messages:[] as Message[]};
+ const calculation=calculateFinancial({kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'});
+ chat.messages.push({id:crypto.randomUUID(),question:'Аннуитет 100 рублей, 12%, месяц',answer:{mode:'ai',registryVersion,text:'Проценты: 1 ₽. Всего: 101 ₽.',calculation},createdAt:new Date().toISOString(),actionId:null});
+ const id=crypto.randomUUID(),intent={kind:'account' as const,id:h.state.accounts[0]!.id,patch:{name:'Основной счёт'}};
+ chat.messages.push({id,question:'Переименуй счёт',answer:{mode:'ai',registryVersion,text:'Пока ничего не сохранено.',proposal:{version:'cashneuro-change-proposal/1',intent,title:'Название счёта',description:['Основной счёт'],sourceAnswerId:null}},createdAt:new Date().toISOString(),actionId:null});
+ h.chats.unshift(chat);await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await page.getByRole('link',{name:'Анализатор',exact:true}).click();
+ await page.getByText('Условия и расчётная модель',{exact:true}).click();await expect(page.getByRole('region',{name:'Расчётный график кредита'})).toContainText('101');await expect(page.getByRole('log')).toContainText('не официальный график банка');
+ await page.getByRole('button',{name:'Проверить последствия предложения',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);
+ expect(h.calls.filter(c=>c.path==='/finance/analyzer-propose').at(-1)?.body.tool).toEqual({name:'finance_action',answerId:id,intent});
+ await page.getByRole('button',{name:'Не применять',exact:true}).click();expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);await expect(page.getByRole('button',{name:'Открыть последствия предложения',exact:true})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});

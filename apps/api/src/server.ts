@@ -1,3 +1,4 @@
+import {assistantWorkflowVersion} from './assistant-workflow.ts';
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -110,7 +111,7 @@ export async function createServer(config: Config) {
     }
     if (request.method === 'POST' && (origin !== config.origin || request.headers['content-type']?.split(';')[0] !== 'application/json')) return reply.code(403).send({ code: 'ORIGIN_DENIED' });
     const path = request.url.split('?')[0]!;
-    if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile, ...(config.assistantProvider?{assistant:'cashneuro-assistant-workflow/6'}:{}) };
+    if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile, ...(config.assistantProvider?{assistant:assistantWorkflowVersion}:{}) };
     let db: PoolClient | undefined;
     try {
       await rate(request);
@@ -238,7 +239,7 @@ export async function createServer(config: Config) {
         else if(tasks&&path==='/finance/analyzer-context')result=await tasks.analyzerTaskContext(db,s.user.id,request.body);
         else if(tasks&&path==='/finance/analyzer-task-cancel')result=await tasks.cancelAnalyzerTask(db,s.user.id,request.body);
         else if(['/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel'].includes(path))throw new HttpError(503,'AI_UNAVAILABLE');
-        else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:'cashneuro-assistant-workflow/6',assistantProfile:await assistant.assistantProfile(db,s.user.id,{})}:{}),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
+        else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:assistantWorkflowVersion,assistantProfile:await assistant.assistantProfile(db,s.user.id,{})}:{}),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
         else if(path==='/finance/analyzer-chat')result=await analyzer!.analyzerChat(db,s.user.id,request.body);
         else if(path==='/finance/analyzer-query')result=await analyzer!.analyzerQuery(db,s.user.id,request.body,config.analyzerAdapter,config.yandexAnalyzer,s.user.email);
         else if(path==='/finance/analyzer-propose')result=await analyzer!.analyzerPropose(db,s.user.id,request.body);

@@ -126,7 +126,7 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  const r=object(value,['actionId','tool']),actionId=uuid(r.actionId),tool=parseTool(r.tool);if(tool.name==='query_finances')throw new TypeError('INVALID_ACTION');
  // Lock and authorization also protect direct internal invocation, not only HTTP routing.
  const state=await prepareFinance(db,userId);
- const message=(await db.query('SELECT answer,action_id FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,tool.answerId])).rows[0];if(!message?.answer.query)throw new HttpError(404,'NOT_FOUND');
+ const message=(await db.query('SELECT answer,action_id FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,tool.answerId])).rows[0];if(!message?.answer.query&&!message?.answer.proposal)throw new HttpError(404,'NOT_FOUND');
  if(message.action_id&&message.action_id!==actionId)throw new HttpError(409,'ACTION_REUSED');
  const existing=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,actionId])).rows[0];
  if(existing){
@@ -135,12 +135,16 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
   if(existing.generation!==state.generation||existing.expected_revision!==state.revision||!existing.fresh)throw new HttpError(409,'FINANCE_CHANGED');
   return {status:'previewed',actionId,intent:existing.intent.canonical,impact:existing.preview,generation:state.generation,requiresConfirmation:existing.intent.analyzer.confirmation};
  }
- const answer=message.answer as Answer,query=answer.query!;
+ const answer=message.answer as Answer,query=answer.query,proposal=answer.proposal;
+ if(proposal&&(proposal.version!=='cashneuro-change-proposal/1'||tool.name!=='finance_action'||stableJSON(tool.intent)!==stableJSON(proposal.intent)))throw new HttpError(409,'ANALYZER_PROPOSAL_CHANGED');
  if(state.generation!==answer.generation||state.revision!==answer.revision)throw new HttpError(409,'FINANCE_CHANGED');
+ let raw:unknown;
+ if(proposal)raw=proposal.intent;
+ else{
+  if(!query)throw new HttpError(404,'NOT_FOUND');
  const {operations,state:dataset}=await operationsDataset(db,userId);
  const ids=queryOperations(operations,dataset,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id),scope=new Set(ids);
  const fixed=(chosen:string[])=>{if(!chosen.length||chosen.length>1000)throw new HttpError(409,'ANALYZER_SCOPE_LIMIT');if(chosen.some(id=>!scope.has(id)))throw new HttpError(409,'ANALYZER_SCOPE_CHANGED');};
- let raw:unknown;
  if(tool.name==='set_inclusion'){fixed(ids);raw={kind:'bulk_operations',operationIds:ids,patch:{analyticsOverride:tool.value}};}
  else if(tool.name==='edit_operations'){const chosen=tool.operationIds??ids;fixed(chosen);raw=chosen.length===1?{kind:'operation',id:chosen[0],patch:tool.patch}:{kind:'bulk_operations',operationIds:chosen,patch:tool.patch};}
  else raw=tool.intent;
@@ -154,7 +158,9 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  if(intent.kind==='delete_financial'&&intent.scope.kind==='operations')fixed(intent.scope.operationIds);
  // Destructive account/period deletion has a dedicated reauthentication UI; never route around it.
  if(intent.kind==='delete_financial'&&intent.scope.kind!=='operations')throw new HttpError(400,'DESTRUCTIVE_FLOW_REQUIRED');
- const confirmation=actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
+ }
+ const intent=parseIntent(raw);
+ const confirmation=!!proposal||actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
  await db.query("UPDATE finance.action SET intent=jsonb_set(intent,'{analyzer}',$3::jsonb) WHERE user_id=$1 AND id=$2",[userId,actionId,JSON.stringify({tool,confirmation,registryVersion})]);
  // New dependencies include linked operations affected outside the original question period.
  if(preview.impact.affectedOperationIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING',[userId,tool.answerId,preview.impact.affectedOperationIds]);
