@@ -80,6 +80,8 @@ jobs:
           packages/analyzer/test/merchant-rule.test.ts
           packages/analyzer/test/calculators.test.ts
           packages/analyzer/test/assistant-changes.test.ts
+          packages/analyzer/test/interface-actions.test.ts
+          packages/analyzer/test/question-catalog.test.ts
           packages/imports/test/bank-description.test.ts
           packages/imports/test/merchant-source.test.ts
           apps/api/test/merchant-source.test.ts
