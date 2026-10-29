@@ -116,6 +116,22 @@ jobs:
           bash -n scripts/run-classification-check.sh
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
+      - name: Build a pinned connected Staging artifact without deploying
+        env:
+          VITE_API_ORIGIN: https://test.cashneuro.ru
+          CASHNEURO_CANDIDATE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node scripts/build-connected-web.mjs finance "$CASHNEURO_CANDIDATE_REVISION"
+          node scripts/prepare-release-candidate.mjs --write
+      - name: Preserve the connected UI and exact source descriptor
+        uses: actions/upload-artifact@v4
+        with:
+          name: cashneuro-connected-candidate
+          path: |
+            apps/web/dist/
+            artifacts/release-candidate.json
+          if-no-files-found: error
+          retention-days: 14
 
   postgres-assistant:
     runs-on: ubuntu-latest

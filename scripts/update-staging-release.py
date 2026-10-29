@@ -120,7 +120,9 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     config = settings()
     origin = validate_origin(config['API_BASE_URL'])
     validate_manifest(json.loads((source / 'apps/web/dist/release.json').read_text()), sha, origin)
-    m.wait_health(True)
+    # The running API may be the previous workflow. Post-switch checks below
+    # still require the candidate workflow; preflight checks liveness/profile.
+    m.wait_health(False)
     current = Path(m.run(['systemctl', 'show', m.UNIT, '--property=WorkingDirectory', '--value']).decode().strip()).parents[1]
     if current.parent != m.BASE / 'backend-releases' or not re.fullmatch('[a-f0-9]{40}', current.name):
         raise m.InstallationError('INSTALLED_API_LAYOUT_CHANGED')
