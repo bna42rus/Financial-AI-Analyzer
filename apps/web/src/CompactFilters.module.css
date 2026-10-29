@@ -18,3 +18,5 @@
 .noMatches{margin:0;padding:18px 8px;font-size:calc(13px * var(--text-scale,1));color:var(--color-secondary-text)}.filters button:disabled,.menu button:disabled{opacity:.55;cursor:default}
 @media(pointer:coarse){.fields input,.fields select,.categoryTrigger,.reset,.expand,.searchRow input,.close,.clear{min-height:44px;font-size:calc(16px * var(--text-scale,1))}.dateField input{width:148px}.bank{width:142px}.account{width:175px}.choice,.child{min-height:44px;box-sizing:border-box}.searchRow{gap:3px}.searchRow .clear{font-size:calc(13px * var(--text-scale,1))}.categoryTrigger{width:205px;flex-basis:205px}.expand{width:38px}.reset{font-size:calc(13px * var(--text-scale,1));padding:6px}.bar{gap:4px;padding:6px}.fields{gap:6px}.details dl{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:no-preference){.expand svg{transition:transform .12s}}
+
+.dates{display:flex;align-items:center;gap:12px;margin-left:14px;padding-left:16px;border-left:1px solid var(--color-border);flex:none}.dateField{gap:8px}

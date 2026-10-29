@@ -1,3 +1,5 @@
+import {Ellipsis} from 'lucide-react';
+import {OverviewPopover} from './OverviewDialogs';
 import {useEffect,useRef,useState} from 'react';
 import {api,ApiError} from './server-client';
 import common from './App.module.css';
@@ -16,12 +18,10 @@ export function ServerClassification({revision,disabled,onChanged,onAccessError}
  useEffect(()=>{if(status?.state!=='queued')return;const timer=window.setInterval(()=>void read(),2000);return()=>window.clearInterval(timer);},[status?.state]);
  if(!status?.enabled)return null;
  async function start(){setBusy(true);setError('');try{await read(true);}finally{if(mounted.current)setBusy(false);}}
- return <section className={common.panel} aria-label="Категории с помощью AI"><h2>Категории с помощью AI</h2>
- <p>AI распределяет операции по вашим категориям, используя безопасные признаки магазина. Ручные решения и правила сохраняются. Неоднозначные покупки остаются на проверке.</p>
- <p>Пользовательская квота чата не расходуется.</p>
- {status.state==='queued'?<p role="status">Подбираем категории… Назначения обновляются по мере обработки.</p>:<button className={common.button} disabled={disabled||busy||status.uncertain>0} onClick={()=>void start()}>Разобрать категории загруженных операций</button>}
+ return <OverviewPopover label="Действия с операциями" icon={<Ellipsis size={19}/>}><section aria-label="Распределение категорий"><small>Определение категорий с помощью ИИ</small>
+ {status.state==='queued'?<p role="status">Подбираем категории… Назначения обновляются по мере обработки.</p>:<button className={common.button} disabled={disabled||busy||status.uncertain>0} onClick={()=>void start()}>Распределить категории</button>}
  {status.applied>0&&<p role="status">Обработано операций: {status.applied}.</p>}
  {status.state==='completed'&&<p>Проход завершён. Если категории остались пустыми, безопасных сведений недостаточно: проверьте эти операции вручную.</p>}
  {status.state==='blocked'&&<p role="status">AI-обработка приостановлена. Импортированные операции сохранены; категории можно назначить вручную. {status.uncertain>0?'Есть запрос с неподтверждённым результатом. Повторная отправка заблокирована до проверки.':'Проверьте доступность AI и лимиты тестового этапа.'}</p>}
- {error&&<p role="alert">{error}</p>}</section>;
+ {error&&<p role="alert">{error}</p>}</section></OverviewPopover>;
 }
