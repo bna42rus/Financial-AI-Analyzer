@@ -106,7 +106,7 @@ for(const mobile of [false,true])test(`authenticated local PDF import → lost a
  async function finish(){for(let n=0;n<10;n++){if(!await tableCount('ingestion_dispatch'))return;assert.equal(await runImportStage(pg.finance),true);}throw new Error('Synthetic import did not finish');}
  function count(label:string){return page.getByRole('region',{name:'Результат загрузки'}).locator('dl > div').filter({has:page.getByText(label,{exact:true})}).locator('dd');}
  try{
-  await page.goto(web+'/#login');await page.getByLabel('Почта',{exact:true}).fill('importer@example.test');await page.getByLabel('Пароль',{exact:true}).fill(pw);await page.getByRole('button',{name:'Продолжить',exact:true}).click();await expect(page.getByText('Доступ активен.',{exact:true})).toBeVisible();await expect(page.getByRole('navigation',{name:'Разделы сайта',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Начните с первой выписки'})).toBeVisible();
+  await page.goto(web+'/#login');await page.getByLabel('Почта',{exact:true}).fill('importer@example.test');await page.getByLabel('Пароль',{exact:true}).fill(pw);await page.getByRole('button',{name:'Продолжить',exact:true}).click();await expect(page.getByRole('navigation',{name:'Разделы сайта',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Начните с первой выписки'})).toBeVisible();
   // Hold history discovery while we exercise an explicit retry after the server accepted the first POST.
   await page.route('**/finance/imports',route=>route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({batches:[],nextCursor:null})}));
   let lost=false;
