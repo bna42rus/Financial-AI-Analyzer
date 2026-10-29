@@ -28,19 +28,7 @@ const step = (i: number): 'assistant_0' | 'assistant_1' | 'assistant_2' => {
 };
 const integer = (v: unknown) => { if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0) throw new TypeError('TASK_REVISION_INVALID'); return v; };
 
-/** No Moscow/billing-cycle fallback and no client-controlled calendar per call. */
-export async function assistantProfile(db: PoolClient, userId: string, value: unknown) {
-  const r = object(value, ['timezone', 'initialize']);
-  if (r.initialize !== undefined && (typeof r.initialize !== 'boolean' || r.timezone === undefined)) throw new TypeError('ASSISTANT_PROFILE_INVALID');
-  await prepareFinance(db, userId);
-  if (r.timezone !== undefined) {
-    const calendar = profileCalendar(new Date(), r.timezone as string);
-    if (!(await db.query('SELECT 1 FROM pg_timezone_names WHERE name=$1', [calendar.timezone])).rowCount) throw new AssistantError('ASSISTANT_TIMEZONE_INVALID');
-    await db.query(`INSERT INTO finance.assistant_profile(user_id,timezone) VALUES($1,$2)
-      ON CONFLICT(user_id) DO UPDATE SET timezone=CASE WHEN $3 THEN finance.assistant_profile.timezone ELSE EXCLUDED.timezone END`, [userId, calendar.timezone, r.initialize === true]);
-  }
-  return { timezone: (await db.query('SELECT timezone FROM finance.assistant_profile WHERE user_id=$1', [userId])).rows[0]?.timezone ?? null };
-}
+export {financeProfile as assistantProfile} from './finance-profile.ts';
 
 /** One connection-level lock per request, no transaction/workspace lock across
  * HTTP. Process death releases it. A durable sent receipt never triggers retry. */

@@ -1,3 +1,4 @@
+import {financialTimezone} from './finance-profile.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
@@ -28,6 +29,6 @@ export async function applyOverviewIntent(db:PoolClient,userId:string,intent:Ove
 }
 export async function queryOverview(db:PoolClient,userId:string,value:unknown){
  const r=object(value??{},['filter','widgets']),filter=parseOperationsFilter(r.filter??{});if(filter.metric)throw new TypeError('METRIC_FILTER_CONFLICT');const items=r.widgets??defaultOverview().widgets;if(!Array.isArray(items)||items.length>30)throw new TypeError('INVALID_WIDGETS');const widgets=items.map(parseWidget);if(new Set(widgets.map(w=>w.id)).size!==widgets.length)throw new TypeError('DUPLICATE_WIDGETS');
- const {state,operations}=await operationsDataset(db,userId),timezone=(await db.query('SELECT timezone FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0]?.timezone??'Europe/Moscow',now=(await db.query('SELECT clock_timestamp() AS now')).rows[0].now as Date;
- const budgets=await budgetRows(db,userId);return {generation:state.generation,revision:state.revision,timezone,warnings:operations.some(o=>o.reviewReasons.includes('incomplete_credit_data'))?['Для части кредитных операций не хватает детализации. Проверьте выписки кредитной карты и состав платежей.']:[],budgetOptions:budgets.map(b=>({id:b.id,name:b.name})),...calculateOverview(operations,{...state,budgets},filter,widgets,now,timezone)};
+ const {state,operations}=await operationsDataset(db,userId),chosenTimezone=await financialTimezone(db,userId),timezone=chosenTimezone??'Etc/UTC',now=(await db.query('SELECT clock_timestamp() AS now')).rows[0].now as Date;
+ const budgets=await budgetRows(db,userId);return {generation:state.generation,revision:state.revision,timezone,profileTimezoneMissing:chosenTimezone===null,warnings:[...(chosenTimezone===null?['Часовой пояс профиля ещё не выбран. Относительные периоды показаны по UTC; выберите свой часовой пояс в настройках.']:[]),...(operations.some(o=>o.reviewReasons.includes('incomplete_credit_data'))?['Для части кредитных операций не хватает детализации. Проверьте выписки кредитной карты и состав платежей.']:[])],budgetOptions:budgets.map(b=>({id:b.id,name:b.name})),...calculateOverview(operations,{...state,budgets},filter,widgets,now,timezone)};
 }

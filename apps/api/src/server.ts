@@ -47,6 +47,7 @@ export async function createServer(config: Config) {
     if(metadata.role!=='finance_api'||metadata.name!==main.name||config.yandexAnalyzer.pool===config.pool)throw new Error('AI_METADATA_ROLE_DENIED');
     await config.yandexAnalyzer.pool.query('SELECT 1 FROM commerce.analyzer_request LIMIT 0');
   }
+  const financialProfile = config.profile === 'finance' ? await import('./finance-profile.ts') : null;
   const analyzer = config.profile === 'finance' ? await import('./analyzer.ts') : null;
   const assistant = config.assistantProvider ? await import('./analyzer-assistant-store.ts') : null;
   const classification = config.profile === 'finance' ? await import('./classification-store.ts') : null;
@@ -186,7 +187,7 @@ export async function createServer(config: Config) {
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { name: s.user.name,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:state.timezone,indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          result = { name: s.user.name,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:await financialProfile!.financialTimezone(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
         await requireAdmin(auth,db,request);result=await mailQueue(db);
@@ -211,7 +212,7 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/assistant-profile','/finance/analyzer-state','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/classification','/finance/review-sessions','/finance/review-command'].includes(path)) {
+      } else if (finance && ['/finance/profile','/finance/assistant-profile','/finance/analyzer-state','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/classification','/finance/review-sessions','/finance/review-command'].includes(path)) {
         const methodAllowed=path==='/finance/imports'?['GET','POST'].includes(request.method):['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method==='GET':request.method==='POST';
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
@@ -231,7 +232,8 @@ export async function createServer(config: Config) {
             :await tasks.executeAnalyzerTask(config.pool,s.user.id,request.body,config.taskProvider!,authorize);
           return reply.send(result);
         }
-        if(path==='/finance/classification')result=await classification!.classificationStatus(db,s.user.id,request.body,config.classificationEnabled?config.assistantProvider:undefined);
+        if(path==='/finance/profile')result=await financialProfile!.financeProfile(db,s.user.id,request.body);
+        else if(path==='/finance/classification')result=await classification!.classificationStatus(db,s.user.id,request.body,config.classificationEnabled?config.assistantProvider:undefined);
         else if(path==='/finance/assistant-profile'){if(!assistant)throw new HttpError(503,'AI_UNAVAILABLE');result=await assistant.assistantProfile(db,s.user.id,request.body);}
         else if(tasks&&path==='/finance/analyzer-context')result=await tasks.analyzerTaskContext(db,s.user.id,request.body);
         else if(tasks&&path==='/finance/analyzer-task-cancel')result=await tasks.cancelAnalyzerTask(db,s.user.id,request.body);

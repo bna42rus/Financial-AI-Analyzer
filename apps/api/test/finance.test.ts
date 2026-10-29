@@ -346,3 +346,13 @@ test('a purchase split keeps one bank operation, categories count only their par
  // Removing the split must preview the dependency conflict instead of guessing a refund category.
  const removal=await command({kind:'components',id:purchase,parts:[]});assert.ok(removal.preview.impact.dependencyConflicts.length>0);await command({kind:'undo',id:randomUUID(),value:removal.actionId});detail=(await request('/finance/operation',{id:purchase})).json();assert.equal(detail.components.length,2);assert.equal(detail.semantics.merchant.value,'Ozon');assert.equal((await view()).summary.netExpensesMinor,'700000');
 });
+
+test('financial profile is owner scoped, initializes once without AI and stays independent of the commercial calendar',async()=>{
+ const before=await view();assert.equal((await request('/session')).json().timezone,null);
+ const initial=await request('/finance/profile',{timezone:'Asia/Tokyo',initialize:true});assert.equal(initial.statusCode,200,initial.body);assert.equal(initial.json().timezone,'Asia/Tokyo');assert.equal((await request('/session')).json().timezone,'Asia/Tokyo');
+ assert.equal((await request('/finance/profile',{timezone:'Pacific/Honolulu',initialize:true})).json().timezone,'Asia/Tokyo');assert.equal((await request('/finance/profile',{timezone:'Pacific/Honolulu'})).json().timezone,'Pacific/Honolulu');assert.equal((await view()).revision,before.revision);assert.deepEqual((await view()).operations,before.operations);
+ assert.equal(await within('second',async db=>(await db.query('SELECT * FROM finance.assistant_profile')).rowCount),0);
+ for(const payload of [{timezone:'Not/A_Zone'},{timezone:'Etc/UTC',userId:'second'},{initialize:true},{timezone:'Asia/Tokyo',initialize:'true'}]){const rejected=await request('/finance/profile',payload);assert.equal(rejected.statusCode,400,rejected.body);assert.equal(rejected.body.includes('Not/A_Zone'),false);}
+ const denied=await control.fastify.inject({method:'POST',url:'/finance/profile',payload:{timezone:'Etc/UTC'},headers:{origin:'https://admin.example.test'}});assert.equal(denied.statusCode,404);
+ await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/profile',{timezone:'Etc/UTC'})).statusCode,403);
+});

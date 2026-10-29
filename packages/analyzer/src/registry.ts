@@ -25,7 +25,7 @@ export type Relevance='financial'|'adjacent'|'ambiguous'|'unrelated';
 export type Interpretation={relevance:Relevance;query?:Query;periodFromQuestion:boolean;followUp:boolean};
 const months=['январ','феврал','март','апрел','ма[йя]','июн','июл','август','сентябр','октябр','ноябр','декабр'];
 /** Finite deterministic commands are explicitly separate from an AI classifier. */
-export function interpret(text:string,global:OperationsFilter,context?:Query,now=new Date(),previousGlobal?:OperationsFilter):Interpretation {
+export function interpret(text:string,global:OperationsFilter,context?:Query,now=new Date(),previousGlobal?:OperationsFilter,timezone='Etc/UTC'):Interpretation {
  const q=safeText(text,2000).toLocaleLowerCase('ru-RU').replace(/ё/g,'е').replace(/[?!.,]+$/g,'').trim();
  const financial=/(расход|доход|потрат|деньг|операци|категори|кредит|вклад|счет|банк|финанс|ставк|курс|налог|тариф|бюджет)/u.test(q);
  const followUp=/^а (по категориям|за .+)$/u.test(q);
@@ -45,7 +45,7 @@ export function interpret(text:string,global:OperationsFilter,context?:Query,now
  else return {relevance:followUp||q.length<8?'ambiguous':financial?'financial':'unrelated',periodFromQuestion:false,followUp:false};
  let filter:OperationsFilter=resolveScope(global,followUp&&context?context.filter:undefined,previousGlobal).filter;
  if(date)filter={...filter,from:date[1],through:date[2]};
- if(month){const n=months.findIndex(m=>new RegExp('^'+m).test(month[1]!)),year=Number(month[2]??new Intl.DateTimeFormat('en',{timeZone:'Europe/Moscow',year:'numeric'}).format(now));filter={...filter,from:`${year}-${String(n+1).padStart(2,'0')}-01`,through:new Date(Date.UTC(year,n+1,0)).toISOString().slice(0,10)};}
+ if(month){const n=months.findIndex(m=>new RegExp('^'+m).test(month[1]!)),year=Number(month[2]??new Intl.DateTimeFormat('en',{timeZone:timezone,year:'numeric'}).format(now));filter={...filter,from:`${year}-${String(n+1).padStart(2,'0')}-01`,through:new Date(Date.UTC(year,n+1,0)).toISOString().slice(0,10)};}
  filter=parseOperationsFilter(filter);
  if(comparison!=='none'&&(!filter.from||!filter.through))return {relevance:'ambiguous',periodFromQuestion:false,followUp:false};
  return {relevance:'financial',query:{name:'query_finances',metric,grouping,comparison,filter},periodFromQuestion:!!periodSuffix,followUp};
