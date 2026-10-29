@@ -117,7 +117,7 @@ export function App() {
           <section className={`${styles.panel} ${styles.largest}`} aria-labelledby="largest-title"><div className={styles.panelHead}><h2 id="largest-title">Крупнейшие расходы</h2><button className={styles.linkButton} onClick={() => showRows('Все операции',overview.matching)}>Все операции <ArrowRight size={16} aria-hidden="true" /></button></div>{overview.largest.length ? overview.largest.map(row => <button className={styles.topRow} key={row.id} onClick={() => showRows(row.merchant,[row])}><span><span>{row.merchant}</span><small>{row.category} · {formatDate(row.date)} · {row.account}</small></span><span>{formatMoney((-BigInt(row.amountMinor)).toString())} <span aria-hidden="true">›</span></span></button>) : <p className={styles.muted}>В выборке нет списаний, учитываемых как расходы.</p>}</section>
         </>}
       </>}
-      {screen!=='analyzer'&&<footer className={styles.footer}><span>Суммы в рублях · разница не является банковским балансом</span></footer>}
+      {screen!=='analyzer'&&<footer className={styles.footer}><span>Суммы в рублях</span></footer>}
     </main>
     <OperationCard row={operationCard} onClose={()=>setOperationCard(null)} onOpenHistory={row=>openSettings('history',row)} />
     <UploadDialog open={modal==='upload'} onClose={()=>setModal(null)} onOpenImports={()=>openSettings('imports')} />
