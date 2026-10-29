@@ -194,7 +194,7 @@ test('local CSV XLSX OCR upload dialog remains readable on desktop and mobile',a
 test('changing shared dates preserves Operations settings, hides stale totals, and manual all-history overrides a dynamic period',async({page})=>{
  await setup(page);await page.getByRole('link',{name:'Операции',exact:true}).click();
  const region=page.getByRole('region',{name:'Проверка и выбор операций'}),list=page.getByRole('list',{name:'Сохранённые операции'});
- await expect(list.getByRole('listitem')).toHaveCount(1);await page.getByLabel('Поиск сохранённых операций').fill('Synthetic shop');await page.getByLabel('Плотность операций').selectOption('compact');
+ await expect(list.getByRole('listitem')).toHaveCount(1);await page.getByLabel('Поиск сохранённых операций').fill('Synthetic shop');await page.getByText('Вид списка',{exact:true}).click();await page.getByLabel('Плотность операций').selectOption('compact');
  let release!:()=>void,started!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;}),begin=new Promise<void>(resolve=>{started=resolve;});
  await page.route('http://127.0.0.1:3000/finance/operations-page',async route=>{if(route.request().method()==='POST'&&route.request().postDataJSON().query.filter.from==='2099-01-01'){started();await gate;}await route.fallback();});
  await page.getByLabel('С даты',{exact:true}).fill('2099-01-01');await begin;

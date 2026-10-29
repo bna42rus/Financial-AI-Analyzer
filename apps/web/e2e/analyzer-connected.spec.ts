@@ -79,3 +79,10 @@ test('calculator answers show the exact assumptions and natural proposals requir
  await page.getByRole('button',{name:'Не применять',exact:true}).click();expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);await expect(page.getByRole('button',{name:'Открыть последствия предложения',exact:true})).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
+
+test('device commands show a local proposal, apply and undo without an AI or financial write',async({page})=>{
+ const h=await setup(page);await send(page,'Включи тёмную тему');
+ const panel=page.getByRole('region',{name:'Настройка из Анализатора'});await expect(panel).toBeVisible();expect(h.calls.filter(c=>['/finance/analyzer-query','/finance/analyzer-task','/finance/preview','/finance/commit'].includes(c.path))).toHaveLength(0);
+ await panel.getByRole('button',{name:'Применить настройку',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','dark');
+ await panel.getByRole('button',{name:'Отменить настройку',exact:true}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','system');expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);
+});
