@@ -1,6 +1,8 @@
 import {test,before,beforeEach,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import type {PoolClient} from 'pg';
 import {postgresFixture} from './postgres.ts';
 import {syntheticOperations} from './operations-fixture.ts';
@@ -37,6 +39,29 @@ beforeEach(async()=>{
  calls=0;behavior='normal';outgoing=[];afterDispatch=undefined;
  for(const user of ['first','second']){await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES($1,'Synthetic',$2,true,now(),now())",[user,user+'@example.test']);await pg.owner.query('INSERT INTO identity.security_state(user_id,indefinite) VALUES($1,true)',[user]);}
  ({ids,category,account}=await seed());
+});
+test('read-only Staging diagnosis exposes the exact account-wide blockers without payloads or ledger changes',async()=>{
+ const period='2026-10-30T12:00:00.123456Z',project='test/reconciliation',unknown=randomUUID(),sent=randomUUID(),foreign=randomUUID(),terminal=randomUUID();
+ await pg.owner.query("UPDATE identity.auth_user SET email=$2 WHERE id=$1",['first',"o'connor@example.test"]);
+ for(const [id,user,status,usage]of [[unknown,'first','unknown','unknown'],[sent,'first','sent','reported'],[foreign,'second','unknown','unknown'],[terminal,'first','failed','reported']]as const){
+  await pg.owner.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,usage_state,input_tokens,output_tokens,created_at)
+   VALUES($1,$2,'gate',$3,$4,'synthetic/legacy','synthetic',$5,$6,$7,'2020-01-01T00:00:00Z')`,[user,id,'0'.repeat(64),status,usage,usage==='reported'?20:null,usage==='reported'?10:null]);
+ }
+ await pg.owner.query(`INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms,reserved_atoms) VALUES($1,$2,'2026-10-31T00:00:00Z',1000000000,123456789)`,[project,period]);
+ await pg.owner.query(`INSERT INTO commerce.ai_user_budget(user_id,anchor_at,period_start,limit_atoms,reserved_atoms) VALUES('first',$1,$1,100000000000,123456789)`,[period]);
+ await pg.owner.query(`INSERT INTO commerce.ai_cost_reservation(user_id,request_id,step,project_id,project_period_start,anchor_at,period_start,price,quoted_input_tokens,quoted_output_tokens,quoted_model_version,reserved_atoms,state)
+  VALUES('first',$1,'gate',$2,$3,$3,$3,'{}',100,100,'synthetic',123456789,'unknown')`,[unknown,project,period]);
+ const settings={apiKey:'SYNTHETIC_KEY_NOT_FOR_OUTPUT',allowedEmails:["o'connor@example.test"],cost:{projectId:project,projectPeriodStart:period}},script=fileURLToPath(new URL('../../../scripts/diagnose-classification-staging.py',import.meta.url));
+ const query=spawnSync('python3',['-B','-c','import importlib.util,json,sys; s=importlib.util.spec_from_file_location("diagnosis",sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.receipt_query(json.loads(sys.argv[2])))',script,JSON.stringify(settings)],{encoding:'utf8',timeout:5000});
+ assert.equal(query.status,0);assert.ok(!query.stdout.includes(settings.apiKey));
+ const before=(await pg.owner.query('SELECT to_jsonb(r) AS row FROM commerce.analyzer_request r ORDER BY user_id,request_id,step')).rows,db=await pg.owner.connect();
+ let report:any;
+ try{const results=await db.query(query.stdout);report=(Array.isArray(results)?results:[results]).flatMap(r=>r.rows).find(r=>r.json_build_object)?.json_build_object;}finally{await db.query('ROLLBACK');db.release();}
+ assert.equal(report.testAccountFound,true);assert.equal(report.blockingCount,2);assert.deepEqual(report.blockingRequests.map((r:any)=>r.request_id).sort(),[unknown,sent].sort());
+ assert.equal(report.openReservationCount,1);assert.equal(report.openReservations[0].request_id,unknown);assert.equal(report.openReservations[0].reserved_atoms,'123456789');assert.equal(report.currentProjectBudget.reserved_atoms,'123456789');
+ assert.equal(report.blockingRequests.find((r:any)=>r.request_id===sent).missing_cost_receipt,true);
+ for(const secret of [settings.apiKey,"o'connor@example.test",'first','second',foreign,terminal])assert.ok(!JSON.stringify(report).includes(secret));
+ assert.deepEqual((await pg.owner.query('SELECT to_jsonb(r) AS row FROM commerce.analyzer_request r ORDER BY user_id,request_id,step')).rows,before);assert.equal(calls,0);
 });
 test('real RLS/ledger pipeline groups repeated merchants, assigns categories and consumes zero customer quota/cost',async()=>{
  const before=await state();await queue();assert.equal(await runClassificationStage(pg.finance,provider()),true);
