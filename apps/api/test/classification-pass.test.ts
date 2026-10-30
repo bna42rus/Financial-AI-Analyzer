@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {classificationInput,classificationTargets,summarizeClassification,classificationPassVersion} from '../src/classification-pass.ts';
+import {classificationInput,classificationTargets,classificationPassBaseline,knownMerchantChanges,summarizeClassification,classificationPassVersion} from '../src/classification-pass.ts';
 import {classificationPlan,applyClassification} from '../src/classification-plan.ts';
 import {initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,Operation} from '../../../packages/finance-core/src/model.ts';
@@ -19,4 +19,10 @@ test('last-pass totals distinguish new assignments, refinements, unchanged and u
  const operations=[op('new'),op('refined'),op('same'),op('unknown')];operations[0]!.semantics.category=facet('food','ai');operations[1]!.semantics.category=facet('food','ai');operations[1]!.semantics.subcategory=facet('leaf','ai');operations[2]!.semantics.category=facet('food','ai');operations[3]!.reviewReasons=['low_category_confidence'];
  const report=summarizeClassification({version:classificationPassVersion,inputHash:'0'.repeat(64),catalogHash:'1'.repeat(64),reconsider:true,baseline:[{id:'new',categoryId:null,subcategoryId:null},{id:'refined',categoryId:'food',subcategoryId:null},{id:'same',categoryId:'food',subcategoryId:null},{id:'unknown',categoryId:null,subcategoryId:null},{id:'deleted',categoryId:null,subcategoryId:null}]},operations);
  assert.deepEqual(report,{scanned:4,defined:3,newlyAssigned:1,changed:2,refined:1,unchanged:2,unresolved:1,needsReview:1});
+});
+
+test('last-pass totals include local rule changes excluded from model eligibility without invalidating their own input',()=>{
+ const g=graph(),rules=[{id:'rule',name:'Own',enabled:true,priority:0,conditions:{merchantEquals:'Пятёрочка'},assignments:{categoryId:'food'}}];g.operations[0]!.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};g.operations[0]!.source.description='Покупка Пятёрочка';
+ const before=classificationInput(g,rules),changes=knownMerchantChanges(g,rules),baseline=classificationPassBaseline(before.targets,changes);assert.equal(before.targets.length,0);assert.equal(baseline.length,1);assert.equal(changes.length,1);g.operations[0]=changes[0]!.next;assert.equal(g.operations[0]!.semantics.category.source,'personal_rule');assert.equal(classificationInput(g,rules).inputHash,before.inputHash);
+ const report=summarizeClassification({version:classificationPassVersion,inputHash:before.inputHash,catalogHash:before.catalogHash,reconsider:false,baseline},g.operations);assert.equal(report.scanned,1);assert.equal(report.newlyAssigned,1);assert.equal(report.defined,1);
 });

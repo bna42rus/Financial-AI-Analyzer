@@ -18,6 +18,10 @@ export function knownMerchantChanges(graph:Graph,rules:Rule[]){return graph.oper
  for(const key of ['kind','role','merchant','category','subcategory','counterparty'] as const)if(['kind','role','counterparty'].includes(key)||op.semantics[key].source==='user'||op.semantics[key].userVerified)(ruled.semantics as Record<string,unknown>)[key]=op.semantics[key];
  return {op,next:applyMerchantRecognition(ruled,graph.categories,graph.categoryBindings)};
 }).filter(({op,next})=>!isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons));}
+export function classificationPassBaseline(targets:Operation[],localChanges:{op:Operation}[]){
+ const operations=new Map([...targets,...localChanges.map(({op})=>op)].map(op=>[op.id,op]));
+ return [...operations.values()].map(op=>({id:op.id,categoryId:op.semantics.category.value,subcategoryId:op.semantics.subcategory.value}));
+}
 export type PassSummary={scanned:number;defined:number;newlyAssigned:number;changed:number;refined:number;unchanged:number;unresolved:number;needsReview:number};
 type Baseline={id:string;categoryId:string|null;subcategoryId:string|null};
 export type PassData={version:typeof classificationPassVersion;inputHash:string;catalogHash:string;reconsider:boolean;baseline:Baseline[];summary?:PassSummary};
@@ -34,15 +38,15 @@ export async function classificationWork(db:PoolClient,userId:string,graph:Graph
  const previousCatalog=last?.decisions.catalogHash??(await db.query('SELECT catalog_hash FROM finance.classification_run WHERE user_id=$1 AND generation=$2 AND engine LIKE $3 ORDER BY created_at DESC,id DESC LIMIT 1',[userId,generation,'cashneuro-category-classification/%'])).rows[0]?.catalog_hash;
  const reconsider=!!previousCatalog&&previousCatalog!==input.catalogHash,plan=classificationPlan(graph,rules,reconsider),cached=(await db.query('SELECT signature,decision FROM finance.classification_cache WHERE user_id=$1',[userId])).rows,bySignature=new Map(cached.map(r=>[r.signature,r.decision]));
  const modelWork=plan.groups.some(g=>!bySignature.has(g.signature)||bySignature.get(g.signature)&&g.operationIds.some(id=>{const op=graph.operations.find(o=>o.id===id)!;try{const next=applyClassification(op,bySignature.get(g.signature));return !isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons);}catch{return false;}}));
- const changed=last?.catalog_hash!==input.inputHash||last?.state==='failed'&&modelWork;
- return {...input,last,reconsider,requiresModel:plan.groups.some(g=>!bySignature.has(g.signature)),needed:changed&&(knownMerchantChanges(graph,rules).length>0||modelWork)};
+ const changed=last?.catalog_hash!==input.inputHash||last?.state==='failed'&&modelWork,localChanges=changed?knownMerchantChanges(graph,rules):[];
+ return {...input,last,reconsider,localChanges,requiresModel:plan.groups.some(g=>!bySignature.has(g.signature)),needed:changed&&(localChanges.length>0||modelWork)};
 }
 export async function ensureClassificationPass(db:PoolClient,userId:string,graph:Graph,rules:Rule[],generation:string){
  const work=await classificationWork(db,userId,graph,rules,generation),last=work.last;
  if(last?.state==='received'&&last.catalog_hash===work.inputHash)return last;
  if(last?.catalog_hash===work.inputHash&&(last.state==='completed'||last.state==='failed'&&!work.needed))return null;
  if(last?.state==='received')await db.query("UPDATE finance.classification_run SET state='discarded' WHERE user_id=$1 AND id=$2",[userId,last.id]);
- const data:PassData={version:classificationPassVersion,inputHash:work.inputHash,catalogHash:work.catalogHash,reconsider:work.reconsider,baseline:work.targets.map(op=>({id:op.id,categoryId:op.semantics.category.value,subcategoryId:op.semantics.subcategory.value}))};
+ const data:PassData={version:classificationPassVersion,inputHash:work.inputHash,catalogHash:work.catalogHash,reconsider:work.reconsider,baseline:classificationPassBaseline(work.targets,work.localChanges)};
  return (await db.query<PassRow>("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,decisions) VALUES($1,$2,$3,$4,$5,'received',$6) RETURNING id,state,catalog_hash,decisions,created_at",[userId,randomUUID(),generation,classificationPassVersion,work.inputHash,JSON.stringify(data)])).rows[0]!;
 }
 export function summarizeClassification(data:PassData,operations:Operation[],reviewIds?:ReadonlySet<string>):PassSummary{

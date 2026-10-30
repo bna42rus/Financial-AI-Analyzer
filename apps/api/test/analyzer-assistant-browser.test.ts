@@ -167,7 +167,8 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     }
     assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rows[0].n,'0');
     assert.ok(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE user_id='task-browser'")).rows[0].n)>2);
-    await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+    await expect(page.getByRole('dialog',{name:'Загрузка выписок',exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Смотреть результат',exact:true}).click();await expect(page.getByRole('heading',{name:'История загрузок',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Результат загрузки'}).getByRole('status')).not.toHaveText('Принята сервером');
     assert.deepEqual(errors,[]);
 
   } finally { barrier.resolve(); await context.close(); await browser.close(); }

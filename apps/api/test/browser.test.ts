@@ -17,6 +17,12 @@ import {previewFinance,commitFinance,prepareFinance,financeView,importEpoch,acce
 let pg:Awaited<ReturnType<typeof postgresFixture>>,finance:Awaited<ReturnType<typeof createServer>>,control:Awaited<ReturnType<typeof createServer>>;
 let fc:Config,cc:Config;const children:ChildProcess[]=[],pw='Synthetic browser password 123!';
 const web='http://127.0.0.1:5175',admin='http://127.0.0.1:5176';
+// A closed browser may leave a final read in flight. A deadlocked TRUNCATE
+// rolls back atomically; retry only disposable fixture cleanup, never API writes.
+async function resetFixture(sql:string){
+ for(let attempt=0;;attempt++){try{await pg.owner.query(sql);return;}catch(error){if((error as {code?:string}).code!=='40P01'||attempt>=2)throw error;await new Promise(resolve=>setTimeout(resolve,25));}}
+}
+
 async function ready(url:string){for(let i=0;i<100;i++){try{if((await fetch(url)).ok)return;}catch{}await new Promise(resolve=>setTimeout(resolve,100));}throw new Error('Synthetic UI did not start');}
 async function mail(kind:string,config=fc){
  const worker={profile:config.profile,pool:config.profile==='control'?pg.mailControl:pg.mailFinance,wrappingKey:config.wrappingKey,environment:'test' as const,financeOrigin:web,controlOrigin:admin,adminRecipient:'owner@example.test'};
@@ -37,7 +43,7 @@ before(async()=>{
 });
 after(async()=>{for(const c of children)c.kill('SIGTERM');await finance?.close();await control?.close();await pg?.close();});
 for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP review → independent email proof → registration → renewal (${mobile?'mobile':'desktop'})`,{timeout:60000},async()=>{
-  await pg.owner.query('TRUNCATE mail.delivery,mail.resend_audit,mail.sandbox_inbox,access.request,access.tariff,commerce.action,identity.auth_user,control.auth_user,access.outbox,identity.outbox,control.outbox,identity.rate_limit,control.rate_limit,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE');
+  await resetFixture('TRUNCATE mail.delivery,mail.resend_audit,mail.sandbox_inbox,access.request,access.tariff,commerce.action,identity.auth_user,control.auth_user,access.outbox,identity.outbox,control.outbox,identity.rate_limit,control.rate_limit,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE');
   const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);
   await pg.owner.query("INSERT INTO control.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('owner','Synthetic owner','owner@example.test',true,now(),now())");
@@ -92,7 +98,7 @@ for(const mobile of [false,true])test(`real HTTP/PostgreSQL application → TOTP
 });
 
 for(const mobile of [false,true])test(`authenticated local PDF import → lost acknowledgement → reload → durable history → no duplicate transactions (${mobile?'mobile':'desktop'})`,{timeout:90000},async()=>{
- await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
+ await resetFixture('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
  await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('importer','Synthetic importer','importer@example.test',true,now(),now())");
  await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('importer-account','importer','importer','credential',$1,now(),now())",[await hashPassword(pw)]);
  await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('importer',true)");
@@ -144,7 +150,7 @@ for(const mobile of [false,true])test(`authenticated local PDF import → lost a
 });
 
 for(const mobile of [false,true])test(`saved operation editing → independent verification → Undo → correction preview → safe retry → two-device conflict (${mobile?'mobile':'desktop'})`,{timeout:120000},async()=>{
- await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
+ await resetFixture('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
  await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('editor','Synthetic editor','editor@example.test',true,now(),now())");
  await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('editor-account','editor','editor','credential',$1,now(),now())",[await hashPassword(pw)]);await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('editor',true)");
  const sourceAccount=randomUUID(),secondAccount=randomUUID(),db=await pg.finance.connect();let operationId='';
@@ -176,7 +182,7 @@ for(const mobile of [false,true])test(`saved operation editing → independent v
 });
 
 for(const mobile of [false,true])test(`real duplicate merge resolves manual conflicts, retries a lost commit and restores source identities with Undo ${mobile?'mobile':'desktop'}`,async()=>{
- await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
+ await resetFixture('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
  await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('merger','Synthetic merger','merger@example.test',true,now(),now())");
  await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('merger-account','merger','merger','credential',$1,now(),now())",[await hashPassword(pw)]);
  await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('merger',true)");
@@ -197,7 +203,7 @@ for(const mobile of [false,true])test(`real duplicate merge resolves manual conf
 });
 
 for(const mobile of [false,true])test(`real relation editors → signed decomposition → allocated refunds → nested reversal → own transfer fee → stale decisions (${mobile?'mobile':'desktop'})`,{timeout:180000},async()=>{
- await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
+ await resetFixture('TRUNCATE identity.auth_user,identity.rate_limit,identity.outbox,commerce.access_cycle,finance.workspace CASCADE');
  await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('relations','Synthetic relations','relations@example.test',true,now(),now())");
  await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('relations-account','relations','relations','credential',$1,now(),now())",[await hashPassword(pw)]);await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('relations',true)");
  const first=randomUUID(),second=randomUUID(),ids:Record<string,string>={},db=await pg.finance.connect();let food='',clothes='';
