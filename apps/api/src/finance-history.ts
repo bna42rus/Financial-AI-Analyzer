@@ -4,6 +4,7 @@ import {object,uuid,dateFact} from '../../../packages/finance-core/src/model.ts'
 import {HttpError} from './types.ts';
 
 const definitions={
+ category_binding:{table:'category_binding',id:'id',keys:['target_key','category_id','subcategory_id'],readonly:[]},
  overview_view:{table:'overview_view',id:'id',keys:['name','definition','is_default','dependency_status','position'],readonly:[]},
  budget:{table:'budget',id:'id',keys:['name','definition','limits','enabled','dependency_status'],readonly:[]},
  operations_view:{table:'operations_view',id:'id',keys:['name','definition','is_default','dependency_status','position'],readonly:[]},
@@ -76,6 +77,7 @@ function referenceConflicts(map:SnapshotMap):Conflict[]{
  const out:Conflict[]=[],get=(k:ObjectKind,id:unknown)=>typeof id==='string'?map.get(key(k,id))?.snapshot.values:undefined;
  const compatible=(role:unknown,c:unknown,s:unknown)=>{const root=get('category',c),sub=get('category',s),allows=(v:Record<string,unknown>)=>!['expense','income'].includes(role as string)||v.role==='both'||v.role===role;return (c===null||!!root&&root.parent_id===null&&allows(root))&&(s===null||!!sub&&sub.parent_id===c&&allows(sub));};
  for(const row of map.values()){const v=row.snapshot.values;let invalid=false;
+  if(row.kind==='category_binding'){const root=get('category',v.category_id),leaf=v.subcategory_id?get('category',v.subcategory_id):undefined;invalid=!root||root.parent_id!==null||root.hidden===true||!['expense','both'].includes(root.role as string)||!!v.subcategory_id&&(!leaf||leaf.parent_id!==v.category_id||leaf.hidden===true||!['expense','both'].includes(leaf.role as string));}
   if(row.kind==='category'&&v.parent_id!==null){const parent=get('category',v.parent_id);invalid=!parent||parent.parent_id!==null||parent.role!=='both'&&parent.role!==v.role;}
   if(row.kind==='operation'){const sem=v.semantics as {role:{value:string};category:{value:string|null};subcategory:{value:string|null};counterparty:{value:string|null}};invalid=!compatible(sem.role.value,sem.category.value,sem.subcategory.value)||sem.counterparty.value!==null&&!get('counterparty',sem.counterparty.value)||!!get('counterparty',sem.counterparty.value)?.merged_into_id||!!v.corrections&&typeof v.corrections==='object'&&'accountId'in v.corrections&&!get('account',(v.corrections as Record<string,unknown>).accountId);}
   if(row.kind==='link'){
@@ -113,7 +115,7 @@ export async function restoreHistory(db:PoolClient,userId:string,intent:RestoreI
  return {table:'history',id:intent.id,before:null,details};
 }
 type HistoryFilter={from?:string;through?:string;operationIds?:string[];kinds?:string[];beforeRevision?:string;limit:number};
-const actionKinds=['save_overview_view','delete_overview_view','reorder_overview_views','save_budget','set_budget_limit','delete_budget','operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different','merge_duplicate','delete_rule','apply_rules','save_operations_view','delete_operations_view','reorder_operations_views'];
+const actionKinds=['set_category_binding','add_catalog_categories','save_overview_view','delete_overview_view','reorder_overview_views','save_budget','set_budget_limit','delete_budget','operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different','merge_duplicate','delete_rule','apply_rules','save_operations_view','delete_operations_view','reorder_operations_views'];
 function parseHistoryFilter(value:unknown):HistoryFilter {const r=object(value,['from','through','operationIds','kinds','beforeRevision','limit']),f:HistoryFilter={limit:100};
  for(const k of ['from','through']as const)if(k in r){const d=dateFact({precision:'instant',instant:r[k]});f[k]=(d as {instant:string}).instant;}if(f.from&&f.through&&f.from>f.through)throw new TypeError('INVALID_RANGE');
  if('operationIds'in r)f.operationIds=ids(r.operationIds);if('kinds'in r){if(!Array.isArray(r.kinds)||!r.kinds.length||r.kinds.length>actionKinds.length||r.kinds.some(k=>typeof k!=='string'||!actionKinds.includes(k)))throw new TypeError('INVALID_HISTORY_KINDS');f.kinds=[...new Set(r.kinds as string[])];}

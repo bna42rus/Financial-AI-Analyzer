@@ -1,13 +1,13 @@
-import {bankDescription} from './bank-description.ts';
+import {bankDescription,merchantBankDescription,financialTransferText} from './bank-description.ts';
 import {localBankAdapter} from './bank-table.ts';
-import {extractSafeSource,parseSafeSource,descriptionSourceSanitizer,sourceSanitizer,localSourceSanitizer,sourceProfiles,normalizeSourceDescription} from './safe-source.ts';
+import {extractSafeSource,parseSafeSource,hasBankDescription,merchantSourceSanitizer,sourceSanitizer,localSourceSanitizer,sourceProfiles,normalizeSourceDescription} from './safe-source.ts';
 import {dateFact,uuid} from '../../finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../finance-core/src/money.ts';
 import {aliasKinds,banks,MAX_FILES,MAX_ROWS,parseContext,validatePreparedBatch,versions} from './contract.ts';
 import type {AliasKind,Bank,Context,IssueCode,PreparedBatch,PreparedFile,PreparedRow,ProcessingVersions} from './contract.ts';
 import {adapterVersions} from './contract.ts';
 
-export type LocalContext=Context&{key:string;expiresAt:string};
+export type LocalContext=Context&{key:string;expiresAt:string;sourceProfiles?:readonly string[];normalizers?:readonly string[]};
 /** Adapter extraction only. Raw text, names and extra columns are never copied. Structured codes need an explicit sanitizer profile. */
 export type ExtractedRow={operationDate:unknown;postedDate?:unknown;amountMinor:unknown;currency:unknown;direction:unknown;account:{kind:AliasKind;value:unknown};bankReference?:unknown;[localOnly:string]:unknown};
 export type ExtractedFile={fileId:string;bank:Bank;bytes:Uint8Array;rows:ExtractedRow[];error?:'LOCAL_READ_FAILED';[localOnly:string]:unknown};
@@ -32,10 +32,12 @@ function bytesFromKey(input:unknown){
 const encoder=new TextEncoder();
 /** Browser WebCrypto only. No network, storage, telemetry, AI or raw-file upload dependency. */
 export async function createLocalPreparation(input:LocalContext,signal?:AbortSignal,adapter:ProcessingVersions['adapter']='source-adapter/1',sanitizer:ProcessingVersions['sanitizer']='text-free/1'){
- if(!['text-free/1',...sourceProfiles].includes(sanitizer)||sanitizer!=='text-free/1'&&!((sanitizer===localSourceSanitizer||sanitizer===descriptionSourceSanitizer)?adapter===localBankAdapter:sanitizer===sourceSanitizer?adapter==='bank-pdf/2':adapter==='bank-pdf/1'))throw new LocalPreparationError('INVALID_SANITIZER');
+ if(!['text-free/1',...sourceProfiles].includes(sanitizer)||sanitizer!=='text-free/1'&&!((sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?adapter===localBankAdapter:sanitizer===sourceSanitizer?adapter==='bank-pdf/2':adapter==='bank-pdf/1'))throw new LocalPreparationError('INVALID_SANITIZER');
  if(!adapterVersions.includes(adapter))throw new LocalPreparationError('INVALID_ADAPTER');
  if(signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');
  if(!globalThis.crypto?.subtle)throw new LocalPreparationError('LOCAL_CRYPTO_UNAVAILABLE');
+ const normalizer=input.normalizers?.includes('strict-source/2')?'strict-source/2':'strict-source/1';
+ const normalizeDate=(value:unknown)=>{const d=dateFact(value);return d.precision==='day'?d:normalizer==='strict-source/2'?{...d,sourceOffsetMinutes:d.sourceOffsetMinutes??null}:{precision:'instant' as const,instant:d.instant};};
  const context=parseContext({contextId:input.contextId,generation:input.generation,keyVersion:input.keyVersion}),expiresAt=Date.parse(input.expiresAt);
  if(!Number.isFinite(expiresAt)||expiresAt<=Date.now())throw new LocalPreparationError('PREPARATION_EXPIRED');
  const decoded=bytesFromKey(input.key);let key:CryptoKey|null;
@@ -62,22 +64,22 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
     try{
      if(!row||typeof row!=='object'||!row.account||!aliasKinds.includes(row.account.kind))throw new RowFailure('INVALID_ACCOUNT');
      let operationDate:PreparedRow['operationDate'],postedDate:PreparedRow['postedDate'];
-     try{operationDate=dateFact(row.operationDate);postedDate=row.postedDate===undefined||row.postedDate===null?null:dateFact(row.postedDate);}catch{throw new RowFailure('INVALID_DATE');}
+     try{operationDate=normalizeDate(row.operationDate);postedDate=row.postedDate===undefined||row.postedDate===null?null:normalizeDate(row.postedDate);}catch{throw new RowFailure('INVALID_DATE');}
      try{if(typeof row.amountMinor!=='string'||row.amountMinor.length>20)throw new Error();parsePersistedMinor(row.amountMinor);}catch{throw new RowFailure('INVALID_AMOUNT');}
      if(row.currency!=='RUB')throw new RowFailure('INVALID_CURRENCY');
      const amountMinor=row.amountMinor as string,direction=row.direction;
      if(!['debit','credit','unknown'].includes(direction as string)||direction==='debit'&&BigInt(amountMinor)>=0n||direction==='credit'&&BigInt(amountMinor)<=0n)throw new RowFailure('INVALID_DIRECTION');
      const account={kind:row.account.kind,hmac:await identifier(file.bank,row.account.kind,row.account.value)},bankRefHmac=row.bankReference===null||row.bankReference===undefined?null:await identifier(file.bank,'bank_reference',row.bankReference);
-     const description=(sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||sanitizer===descriptionSourceSanitizer)?normalizeSourceDescription(row.localDescription):null;
+     const description=(sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?normalizeSourceDescription(row.localDescription):null;
      const descriptionHmac=description===null?null:await sign(encoder.encode(JSON.stringify(['source-description/1',file.bank,row.account.kind,account.hmac,description])));
      let source=row.safeSource??null;
-     if(sanitizer===descriptionSourceSanitizer){const enriched=extractSafeSource(row.localDescription,amountMinor,descriptionSourceSanitizer);if(enriched){enriched.details=bankDescription(row.localDescription,row.localMerchant,row.localBankCategory,row.localMcc);if(enriched.event==='other'&&enriched.details.mcc&&BigInt(amountMinor)<0n&&!/перевод|transfer|\bSBP\b|СБП|комисси|fee/iu.test(enriched.details.description)){enriched.event='purchase';enriched.details.merchantText ||= enriched.details.description.slice(0,160);}}source=enriched;}
-     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(sanitizer!=='text-free/1'?{safeSource:parseSafeSource(source,amountMinor,sanitizer)}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||sanitizer===descriptionSourceSanitizer)?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
+     if(hasBankDescription(sanitizer)){const enriched=extractSafeSource(row.localDescription,amountMinor,sanitizer as typeof sourceProfiles[number]);if(enriched){enriched.details=(sanitizer===merchantSourceSanitizer?merchantBankDescription:bankDescription)(row.localDescription,row.localMerchant,row.localBankCategory,row.localMcc);if(enriched.event==='other'&&enriched.details.mcc&&BigInt(amountMinor)<0n&&!(sanitizer===merchantSourceSanitizer?financialTransferText(enriched.details.description)||/комисси|fee/iu.test(enriched.details.description):/перевод|transfer|\bSBP\b|СБП|комисси|fee/iu.test(enriched.details.description))){enriched.event='purchase';enriched.details.merchantText ||= enriched.details.description.slice(0,160);}}source=enriched;}
+     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(sanitizer!=='text-free/1'?{safeSource:parseSafeSource(source,amountMinor,sanitizer)}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
     }catch(error){if(!(error instanceof RowFailure))throw error;result.issues.push({ordinal,code:error.code});}
    }
    prepared.push(result);
   }
-  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,adapter,sanitizer},context:{...context},batchId,files:prepared}).batch;
+  check();return validatePreparedBatch({schemaVersion:1,versions:{...versions,normalizer,adapter,sanitizer},context:{...context},batchId,files:prepared}).batch;
  }
  check();return {prepare,dispose};
 }

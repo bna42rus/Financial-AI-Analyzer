@@ -1,0 +1,27 @@
+{
+  "audit": "cashneuro-activity-document-audit/1",
+  "status": "PASS_DOCUMENT_STRUCTURE_ONLY",
+  "as_of": "2026-10-28",
+  "baseline_commit": "af6a2c997f47caf215eedb9840f70333d5a577f9",
+  "baseline_starter_blob_sha": "f67d375dd00854fe2126d399a00673402f479019",
+  "counts": {
+    "domains": 24,
+    "activities": 194,
+    "forms_within_records": 4282,
+    "globally_distinct_normalized_forms": 4282,
+    "rules": 40,
+    "semantic_category_targets": 78,
+    "conditional_routers": 32,
+    "normalized_literal_collisions": 0,
+    "specific_sense_edges": 18,
+    "future_scenario_families": 153
+  },
+  "retained_inputs_verified": 31,
+  "data_sha256": "ddb75404b30060c59e1b7a226b5ce55bf4e02ce85877ce080f0feb84e2207120",
+  "document_sha256": "bceb02f514f4d8ce50084931cc974a02f6e813cca49d8ad4de2e9034065ff7f9",
+  "paid_calls": 0,
+  "runtime_tests": "NOT_RUN",
+  "ui_tests": "NOT_RUN",
+  "model_tests": "NOT_RUN",
+  "warning": "Literal-collision count and structural checks are not semantic/product accuracy or implementation acceptance."
+}

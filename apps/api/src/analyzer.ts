@@ -1,3 +1,4 @@
+import {financialTimezone} from './finance-profile.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
@@ -65,7 +66,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  const now=(await db.query('SELECT clock_timestamp() AS now')).rows[0].now as Date;
  let context:Query|undefined,previousGlobal:OperationsFilter|undefined;
  if(contextId){const c=(await db.query('SELECT context,request FROM finance.analyzer_message WHERE user_id=$1 AND chat_id=$2 AND id=$3',[userId,chatId,contextId])).rows[0];if(!c?.context)throw new HttpError(409,'CONTEXT_UNAVAILABLE');const tool=parseTool(c.context);if(tool.name!=='query_finances')throw new TypeError('INVALID_CONTEXT');context=tool;if(c.request?.filter)previousGlobal=parseOperationsFilter(c.request.filter);}
- const intent=interpret(text,filter,context,now,previousGlobal);let query=intent.query;
+ const timezone=await financialTimezone(db,userId)??'Etc/UTC',intent=interpret(text,filter,context,now,previousGlobal,timezone);let query=intent.query;
  if(query?.filter.operationIds){const resolved=(await db.query('SELECT finance.canonical_operation($1,id) AS id FROM unnest($2::uuid[]) AS id',[userId,query.filter.operationIds])).rows.map(r=>r.id);query={...query,filter:{...query.filter,operationIds:[...new Set<string>(resolved)]}};}
  let answer:Answer={text:intent.relevance==='unrelated'?'Я помогаю разбираться в финансах. Спросите о своих расходах, доходах или операциях.':intent.relevance==='ambiguous'?'Уточните показатель и период: например, «Расходы по категориям за сентябрь 2026».':'Для такого вопроса нужна подключённая AI-модель. Сейчас доступны точные расчёты расходов, доходов, категорий, крупных операций и сравнение с предыдущим периодом.',mode:intent.relevance==='unrelated'?'redirect':intent.relevance==='ambiguous'?'clarification':'unavailable',registryVersion};
  let usage:{inputTokens:number;outputTokens:number}|undefined;
@@ -84,7 +85,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
    const priorPlan=(await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan'",[userId,id])).rowCount;
    if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining&&!priorPlan)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
    const base=resolveScope(filter,gate.value.followUp&&context?context.filter:undefined,previousGlobal).filter;await assertReferences(db,userId,base);
-   const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Moscow',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
+   const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
    const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;
    const planned=await yandex.call({userId,chatId,requestId:id,step:'plan',binding:{...binding,catalog},prompt:planPrompt,input:modelInput(text,base,currentDate),schema:planSchema,periodStart:(await analyzerCycle(db,userId)).startExact,anchorAt},(v,cached):ModelPlan=>{
     if(!cached)return parseModelPlan(v,base,catalog);
@@ -113,7 +114,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
   if(stableJSON(tool)!==stableJSON(query))throw new HttpError(400,'AI_SCOPE_CHANGED');query=tool;usage={inputTokens:tokenUsage(plan.inputTokens),outputTokens:tokenUsage(plan.outputTokens)};
  }
  let dependencyIds:string[]=[];
- if(query)({answer,dependencyIds}=await calculateAnalyzerQuery(db,userId,query,now,{mode:external?'ai':adapter?'test_adapter':'deterministic',periodFromQuestion:intent.periodFromQuestion,followUp:intent.followUp,provider:external??(adapter?{id:adapter.id,model:adapter.model,version:adapter.version}:undefined)}));
+ if(query)({answer,dependencyIds}=await calculateAnalyzerQuery(db,userId,query,now,{mode:external?'ai':adapter?'test_adapter':'deterministic',periodFromQuestion:intent.periodFromQuestion,followUp:intent.followUp,timezone,provider:external??(adapter?{id:adapter.id,model:adapter.model,version:adapter.version}:undefined)}));
  await db.query('INSERT INTO finance.analyzer_message(user_id,id,chat_id,question,answer,context,request) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,chatId,text,JSON.stringify(answer),query?JSON.stringify(query):null,JSON.stringify(request)]);
  if(dependencyIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[])',[userId,id,dependencyIds]);
  await db.query("UPDATE finance.analyzer_chat SET title=CASE WHEN title='Новый диалог' AND $3 THEN $4 ELSE title END,modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2",[userId,chatId,!!query,text.slice(0,100)]);
@@ -125,7 +126,7 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  const r=object(value,['actionId','tool']),actionId=uuid(r.actionId),tool=parseTool(r.tool);if(tool.name==='query_finances')throw new TypeError('INVALID_ACTION');
  // Lock and authorization also protect direct internal invocation, not only HTTP routing.
  const state=await prepareFinance(db,userId);
- const message=(await db.query('SELECT answer,action_id FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,tool.answerId])).rows[0];if(!message?.answer.query)throw new HttpError(404,'NOT_FOUND');
+ const message=(await db.query('SELECT answer,action_id FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,tool.answerId])).rows[0];if(!message?.answer.query&&!message?.answer.proposal)throw new HttpError(404,'NOT_FOUND');
  if(message.action_id&&message.action_id!==actionId)throw new HttpError(409,'ACTION_REUSED');
  const existing=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,actionId])).rows[0];
  if(existing){
@@ -134,12 +135,16 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
   if(existing.generation!==state.generation||existing.expected_revision!==state.revision||!existing.fresh)throw new HttpError(409,'FINANCE_CHANGED');
   return {status:'previewed',actionId,intent:existing.intent.canonical,impact:existing.preview,generation:state.generation,requiresConfirmation:existing.intent.analyzer.confirmation};
  }
- const answer=message.answer as Answer,query=answer.query!;
+ const answer=message.answer as Answer,query=answer.query,proposal=answer.proposal;
+ if(proposal&&(proposal.version!=='cashneuro-change-proposal/1'||tool.name!=='finance_action'||stableJSON(tool.intent)!==stableJSON(proposal.intent)))throw new HttpError(409,'ANALYZER_PROPOSAL_CHANGED');
  if(state.generation!==answer.generation||state.revision!==answer.revision)throw new HttpError(409,'FINANCE_CHANGED');
+ let raw:unknown;
+ if(proposal)raw=proposal.intent;
+ else{
+  if(!query)throw new HttpError(404,'NOT_FOUND');
  const {operations,state:dataset}=await operationsDataset(db,userId);
  const ids=queryOperations(operations,dataset,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id),scope=new Set(ids);
  const fixed=(chosen:string[])=>{if(!chosen.length||chosen.length>1000)throw new HttpError(409,'ANALYZER_SCOPE_LIMIT');if(chosen.some(id=>!scope.has(id)))throw new HttpError(409,'ANALYZER_SCOPE_CHANGED');};
- let raw:unknown;
  if(tool.name==='set_inclusion'){fixed(ids);raw={kind:'bulk_operations',operationIds:ids,patch:{analyticsOverride:tool.value}};}
  else if(tool.name==='edit_operations'){const chosen=tool.operationIds??ids;fixed(chosen);raw=chosen.length===1?{kind:'operation',id:chosen[0],patch:tool.patch}:{kind:'bulk_operations',operationIds:chosen,patch:tool.patch};}
  else raw=tool.intent;
@@ -153,7 +158,9 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  if(intent.kind==='delete_financial'&&intent.scope.kind==='operations')fixed(intent.scope.operationIds);
  // Destructive account/period deletion has a dedicated reauthentication UI; never route around it.
  if(intent.kind==='delete_financial'&&intent.scope.kind!=='operations')throw new HttpError(400,'DESTRUCTIVE_FLOW_REQUIRED');
- const confirmation=actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
+ }
+ const intent=parseIntent(raw);
+ const confirmation=!!proposal||actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
  await db.query("UPDATE finance.action SET intent=jsonb_set(intent,'{analyzer}',$3::jsonb) WHERE user_id=$1 AND id=$2",[userId,actionId,JSON.stringify({tool,confirmation,registryVersion})]);
  // New dependencies include linked operations affected outside the original question period.
  if(preview.impact.affectedOperationIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING',[userId,tool.answerId,preview.impact.affectedOperationIds]);
@@ -165,7 +172,7 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
 export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;timezone?:string;provider?:Answer['provider']}){
  await assertReferences(db,userId,query.filter);const {state,operations}=await operationsDataset(db,userId);
   const widget=parseWidget({id:randomUUID(),name:query.metric==='income'?'Доходы':query.metric==='attention'?'Требуют внимания':'Расходы',metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:{kind:query.comparison},chart:'table',topN:query.grouping==='operation'?3:10});
-  const result=calculateWidget(widget,operations,state,{},now,options.timezone??'Europe/Moscow');
+  const result=calculateWidget(widget,operations,state,{},now,options.timezone??await financialTimezone(db,userId)??'Etc/UTC');
   const selected=queryOperations(operations,state,{filter:query.filter,sort:'date',direction:'asc',group:'none'}).operations;
   let dependencyIds=selected.map(o=>o.id);if(result.comparisonFilter)dependencyIds=[...new Set([...dependencyIds,...queryOperations(operations,state,{filter:result.comparisonFilter,sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)])];
   // Linked source facts outside the visible period contribute to terminal allocations.

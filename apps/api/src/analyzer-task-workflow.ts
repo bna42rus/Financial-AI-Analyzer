@@ -2,7 +2,7 @@ import { object, dateFact, uuid } from '../../../packages/finance-core/src/model
 import { safeQuestion } from '../../../packages/analyzer/src/yandex-contract.ts';
 import type { Catalog } from '../../../packages/analyzer/src/yandex-contract.ts';
 import type { Query } from '../../../packages/analyzer/src/registry.ts';
-import { registryVersion } from '../../../packages/analyzer/src/registry.ts';
+import { taskRegistryVersion as registryVersion } from '../../../packages/analyzer/src/task-protocol.ts';
 import { parseTaskBook, globalSnapshot, taskDescriptors, resolveTaskDecision, acceptTaskResult, taskContextVersion } from '../../../packages/analyzer/src/task-context.ts';
 import type { TaskScope, TaskBook, GlobalSnapshot } from '../../../packages/analyzer/src/task-context.ts';
 import { TaskError } from '../../../packages/analyzer/src/task-context.ts';

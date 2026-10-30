@@ -1,0 +1,252 @@
+{
+  "audit": "cashneuro-name-existing-functions/1",
+  "status": "BASELINE_OBSERVATIONS_RECORDED_NOT_A_NAME_IMPLEMENTATION",
+  "baseline_commit": "55f2f92832b44d1a75c48d87c02bb1b514a2e0c7",
+  "source_files_verified": 12,
+  "synthetic_inputs": 15,
+  "observations": [
+    {
+      "id": "NAME-B01",
+      "kind": "recognition",
+      "input": "Кафе Москва",
+      "result": {
+        "name": "Кафе",
+        "brand": null,
+        "service": "cafe",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B02",
+      "kind": "recognition",
+      "input": "Магазин Россия",
+      "result": {
+        "name": "Магазин",
+        "brand": null,
+        "service": null,
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B03",
+      "kind": "recognition",
+      "input": "Столовая Иннополис",
+      "result": {
+        "name": "Столовая",
+        "brand": null,
+        "service": "cafe",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B04",
+      "kind": "recognition",
+      "input": "Кафе Москва RUS",
+      "result": {
+        "name": "Кафе",
+        "brand": null,
+        "service": "cafe",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B05",
+      "kind": "recognition",
+      "input": "OZON FRESH MOSCOW RUS",
+      "result": {
+        "name": "OZON",
+        "brand": "Ozon",
+        "service": "marketplace",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B06",
+      "kind": "recognition",
+      "input": "Пятёрочка доставка Москва Рус",
+      "result": {
+        "name": "Пятёрочка",
+        "brand": "Пятёрочка",
+        "service": "grocery",
+        "delivery": true,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B07",
+      "kind": "recognition",
+      "input": "Яндекс Маркет доставка",
+      "result": {
+        "name": "Яндекс Маркет",
+        "brand": "Яндекс Маркет",
+        "service": "marketplace",
+        "delivery": true,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B08",
+      "kind": "recognition",
+      "input": "Timeweb.cloud Innopolis Rus",
+      "result": {
+        "name": "TimeWeb",
+        "brand": "TimeWeb",
+        "service": "cloud",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B09",
+      "kind": "recognition",
+      "input": "World Class Moscow Rus",
+      "result": {
+        "name": "World Class",
+        "brand": "Ворлд Класс",
+        "service": "fitness",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B10",
+      "kind": "recognition",
+      "input": "XFit MOSCOW RUS",
+      "result": {
+        "name": "XFit",
+        "brand": "X-Fit",
+        "service": "fitness",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B11",
+      "kind": "recognition",
+      "input": "ИП Иванов Иван 24",
+      "result": {
+        "name": "ИП Иванов Иван 24",
+        "brand": null,
+        "service": null,
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B12",
+      "kind": "recognition",
+      "input": "СБЕР 24 Москва Рус",
+      "result": {
+        "name": "Москва",
+        "brand": null,
+        "service": null,
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B13",
+      "kind": "recognition",
+      "input": "Аптека 36,6",
+      "result": {
+        "name": "Аптека 36,6",
+        "brand": "Аптека 36,6",
+        "service": "pharmacy",
+        "delivery": false,
+        "conflict": false
+      }
+    },
+    {
+      "id": "NAME-B14",
+      "kind": "bank-description",
+      "input": {
+        "description": "Оплата услуг бюро переводов",
+        "merchant": "Бюро переводов Север"
+      },
+      "result": {
+        "description": "Оплата услуг бюро переводов",
+        "merchantText": "",
+        "bankCategory": "",
+        "mcc": null
+      }
+    },
+    {
+      "id": "NAME-B15",
+      "kind": "source-fields",
+      "input": "Покупка PYATEROCHKA MOSCOW RUS",
+      "result": {
+        "detailsMerchant": "PYATEROCHKA MOSCOW RUS",
+        "fields": {
+          "sourceKind": "purchase",
+          "merchantText": "Пятёрочка",
+          "description": "Покупка PYATEROCHKA MOSCOW RUS",
+          "bankCategory": "",
+          "sourceMcc": null
+        }
+      }
+    }
+  ],
+  "baselineChecks": [
+    {
+      "id": "NAME-I01",
+      "observation_refs": [
+        "NAME-B01",
+        "NAME-B02",
+        "NAME-B03",
+        "NAME-B04"
+      ],
+      "observed_risk": true,
+      "meaning": "Unproven city/country can be lost from an unknown name."
+    },
+    {
+      "id": "NAME-I02",
+      "observation_refs": [
+        "NAME-B05"
+      ],
+      "observed_risk": true,
+      "meaning": "Specific Fresh qualifier is lost by the broad Ozon display match."
+    },
+    {
+      "id": "NAME-I03",
+      "observation_refs": [
+        "NAME-B12"
+      ],
+      "observed_risk": true,
+      "meaning": "Unknown unsegmented name can be reduced by generic prefix plus geo trimming."
+    },
+    {
+      "id": "NAME-I04",
+      "observation_refs": [
+        "NAME-B14"
+      ],
+      "observed_risk": true,
+      "meaning": "Commercial translation merchant is suppressed by the substring перевод."
+    },
+    {
+      "id": "NAME-I05",
+      "observation_refs": [
+        "NAME-B15"
+      ],
+      "observed_risk": true,
+      "meaning": "Source-fields projection can change the alphabet before NAME."
+    }
+  ],
+  "control_observations": [
+    "NAME-B08",
+    "NAME-B09",
+    "NAME-B10",
+    "NAME-B11",
+    "NAME-B13"
+  ],
+  "integration_requirement": "NAME-I06 is a separate compatibility requirement, not a reproduced bug fixed by this probe.",
+  "future_name_product_tests": "NOT_RUN",
+  "ui_tests": "NOT_RUN",
+  "model_tests": "NOT_RUN",
+  "new_paid_calls": 0,
+  "source_or_database_writes": 0
+}

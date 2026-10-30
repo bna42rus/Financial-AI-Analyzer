@@ -15,7 +15,7 @@ export class OperationFlow{
  edit(patch:OperationPatch){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'edit',baseline:this.state.detail,intent:{kind:'operation',id:this.state.detail.id,patch:safeOperationPatch(patch)}});}
  correct(patch:OperationPatch){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'correction',baseline:this.state.detail,intent:{kind:'operation',id:this.state.detail.id,patch:safeOperationPatch(patch)}});}
  relation(intent:RelationIntent){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'relation',baseline:this.state.detail,intent:structuredClone(intent)});}
- undo(){if(this.state.phase!=='idle'||!this.state.undoActionId||this.disposed)return;return this.begin({mode:'undo',baseline:this.state.detail,intent:{kind:'undo',id:crypto.randomUUID(),value:this.state.undoActionId}});}
+ undo(expectedId?:string){if(expectedId&&expectedId!==this.state.undoActionId)return;if(this.state.phase!=='idle'||!this.state.undoActionId||this.disposed)return;return this.begin({mode:'undo',baseline:this.state.detail,intent:{kind:'undo',id:crypto.randomUUID(),value:this.state.undoActionId}});}
  retry(){if(this.state.phase==='retry'&&this.pending&&!this.disposed)return this.send(this.pending);}
  confirm(){if(this.state.phase==='preview'&&this.pending&&!this.disposed)return this.send(this.pending);}
  cancelPreview(){if(this.state.phase==='preview'){this.pending=null;this.publish({phase:'idle',preview:null,error:''});}}

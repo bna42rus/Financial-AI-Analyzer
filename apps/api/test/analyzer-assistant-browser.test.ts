@@ -63,7 +63,7 @@ async function within<T>(fn: (db: PoolClient) => Promise<T>) {
   catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
 }
 async function screen(page: Page, name: string) {
-  const opener = page.getByRole('button', { name: 'Открыть экраны приложения' }), link = page.getByRole('link', { name, exact: true });
+  const opener = page.getByRole('button', { name: 'Вернуться к финансам' }), link = page.getByRole('link', { name, exact: true });
   await expect(opener.or(link).first()).toBeVisible();
   if (await opener.isVisible()) await opener.click();
   await link.click();
@@ -88,12 +88,13 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await expect(page.getByText('Часовой пояс анализа: Pacific/Honolulu', { exact: true })).toBeVisible();
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
     await screen(page,'Операции');
-    const categoryPanel=page.getByRole('region',{name:'Категории с помощью AI'});
-    await categoryPanel.getByRole('button',{name:'Разобрать категории загруженных операций',exact:true}).click();
-    await expect(categoryPanel.getByText('Подбираем категории… Назначения обновляются по мере обработки.')).toBeVisible();
+    await page.getByRole('button',{name:'Определение категорий с помощью ИИ',exact:true}).click();const categoryPanel=page.getByRole('region',{name:'Распределение категорий'});
+    const classificationStarted=page.waitForResponse(response=>new URL(response.url()).pathname==='/finance/classification'&&response.request().postDataJSON()?.start===true&&response.status()===200);
+    await categoryPanel.getByRole('button',{name:'Распределить категории',exact:true}).click();
+    await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();await classificationStarted;
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
-    await expect(categoryPanel).toContainText('Обработано операций: 1.');
+    await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Назначено впервые',{exact:true})}).locator('dd')).toHaveText('1');await page.keyboard.press('Escape');
     assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;await screen(page,'Анализатор');await idle();
     await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
     await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
@@ -153,7 +154,7 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
       {name:'Private.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(syntheticXlsx())},
       {name:'Private.pdf',mimeType:'application/pdf',buffer:Buffer.from(syntheticPdf(syntheticLayout('tbank')))}
     ]);
-    await expect(page.getByText('Загрузка принята сервером. Результат сохранён в истории загрузок.')).toBeVisible({timeout:30000});
+    assert.equal(prepared.length,0);await page.getByRole('button',{name:'Загрузить',exact:true}).click();await expect(page.getByRole('button',{name:'Открыть загрузку',exact:true})).toBeVisible({timeout:30000});
     assert.equal(prepared.length,1);
     // The approved profile retains ordinary names in bank descriptions, while
     // filenames, raw files and actual identifiers remain forbidden.
@@ -166,7 +167,8 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     }
     assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rows[0].n,'0');
     assert.ok(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE user_id='task-browser'")).rows[0].n)>2);
-    await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+    await expect(page.getByRole('dialog',{name:'Загрузка выписок',exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Смотреть результат',exact:true}).click();await expect(page.getByRole('heading',{name:'История загрузок',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Результат загрузки'}).getByRole('status')).not.toHaveText('Принята сервером');
     assert.deepEqual(errors,[]);
 
   } finally { barrier.resolve(); await context.close(); await browser.close(); }

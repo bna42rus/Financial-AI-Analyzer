@@ -1,0 +1,48 @@
+{
+  "schema": "cashneuro-catalog-source-implementation-evidence/1",
+  "baseline_commit": "609a953d22c2c9ac58af0984d9b6cc2d68b4c616",
+  "source_profile": "bank-source/5",
+  "source_wire_schema": "CLOSED_DETAILS_WITH_TEXT_EVIDENCE",
+  "runtime_catalog_activation": "INACTIVE_REQUIRES_TYPED_RUNTIME_GUARDS",
+  "new_paid_posts": 0,
+  "staging_changed": false,
+  "primary_pdf_sha256": "5255d758534e74c9329cb8437e8a862f4bf989999172903a862462294b4ce9c8",
+  "local_checks": {
+    "baseline_root_tests": 271,
+    "changed_root_tests": 286,
+    "web_unit_tests": 83,
+    "api_unit_tests": 218,
+    "targeted_source_and_classification_tests": 23,
+    "targeted_overlap_note": "Targeted tests partly overlap root tests; do not add counts as unique.",
+    "compiler_tests": 3,
+    "full_check": "PASS",
+    "compiler_reconstruction": "ALL_28_SOURCE_DOCUMENTS_BYTE_IDENTICAL",
+    "typechecks": "PASS",
+    "retained_design_files": "UNCHANGED",
+    "postgres_http": "CI_REQUIRED_NOT_RUN_LOCALLY_ROOT_ONLY_CONTAINER"
+  },
+  "generated_artifact": {
+    "path": "packages/finance-core/src/catalog/generated/catalog-v1.json",
+    "sha256": "7ac0b097065de33a787e234070f6d3bb8fb3d9e2685e51f1c86f6943da164b60",
+    "storage": "REPRODUCIBLE_BUILD_OUTPUT_WITH_TRACKED_BYTE_MANIFEST",
+    "manifest": "packages/finance-core/src/catalog/generated/catalog-v1.manifest.json"
+  },
+  "findings_scope": {
+    "NAME-I04": "NEW_VERSION_5_SOURCE_FIX_NOT_HISTORICAL_REWRITE",
+    "NAME-I05": "NEW_VERSION_5_SOURCE_FIX_NOT_HISTORICAL_REWRITE",
+    "OTHER_NAME_FIN": "NOT_CLOSED_BY_THIS_STEP"
+  },
+  "rollout_gate": "BACKEND_ROLLBACK_TARGET_MUST_SUPPORT_VERSION_5_OBSERVATIONS",
+  "storage_migration": "0031_merchant_source.sql",
+  "storage_gate": "VERSION_5_NOT_ADVERTISED_OR_ACCEPTED_BEFORE_CLOSED_EVIDENCE_CONSTRAINT",
+  "first_ci": {
+    "run_id": 40667182044,
+    "software": "PASS",
+    "postgres_http": {
+      "passed": 179,
+      "failed_new_cases": 2,
+      "reason": "finite_source_evidence did not accept the new closed marker",
+      "correction": "Add 0031, include fixtures/installers, storage capability and negative SQL assertions; rerun required"
+    }
+  }
+}

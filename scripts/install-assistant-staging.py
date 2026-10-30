@@ -130,7 +130,7 @@ def docker_database():
 def health(expected=False):
     with urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=3) as response:
         value = json.load(response)
-    return value.get('status') == 'ok' and value.get('profile') == 'finance' and (not expected or value.get('assistant') == 'cashneuro-assistant-workflow/6')
+    return value.get('status') == 'ok' and value.get('profile') == 'finance' and (not expected or value.get('assistant') == 'cashneuro-assistant-workflow/7')
 
 
 def wait_health(expected=False):
@@ -242,6 +242,10 @@ def install(args):
     selected = [next(p for p in migrations if p.name.startswith(str(n).zfill(4) + '_')) for n in range(24 + start, 28)]
     if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='marketplace_catalog_initialized')") == 'f':
         selected.append(next(p for p in migrations if p.name.startswith('0030_')))
+    if sql("SELECT position('textEvidence' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") != 't':
+        selected.append(next(p for p in migrations if p.name.startswith('0031_')))
+    if sql("SELECT to_regclass('finance.category_binding') IS NOT NULL") != 't':
+        selected.append(next(p for p in migrations if p.name.startswith('0032_')))
     # Do not replace an existing account quota or change its entitlement.
     quota_sql = ''
     if user['quota'] is None:
@@ -281,7 +285,7 @@ def install(args):
         print('Ошибка переключения. Выполняется откат.', flush=True)
         restore(backup)
         raise
-    print(json.dumps({'status': 'INSTALLED', 'sha': args.sha, 'assistant': 'cashneuro-assistant-workflow/6', 'paidCalls': 0, 'rollback': rollback_command}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'INSTALLED', 'sha': args.sha, 'assistant': 'cashneuro-assistant-workflow/7', 'paidCalls': 0, 'rollback': rollback_command}, ensure_ascii=False), flush=True)
 
 
 def main():

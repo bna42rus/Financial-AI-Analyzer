@@ -109,12 +109,12 @@ test('profile timezone has no Moscow fallback and an invalid or missing profile 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_task_request')).rows[0].n, '0');
 });
 
-test('off-topic and general explanations store history without reading the financial catalog or consuming a task unit', async () => {
+test('off-topic is free, ordinary AI explanation consumes one unit and neither reads the financial catalog', async () => {
   const b = await body(); outputs = [{ version: assistantVersion, topic: 'unrelated', action: 'redirect' }];
-  const off = await run({ ...b, text: 'Почему белка рыжая?' }); assert.equal(off.statusCode, 200, off.body); assert.equal(off.json().answer.mode, 'redirect');
+  const off = await run({ ...b, text: 'Почему белка рыжая?' }); assert.equal(off.statusCode, 200, off.body); assert.equal(off.json().answer.mode, 'redirect');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
   outputs = [{ version: assistantVersion, topic: 'general_finance', action: 'explain' }, { text: 'Инфляция уменьшает покупательную способность денег.' }];
   const explained = await run({ ...b, id: randomUUID(), text: 'Объясни инфляцию.' }); assert.equal(explained.statusCode, 200, explained.body); assert.equal(explained.json().answer.mode, 'ai'); assert.equal(calls, 3);
-  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '0');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
   assert.equal((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation.turns.length, 2);
   for (const input of outgoing) assert.equal('catalog' in input, false);
 });
@@ -314,4 +314,35 @@ test('the pilot call ceiling includes another tenant without exposing their priv
   assert.equal((await pg.owner.query('SELECT dispatch_count FROM commerce.ai_project_budget')).rows[0].dispatch_count,2);
   assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM commerce.ai_cost_reservation WHERE user_id='second'")).rows[0].n,0);
  }finally{await target.close();}
+});
+
+test('deterministic calculator returns exact code results, charges once and preserves every financial source',async()=>{
+ const b={...await body(),text:'Аннуитет 100 рублей, 12% годовых, один месяц'},before=(await pg.owner.query('SELECT id,source_observation_id,corrections,semantics FROM finance.transaction ORDER BY id')).rows;
+ outputs=[{version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'}}];
+ const result=await run(b);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().code,'FINANCIAL_CALCULATION');assert.equal(result.json().answer.calculation.totalPaidMinor,'10100');assert.equal(result.json().answer.calculation.interestMinor,'100');assert.equal(calls,1);
+ assert.deepEqual((await pg.owner.query('SELECT id,source_observation_id,corrections,semantics FROM finance.transaction ORDER BY id')).rows,before);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action')).rows[0].n,'0');assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
+ const replay=await run(b);assert.deepEqual(replay.json(),result.json());assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
+ for(const v of outgoing){const text=JSON.stringify(v);assert.ok(!text.includes(account));assert.ok(!operationIds.some(id=>text.includes(id)));}
+});
+
+test('natural account proposal without a query cannot write until exact preview and explicit commit, then supports Undo',async()=>{
+ const b={...await body(),text:'Переименуй счёт Synthetic account в Мой основной счёт'},old=(await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name;
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'account',name:old,patch:{name:'Мой основной счёт'}}}];
+ const result=await run(b);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().code,'CHANGE_PROPOSED');assert.equal(result.json().answer.query,undefined);assert.equal(calls,2);
+ const tool={name:'finance_action',answerId:b.id,intent:result.json().answer.proposal.intent};
+ assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,old);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action')).rows[0].n,'0');
+ const forged=await request('/finance/analyzer-propose',{actionId:randomUUID(),tool:{...tool,intent:{...tool.intent,patch:{name:'Подменено клиентом'}}}});assert.equal(forged.statusCode,409,forged.body);assert.equal(forged.json().code,'ANALYZER_PROPOSAL_CHANGED');
+ const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,old);
+ const committed=await request('/finance/commit',{actionId});assert.equal(committed.statusCode,200,committed.body);assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,'Мой основной счёт');
+ assert.deepEqual((await request('/finance/commit',{actionId})).json(),committed.json());
+ const w=await within(db=>financeView(db,'first')),undoId=randomUUID();const undo=await request('/finance/preview',{actionId:undoId,generation:w.generation,revision:w.revision,intent:{kind:'undo',id:randomUUID(),value:actionId}});assert.equal(undo.statusCode,200,undo.body);assert.equal((await request('/finance/commit',{actionId:undoId})).statusCode,200);assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,old);
+});
+
+test('natural operation changes require a current last-answer scope and freeze exact IDs before preview',async()=>{
+ const b=await body(),change={version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'answer_operations',patch:{comment:'Из проверенного ответа'}}};
+ outputs=[change];const missing=await run({...b,text:'Добавь комментарий операциям этого ответа'});assert.equal(missing.json().code,'ASSISTANT_CHANGE_SCOPE_REQUIRED');assert.equal(missing.json().answer.proposal,undefined);
+ outputs=[plan([set('metric','expenses')])];const read=await run({...b,id:randomUUID(),text:'Покажи мои расходы'});assert.equal(read.json().code,'FINANCIAL_QUERY');
+ const proposalId=randomUUID();outputs=[change];const proposed=await run({...b,id:proposalId,text:'Добавь комментарий операциям этого ответа'});assert.equal(proposed.json().code,'CHANGE_PROPOSED');const p=proposed.json().answer.proposal;assert.deepEqual(new Set(p.intent.operationIds),new Set(operationIds));
+ const tool={name:'finance_action',answerId:proposalId,intent:p.intent},actionId=randomUUID();const preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);
+ const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);assert.deepEqual(new Set((await pg.owner.query("SELECT id FROM finance.transaction WHERE comment='Из проверенного ответа'")).rows.map(r=>r.id)),new Set(operationIds));
 });

@@ -5,6 +5,10 @@ import type {SourceCandidate} from '../src/matching.ts';
 import type {PreparedRow} from '../src/contract.ts';
 const row:PreparedRow={ordinal:1,operationDate:{precision:'day',date:'2026-09-01'},postedDate:null,amountMinor:'-100',currency:'RUB',direction:'debit',account:{kind:'bank_account',hmac:'a'.repeat(64)},bankRefHmac:null};
 const source=(patch:Partial<SourceCandidate>={}):SourceCandidate=>({transactionId:'one',fileHmac:'file',ordinal:1,bankRefHmac:null,operationDate:row.operationDate,postedDate:null,amountMinor:'-100',currency:'RUB',direction:'debit',...patch});
+test('calendar evidence never alters immutable strict descriptors or one-to-one identity',()=>{
+ const old={...row,operationDate:{precision:'instant' as const,instant:'2026-09-30T22:30:00.000Z'},descriptionHmac:'a'.repeat(64)},current={...old,operationDate:{...old.operationDate,sourceOffsetMinutes:540}};
+ assert.equal(strictSourceDescriptor(old),strictSourceDescriptor(current));assert.equal(sameSource(current,source({operationDate:old.operationDate})),true);assert.equal(matchSource(current,'file',[source({operationDate:old.operationDate})],new Set()).transactionId,'one');assert.equal(matchSource(current,'file',[source({operationDate:old.operationDate})],new Set(['one'])).transactionId,null);
+});
 test('same-file row instance reuses a transaction, without suppressing the file',()=>assert.deepEqual(matchSource(row,'file',[source()],new Set()),{transactionId:'one',possibleIds:[]}));
 test('ordinal never becomes a bank ID across different files',()=>assert.deepEqual(matchSource(row,'different',[source()],new Set()),{transactionId:null,possibleIds:['one']}));
 test('two identical real purchases in one file remain separate without an invented duplicate warning',()=>assert.deepEqual(matchSource({...row,ordinal:2},'file',[source()],new Set(['one'])),{transactionId:null,possibleIds:[]}));

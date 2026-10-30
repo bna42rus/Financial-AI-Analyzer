@@ -29,6 +29,75 @@ def command(args, *, data=None, timeout=6):
     return result.stdout
 
 
+def receipt_query(settings):
+    emails = settings.get('allowedEmails')
+    cost = settings.get('cost', {})
+    if (not isinstance(emails, list) or not 1 <= len(emails) <= 100
+            or any(not isinstance(v, str) or not 1 <= len(v) <= 254 for v in emails)
+            or not isinstance(cost, dict)):
+        raise InspectionError('CONFIGURATION_SCOPE_INVALID')
+    # Only the account selector and budget key enter SQL. API keys, arbitrary
+    # configuration and request/answer payloads never leave their private files.
+    scope = json.dumps({'emails': emails, 'project': cost.get('projectId'),
+                        'period': cost.get('projectPeriodStart')}).replace("'", "''")
+    return """BEGIN READ ONLY;
+SET LOCAL standard_conforming_strings=on;
+SET LOCAL statement_timeout='5s';
+SET LOCAL lock_timeout='2s';
+WITH config AS (SELECT '%s'::jsonb AS value),
+ test_account AS (
+  SELECT id FROM identity.auth_user
+  WHERE email_verified AND email IN (
+   SELECT jsonb_array_elements_text(value->'emails') FROM config)
+  ORDER BY id LIMIT 1
+ ), blockers AS (
+  SELECT r.request_id,r.step,r.created_at,r.dispatched_at,r.state,r.provider,
+   r.usage_state,r.input_tokens,r.output_tokens,r.model_version,
+   c.state AS cost_state,c.reserved_atoms::text,c.settled_atoms::text,
+   c.reported_input_tokens,c.reported_output_tokens,c.reported_model_version,
+   c.project_id,c.project_period_start,c.request_id IS NULL AS missing_cost_receipt
+  FROM commerce.analyzer_request r LEFT JOIN commerce.ai_cost_reservation c
+  USING(user_id,request_id,step)
+  WHERE r.user_id=(SELECT id FROM test_account)
+   AND (r.state='sent' OR r.usage_state='unknown')
+ )
+SELECT json_build_object('databaseMatches',current_database()='finance_staging',
+ 'classificationMigrationPresent',to_regclass('finance.classification_run') IS NOT NULL,
+ 'testAccountFound',EXISTS(SELECT 1 FROM test_account),
+ 'blockingCount',(SELECT count(*) FROM blockers),
+ 'blockingRequests',COALESCE((SELECT json_agg(t) FROM (
+  SELECT * FROM blockers ORDER BY created_at,request_id,step LIMIT 30
+ )t),'[]'::json),
+ 'openReservationCount',(SELECT count(*) FROM commerce.ai_cost_reservation c
+  WHERE c.user_id=(SELECT id FROM test_account) AND c.state IN ('reserved','unknown')),
+ 'openReservations',COALESCE((SELECT json_agg(t) FROM (
+  SELECT c.request_id,c.step,c.created_at,c.state,c.project_id,c.project_period_start,
+   c.reserved_atoms::text,c.settled_atoms::text,
+   c.quoted_input_tokens,c.quoted_output_tokens,c.quoted_model_version,
+   c.reported_input_tokens,c.reported_output_tokens,c.reported_model_version
+  FROM commerce.ai_cost_reservation c
+  WHERE c.user_id=(SELECT id FROM test_account) AND c.state IN ('reserved','unknown')
+  ORDER BY c.created_at,c.request_id,c.step LIMIT 30
+ )t),'[]'::json),
+ 'currentProjectBudget',(SELECT row_to_json(t) FROM (
+  SELECT b.project_id,b.period_start,b.period_end,b.limit_atoms::text,
+   b.spent_atoms::text,b.reserved_atoms::text,b.blocked
+  FROM commerce.ai_project_budget b,config
+  WHERE b.project_id=config.value->>'project'
+   AND b.period_start=(config.value->>'period')::timestamptz
+ )t),
+ 'receipts',COALESCE((SELECT json_agg(t) FROM (
+  SELECT r.created_at,r.state,r.usage_state,r.input_tokens,r.output_tokens,c.state AS cost_state
+  FROM commerce.analyzer_request r LEFT JOIN commerce.ai_cost_reservation c
+  USING(user_id,request_id,step)
+  WHERE r.provider='cashneuro-category-smoke/1'
+   AND r.user_id=(SELECT id FROM test_account)
+  ORDER BY r.created_at DESC,r.request_id LIMIT 10
+ )t),'[]'::json));
+ROLLBACK;
+""" % scope
+
+
 def inspect():
     if os.geteuid() != 0:
         raise InspectionError('ROOT_REQUIRED')
@@ -85,21 +154,7 @@ def inspect():
     emit('3/4', status='OK', database='finance_staging', port=5411)
 
     emit('4/4', status='START')
-    query = """BEGIN READ ONLY;
-SET LOCAL statement_timeout='5s';
-SET LOCAL lock_timeout='2s';
-SELECT json_build_object('databaseMatches',current_database()='finance_staging',
- 'classificationMigrationPresent',to_regclass('finance.classification_run') IS NOT NULL,
- 'receipts',COALESCE((SELECT json_agg(t) FROM (
-  SELECT r.created_at,r.state,r.usage_state,r.input_tokens,r.output_tokens,c.state AS cost_state
-  FROM commerce.analyzer_request r LEFT JOIN commerce.ai_cost_reservation c
-  USING(user_id,request_id,step)
-  WHERE r.provider='cashneuro-category-smoke/1'
-  AND r.created_at>=to_timestamp(1792231353)
-  ORDER BY r.created_at DESC LIMIT 10
- )t),'[]'::json));
-ROLLBACK;
-"""
+    query = receipt_query(settings)
     output = command(['docker', 'exec', '-i', selected[0], 'sh', '-c',
                       'exec psql -X -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-postgres}" '
                       '-d finance_staging -Atq'], data=query, timeout=9)

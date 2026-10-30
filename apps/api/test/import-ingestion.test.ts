@@ -427,3 +427,168 @@ test('same-file reimport preserves a manual purchase split and bank identity, wh
  const operations=(await request('/finance/state')).json().operations;assert.equal(operations.length,2);const added=operations.find((o:any)=>o.id!==original.id);assert.equal(added.classification.merchant.value,'Ozon');assert.equal(added.decompositionActive,false);assert.equal(added.amountMinor,'-20000');assert.equal((await detail(original.id)).components.length,2);
  await command({kind:'cancel_import',batchId:repeat.batchId});assert.equal((await detail(original.id)).components.length,2);assert.equal((await counts()).transaction,2);
 });
+
+test('/5 HTTP reimport keeps identity, immutable old observations, manual merchant and category parts through cancellation',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ async function prepare(profile:typeof merchantSourceSanitizer|typeof descriptionSourceSanitizer,bytes:string){
+  const local=await createLocalPreparation(await context(),undefined,localBankAdapter,profile);
+  try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows:[row({bankReference:undefined,operationDate:{precision:'instant',instant:'2026-10-01T12:00:00.000Z'},amountMinor:'-10000',localDescription:'Покупка PYATEROCHKA MOSCOW RUS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ }
+ assert.ok((await context()).sourceProfiles?.includes(merchantSourceSanitizer));
+ const first=await prepare(descriptionSourceSanitizer,'Synthetic old source');await accept(first);await drain(first.batchId);const original=await importedOperation();
+ const observations=(await pg.owner.query("SELECT id,merchant_text,description,versions FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ const state=(await request('/finance/state')).json(),food=state.categories.find((c:any)=>c.name==='Продукты'&&c.parentId===null).id;
+ await command({kind:'operation',id:original.id,patch:{merchant:'Моё личное имя',comment:'Моя заметка'}});
+ await command({kind:'components',id:original.id,parts:[{type:'other',amountMinor:'-6000',role:'expense',categoryId:food},{type:'other',amountMinor:'-4000',role:'expense',categoryId:food}]});
+ const parts=(await detail(original.id)).components;
+ const next=await prepare(merchantSourceSanitizer,'Synthetic new source');assert.equal(next.files[0]!.rows[0]!.descriptionHmac,first.files[0]!.rows[0]!.descriptionHmac);
+ await accept(next);const report=await drain(next.batchId);assert.equal(report.counts.updated,1);assert.equal(report.counts.created,0);assert.equal((await counts()).transaction,1);
+ const current=await detail(original.id);assert.equal(current.source.merchantText,'PYATEROCHKA MOSCOW RUS');assert.equal(current.semantics.merchant.value,'Моё личное имя');assert.equal(current.comment,'Моя заметка');assert.deepEqual(current.components,parts);
+ const oldRows=(await pg.owner.query("SELECT id,merchant_text,description,versions FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[observations.map(r=>r.id)])).rows;assert.deepEqual(oldRows,observations);
+ await command({kind:'cancel_import',batchId:next.batchId});const restored=await detail(original.id);assert.equal(restored.source.merchantText,'Пятёрочка');assert.equal(restored.source.versions.sourceSanitizer,descriptionSourceSanitizer);assert.equal(restored.semantics.merchant.value,'Моё личное имя');assert.deepEqual(restored.components,parts);
+});
+
+test('/5 HTTP source preserves a translation business and keeps a real incoming transfer as a separate event',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let prepared:PreparedBatch;
+ try{prepared=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic translation and money transfer'),rows:[row({bankReference:'Synthetic-business',localDescription:'Оплата услуг бюро переводов',localMerchant:'Бюро переводов Север',parser:'tbank-table/1'}),row({bankReference:'Synthetic-transfer',amountMinor:'100',direction:'credit',localDescription:'Входящий перевод Иван Петров',localMerchant:'Иван Петров',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(prepared);const report=await drain(prepared.batchId);assert.equal(report.counts.created,2);
+ const operations=await Promise.all(report.operationIds.map((id:string)=>detail(id)));
+ const business=operations.find(o=>o.source.sourceKind==='purchase')!,transfer=operations.find(o=>o.source.sourceKind==='transfer_in')!;
+ assert.equal(business.source.merchantText,'Бюро переводов Север');assert.equal(transfer.source.merchantText,'');assert.equal(transfer.source.description,'Входящий перевод Иван Петров');assert.equal(transfer.semantics.role.value,'unresolved');
+ assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
+});
+
+test('/5 capability and acceptance wait for the storage migration; old source formats remain supported',async()=>{
+ const {readFile}=await import('node:fs/promises'),{merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const legacyMigration=await readFile(new URL('../../../packages/database/migrations/0029_bank_description.sql',import.meta.url),'utf8');
+ const nextMigration=await readFile(new URL('../../../packages/database/migrations/0031_merchant_source.sql',import.meta.url),'utf8');
+ await pg.owner.query(legacyMigration);
+ try{
+  const c=await context();assert.equal(c.sourceProfiles?.includes(merchantSourceSanitizer),false);
+  const local=await createLocalPreparation(c,undefined,localBankAdapter,merchantSourceSanitizer);let prepared:PreparedBatch;
+  try{prepared=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic schema-capability test'),rows:[row({localDescription:'Покупка Аптека Ромашка',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+  const refused=await request('/finance/import-accept',prepared);assert.equal(refused.statusCode,503,refused.body);assert.equal(refused.json().code,'IMPORT_SOURCE_PROFILE_UNAVAILABLE');assert.equal((await counts()).ingestion_batch,0);
+  await pg.owner.query(nextMigration);assert.equal((await context()).sourceProfiles?.includes(merchantSourceSanitizer),true);
+  await accept(prepared);await drain(prepared.batchId);
+  const saved=(await pg.owner.query("SELECT id,source_evidence FROM finance.ingestion_row WHERE user_id='first' AND source_evidence IS NOT NULL")).rows[0];
+  for(const flag of [null,false,0,{},'safe','']){
+   const bad=structuredClone(saved.source_evidence);bad.details.textEvidence=flag;
+   await assert.rejects(pg.owner.query('UPDATE finance.ingestion_row SET source_evidence=$2 WHERE id=$1',[saved.id,JSON.stringify(bad)]),(e:any)=>e.code==='23514');
+  }
+  const extra={...saved.source_evidence,details:{...saved.source_evidence.details,raw:'forbidden'}};
+  await assert.rejects(pg.owner.query('UPDATE finance.ingestion_row SET source_evidence=$2 WHERE id=$1',[saved.id,JSON.stringify(extra)]),(e:any)=>e.code==='23514');
+  assert.deepEqual((await pg.owner.query('SELECT source_evidence FROM finance.ingestion_row WHERE id=$1',[saved.id])).rows[0].source_evidence,saved.source_evidence);
+ }finally{await pg.owner.query(nextMigration);}
+});
+
+test('/5 import applies typed activity and own category resolution while retaining bank wording, roles and separate review',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ const merchants=['Аптека Ромашка','Optika Север','Яндекс Go','Пятёрочка доставка','Кафе на АЗС','AP\u200bTEKA Ромашка'];
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic finite activity import'),rows:merchants.map((name,i)=>row({bankReference:'Synthetic-activity-'+i,localDescription:'Покупка '+name,localMerchant:name,parser:'tbank-table/1'}))}]);}finally{local.dispose();}
+ await accept(b!);const report=await drain(b!.batchId);assert.equal(report.counts.created,6);const state=(await request('/finance/state')).json(),details=await Promise.all(report.operationIds.map((id:string)=>detail(id)));
+ const expected=['Аптеки','Оптика','Такси','Доставка продуктов','Рестораны и кафе',null];
+ for(let i=0;i<merchants.length;i++){
+  const op=details.find((o:any)=>o.source.merchantText===merchants[i]!.replace('\u200b',''))!;assert.ok(op,merchants[i]);assert.equal(op.source.amountMinor,'-100');assert.equal(op.semantics.kind.value,i===5?'other':'purchase');assert.equal(op.semantics.role.value,i===5?'unresolved':'expense');assert.equal(op.semantics.merchant.value,op.source.merchantText);assert.equal(op.components.length,0);
+  const sub=state.categories.find((c:any)=>c.id===op.semantics.subcategory.value)?.name??null;assert.equal(sub,expected[i],merchants[i]);
+  if(i===1)assert.equal(state.categories.find((c:any)=>c.id===op.semantics.category.value)?.name,'Здоровье и спорт');
+  if(i===2)assert.equal(op.semantics.category.confidence,80);
+  if(i===5)assert.equal(op.semantics.category.value,null);
+ }
+ assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
+});
+
+test('/5 future Latin imports retain existing Cyrillic private predicates ahead of the common activity catalog',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');const state=(await request('/finance/state')).json(),custom=state.categories.find((c:any)=>c.name==='Еда вне дома'&&!c.parentId).id;
+ await command({kind:'rule',id:randomUUID(),create:true,patch:{name:'Личное прежнее правило',enabled:true,priority:2,conditions:{merchantContains:'Пятёрочка'},assignments:{categoryId:custom}}});
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic existing private predicate'),rows:[row({localDescription:'Покупка PYATEROCHKA MOSCOW RUS',localMerchant:'PYATEROCHKA MOSCOW RUS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);const op=await importedOperation();assert.equal(op.semantics.category.value,custom);assert.equal(op.semantics.category.source,'personal_rule');assert.equal(op.source.merchantText,'PYATEROCHKA MOSCOW RUS');assert.equal(op.semantics.merchant.value,'PYATEROCHKA MOSCOW RUS');assert.equal(op.source.description,'Покупка PYATEROCHKA MOSCOW RUS');
+});
+
+test('/5 NAME is a read-only view shared by state, detail, search and saved operation rows',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic NAME projection'),rows:[row({localDescription:'Покупка WORLDCLASS',localMerchant:'WORLDCLASS',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);const original=await importedOperation(),observations=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,epoch=(await request('/finance/epoch')).json();
+ assert.equal(original.displayName.title,'World Class');assert.equal(original.semantics.merchant.value,'WORLDCLASS');assert.equal(original.source.merchantText,'WORLDCLASS');assert.equal(original.source.description,'Покупка WORLDCLASS');
+ const state=(await request('/finance/state')).json(),page=await request('/finance/operations-page',{query:{filter:{search:'World Class'}}});assert.equal(page.statusCode,200,page.body);assert.equal(page.json().total,1);
+ assert.deepEqual(state.operations[0].displayName,original.displayName);assert.deepEqual(page.json().operations[0].displayName,original.displayName);assert.equal(original.displayName.safeBankDescriptionRef.operationId,original.id);
+ assert.deepEqual((await request('/finance/epoch')).json(),epoch);assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,observations);
+ await command({kind:'operation',id:original.id,patch:{merchant:'Мой зал 24'}});const manual=await detail(original.id);assert.equal(manual.displayName.title,'Мой зал 24');assert.deepEqual(manual.source,original.source);
+ assert.equal((await request('/finance/operations-page',{query:{filter:{search:'Мой зал 24'}}})).json().total,1);
+ await command({kind:'delete_financial',scope:{kind:'operations',operationIds:[original.id]}});assert.equal((await request('/finance/operation',{id:original.id})).statusCode,404);assert.equal((await request('/finance/operations-page',{query:{filter:{search:'World Class'}}})).json().total,0);
+});
+test('/5 extended logistics assigns the actual separate service without disguising the bank wording as goods',async()=>{
+ const {merchantSourceSanitizer}=await import('../../../packages/imports/src/safe-source.ts');const local=await createLocalPreparation(await context(),undefined,localBankAdapter,merchantSourceSanitizer);let b:PreparedBatch;
+ try{b=await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic parcel service'),rows:[row({localDescription:'Покупка B2CPL отправка посылки',localMerchant:'B2CPL',localMcc:'4215',parser:'tbank-table/1'})]}]);}finally{local.dispose();}
+ await accept(b!);await drain(b!.batchId);const item=await importedOperation(),state=(await request('/finance/state')).json();assert.equal(state.categories.find((c:any)=>c.id===item.semantics.subcategory.value)?.name,'Прочий транспорт');assert.equal(item.displayName.title,'B2CPL');assert.equal(item.source.merchantText,'B2CPL');assert.equal(item.components.length,0);assert.equal(item.semantics.role.value,'expense');
+});
+
+async function interestBatch(bytes:string,rows:ExtractedRow[],profile:'bank-source/5'|'bank-source/4'='bank-source/5'){
+ const local=await createLocalPreparation(await context(),undefined,localBankAdapter,profile);
+ try{return await local.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode(bytes),rows}]);}finally{local.dispose();}
+}
+test('FIN-T59 HTTP: unknown installment payments have a terminal contract reason and no duplicated purchase expense',async()=>{
+ const rows=[row({bankReference:'Synthetic-full-purchase',localDescription:'Покупка Ozon',amountMinor:'-10000',parser:'tbank-table/1'}),row({bankReference:'Synthetic-installment',localDescription:'Очередной платёж Яндекс Сплит',amountMinor:'-2500',parser:'tbank-table/1',localMcc:'5999'})],b=await interestBatch('Synthetic purchase and installment',rows);await accept(b);await drain(b.batchId);
+ const state=(await request('/finance/state')).json(),payment=state.operations.find((o:any)=>o.amountMinor==='-2500');assert.equal(payment.financialContract.status,'BLOCKED_UNSUPPORTED_CONTRACT');assert.equal(payment.analyticsRole,'unresolved');assert.equal(state.summary.netExpensesMinor,'10000');assert.equal(state.summary.unresolvedMinor,'2500');assert.equal((await counts()).account,1);
+ const detailBefore=await detail(payment.id),ledger=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;await command({kind:'operation',id:payment.id,patch:{role:'neutral'}});const chosen=await detail(payment.id);assert.equal(chosen.projection.analyticsRole,'neutral');assert.equal(chosen.projection.financialContract,undefined);assert.deepEqual(chosen.source,detailBefore.source);assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,ledger);
+});
+test('own category binding changes future recognition, survives rename, preserves past/manual rows and uses only owned targets',async()=>{
+ const root=randomUUID(),leaf=randomUUID();await command({kind:'category',id:root,create:true,patch:{name:'Мой раздел здоровья',parentId:null,role:'expense',hidden:false}});await command({kind:'category',id:leaf,create:true,patch:{name:'Мои аптеки',parentId:root,role:'expense',hidden:false}});
+ const saved=await command({kind:'set_category_binding',targetKey:'pharmacy',categoryId:root,subcategoryId:leaf});assert.equal(saved.preview.impact.details.targetLabel,'Здоровье и спорт / Аптеки');
+ const input=row({localDescription:'Покупка Аптека Ромашка',localMerchant:'Аптека Ромашка',parser:'tbank-table/1'}),b=await interestBatch('Synthetic bound pharmacy',[input]);await accept(b);await drain(b.batchId);const first=await importedOperation();assert.equal(first.semantics.category.value,root);assert.equal(first.semantics.subcategory.value,leaf);
+ await command({kind:'category',id:root,patch:{name:'Любое личное имя'}});await command({kind:'category',id:leaf,patch:{name:'Мой карман'}});const b2=await interestBatch('Synthetic renamed bound pharmacy',[{...input,bankReference:'Synthetic-second-bound'}]);await accept(b2);await drain(b2.batchId);const state=(await request('/finance/state')).json();assert.equal(state.categoryBindings.pharmacy.categoryId,root);assert.equal(state.operations.filter((o:any)=>o.classification.subcategory.value===leaf).length,2);
+ await command({kind:'category',id:leaf,patch:{hidden:true}});const b3=await interestBatch('Synthetic hidden binding',[{...input,bankReference:'Synthetic-third-bound'}]);await accept(b3);await drain(b3.batchId);const current=(await request('/finance/state')).json();assert.equal(current.operations.filter((o:any)=>o.classification.category.value===root).length,2);assert.equal(current.operations.filter((o:any)=>o.classification.category.value===null).length,1);
+ assert.equal(await within('second',async db=>(await db.query('SELECT * FROM finance.category_binding')).rowCount),0);for(const pool of [pg.control,pg.mailFinance,pg.mailControl])await assert.rejects(pool.query('SELECT * FROM finance.category_binding'),{code:'42501'});
+ const s=(await request('/finance/epoch')).json();const invalid=await request('/finance/preview',{actionId:randomUUID(),generation:s.generation,revision:s.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:randomUUID(),subcategoryId:null}});assert.equal(invalid.statusCode,409,invalid.body);assert.equal(invalid.json().code,'CATEGORY_BINDING_INVALID');
+});
+test('FIN-T92/T93 HTTP: source-local dates survive normalizer upgrade, conflict/cancellation and manual corrections without a duplicate',async()=>{
+ const instant='2026-09-30T22:30:00.000Z',input=row({operationDate:{precision:'instant',instant,sourceOffsetMinutes:540},postedDate:{precision:'instant',instant:'2026-10-01T22:30:00.000Z',sourceOffsetMinutes:-600},localDescription:'Покупка Синтетический магазин',parser:'tbank-table/1',bankReference:undefined});
+ const c=await context();assert.ok(c.normalizers?.includes('strict-source/2'));
+ const legacy=await createLocalPreparation({...c,normalizers:undefined},undefined,localBankAdapter,'bank-source/5');let first:PreparedBatch;try{first=await legacy.prepare(randomUUID(),[{fileId:randomUUID(),bank:'tbank',bytes:new TextEncoder().encode('Synthetic same source calendar'),rows:[input]}]);}finally{legacy.dispose();}
+ await accept(first!);await drain(first!.batchId);const original=await importedOperation();assert.ok(original.projection.reviewReasons.includes('source_timezone_unknown'));
+ const oldRows=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ const next=await interestBatch('Synthetic same source calendar',[input]);await accept(next);assert.equal((await drain(next.batchId)).counts.created,0);let current=await detail(original.id);assert.equal(current.source.operationDate.sourceOffsetMinutes,540);assert.equal(current.source.postedDate.sourceOffsetMinutes,-600);assert.ok(!current.projection.reviewReasons.includes('source_timezone_unknown'));assert.equal((await counts()).transaction,1);
+ assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[oldRows.map(r=>r.id)])).rows,oldRows);
+ const page=(await request('/finance/operations-page',{query:{filter:{from:'2026-10-01',through:'2026-10-01'}}})).json();assert.equal(page.total,1);
+ const conflict=await interestBatch('Synthetic conflicting explicit offset',[{...input,operationDate:{precision:'instant',instant,sourceOffsetMinutes:-600}}]);await accept(conflict);await drain(conflict.batchId);current=await detail(original.id);assert.equal(current.source.operationDate.sourceOffsetMinutes,null);assert.ok(current.projection.reviewReasons.includes('source_timezone_conflict'));
+ await command({kind:'operation',id:original.id,patch:{corrections:{operationDate:{precision:'day',date:'2026-10-03'},postedDate:null}}});current=await detail(original.id);assert.equal(current.projection.date.date,'2026-10-03');assert.ok(!current.projection.reviewReasons.includes('source_timezone_conflict'));assert.equal((await request('/finance/operations-page',{query:{filter:{postedFrom:'2026-10-01'}}})).json().total,0);
+ await command({kind:'cancel_import',batchId:conflict.batchId});current=await detail(original.id);assert.equal(current.source.operationDate.sourceOffsetMinutes,540);assert.equal(current.projection.date.date,'2026-10-03');await command({kind:'operation',id:original.id,patch:{corrections:{}}});
+ await command({kind:'cancel_import',batchId:next.batchId});current=await detail(original.id);assert.ok(current.projection.reviewReasons.includes('source_timezone_unknown'));assert.equal(current.source.operationDate.sourceOffsetMinutes,undefined);assert.equal(current.source.amountMinor,'-100');
+});
+test('FIN-T49/T50 HTTP: /5 incoming deposit interest and paid loan interest retain bank facts through repeat, corrections reset and cancellation',async()=>{
+ const input=[row({bankReference:'Synthetic-received-interest',localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'}),row({bankReference:'Synthetic-paid-interest',localDescription:'Уплата процентов по кредиту',amountMinor:'-50000',direction:'debit',parser:'tbank-table/1'})];
+ const first=await interestBatch('Synthetic interest first',input);await accept(first);await drain(first.batchId);const state=(await request('/finance/state')).json(),received=state.operations.find((o:any)=>o.amountMinor==='450000'),paid=state.operations.find((o:any)=>o.amountMinor==='-50000');
+ assert.equal(received.analyticsRole,'income');assert.equal(paid.analyticsRole,'expense');assert.equal(state.summary.incomeMinor,'450000');assert.equal(state.summary.netExpensesMinor,'50000');assert.equal(state.categories.find((c:any)=>c.id===received.classification.subcategory.value)?.name,'Проценты по счетам и вкладам');assert.equal(state.categories.find((c:any)=>c.id===paid.classification.subcategory.value)?.name,'Проценты');
+ const before=await detail(received.id);assert.equal(before.source.sourceKind,'other');assert.equal(before.semantics.kind.value,'interest');assert.equal(before.semantics.kind.source,'deterministic_system_rule');
+ const oldObservations=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;
+ await command({kind:'operation',id:received.id,patch:{corrections:{amountMinor:'450001'},comment:'Мои проценты'}});assert.equal((await detail(received.id)).projection.analyticsRole,'income');await command({kind:'operation',id:received.id,patch:{corrections:{}}});assert.equal((await detail(received.id)).projection.amountMinor,'450000');
+ const again=await interestBatch('Synthetic interest repeat',input);await accept(again);assert.equal((await drain(again.batchId)).counts.existing,2);assert.equal((await counts()).transaction,2);
+ assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[oldObservations.map(o=>o.id)])).rows,oldObservations);
+ await command({kind:'cancel_import',batchId:again.batchId});const restored=await detail(received.id);assert.equal(restored.projection.analyticsRole,'income');assert.equal(restored.comment,'Мои проценты');assert.equal(restored.source.amountMinor,'450000');assert.equal(restored.source.sourceKind,'other');
+ assert.equal(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.classification_run WHERE user_id='first'")).rows[0].n),0);
+});
+test('FIN-P04/P09 HTTP: private interest role and a later verified decision survive repeat and cancellation',async()=>{
+ await command({kind:'rule',id:randomUUID(),create:true,patch:{name:'Личное учётное решение',enabled:true,priority:1,conditions:{descriptionContains:'процентов по вкладу'},assignments:{role:'neutral'}}});
+ const rows=[row({localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'})],first=await interestBatch('Synthetic private interest',rows);await accept(first);await drain(first.batchId);let op=await importedOperation();assert.equal(op.semantics.role.source,'personal_rule');assert.equal(op.projection.analyticsRole,'neutral');
+ await command({kind:'operation',id:op.id,patch:{role:'income',merchant:'Мой вклад'}});const again=await interestBatch('Synthetic private interest repeat',rows);await accept(again);await drain(again.batchId);await command({kind:'cancel_import',batchId:again.batchId});op=await detail(op.id);assert.equal(op.semantics.role.userVerified,true);assert.equal(op.projection.analyticsRole,'income');assert.equal(op.semantics.merchant.value,'Мой вклад');
+});
+test('FIN-P09 HTTP: deleting the only /5 evidence removes inferred interest while retained legacy facts stay unresolved',async()=>{
+ const rows=[row({localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'})];
+ const current=await interestBatch('Synthetic current interest',rows);await accept(current);await drain(current.batchId);const id=(await importedOperation()).id;assert.equal((await detail(id)).semantics.kind.value,'interest');
+ const old=await interestBatch('Synthetic legacy retained',rows,'bank-source/4');await accept(old);await drain(old.batchId);await command({kind:'cancel_import',batchId:current.batchId});const restored=await detail(id);assert.equal(restored.source.versions.sourceSanitizer,'bank-source/4');assert.equal(restored.semantics.kind.value,'other');assert.equal(restored.projection.analyticsRole,'unresolved');assert.equal(restored.semantics.category.value,null);
+});
+test('FIN-P09 HTTP: a full financial reset and fresh import do not resurrect the wrong interest initializer',async()=>{
+ const rows=[row({localDescription:'Начисление процентов по вкладу',amountMinor:'450000',direction:'credit',parser:'tbank-table/1'})],first=await interestBatch('Synthetic interest before reset',rows);await accept(first);await drain(first.batchId);const before=await importedOperation();
+ await command({kind:'reset_financial',keepCategories:true,keepRules:true,keepInterface:true});assert.equal((await counts()).transaction,0);
+ const fresh=await interestBatch('Synthetic interest after reset',rows);await accept(fresh);await drain(fresh.batchId);const after=await importedOperation();assert.notEqual(after.id,before.id);assert.equal(after.projection.analyticsRole,'income');assert.equal(after.source.amountMinor,'450000');assert.equal(after.source.description,before.source.description);
+});
+
+test('/5 full catalog recognizes additional agreed profiles locally and preserves facts across exact replay',async()=>{
+ const examples=[['Skuratov Coffee','Рестораны и кафе'],['Самсон-Фарма','Аптеки'],['Линзмастер','Оптика'],['SwimRocket','Фитнес и спорт'],['ВсеИнструменты.ру','Ремонт'],['Бауцентр','Ремонт'],['Nail Sunny','Парикмахерские и салоны'],['Befree','Одежда'],['Кинопоиск','Видео и музыка'],['Midjourney','AI-сервисы'],['Аэрофлот','Авиабилеты'],['Skillbox','Курсы']] as const;
+ const rows=examples.map(([merchant],n)=>row({bankReference:'Synthetic-catalog-'+n,localDescription:'Покупка '+merchant,localMerchant:merchant,amountMinor:'-12345',parser:'tbank-table/1'})),batch=await interestBatch('Synthetic complete catalog profiles',rows);await accept(batch);const drained=await drain(batch.batchId);assert.equal(drained.counts.created,examples.length);
+ const state=(await request('/finance/state')).json();assert.equal(state.operations.length,examples.length);for(const [merchant,leaf]of examples){const operation=state.operations.find((o:any)=>o.description==='Покупка '+merchant);assert.ok(operation,merchant);const original=await detail(operation.id);assert.equal(original.source.merchantText,merchant);assert.equal(original.source.amountMinor,'-12345');assert.equal(original.source.description,'Покупка '+merchant);assert.equal(operation.classification.category.source,'global_rule');assert.equal(state.categories.find((c:any)=>c.id===operation.classification.subcategory.value)?.name,leaf,merchant);}
+ const observations=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;const repeat=await interestBatch('Synthetic complete catalog profiles',rows);await accept(repeat);assert.equal((await drain(repeat.batchId)).counts.created,0);assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[observations.map(o=>o.id)])).rows,observations);assert.equal((await request('/finance/state')).json().operations.length,examples.length);
+});

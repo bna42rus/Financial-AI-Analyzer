@@ -1,4 +1,7 @@
 import importlib.util
+import ast
+import inspect
+import io
 import json
 import os
 from pathlib import Path
@@ -15,6 +18,18 @@ spec.loader.exec_module(m)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_upgrade_accepts_previous_workflow_only_before_switch(self):
+        function = ast.parse(inspect.getsource(m.install)).body[0]
+        calls = sorted([n for n in ast.walk(function) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) and n.func.value.id == 'm' and n.func.attr == 'wait_health'], key=lambda n:n.lineno)
+        self.assertGreaterEqual(len(calls), 2)
+        self.assertFalse(calls[0].args[0].value)
+        self.assertTrue(all(call.args[0].value is True for call in calls[1:]))
+        for version, expected in [('cashneuro-assistant-workflow/6', False), ('cashneuro-assistant-workflow/7', True)]:
+            payload = json.dumps({'status':'ok','profile':'finance','assistant':version}).encode()
+            with patch.object(m.m.urllib.request,'urlopen',side_effect=lambda *a,**k:io.BytesIO(payload)):
+                self.assertTrue(m.m.health(False))
+                self.assertEqual(m.m.health(True), expected)
+
     def test_renewed_rollback_and_candidate_share_one_carried_budget_and_cannot_expand_authority(self):
         previous = {'realm':'staging/finance','apiKey':'synthetic-only','allowedEmails':['owner@example.test'],'modelMetadataSha256':'b'*64,'tariffSource':'fixed',
                     'maximumCalls':14,'admission':{'stageCapAtoms':'10000000000','stageMaximumCalls':60,'spentAtoms':'100','calls':46},'cost':{'projectId':'staging/test','price':{'input':'15.86'}}}

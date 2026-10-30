@@ -1,3 +1,4 @@
+import {prepareAssistantChange} from './assistant-changes.ts';
 import { isDeepStrictEqual } from 'node:util';
 import type { Pool, PoolClient } from 'pg';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
@@ -28,19 +29,7 @@ const step = (i: number): 'assistant_0' | 'assistant_1' | 'assistant_2' => {
 };
 const integer = (v: unknown) => { if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0) throw new TypeError('TASK_REVISION_INVALID'); return v; };
 
-/** No Moscow/billing-cycle fallback and no client-controlled calendar per call. */
-export async function assistantProfile(db: PoolClient, userId: string, value: unknown) {
-  const r = object(value, ['timezone', 'initialize']);
-  if (r.initialize !== undefined && (typeof r.initialize !== 'boolean' || r.timezone === undefined)) throw new TypeError('ASSISTANT_PROFILE_INVALID');
-  await prepareFinance(db, userId);
-  if (r.timezone !== undefined) {
-    const calendar = profileCalendar(new Date(), r.timezone as string);
-    if (!(await db.query('SELECT 1 FROM pg_timezone_names WHERE name=$1', [calendar.timezone])).rowCount) throw new AssistantError('ASSISTANT_TIMEZONE_INVALID');
-    await db.query(`INSERT INTO finance.assistant_profile(user_id,timezone) VALUES($1,$2)
-      ON CONFLICT(user_id) DO UPDATE SET timezone=CASE WHEN $3 THEN finance.assistant_profile.timezone ELSE EXCLUDED.timezone END`, [userId, calendar.timezone, r.initialize === true]);
-  }
-  return { timezone: (await db.query('SELECT timezone FROM finance.assistant_profile WHERE user_id=$1', [userId])).rows[0]?.timezone ?? null };
-}
+export {financeProfile as assistantProfile} from './finance-profile.ts';
 
 /** One connection-level lock per request, no transaction/workspace lock across
  * HTTP. Process death releases it. A durable sent receipt never triggers retry. */
@@ -174,6 +163,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
     try {
     await runAssistant(r, model, journal, {
       guard: expected => within(db => guard(db, expected)),
+      prepareChange: (change,sourceAnswerId) => within(async db => {await guard(db);return prepareAssistantChange(db,userId,id,change,sourceAnswerId);}),
       catalog: () => within(async db => { await guard(db); return yandexCatalog(db, userId); }),
       authorizeQuery: query => within(async db => { await guard(db); await assertReferences(db, userId, query.filter); }),
       calculate: (query, calendar) => within(async db => {
@@ -197,7 +187,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           if (!calculation || !isDeepStrictEqual(reply.query, calculation.answer.query)) throw new HttpError(409, 'AI_STATE_CHANGED');
           await assertReferences(db, userId, reply.query!.filter);
           answer = { ...calculation.answer, followUp: conversation.book.nodes.at(-1)!.parent !== null };
-        } else answer = { registryVersion, mode: reply.status === 'answer' ? 'ai' : reply.status === 'redirect' ? 'redirect' : reply.status === 'clarification' ? 'clarification' : 'unavailable', text: reply.text };
+        } else answer = { registryVersion, mode: reply.status === 'answer' ? 'ai' : reply.status === 'redirect' ? 'redirect' : reply.status === 'clarification' ? 'clarification' : 'unavailable', text: reply.text,...(reply.calculation?{calculation:reply.calculation}:{}),...(reply.proposal?{proposal:reply.proposal}:{}),generation:r.scope.generation,revision:r.dataRevision,computedAt:r.now.toISOString() };
         await db.query('INSERT INTO finance.analyzer_message(user_id,id,chat_id,question,answer,context,request) VALUES($1,$2,$3,$4,$5,$6,$7)', [userId, id, chatId, text, JSON.stringify(answer), reply.query ? JSON.stringify(reply.query) : null, JSON.stringify(body)]);
         if (reply.status === 'query' && calculation!.dependencyIds.length) await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[])', [userId, id, calculation!.dependencyIds]);
         await db.query(`INSERT INTO finance.assistant_conversation(user_id,chat_id,chat_epoch,generation,conversation) VALUES($1,$2,$3,$4,$5)
@@ -205,7 +195,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
         const book = conversation.book;
         await db.query(`INSERT INTO finance.analyzer_task_book(user_id,chat_id,chat_epoch,generation,book,head,node_count) VALUES($1,$2,$3,$4,$5,$6,$7)
           ON CONFLICT(user_id,chat_id) DO UPDATE SET book=EXCLUDED.book,head=EXCLUDED.head,node_count=EXCLUDED.node_count,generation=EXCLUDED.generation`, [userId, chatId, chatEpoch, generation, JSON.stringify(book), book.nodes.at(-1)?.messageId ?? null, book.nodes.length]);
-        if (reply.status === 'query') {
+        if (reply.status === 'query' || reply.status === 'answer') {
           const quota = await analyzerQuota(db, userId, true);
           if (!quota.available || quota.limit === null || quota.used >= quota.limit) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
           const billed = await db.query(`INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version)
@@ -215,7 +205,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           if (billed.rowCount !== 1) throw new HttpError(409, 'AI_STATE_CHANGED');
         }
         await db.query("UPDATE commerce.analyzer_request SET state='completed',updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND state='received'", [userId, id]);
-        await db.query("UPDATE finance.analyzer_chat SET title=CASE WHEN title='Новый диалог' AND $3 THEN $4 ELSE title END,modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2", [userId, chatId, reply.status === 'query', text.slice(0,100)]);
+        await db.query("UPDATE finance.analyzer_chat SET title=CASE WHEN title='Новый диалог' AND $3 THEN $4 ELSE title END,modified_at=clock_timestamp() WHERE user_id=$1 AND id=$2", [userId, chatId, reply.status === 'query' || reply.status === 'answer', text.slice(0,100)]);
         savedReply = { id, answer, code: reply.code, quota: await analyzerQuota(db, userId, true) };
         await db.query("UPDATE finance.analyzer_task_request SET state='completed',reply=$3 WHERE user_id=$1 AND id=$2 AND state='pending'", [userId, id, JSON.stringify(savedReply)]);
       }),

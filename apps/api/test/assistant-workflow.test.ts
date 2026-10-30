@@ -16,7 +16,7 @@ const plan = (changes: unknown[], mode = 'new') => ({ version: assistantVersion,
 function harness() {
   let conversation = emptyConversation(scope), calls: CompletionInput[] = [], catalogs = 0, calculations = 0, currentGlobal = structuredClone(global), currentNow = new Date('2026-10-15T22:30:00Z');
   const journals = new Map<string, AssistantJournal>(), requests = new Map<string, AssistantRequest>();
-  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog } = {}) => {
+  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog; prepareChange?: AssistantServices['prepareChange'] } = {}) => {
     if (options.global) currentGlobal = options.global; if (options.now) currentNow = options.now;
     const request: AssistantRequest = requests.get(trialId(n)) ?? { requestId: trialId(n), scope, conversation: structuredClone(conversation), global: currentGlobal, dataRevision: '1', question, now: currentNow, timezone: options.timezone ?? calendar.timezone };
     requests.set(request.requestId, request);
@@ -34,7 +34,7 @@ function harness() {
     } };
     const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() {}, async settle() {} } as AssistantJournal;
     journals.set(request.requestId, journal);
-    const services: AssistantServices = { async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
+    const services: AssistantServices = { prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
       async calculate(query, actualCalendar) { calculations++; assert.equal(actualCalendar.timezone, request.timezone); return trialResult(query); },
       render(_query, result) { return 'Проверенный расчёт: ' + JSON.stringify((result as any).totals); }, async commit(input) { conversation = input.conversation; } };
     return runAssistant(request, model, journal, services);
@@ -444,4 +444,26 @@ test('only the exact reserved period marker canonicalizes to use_current, withou
   assert.equal(reply.status, 'query'); assert.equal(reply.query!.filter.from, '2026-10-01');
   assert.equal(reply.query!.grouping, 'category'); assert.equal(reply.query!.comparison, 'previous_same');
   assert.equal(h.state.book.nodes[1]!.parent, trialId(663));
+});
+
+
+test('calculator route returns code-computed cents, records the exact model and replays with no catalog or financial query',async()=>{
+ const h=harness(),p={version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'}};
+ const result=await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[p]);
+ assert.equal(result.code,'FINANCIAL_CALCULATION');assert.equal(result.calculation?.kind,'loan');if(result.calculation?.kind==='loan')assert.equal(result.calculation.totalPaidMinor,'10100');
+ assert.equal(h.calls.length,1);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);assert.equal(h.state.book.nodes.length,0);
+ assert.deepEqual(await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[]),result);assert.equal(h.calls.length,1);
+});
+test('a natural change is a persisted proposal after completeness review and never a calculation or implicit write',async()=>{
+ const h=harness();let prepared=0;const proposal={version:'cashneuro-change-proposal/1' as const,intent:{kind:'account' as const,id:trialId(1),patch:{name:'Моя карта'}},title:'Переименовать счёт',description:['Моя карта'],sourceAnswerId:null};
+ const p={version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'account',name:'Карта',patch:{name:'Моя карта'}}};
+ const reply=await h.execute(979,'Назови счёт Карта — Моя карта',[p],{prepareChange:async(_c,source)=>{prepared++;assert.equal(source,null);return proposal;}});
+ assert.equal(reply.code,'CHANGE_PROPOSED');assert.deepEqual(reply.proposal,proposal);assert.equal(reply.modelCalls,2);assert.equal(prepared,1);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);assert.equal(h.state.book.nodes.length,0);
+ assert.deepEqual(await h.execute(979,'Назови счёт Карта — Моя карта',[]),reply);assert.equal(prepared,1);
+});
+test('incomplete or unresolved natural changes never prepare a mutation or widen the previous answer',async()=>{
+ const h=harness();let prepared=0;const p={version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'answer_operations',patch:{comment:'Для проверки'}}};
+ const blocked=await h.execute(980,'Пометь операции после зарплаты',[p,{plan:p,conditions:[{text:'Дата зарплаты неизвестна',scope:'financial',covered:false}]}],{prepareChange:async()=>{prepared++;throw Error('UNEXPECTED');}});
+ assert.equal(blocked.status,'clarification');assert.equal(prepared,0);
+ const missing=await h.execute(981,'Пометь операции этого ответа',[p],{prepareChange:async()=>{throw Error('ASSISTANT_CHANGE_SCOPE_REQUIRED');}});assert.equal(missing.status,'clarification');assert.equal(missing.proposal,undefined);
 });

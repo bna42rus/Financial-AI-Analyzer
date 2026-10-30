@@ -74,6 +74,41 @@ class DiagnosisTests(unittest.TestCase):
         self.assertEqual(rows[-1]['code'],'STAGING_DATABASE_LAYOUT_CHANGED')
         self.assertFalse(any(args[:2]==['docker','exec'] for args,_ in calls))
 
+    def test_all_unresolved_account_requests_are_visible_even_outside_the_smoke_period(self):
+        _, _, calls = self.run_inspection()
+        sql = calls[-1][1]['input']
+        blockers = sql.split('blockers AS (', 1)[1].split(')\nSELECT json_build_object', 1)[0]
+        self.assertIn("r.state='sent' OR r.usage_state='unknown'", blockers)
+        self.assertIn('r.user_id=(SELECT id FROM test_account)', blockers)
+        self.assertNotIn('r.provider=', blockers)
+        self.assertNotIn('r.created_at>=', blockers)
+        self.assertIn('missing_cost_receipt', blockers)
+        self.assertIn('LIMIT 30', sql)
+        self.assertIn("state IN ('reserved','unknown')", sql)
+        self.assertIn("'blockingCount'", sql)
+
+    def test_query_whitelists_configuration_and_keeps_money_exact(self):
+        sql = m.receipt_query({'apiKey':'API_KEY_NOT_FOR_SQL', 'unrelated':'OTHER_SECRET',
+                              'allowedEmails':["o'connor@example.test"],
+                              'cost':{'projectId':'test/reconciliation',
+                                      'projectPeriodStart':'2026-10-30T12:00:00.123456Z',
+                                      'private':'COST_SECRET'}})
+        self.assertNotIn('API_KEY_NOT_FOR_SQL', sql)
+        self.assertNotIn('OTHER_SECRET', sql)
+        self.assertNotIn('COST_SECRET', sql)
+        self.assertIn("o''connor@example.test", sql)
+        self.assertIn('reserved_atoms::text', sql)
+        self.assertIn('settled_atoms::text', sql)
+        self.assertIn('BEGIN READ ONLY;', sql)
+        self.assertTrue(sql.rstrip().endswith('ROLLBACK;'))
+        for verb in ['UPDATE ', 'DELETE ', 'INSERT ', 'TRUNCATE ', 'ALTER ']:
+            self.assertNotIn(verb, sql)
+
+    def test_invalid_or_unbounded_account_scope_is_rejected(self):
+        for emails in [None, [], ['a@example.test']*101, [123], ['x'*255]]:
+            with self.assertRaisesRegex(m.InspectionError,'CONFIGURATION_SCOPE_INVALID'):
+                m.receipt_query({'allowedEmails':emails})
+
 
 if __name__=='__main__':
     unittest.main()

@@ -28,6 +28,33 @@ async function append(amount:string,kind:Kind='purchase',transactionId:string|nu
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
+test('category binding preview is read-only, confirms/undoes atomically, remaps merges and rejects hidden targets',async()=>{
+ let w=await view();const root=w.categories.find((c:any)=>c.name==='Здоровье и спорт'&&!c.parentId),leaf=w.categories.find((c:any)=>c.name==='Аптеки'&&c.parentId===root.id),actionId=randomUUID(),input={actionId,generation:w.generation,revision:w.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:root.id,subcategoryId:leaf.id}};
+ const preview=await request('/finance/preview',input);assert.equal(preview.statusCode,200,preview.body);assert.deepEqual((await view()).categoryBindings,{});const applied=await request('/finance/commit',{actionId});assert.equal(applied.statusCode,200,applied.body);assert.deepEqual((await view()).categoryBindings.pharmacy,{categoryId:root.id,subcategoryId:leaf.id});
+ await command({kind:'undo',id:randomUUID(),value:actionId});assert.deepEqual((await view()).categoryBindings,{});await command(input.intent);
+ const custom=randomUUID();await command({kind:'category',id:custom,create:true,patch:{name:'Моя медицина',role:'expense',parentId:null,hidden:false}});await command({kind:'merge_categories',id:custom,sourceIds:[root.id]});w=await view();assert.equal(w.categoryBindings.pharmacy.categoryId,custom);assert.equal(w.categoryBindings.pharmacy.subcategoryId,leaf.id);
+ await command({kind:'category',id:leaf.id,patch:{hidden:true}});w=await view();assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:custom,subcategoryId:leaf.id}})).json().code,'CATEGORY_BINDING_INVALID');
+ await command({kind:'set_category_binding',targetKey:'pharmacy',categoryId:null,subcategoryId:null});assert.deepEqual((await view()).categoryBindings,{});
+});
+test('selected catalog categories are present only in new starters; existing users get authorized read-only preview, atomic commit and Undo',async()=>{
+ const additions=['Аренда пауэрбанков','Спортивное питание','Техника и электроника','Стоматология','Оптика','Медицинские изделия'];let w=await view();for(const name of additions)assert.ok(w.categories.some((c:any)=>c.name===name));
+ await pg.owner.query("DELETE FROM finance.category WHERE user_id='first' AND name=ANY($1::text[])",[additions]);w=await view();assert.ok(additions.every(name=>!w.categories.some((c:any)=>c.name===name)));const before=structuredClone(w.categories),id=randomUUID(),keys=['powerbank','sport_nutrition','electronics','dentistry','optics','medical_devices'];
+ const p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'add_catalog_categories',keys}});assert.equal(p.statusCode,200,p.body);assert.equal(p.json().impact.details.createdCategories.length,6);assert.deepEqual((await view()).categories,before);
+ const applied=await request('/finance/commit',{actionId:id});assert.equal(applied.statusCode,200,applied.body);assert.deepEqual((await request('/finance/commit',{actionId:id})).json(),applied.json());w=await view();for(const name of additions)assert.equal(w.categories.filter((c:any)=>c.name===name).length,1);
+ await command({kind:'undo',id:randomUUID(),value:id});assert.deepEqual((await view()).categories,before);
+});
+test('catalog additions reuse own synonyms, preserve hidden and ambiguous nodes, and reject stale/foreign-shaped requests',async()=>{
+ let w=await view();const power=w.categories.find((c:any)=>c.name==='Аренда пауэрбанков'),optics=w.categories.find((c:any)=>c.name==='Оптика');await command({kind:'category',id:power.id,patch:{name:'Прокат зарядок'}});await command({kind:'category',id:optics.id,patch:{hidden:true}});w=await view();
+ const id=randomUUID(),p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'add_catalog_categories',keys:['powerbank','optics']}});assert.equal(p.statusCode,200,p.body);assert.equal(p.json().impact.details.createdCategories.length,0);assert.deepEqual(p.json().impact.details.categoryDecisions.map((d:any)=>d.status),['present','hidden']);
+ await command({kind:'category',id:power.id,patch:{name:'Мои зарядки'}});assert.equal((await request('/finance/commit',{actionId:id})).json().code,'FINANCE_CHANGED');
+ w=await view();for(const intent of [{kind:'add_catalog_categories',keys:['powerbank'],ids:{powerbank:randomUUID()}},{kind:'add_catalog_categories',keys:['foreign-key']},{kind:'add_catalog_categories',keys:['powerbank','powerbank']}])assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent})).statusCode,400);
+ const deniedId=randomUUID();const ready=await request('/finance/preview',{actionId:deniedId,generation:w.generation,revision:w.revision,intent:{kind:'add_catalog_categories',keys:['powerbank']}});assert.equal(ready.statusCode,200,ready.body);await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId:deniedId})).statusCode,403);
+});
+test('FIN-T49/T50: trusted bank interest uses actual signed amount in initial and repeated observations and protects owner role',async()=>{
+ const received=(await append('450000','interest')).transactionId,paid=(await append('-50000','interest')).transactionId;let w=await view();assert.equal(w.operations.find((o:any)=>o.id===received).analyticsRole,'income');assert.equal(w.operations.find((o:any)=>o.id===paid).analyticsRole,'expense');assert.equal(w.summary.incomeMinor,'450000');assert.equal(w.summary.netExpensesMinor,'50000');
+ await append('450001','interest',received);w=await view();assert.equal(w.operations.find((o:any)=>o.id===received).classification.role.value,'income');
+ await command({kind:'operation',id:received,patch:{role:'neutral'}});await append('450002','interest',received);const manual=(await view()).operations.find((o:any)=>o.id===received);assert.equal(manual.analyticsRole,'neutral');assert.equal(manual.classification.role.userVerified,true);
+});
 test('HTTP financial text boundary rejects passport, email and invisible-identifier bypasses without writes or reflection',async()=>{
  const operationId=(await append('-1000')).transactionId;
  for(const raw of ['Паспорт 4510 123456','Email synthetic.private@example.test','Карта 1234\u200b5678\u20609012\u200e3456','Договор No TEST-123456']){
@@ -101,7 +128,7 @@ test('bulk preview cannot commit after a new import or access expiry and does no
 });
 
 test('new workspace has starter categories, no invented transactions and scoped runtime roles',async()=>{
- const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,31);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
+ const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,32);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
  for(const pool of [pg.control,pg.mailControl,pg.mailFinance])await assert.rejects(pool.query('SELECT * FROM finance.transaction'),{code:'42501'});
  assert.equal((await control.fastify.inject({method:'GET',url:'/finance/state',headers:{cookie,origin:'https://admin.example.test'}})).statusCode,404);
 });
@@ -318,4 +345,14 @@ test('a purchase split keeps one bank operation, categories count only their par
  assert.deepEqual((await pg.owner.query('SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id=$1 AND transaction_id=$2',['first',purchase])).rows,originals);
  // Removing the split must preview the dependency conflict instead of guessing a refund category.
  const removal=await command({kind:'components',id:purchase,parts:[]});assert.ok(removal.preview.impact.dependencyConflicts.length>0);await command({kind:'undo',id:randomUUID(),value:removal.actionId});detail=(await request('/finance/operation',{id:purchase})).json();assert.equal(detail.components.length,2);assert.equal(detail.semantics.merchant.value,'Ozon');assert.equal((await view()).summary.netExpensesMinor,'700000');
+});
+
+test('financial profile is owner scoped, initializes once without AI and stays independent of the commercial calendar',async()=>{
+ const before=await view();assert.equal((await request('/session')).json().timezone,null);
+ const initial=await request('/finance/profile',{timezone:'Asia/Tokyo',initialize:true});assert.equal(initial.statusCode,200,initial.body);assert.equal(initial.json().timezone,'Asia/Tokyo');assert.equal((await request('/session')).json().timezone,'Asia/Tokyo');
+ assert.equal((await request('/finance/profile',{timezone:'Pacific/Honolulu',initialize:true})).json().timezone,'Asia/Tokyo');assert.equal((await request('/finance/profile',{timezone:'Pacific/Honolulu'})).json().timezone,'Pacific/Honolulu');assert.equal((await view()).revision,before.revision);assert.deepEqual((await view()).operations,before.operations);
+ assert.equal(await within('second',async db=>(await db.query('SELECT * FROM finance.assistant_profile')).rowCount),0);
+ for(const payload of [{timezone:'Not/A_Zone'},{timezone:'Etc/UTC',userId:'second'},{initialize:true},{timezone:'Asia/Tokyo',initialize:'true'}]){const rejected=await request('/finance/profile',payload);assert.equal(rejected.statusCode,400,rejected.body);assert.equal(rejected.body.includes('Not/A_Zone'),false);}
+ const denied=await control.fastify.inject({method:'POST',url:'/finance/profile',payload:{timezone:'Etc/UTC'},headers:{origin:'https://admin.example.test'}});assert.equal(denied.statusCode,404);
+ await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/profile',{timezone:'Etc/UTC'})).statusCode,403);
 });

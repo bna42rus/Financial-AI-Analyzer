@@ -1,3 +1,9 @@
+import {parseCategoryBinding,applyCategoryBinding} from './category-bindings.ts';
+import type {CategoryBindingIntent} from './category-bindings.ts';
+import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
+import {parseSelectedCategories,applySelectedCategories} from './selected-categories.ts';
+import type {SelectedCategoryIntent} from './selected-categories.ts';
+import {operationDisplayName} from '../../../packages/finance-core/src/operation-name.ts';
 import {cleanBankText} from '../../../packages/imports/src/bank-description.ts';
 import {parseOverviewIntent,applyOverviewIntent} from './overview.ts';
 import type {OverviewIntent} from './overview.ts';
@@ -20,7 +26,7 @@ import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
-import {object,choice,uuid,dateFact,correction,initialSemantics,defaultRole,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
+import {object,choice,uuid,dateFact,correction,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
@@ -80,7 +86,9 @@ export async function loadFinance(db:PoolClient,userId:string){
  const evidence=await sourceEvidence(db,userId),evidenceByOperation=new Map<string,typeof evidence>();
  for(const row of evidence){const own=evidenceByOperation.get(row.transaction_id)??[];own.push(row);evidenceByOperation.set(row.transaction_id,own);}
  const transactionById=new Map(t.map(r=>[r.id,r]));
- const graph:Graph={accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
+ const bindings=(await db.query('SELECT target_key,category_id,subcategory_id FROM finance.category_binding WHERE user_id=$1 ORDER BY target_key',[userId])).rows;
+ const categoryBindings=Object.fromEntries(bindings.map(b=>[b.target_key,{categoryId:b.category_id,subcategoryId:b.subcategory_id}]));
+ const graph:Graph={categoryBindings,accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
   const source=observations.get(r.sourceObservationId!);if(!source)throw new TypeError('SOURCE_MISSING');
   const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
   const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,corrections:r.corrections,semantics:{...r.semantics,merchant:{...r.semantics.merchant,value:cleanBankText(r.semantics.merchant.value,160)}},comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
@@ -95,7 +103,7 @@ export async function financeView(db:PoolClient,userId:string,filter:Filter={},c
  const tombstones=(await db.query('SELECT id,merged_into_id AS "canonicalId" FROM finance.transaction WHERE user_id=$1 AND merged_into_id IS NOT NULL ORDER BY id',[userId])).rows;
  const summary=aggregate(projection.operations,filter);
  const duplicateCandidates=(await db.query("SELECT id,left_id AS \"leftId\",right_id AS \"rightId\" FROM finance.duplicate_candidate WHERE user_id=$1 AND status='candidate' ORDER BY id",[userId])).rows;
- return {operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:o.corrections.postedDate??o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
+ return {categoryBindings:graph.categoryBindings,operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,displayName:operationDisplayName(o,{counterparties:parties}),classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:Object.hasOwn(o.corrections,'postedDate')?o.corrections.postedDate!:o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
 }
 export function parseFilter(value:unknown):Filter{
  const r=object(value,['from','through','accountIds','categoryIds','includeExcluded','compact']),f:Filter={};
@@ -107,17 +115,19 @@ export function parseFilter(value:unknown):Filter{
 }
 export async function operationView(db:PoolClient,userId:string,id:unknown){
  const requested=uuid(id),canonical=(await db.query('SELECT finance.canonical_operation($1,$2) AS id',[userId,requested])).rows[0].id;
- const {graph,state}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
+ const {graph,state,parties}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
  const resolved=reconcile(graph),related=(l:{sourceId:string;targetId:string})=>l.sourceId===op.id||l.targetId===op.id;
  const links=graph.links.filter(related),linkIds=new Set(links.map(l=>l.id));
  const classificationHistory=(await db.query(`SELECT a.id,a.created_at AS "createdAt",r.engine,a.before_facets AS before,a.after_facets AS after FROM finance.classification_assignment a JOIN finance.classification_run r ON (r.user_id,r.id)=(a.user_id,a.run_id) WHERE a.user_id=$1 AND a.transaction_id=$2 ORDER BY a.created_at DESC,a.id DESC LIMIT 20`,[userId,op.id])).rows;
  const safeFacets=(value:Record<string,any>)=>value?.merchant?{...value,merchant:{...value.merchant,value:cleanBankText(value.merchant.value,160)}}:value;
  const safeHistory=classificationHistory.map(r=>({...r,before:safeFacets(r.before),after:safeFacets(r.after)}));
- const {bankRefHmac,...source}=op.source;return {...op,source,classificationHistory:safeHistory,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
+ const {bankRefHmac,...source}=op.source;return {...op,source,displayName:operationDisplayName(op,{counterparties:parties}),classificationHistory:safeHistory,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type Intent=OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type Intent=CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
+ if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
+ if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
   if(k==='merge_duplicate')return parseMergeDuplicate(value);
@@ -173,6 +183,8 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='set_category_binding')return applyCategoryBinding(db,userId,intent,(await loadFinance(db,userId)).graph);
+ if(intent.kind==='add_catalog_categories')return applySelectedCategories(db,userId,intent,(await loadFinance(db,userId)).graph);
  if(intent.kind==='save_overview_view'||intent.kind==='delete_overview_view'||intent.kind==='reorder_overview_views')return applyOverviewIntent(db,userId,intent);
  if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
  if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
@@ -354,13 +366,11 @@ export async function acceptObservation(db:PoolClient,userId:string,epoch:Import
   return {transactionId:existing.transaction_id as string,observationId,projection:reconcile((await loadFinance(db,userId)).graph).operations.find(o=>o.id===existing.transaction_id)};
  }
  const {graph,rules}=await loadFinance(db,userId),account=canonicalAccount(graph,fact.accountId);
- const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialSemantics(kind,fact.merchantText);
+ const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialBankSemantics(fact);
  if(transactionId!==null){
-  const previous=await row(db,userId,'transaction',id);semantics=structuredClone(previous.semantics);
-  if(!semantics.kind.userVerified&&semantics.kind.source==='bank'){semantics.kind=facet(kind,'bank');if(!semantics.role.userVerified&&semantics.role.source==='deterministic_system_rule')semantics.role=facet(defaultRole(kind));}
-  if(!semantics.merchant.userVerified&&semantics.merchant.source==='bank')semantics.merchant=facet(fact.merchantText,'bank');
+  const previous=await row(db,userId,'transaction',id);semantics=refreshBankSemantics(previous.semantics,fact);
  }else{
-  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyRules(op,account,rules);
+  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyFinancialRecognition(applyRules(op,account,rules),graph.categories);
   semantics=classified.semantics;await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,observationId,JSON.stringify(semantics),classified.analyticsOverride,JSON.stringify(classified.reviewReasons)]);
  }
  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,merchant_text,description,bank_category,bank_ref_hmac,versions,source_kind,operation_amount_minor,operation_currency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[userId,observationId,id,fact.accountId,JSON.stringify(fact.operationDate),fact.postedDate===null?null:JSON.stringify(fact.postedDate),fact.amountMinor,fact.currency,fact.merchantText,fact.description,fact.bankCategory,fact.bankRefHmac,JSON.stringify(fact.versions),kind,fact.operationAmountMinor,fact.operationCurrency]);

@@ -17,6 +17,8 @@ on:
       - 'packages/imports/**'
       - 'packages/database/migrations/0029_bank_description.sql'
       - 'packages/database/migrations/0030_marketplace_catalog.sql'
+      - 'packages/database/migrations/0031_merchant_source.sql'
+      - 'packages/database/migrations/0032_category_bindings.sql'
       - 'scripts/*assistant-staging*'
       - 'scripts/*connected-web*'
       - 'scripts/*staging-release*'
@@ -62,11 +64,29 @@ jobs:
       - name: Offline checks only, with fake HTTP and synthetic finance
         run: >-
           node --experimental-transform-types --test
+          packages/finance-core/test/full-catalog.test.ts
+          packages/finance-core/test/category-bindings.test.ts
+          packages/finance-core/test/selected-categories.test.ts
+          packages/finance-core/test/installment-contract.test.ts
+          packages/finance-core/test/bank-calendar.test.ts
+          packages/finance-core/test/financial-evidence.test.ts
+          packages/finance-core/test/financial-contracts.test.ts
+          packages/finance-core/test/operation-name.test.ts
+          packages/finance-core/test/extended-catalog.test.ts
+          packages/finance-core/test/activity-recognition.test.ts
+          packages/finance-core/test/rule-source-compatibility.test.ts
           packages/finance-core/test/merchant-recognition.test.ts
           packages/finance-core/test/grocery-recognition.test.ts
           packages/analyzer/test/merchant-rule.test.ts
+          packages/analyzer/test/calculators.test.ts
+          packages/analyzer/test/assistant-changes.test.ts
+          packages/analyzer/test/interface-actions.test.ts
+          packages/analyzer/test/question-catalog.test.ts
           packages/imports/test/bank-description.test.ts
+          packages/imports/test/merchant-source.test.ts
+          apps/api/test/merchant-source.test.ts
           apps/api/test/classification-plan.test.ts
+          apps/api/test/classification-pass.test.ts
           apps/api/test/classification-smoke-support.test.ts
           apps/api/test/classification-admission.test.ts
           apps/api/test/assistant-workflow.test.ts
@@ -77,6 +97,14 @@ jobs:
           apps/api/test/task-json-cache-audit.test.ts
           packages/analyzer/test/task-context.test.ts
           packages/analyzer/test/task-literals.test.ts
+      - name: Check the inactive complete catalog build and lossless source coverage
+        run: |
+          python3 scripts/compile-merchant-catalog.py --check
+          python3 scripts/test-compile-merchant-catalog.py
+          python3 scripts/compile-activity-runtime.py --check
+          python3 scripts/compile-name-runtime.py --check
+          python3 scripts/compile-profile-runtime.py --check
+          python3 scripts/test-compile-profile-runtime.py
       - name: Check Staging installation and rollback without changing a service
         run: |
           python3 scripts/test-inspect-assistant-staging.py
@@ -89,6 +117,22 @@ jobs:
           bash -n scripts/run-classification-check.sh
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
+      - name: Build a pinned connected Staging artifact without deploying
+        env:
+          VITE_API_ORIGIN: https://test.cashneuro.ru
+          CASHNEURO_CANDIDATE_REVISION: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          node scripts/build-connected-web.mjs finance "$CASHNEURO_CANDIDATE_REVISION"
+          node scripts/prepare-release-candidate.mjs --write
+      - name: Preserve the connected UI and exact source descriptor
+        uses: actions/upload-artifact@v4
+        with:
+          name: cashneuro-connected-candidate
+          path: |
+            apps/web/dist/
+            artifacts/release-candidate.json
+          if-no-files-found: error
+          retention-days: 14
 
   postgres-assistant:
     runs-on: ubuntu-latest
@@ -123,4 +167,14 @@ jobs:
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
           ASSISTANT_UI_ASSET_MODE: built
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts test/operations-browser.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-assistant-browser.test.ts test/operations-browser.test.ts test/catalog-settings-browser.test.ts
+      - name: Preserve synthetic interface evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cashneuro-workspace-previews
+          path: |
+            apps/api/workspace-previews/
+            apps/api/operations-previews/
+          if-no-files-found: ignore
+          retention-days: 7
