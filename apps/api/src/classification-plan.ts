@@ -35,7 +35,7 @@ export function serviceEvidenceMissing(signal:{merchant:string|null;description?
 
 /** Only locally sanitized /4 merchant evidence is eligible beyond the legacy
  * finite brands. No accounts, amounts, dates, HMACs or user comments. */
-export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[]){
+export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[],reconsider=false){
  const s=op.semantics,c=s.category,sub=s.subcategory;
  if(op.decomposition||graph.components.some(p=>p.transactionId===op.id)||!['expense','income'].includes(s.role.value)||
    c.userVerified||sub.userVerified||protectedSources.has(c.source)||protectedSources.has(sub.source)||
@@ -55,16 +55,16 @@ export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[]){
  const merchant=details?.merchantText|| (brands.has(op.source.merchantText)?op.source.merchantText:null);
  if(!merchant&&!details?.description&&!details?.mcc&&!['fee','interest','insurance','cashback'].includes(s.kind.value))return null;
  const signal={merchant,kind:s.kind.value,role:s.role.value,...(details?{description:details.description,bankCategory:details.bankCategory,mcc:details.mcc}: {})};
- if(c.value!==null&&c.source==='ai'&&c.confidence>=90&&!serviceEvidenceMissing(signal))return null;
+ if(!reconsider&&c.value!==null&&c.source==='ai'&&c.confidence>=90&&!serviceEvidenceMissing(signal))return null;
  return signal;
 }
-export function classificationPlan(graph:Graph,rules:Rule[]=[]){
+export function classificationPlan(graph:Graph,rules:Rule[]=[],reconsider=false){
  const categories=graph.categories.filter(c=>!c.hidden&&(c.parentId===null||graph.categories.some(p=>p.id===c.parentId&&!p.hidden))).sort((a,b)=>a.id.localeCompare(b.id));
  if(categories.length>300)throw Error('CLASSIFICATION_CATALOG_TOO_LARGE');
  const catalog=categories.map((c,i)=>({ref:'c'+(i+1),name:safeText(c.name,160),role:c.role,parent:c.parentId===null?null:'c'+(categories.findIndex(p=>p.id===c.parentId)+1)}));
  const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,extendedCatalogSha256,fullCatalogDataSha256,installmentPolicyVersion,categories,bindings:graph.categoryBindings});
  const groups=new Map<string,{signature:string;sortKey:string;signal:NonNullable<ReturnType<typeof classificationSignal>>;operationIds:string[]}>();
- for(const op of graph.operations){const signal=classificationSignal(op,graph,rules);if(!signal)continue;
+ for(const op of graph.operations){const signal=classificationSignal(op,graph,rules,reconsider);if(!signal)continue;
   const signature=digest({version:classificationVersion,catalogHash,signal});
   const group=groups.get(signature)??{signature:digest({policy:classificationEvidencePolicy,signature}),sortKey:signature,signal,operationIds:[]};group.operationIds.push(op.id);groups.set(signature,group);
  }

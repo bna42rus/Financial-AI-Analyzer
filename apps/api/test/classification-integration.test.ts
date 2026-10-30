@@ -186,3 +186,13 @@ test('/5 context guard blocks a known unresolved subject before model dispatch e
  await pg.owner.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',['first',JSON.stringify(initialSemantics('purchase','СТО'))]);
  await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.ok((await state()).operations.every(o=>o.classification.category.value===null));assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_run')).rows[0].n,0);
 });
+
+test('explicit restart is disabled for unchanged input; a new category enables a precise new pass without losing manual decisions',async()=>{
+ let status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,true);
+ await within(db=>classificationStatus(db,'first',{start:true},provider()));await runClassificationStage(pg.finance,provider());await runClassificationStage(pg.finance,provider());
+ status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,false);assert.equal(status.last?.scanned,3);assert.equal(status.last?.newlyAssigned,3);assert.equal(status.last?.unresolved,0);const previousCalls=calls;
+ await assert.rejects(()=>within(db=>classificationStatus(db,'first',{start:true},provider())),/CLASSIFICATION_NOT_NEEDED/);assert.equal(calls,previousCalls);
+ await within(async db=>{const manual=initialSemantics('purchase','Пятёрочка');manual.category=facet(category,'user',true);await db.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['first',ids[0],JSON.stringify(manual)]);await db.query('INSERT INTO finance.category(user_id,id,name,parent_id,role,hidden) VALUES($1,$2,$3,$4,$5,false)',['first',randomUUID(),'Synthetic leaf',category,'expense']);});
+ status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,true);assert.equal(status.last,null);await within(db=>classificationStatus(db,'first',{start:true},provider()));await runClassificationStage(pg.finance,provider());await runClassificationStage(pg.finance,provider());assert.equal(calls,previousCalls+1);assert.equal((await state()).operations.find(o=>o.id===ids[0])!.classification.category.source,'user');
+ status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,false);assert.equal(status.last?.scanned,2);
+});
