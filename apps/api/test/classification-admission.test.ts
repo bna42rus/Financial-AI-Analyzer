@@ -27,6 +27,16 @@ test('runtime admission carries every previous paid call, preserves original cei
  assert.deepEqual(unexpired.cost,next.cost);
  assert.throws(()=>classificationRuntimeAdmission(old,{calls:1,spentAtoms:'0',reservedAtoms:'1',blocked:false},'d'.repeat(64),tariff,now),/RECONCILIATION_REQUIRED/);
 });
+test('unexpired evidence rebind preserves an unknown reserve and every authority field; expiration still forbids rollover',()=>{
+ const active=classificationRuntimeAdmission(original(),{calls:4,spentAtoms:'200000000',reservedAtoms:'0',blocked:false},'d'.repeat(64),tariff,now),totals={calls:1,spentAtoms:'0',reservedAtoms:'2328657920',blocked:false},before=structuredClone({active,totals});
+ const next=classificationRuntimeAdmission(active,totals,'e'.repeat(64),tariff,now);
+ assert.deepEqual({...next,sourceSha256:active.sourceSha256},active);assert.deepEqual({active,totals},before);
+ assert.equal(next.cost.projectPeriodStart,active.cost.projectPeriodStart);assert.equal(next.maximumCalls,active.maximumCalls);assert.deepEqual(next.admission,active.admission);
+ assert.throws(()=>classificationRuntimeAdmission(active,{...totals,blocked:true},'e'.repeat(64),tariff,now),/RECONCILIATION_REQUIRED/);
+ const later=new Date(Date.parse(active.expiresAt)+1);
+ assert.throws(()=>classificationRuntimeAdmission(active,totals,'e'.repeat(64),{...tariff,checkedAt:later.toISOString()},later),/RECONCILIATION_REQUIRED/);
+ assert.throws(()=>classificationRuntimeAdmission(active,{...totals,reservedAtoms:'-1'},'e'.repeat(64),tariff,now),/ACCOUNTING_INVALID/);
+});
 async function archive(t:any){
  const directory=await mkdtemp(join(tmpdir(),'classification-admission-test-'));t.after(()=>rm(directory,{recursive:true,force:true}));
  for(const name of classificationSmokeNames){
