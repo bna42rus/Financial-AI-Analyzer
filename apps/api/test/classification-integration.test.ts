@@ -177,14 +177,14 @@ test('/5 activity pass records its own engine with zero model POSTs and preserve
  await queue();await runClassificationStage(pg.finance,provider());const result=await state(),pharmacy=result.categories.find(c=>c.name==='Аптеки')!;
  assert.equal(calls,0);assert.ok(result.operations.every(o=>o.classification.subcategory.value===pharmacy.id&&o.classification.category.source==='global_rule'&&o.classification.merchant.value===merchant));
  assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows,sourceBefore);
- const runs=(await pg.owner.query('SELECT engine,applied FROM finance.classification_run')).rows;assert.deepEqual(runs,[{engine:'cashneuro-activity-catalog/3',applied:3}]);
+ const runs=(await pg.owner.query('SELECT engine,applied FROM finance.classification_run')).rows;assert.deepEqual(runs.filter(r=>r.engine!=='cashneuro-category-pass/1'),[{engine:'cashneuro-activity-catalog/3',applied:3}]);assert.deepEqual(runs.filter(r=>r.engine==='cashneuro-category-pass/1'),[{engine:'cashneuro-category-pass/1',applied:0}]);const status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,false);assert.equal(status.last?.scanned,3);assert.equal(status.last?.newlyAssigned,3);
  assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
  await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_assignment')).rows[0].n,3);
 });
 test('/5 context guard blocks a known unresolved subject before model dispatch even with available categories',async()=>{
  await pg.owner.query("UPDATE finance.source_observation SET merchant_text='СТО',description='Покупка СТО',versions=versions || '{\"sourceSanitizer\":\"bank-source/5\",\"sourceTextEvidence\":\"intact\"}'::jsonb WHERE user_id='first'");
  await pg.owner.query('UPDATE finance.transaction SET semantics=$2 WHERE user_id=$1',['first',JSON.stringify(initialSemantics('purchase','СТО'))]);
- await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.ok((await state()).operations.every(o=>o.classification.category.value===null));assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM finance.classification_run')).rows[0].n,0);
+ await queue();await runClassificationStage(pg.finance,provider());assert.equal(calls,0);assert.ok((await state()).operations.every(o=>o.classification.category.value===null));assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM finance.classification_run WHERE engine<>'cashneuro-category-pass/1'")).rows[0].n,0);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
 });
 
 test('explicit restart is disabled for unchanged input; a new category enables a precise new pass without losing manual decisions',async()=>{
@@ -195,4 +195,9 @@ test('explicit restart is disabled for unchanged input; a new category enables a
  await within(async db=>{const manual=initialSemantics('purchase','Пятёрочка');manual.category=facet(category,'user',true);await db.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['first',ids[0],JSON.stringify(manual)]);await db.query('INSERT INTO finance.category(user_id,id,name,parent_id,role,hidden) VALUES($1,$2,$3,$4,$5,false)',['first',randomUUID(),'Synthetic leaf',category,'expense']);});
  status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,true);assert.equal(status.last,null);await within(db=>classificationStatus(db,'first',{start:true},provider()));await runClassificationStage(pg.finance,provider());await runClassificationStage(pg.finance,provider());assert.equal(calls,previousCalls+1);assert.equal((await state()).operations.find(o=>o.id===ids[0])!.classification.category.source,'user');
  status=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(status.canStart,false);assert.equal(status.last?.scanned,2);
+});
+
+test('a pre-dispatch funding failure can be retried after capacity returns, but a paid invalid response remains non-retryable',async()=>{
+ await queue();await runClassificationStage(pg.finance,provider('0.01'));assert.equal(calls,0);assert.equal((await within(db=>classificationStatus(db,'first',{},provider('0.01')))).canStart,false);
+ const ready=await within(db=>classificationStatus(db,'first',{},provider()));assert.equal(ready.canStart,true);await within(db=>classificationStatus(db,'first',{start:true},provider()));await runClassificationStage(pg.finance,provider());await runClassificationStage(pg.finance,provider());assert.equal(calls,1);assert.equal((await within(db=>classificationStatus(db,'first',{},provider()))).canStart,false);
 });

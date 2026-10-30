@@ -8,7 +8,7 @@ import {applyRules,ruleMatches} from '../../../packages/finance-core/src/rules.t
 import {applyMerchantRecognition} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {classificationPlan,digest,applyClassification} from './classification-plan.ts';
 export const classificationPassVersion='cashneuro-category-pass/1';
-const protectedSources=new Set(['user','personal_rule','global_rule']);
+const protectedSources=new Set(['user','personal_rule']);
 export function classificationTargets(graph:Graph,rules:Rule[]){return graph.operations.filter(op=>{
  const c=op.semantics.category,s=op.semantics.subcategory,a=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId));
  return !!a&&!op.decomposition&&!graph.components.some(p=>p.transactionId===op.id)&&['expense','income'].includes(op.semantics.role.value)&&!c.userVerified&&!s.userVerified&&!protectedSources.has(c.source)&&!protectedSources.has(s.source)&&!rules.some(r=>r.enabled&&('categoryId'in r.assignments||'subcategoryId'in r.assignments)&&ruleMatches(op,a,r));
@@ -34,13 +34,13 @@ export async function classificationWork(db:PoolClient,userId:string,graph:Graph
  const previousCatalog=last?.decisions.catalogHash??(await db.query('SELECT catalog_hash FROM finance.classification_run WHERE user_id=$1 AND generation=$2 AND engine LIKE $3 ORDER BY created_at DESC,id DESC LIMIT 1',[userId,generation,'cashneuro-category-classification/%'])).rows[0]?.catalog_hash;
  const reconsider=!!previousCatalog&&previousCatalog!==input.catalogHash,plan=classificationPlan(graph,rules,reconsider),cached=(await db.query('SELECT signature,decision FROM finance.classification_cache WHERE user_id=$1',[userId])).rows,bySignature=new Map(cached.map(r=>[r.signature,r.decision]));
  const modelWork=plan.groups.some(g=>!bySignature.has(g.signature)||bySignature.get(g.signature)&&g.operationIds.some(id=>{const op=graph.operations.find(o=>o.id===id)!;try{const next=applyClassification(op,bySignature.get(g.signature));return !isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons);}catch{return false;}}));
- const changed=last?.catalog_hash!==input.inputHash;
+ const changed=last?.catalog_hash!==input.inputHash||last?.state==='failed'&&modelWork;
  return {...input,last,reconsider,requiresModel:plan.groups.some(g=>!bySignature.has(g.signature)),needed:changed&&(knownMerchantChanges(graph,rules).length>0||modelWork)};
 }
 export async function ensureClassificationPass(db:PoolClient,userId:string,graph:Graph,rules:Rule[],generation:string){
  const work=await classificationWork(db,userId,graph,rules,generation),last=work.last;
  if(last?.state==='received'&&last.catalog_hash===work.inputHash)return last;
- if(last?.catalog_hash===work.inputHash&&['completed','failed'].includes(last.state))return null;
+ if(last?.catalog_hash===work.inputHash&&(last.state==='completed'||last.state==='failed'&&!work.needed))return null;
  if(last?.state==='received')await db.query("UPDATE finance.classification_run SET state='discarded' WHERE user_id=$1 AND id=$2",[userId,last.id]);
  const data:PassData={version:classificationPassVersion,inputHash:work.inputHash,catalogHash:work.catalogHash,reconsider:work.reconsider,baseline:work.targets.map(op=>({id:op.id,categoryId:op.semantics.category.value,subcategoryId:op.semantics.subcategory.value}))};
  return (await db.query<PassRow>("INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state,decisions) VALUES($1,$2,$3,$4,$5,'received',$6) RETURNING id,state,catalog_hash,decisions,created_at",[userId,randomUUID(),generation,classificationPassVersion,work.inputHash,JSON.stringify(data)])).rows[0]!;

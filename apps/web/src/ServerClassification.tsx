@@ -12,10 +12,10 @@ type Status={enabled:boolean;state:'idle'|'queued'|'completed'|'blocked';calls:n
 export function ServerClassification({revision,disabled,onChanged,onAccessError,onUnresolved,visible=true}:{revision:string;disabled:boolean;onChanged:()=>void;onAccessError:(e:unknown)=>void;onUnresolved:(filter:OperationsFilter)=>void;visible?:boolean}){
  const [status,setStatus]=useState<Status|null>(null),[busy,setBusy]=useState(false),[summary,setSummary]=useState<Summary|null>(null),notices=useNotices();
  const callbacks=useRef({onChanged,onAccessError,onUnresolved});callbacks.current={onChanged,onAccessError,onUnresolved};
- const previous=useRef<number|null>(null),mounted=useRef(false),watching=useRef(false),source=useRef(''),turn=useRef(0),currentRevision=useRef(revision);currentRevision.current=revision;
+ const previous=useRef<number|null>(null),mounted=useRef(false),watching=useRef(false),source=useRef(''),wasEligible=useRef(false),turn=useRef(0),currentRevision=useRef(revision);currentRevision.current=revision;
  async function read(start=false){const version=++turn.current,observedRevision=currentRevision.current;
   try{const value=await api<Status>('/finance/classification',start?{start:true}:{});if(!mounted.current||version!==turn.current||!start&&observedRevision!==currentRevision.current)return;
-   if(value.canStart&&source.current!==value.sourceKey)setSummary(null);source.current=value.sourceKey;
+   if(value.canStart&&(!wasEligible.current||source.current!==value.sourceKey))setSummary(null);source.current=value.sourceKey;wasEligible.current=value.canStart;
    if(value.state==='queued'){watching.current=true;setSummary(null);}
    else if(watching.current){watching.current=false;if(value.last)setSummary(value.last);}
    setStatus(value);if(previous.current!==null&&value.applied!==previous.current)callbacks.current.onChanged();previous.current=value.applied;
