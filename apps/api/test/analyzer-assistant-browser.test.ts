@@ -89,8 +89,9 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
     await screen(page,'Операции');
     await page.getByRole('button',{name:'Определение категорий с помощью ИИ',exact:true}).click();const categoryPanel=page.getByRole('region',{name:'Распределение категорий'});
+    const classificationStarted=page.waitForResponse(response=>new URL(response.url()).pathname==='/finance/classification'&&response.request().postDataJSON()?.start===true&&response.status()===200);
     await categoryPanel.getByRole('button',{name:'Распределить категории',exact:true}).click();
-    await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();
+    await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();await classificationStarted;
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Назначено впервые',{exact:true})}).locator('dd')).toHaveText('1');await page.keyboard.press('Escape');
