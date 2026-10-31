@@ -111,7 +111,9 @@ jobs:
           python3 scripts/test-install-assistant-staging.py
           bash -n scripts/prepare-assistant-staging.sh
           node scripts/check-branch-consolidation.mjs
-          python3 scripts/test-update-staging-release.py
+          # Installer integration creates root-owned 0600 fixtures and exercises
+          # the same ownership checks as the actual privileged deployment.
+          sudo /usr/bin/python3 -B scripts/test-update-staging-release.py
           python3 scripts/test-diagnose-classification-staging.py
           bash -n scripts/prepare-staging-release.sh
           bash -n scripts/run-classification-check.sh
