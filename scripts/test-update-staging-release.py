@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import stat
 import sys
 import tempfile
 import unittest
@@ -19,6 +20,41 @@ spec.loader.exec_module(m)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_paused_rollback_uses_real_snapshot_files_without_recreating_an_existing_file(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = {name: root/name for name in ['caddy','dropin','workerUnit','workerEnv','assistantConfig']}
+            original = b'[Service]\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=1 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\n'
+            settings = {'expiresAt':'2000-01-01T00:00:00Z','sourceSha256':'a'*64,'admission':{'calls':69,'stageMaximumCalls':70},'cost':{'reservedAtoms':'2328657920'}}
+            contents = {'caddy':b'synthetic caddy','dropin':original,'workerUnit':b'synthetic worker','workerEnv':b'synthetic env','assistantConfig':json.dumps(settings).encode()}
+            for name,path in paths.items():
+                path.write_bytes(contents[name])
+            backup = m.create_backup_directory(root,'a'*40)
+            paused = m.pause_expired_ai(settings,original)
+            with patch.object(m.m,'CADDY',paths['caddy']), patch.object(m.m,'DROPIN',paths['dropin']), patch.object(m.m,'CONFIG',paths['assistantConfig']), patch.object(m,'WORKER_UNIT',paths['workerUnit']), patch.object(m,'WORKER_ENV',paths['workerEnv']), patch.object(m.m,'run',side_effect=AssertionError('No service or paid call in preparation')):
+                metadata = m.rollback_files(backup,True,False,original,paused)
+            self.assertTrue(metadata['expiredAiPaused'])
+            self.assertEqual((backup/'dropin').read_bytes(),paused)
+            self.assertEqual((backup/'dropin.original').read_bytes(),original)
+            self.assertEqual((backup/'assistantConfig').read_bytes(),contents['assistantConfig'])
+            for name,path in paths.items():
+                self.assertEqual(path.read_bytes(),contents[name],name+' must stay unchanged')
+            for path in backup.iterdir():
+                self.assertEqual(stat.S_IMODE(path.stat().st_mode),0o600)
+            self.assertEqual(stat.S_IMODE(backup.stat().st_mode),0o700)
+            self.assertFalse(list(backup.glob('*.assistant-*')))
+
+    def test_repeated_preparation_keeps_existing_backups_and_allocates_a_private_new_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = m.create_backup_directory(root,'b'*40)
+            (first/'original').write_bytes(b'keep this backup')
+            second = m.create_backup_directory(root,'b'*40)
+            self.assertNotEqual(first,second)
+            self.assertEqual((first/'original').read_bytes(),b'keep this backup')
+            self.assertEqual(stat.S_IMODE(second.stat().st_mode),0o700)
+            self.assertEqual(list(second.iterdir()),[])
+
     def test_expired_ai_pause_disables_explicit_exec_environment_without_renewing_the_private_settings(self):
         previous = {'expiresAt':'2026-10-30T15:25:53.579Z','sourceSha256':'a'*64,'admission':{'calls':69,'stageMaximumCalls':70},'cost':{'projectId':'staging/original'}}
         original = json.loads(json.dumps(previous))

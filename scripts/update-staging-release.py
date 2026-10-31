@@ -11,6 +11,7 @@ import shlex
 import shutil
 import stat
 import sys
+import tempfile
 import time
 from urllib.parse import urlsplit
 
@@ -67,6 +68,25 @@ def snapshot(backup, name, path):
     info = path.stat()
     m.private_write(backup / name, path.read_bytes())
     return {'mode': stat.S_IMODE(info.st_mode), 'uid': info.st_uid, 'gid': info.st_gid}
+
+
+def create_backup_directory(root, sha):
+    return Path(tempfile.mkdtemp(prefix='connected-release-' + sha[:12] + '-', dir=root))
+
+
+def rollback_files(backup, assistant_config=False, original_ai_config=False, old_dropin=None, paused_dropin=None):
+    metadata = {name: snapshot(backup, name, path) for name, path in [('caddy', m.CADDY), ('dropin', m.DROPIN), ('workerUnit', WORKER_UNIT), ('workerEnv', WORKER_ENV)]}
+    if assistant_config:
+        metadata['assistantConfig'] = snapshot(backup, 'assistantConfig', m.CONFIG)
+        if original_ai_config:
+            m.private_write(backup / 'assistantConfig.original', m.CONFIG.read_bytes())
+    if paused_dropin is not None:
+        # Snapshot already created dropin. Replace it atomically; keep the exact original separately.
+        m.private_write(backup / 'dropin.original', old_dropin)
+        owner = backup.stat()
+        m.atomic_replace(backup / 'dropin', paused_dropin, 0o600, owner.st_uid, owner.st_gid)
+        metadata['expiredAiPaused'] = True
+    return metadata
 
 
 def rebind_classification_settings(previous, installed_sha, next_sha):
@@ -173,18 +193,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     release = m.BASE / 'backend-releases' / sha
     if release.exists():
         raise m.InstallationError('RELEASE_ALREADY_EXISTS_REQUIRES_REVIEW')
-    backup = Path('/var/lib/cashneuro') / ('connected-release-' + sha[:12] + '-' + str(int(time.time())))
-    backup.mkdir(mode=0o700)
-    metadata = {name: snapshot(backup, name, path) for name, path in [('caddy', m.CADDY), ('dropin', m.DROPIN), ('workerUnit', WORKER_UNIT), ('workerEnv', WORKER_ENV)]}
-    if enable_classification or keep_ai_paused:
-        metadata['assistantConfig'] = snapshot(backup, 'assistantConfig', m.CONFIG)
-        if evidence:
-            m.private_write(backup / 'assistantConfig.original', m.CONFIG.read_bytes())
-    if keep_ai_paused:
-        # Preserve the exact original too. A rollback must keep expired AI off so the old API can restart.
-        m.private_write(backup / 'dropin.original', old_dropin)
-        m.private_write(backup / 'dropin', paused_dropin)
-        metadata['expiredAiPaused'] = True
+    backup = create_backup_directory(Path('/var/lib/cashneuro'), sha)
+    metadata = rollback_files(backup, enable_classification or keep_ai_paused, bool(evidence), old_dropin, paused_dropin)
     services = m.run(['systemctl', 'list-units', '--all', '--plain', '--no-legend', '--type=service', 'cashneuro*import*']).decode().splitlines()
     existing = [line.split()[0] for line in services if len(line.split()) > 3 and line.split()[2] == 'active']
     metadata['workerManaged'] = not existing or existing == [WORKER]
