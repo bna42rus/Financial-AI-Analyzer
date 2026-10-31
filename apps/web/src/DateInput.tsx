@@ -13,7 +13,7 @@ type Props=Omit<InputHTMLAttributes<HTMLInputElement>,'type'|'value'|'onChange'|
 /** Four-digit year in the visible editor; the native calendar emits the same source-local ISO day. */
 export function DateInput({value='',onValueChange,min,max,...props}:Props){
  const [text,setText]=useState(()=>display(value)),last=useRef(value),input=useRef<HTMLInputElement>(null),calendar=useRef<HTMLInputElement>(null);
- useEffect(()=>{if(value!==last.current){last.current=value;setText(display(value));}},[value]);
+ useEffect(()=>{if(value!==last.current){last.current=value;setText(display(value));input.current?.setCustomValidity('');}},[value]);
  function update(next:string){const formatted=dateText(next),parsed=dateFromText(formatted),invalid=!!formatted&&(!parsed||!!min&&parsed<min||!!max&&parsed>max);setText(formatted);input.current?.setCustomValidity(invalid?'Введите дату в формате дд.мм.гггг.':'');if(!formatted||parsed&&!invalid){last.current=parsed??'';onValueChange?.(last.current);}}
  return <span className={styles.field}><input {...props} ref={input} type="text" inputMode="numeric" placeholder="дд.мм.гггг" maxLength={10} value={text} onChange={e=>update(e.target.value)} onBlur={e=>{if(!text)input.current?.setCustomValidity('');props.onBlur?.(e);}}/><span className={styles.calendar}><CalendarDays size={15} aria-hidden="true"/><input ref={calendar} type="date" tabIndex={-1} aria-label={'Календарь: '+(props['aria-label']??'дата')} min={min??'0001-01-01'} max={max??'9999-12-31'} value={value} disabled={props.disabled} onChange={e=>update(e.target.value)}/></span></span>;
 }

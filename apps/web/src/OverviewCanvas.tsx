@@ -4,7 +4,7 @@ import {GripVertical,Maximize2} from 'lucide-react';
 import type {LayoutItem} from '../../../packages/finance-core/src/overview';
 import {layoutLimits,layoutWidth,packOverview} from './overview-layout';
 import styles from './Overview.module.css';
-type Gesture={id:string;kind:'move'|'resize';x:number;y:number;left:number;top:number;width:number;height:number;next:LayoutItem;target:string|null};
+type Gesture={id:string;kind:'move'|'resize';x:number;y:number;left:number;top:number;width:number;height:number;next:LayoutItem;target:string|null;order:LayoutItem[]|null};
 export function OverviewCanvas({items,device,disabled,names,onChange,children}:{items:LayoutItem[];device:'desktop'|'mobile';disabled:boolean;names:Map<string,string>;onChange:(items:LayoutItem[])=>void;children:(item:LayoutItem)=>ReactNode}){
  const root=useRef<HTMLDivElement>(null),[container,setContainer]=useState(1),[heights,setHeights]=useState<Record<string,number>>({}),[preview,setPreview]=useState<LayoutItem|null>(null),[order,setOrder]=useState<LayoutItem[]|null>(null),[drag,setDrag]=useState<{id:string;x:number;y:number}|null>(null),[message,setMessage]=useState('');
  const gesture=useRef<Gesture|null>(null),current=useRef({items,disabled,onChange});current.current={items,disabled,onChange};
@@ -12,17 +12,17 @@ export function OverviewCanvas({items,device,disabled,names,onChange,children}:{
  useLayoutEffect(()=>{const el=root.current;if(!el)return;const measure=()=>{setContainer(el.clientWidth);const next:Record<string,number>={};el.querySelectorAll<HTMLElement>('[data-canvas-body]').forEach(n=>{const body=n.querySelector<HTMLElement>('article');next[n.dataset.canvasBody!]=Math.ceil(body?.getBoundingClientRect().height??n.getBoundingClientRect().height);});setHeights(old=>JSON.stringify(old)===JSON.stringify(next)?old:next);};const observer=new ResizeObserver(measure);observer.observe(el);el.querySelectorAll('[data-canvas-body]').forEach(n=>observer.observe(n));measure();return()=>observer.disconnect();},[items.map(i=>i.id+':'+i.hidden).join('|'),device]);
  function start(e:PointerEvent<HTMLButtonElement>,item:LayoutItem,kind:'move'|'resize'){
   if(disabled||e.button!==0)return;e.preventDefault();e.currentTarget.focus();e.currentTarget.setPointerCapture(e.pointerId);const cell=e.currentTarget.closest<HTMLElement>('[data-widget-id]')!,rect=cell.getBoundingClientRect(),base=root.current!.getBoundingClientRect();
-  gesture.current={id:item.id,kind,x:e.clientX,y:e.clientY,left:rect.left-base.left,top:rect.top-base.top,width:rect.width,height:rect.height,next:item,target:null};if(kind==='move'){setOrder(items);setDrag({id:item.id,x:rect.left-base.left,y:rect.top-base.top});}
+  gesture.current={id:item.id,kind,x:e.clientX,y:e.clientY,left:rect.left-base.left,top:rect.top-base.top,width:rect.width,height:rect.height,next:item,target:null,order:null};if(kind==='move'){setOrder(items);setDrag({id:item.id,x:rect.left-base.left,y:rect.top-base.top});}
  }
  function move(e:PointerEvent<HTMLButtonElement>){const g=gesture.current;if(!g||current.current.disabled)return;const dx=e.clientX-g.x,dy=e.clientY-g.y;
   if(g.kind==='move'){
    setDrag({id:g.id,x:g.left+dx,y:g.top+dy});const hit=document.elementsFromPoint(e.clientX,e.clientY).map(n=>n.closest<HTMLElement>('[data-widget-id]')).find(n=>n?.dataset.widgetId!==g.id),target=hit?.dataset.widgetId;
-   if(target&&g.target!==target){g.target=target;const next=[...current.current.items],from=next.findIndex(i=>i.id===g.id),to=next.findIndex(i=>i.id===target);const [item]=next.splice(from,1);next.splice(to,0,item!);setOrder(next);}
+   if(target&&g.target!==target){g.target=target;const next=[...current.current.items],from=next.findIndex(i=>i.id===g.id),to=next.findIndex(i=>i.id===target);const [item]=next.splice(from,1);next.splice(to,0,item!);g.order=next;setOrder(next);}
   }else{
    const width=Math.min(container,Math.max(Math.min(layoutLimits.minimumWidth,container),g.width+dx)),widthPercent=Math.max(20,Math.min(100,(width+layoutLimits.gap)/(container+layoutLimits.gap)*100));g.next={...g.next,widthPercent:Math.round(widthPercent*100)/100,heightPx:Math.round(Math.min(1600,Math.max(240,g.height+dy)))};setPreview(g.next);
   }
  }
- function finish(cancel=false){const g=gesture.current;gesture.current=null;setPreview(null);setDrag(null);const reordered=order;setOrder(null);if(!g||cancel||current.current.disabled)return;
+ function finish(cancel=false){const g=gesture.current;gesture.current=null;setPreview(null);setDrag(null);const reordered=g?.order;setOrder(null);if(!g||cancel||current.current.disabled)return;
   if(g.kind==='resize'){if(g.next.widthPercent===undefined)return;current.current.onChange(current.current.items.map(i=>i.id===g.id?g.next:i));setMessage('Размер изменён: '+names.get(g.id));}
   else if(g.target&&reordered){current.current.onChange(reordered);setMessage('Виджет перемещён: '+names.get(g.id));}
  }

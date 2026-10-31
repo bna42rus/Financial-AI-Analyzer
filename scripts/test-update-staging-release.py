@@ -1,4 +1,5 @@
 import importlib.util
+from datetime import datetime, timezone
 import ast
 import inspect
 import io
@@ -18,6 +19,30 @@ spec.loader.exec_module(m)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_expired_ai_pause_disables_explicit_exec_environment_without_renewing_the_private_settings(self):
+        previous = {'expiresAt':'2026-10-30T15:25:53.579Z','sourceSha256':'a'*64,'admission':{'calls':69,'stageMaximumCalls':70},'cost':{'projectId':'staging/original'}}
+        original = json.loads(json.dumps(previous))
+        command = b'[Service]\nWorkingDirectory=/srv/test/apps/api\nEnvironment=ASSISTANT_ENABLED=1\nExecStart=\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=1 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\n'
+        result = m.pause_expired_ai(previous,command,datetime(2026,10,31,tzinfo=timezone.utc))
+        self.assertIn(b'CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=0 AI_ENABLED=0',result)
+        self.assertIn(b'Environment=CLASSIFICATION_ENABLED=0',result)
+        self.assertNotIn(b'ASSISTANT_ENABLED=1',result)
+        self.assertEqual(previous,original)
+        self.assertNotIn(b'ASSISTANT_ENABLED=1',m.pause_expired_ai(previous,result,datetime(2026,10,31,tzinfo=timezone.utc)))
+        self.assertIn(b'WorkingDirectory=/srv/test/apps/api',result)
+        with self.assertRaises(m.m.InstallationError):
+            m.pause_expired_ai(previous,command,datetime(2026,10,29,tzinfo=timezone.utc))
+        for settings in [{}, {'expiresAt':'not a timestamp'}, {'expiresAt':'2026-10-30T00:00:00'}]:
+            with self.assertRaises(m.m.InstallationError):
+                m.pause_expired_ai(settings,command,datetime(2026,10,31,tzinfo=timezone.utc))
+        with self.assertRaises(m.m.InstallationError):
+            m.pause_expired_ai(previous,b'ExecStart=unexpected',datetime(2026,10,31,tzinfo=timezone.utc))
+
+    def test_paused_install_cannot_combine_with_a_paid_probe_or_evidence_renewal(self):
+        for enable,evidence,tested in [(True,None,None),(False,'archive',None),(False,None,'a'*64)]:
+            with self.assertRaisesRegex(m.m.InstallationError,'PAUSED_AI_ARGUMENTS_CONFLICT'):
+                m.install(Path('/does-not-exist'),'a'*40,enable,evidence,tested,True)
+
     def test_upgrade_accepts_previous_workflow_only_before_switch(self):
         function = ast.parse(inspect.getsource(m.install)).body[0]
         calls = sorted([n for n in ast.walk(function) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute) and isinstance(n.func.value, ast.Name) and n.func.value.id == 'm' and n.func.attr == 'wait_health'], key=lambda n:n.lineno)

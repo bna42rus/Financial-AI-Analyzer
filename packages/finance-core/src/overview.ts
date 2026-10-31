@@ -94,7 +94,7 @@ export function calculateWidget(w:Widget,rows:OperationRow[],catalog:OverviewCat
    insert(key,label,op,p,context);
   }
   // Include every zero interval, including gaps for the selected category. Never use only observed buckets.
-  if(w.grouping==='time'&&f.from&&f.through){let at=bucketWindow(f.from,g).from;while(at<=f.through){const window=bucketWindow(at,g);insert(window.from,window.from,null,null,{...f,from:clipped(f.from,window.from,true),through:clipped(f.through,window.through,false)});at=window.next;}}
+  if(w.grouping==='time'&&rows.length&&f.from&&f.through){let at=bucketWindow(f.from,g).from;while(at<=f.through){const window=bucketWindow(at,g);insert(window.from,window.from,null,null,{...f,from:clipped(f.from,window.from,true),through:clipped(f.through,window.through,false)});at=window.next;}}
 
   return [...buckets.values()].sort((a,b)=>a.key.localeCompare(b.key));
  };

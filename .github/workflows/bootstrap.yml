@@ -131,12 +131,17 @@ jobs:
       - name: Check overview drafts, comparisons, delayed responses and access loss in desktop and mobile browsers
         run: pnpm --filter @finance/web exec playwright test e2e/overview-connected.spec.ts
       - name: Save real PostgreSQL Overview desktop and mobile previews
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: overview-previews
           path: |
             apps/api/overview-previews/*.png
             apps/web/test-results/**/overview-complete.png
+            apps/web/test-results/**/canvas-dragged.png
+            apps/web/test-results/**/view-settings.png
+            apps/web/test-results/**/trace.zip
+            apps/web/test-results/**/error-context.md
           if-no-files-found: error
           retention-days: 7
 
