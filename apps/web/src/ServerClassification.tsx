@@ -1,4 +1,4 @@
-import {Ellipsis,LoaderCircle} from 'lucide-react';
+import {LoaderCircle} from 'lucide-react';
 import {OverviewPopover} from './OverviewDialogs';
 import {useEffect,useRef,useState} from 'react';
 import {api,ApiError} from './server-client';
@@ -24,10 +24,10 @@ export function ServerClassification({revision,disabled,onChanged,onAccessError,
  useEffect(()=>{mounted.current=true;return()=>{mounted.current=false;++turn.current;};},[]);
  useEffect(()=>{void read();},[revision]);
  useEffect(()=>{if(status?.state!=='queued')return;const timer=window.setInterval(()=>void read(),2000);return()=>window.clearInterval(timer);},[status?.state]);
- if(!visible||!status||!status.enabled&&!summary||!status.canStart&&status.state!=='queued'&&!summary)return null;
+ if(!visible)return null;
  async function start(){if(!status?.canStart||busy)return;setBusy(true);setSummary(null);watching.current=true;try{await read(true);}finally{if(mounted.current)setBusy(false);}}
- return <OverviewPopover label="Определение категорий с помощью ИИ" icon={<Ellipsis size={19}/>}><section aria-label="Распределение категорий">
- <button className={common.button} disabled={disabled||busy||!status.canStart} onClick={()=>void start()}>Распределить категории</button>
- {(busy||status.state==='queued')?<div role="status" className={styles.classificationBusy}><LoaderCircle className={noticeStyles.spinner} size={22}/><span>Определяем категории…</span></div>:summary&&<section aria-label="Последняя обработка категорий"><dl className={styles.classificationStats}>{[['Обработано операций',summary.scanned],['Всего с категорией',summary.defined],['Назначено впервые',summary.newlyAssigned],['Изменено назначений',summary.changed],['Из них уточнено',summary.refined],['Без изменений',summary.unchanged],['Без категории',summary.unresolved],['Требуют проверки',summary.needsReview]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{summary.unresolved>0&&<button className={common.button} data-close-popover onClick={()=>callbacks.current.onUnresolved({uncategorized:true,...(summary.unresolvedIds?{operationIds:summary.unresolvedIds}:{})})}>{summary.unresolvedIds?'Разобрать неопределённые операции':'Все операции без категории'}</button>}</section>}
+ return <OverviewPopover label="Категории с помощью ИИ"><section aria-label="Распределение категорий">
+ <button className={common.button} disabled={disabled||busy||!status?.canStart} onClick={()=>void start()}>Распределить категории</button>
+ {(busy||status?.state==='queued')?<div role="status" className={styles.classificationBusy}><LoaderCircle className={noticeStyles.spinner} size={22}/><span>Определяем категории…</span></div>:summary&&<section aria-label="Последняя обработка категорий"><dl className={styles.classificationStats}>{[['Обработано операций',summary.scanned],['Всего с категорией',summary.defined],['Назначено впервые',summary.newlyAssigned],['Изменено назначений',summary.changed],['Из них уточнено',summary.refined],['Без изменений',summary.unchanged],['Без категории',summary.unresolved],['Требуют проверки',summary.needsReview]].map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>{summary.unresolved>0&&<button className={common.button} data-close-popover onClick={()=>callbacks.current.onUnresolved({uncategorized:true,...(summary.unresolvedIds?{operationIds:summary.unresolvedIds}:{})})}>{summary.unresolvedIds?'Разобрать неопределённые операции':'Все операции без категории'}</button>}</section>}
  </section></OverviewPopover>;
 }

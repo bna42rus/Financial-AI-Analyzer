@@ -1,0 +1,8 @@
+import {test,expect} from 'vitest';
+import {packOverview} from './overview-layout';
+import {defaultOverview} from '../../../packages/finance-core/src/overview';
+import {chartPalette} from './chart-palette';
+import {dateFromText,dateText} from './DateInput';
+test('continuous cards stay inside the canvas, have no overlaps and fill short columns',()=>{const items=defaultOverview().desktop.slice(0,6).map((i,n)=>({...i,widthPercent:[50,50,30,70,37,63][n],heightPx:240+n*23}));for(const width of [320,390,768,1440]){const layout=packOverview(items,width,'desktop',{});for(const p of layout){expect(p.x).toBeGreaterThanOrEqual(0);expect(p.x+p.width).toBeLessThanOrEqual(width+.5);for(const other of layout.filter(i=>i.id!==p.id))expect(p.x>=other.x+other.width||other.x>=p.x+p.width||p.y>=other.y+other.height||other.y>=p.y+p.height).toBe(true);}}const two=packOverview(defaultOverview().desktop.slice(0,3),1000,'desktop',{[items[0]!.id]:280,[items[1]!.id]:600,[items[2]!.id]:300});expect(two[2]!.x).toBe(0);expect(two[2]!.y).toBe(296);});
+test('all 50 chart colors are saved and unique',()=>{expect(chartPalette).toHaveLength(50);expect(new Set(chartPalette).size).toBe(50);expect(chartPalette.every(c=>/^#[0-9A-F]{6}$/.test(c))).toBe(true);});
+test('date editing supports typing, ISO paste, leap days and exactly four year digits',()=>{expect(dateText('31102026222')).toBe('31.10.2026');expect(dateText('2026-10-31')).toBe('31.10.2026');expect(dateFromText('29.02.2024')).toBe('2024-02-29');expect(dateFromText('29.02.2026')).toBe(null);expect(dateFromText('01.01.0000')).toBe(null);expect(dateFromText('31.12.9999')).toBe('9999-12-31');expect(dateFromText('31.10.20266')).toBe(null);});

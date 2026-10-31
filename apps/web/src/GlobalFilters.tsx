@@ -1,3 +1,4 @@
+import {DateInput} from './DateInput';
 import type { DemoOperation, OverviewFilters } from './demo/overview';
 import styles from './App.module.css';
 
@@ -13,8 +14,8 @@ export function GlobalFilters({operations,filters,onChange}: Props) {
   const invalid = filters.start > filters.end;
   return <section className={styles.filters} aria-label="Глобальные фильтры">
     <div className={styles.dateFields}>
-      <label>С даты<input type="date" aria-label="С даты" value={filters.start} aria-invalid={invalid} onChange={e=>e.target.value&&onChange({start:e.target.value})} /></label>
-      <label>По дату<input type="date" aria-label="По дату" value={filters.end} aria-invalid={invalid} onChange={e=>e.target.value&&onChange({end:e.target.value})} /></label>
+      <label>С даты<DateInput  aria-label="С даты" value={filters.start} aria-invalid={invalid} onValueChange={value=>value&&onChange({start:value})} /></label>
+      <label>По дату<DateInput  aria-label="По дату" value={filters.end} aria-invalid={invalid} onValueChange={value=>value&&onChange({end:value})} /></label>
     </div>
     <label>Банк<select aria-label="Банк" value={filters.bank} onChange={e=>onChange({bank:e.target.value,account:''})}><option value="">Все банки</option>{banks.map(bank=><option key={bank}>{bank}</option>)}</select></label>
     <label>Счёт<select aria-label="Счёт" value={filters.account} onChange={e=>onChange({account:e.target.value})}><option value="">Все счета</option>{accounts.map(account=><option key={account}>{account}</option>)}</select></label>

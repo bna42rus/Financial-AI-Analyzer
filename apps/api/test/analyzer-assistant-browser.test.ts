@@ -88,7 +88,7 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await expect(page.getByText('Часовой пояс анализа: Pacific/Honolulu', { exact: true })).toBeVisible();
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
     await screen(page,'Операции');
-    await page.getByRole('button',{name:'Определение категорий с помощью ИИ',exact:true}).click();const categoryPanel=page.getByRole('region',{name:'Распределение категорий'});
+    await page.getByRole('button',{name:'Категории с помощью ИИ',exact:true}).click();const categoryPanel=page.getByRole('region',{name:'Распределение категорий'});
     const classificationStarted=page.waitForResponse(response=>new URL(response.url()).pathname==='/finance/classification'&&response.request().postDataJSON()?.start===true&&response.status()===200);
     await categoryPanel.getByRole('button',{name:'Распределить категории',exact:true}).click();
     await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();await classificationStarted;

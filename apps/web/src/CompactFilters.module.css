@@ -20,3 +20,6 @@
 @media(prefers-reduced-motion:no-preference){.expand svg{transition:transform .12s}}
 
 .dates{display:flex;align-items:center;gap:12px;margin-left:14px;padding-left:16px;border-left:1px solid var(--color-border);flex:none}.dateField{gap:8px}
+
+/* Inset focus stays entirely inside the scrollable, unchanged filter strip. */
+.fields :is(input,select,button):focus-visible,.actions button:focus-visible{outline:2px solid var(--color-primary);outline-offset:-3px}

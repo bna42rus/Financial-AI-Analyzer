@@ -41,3 +41,11 @@ test('a new view rejects a duplicate normalized name and another tenant may use 
  await create();await assert.rejects(()=>create(definition(),false,'  SYNTHETIC   Overview  '),/OVERVIEW_VIEW_NAME_EXISTS/);assert.equal((await within(db=>overviewViews(db,'first'))).views.length,1);
  await within(async db=>{const s=await prepareFinance(db,'second'),actionId=randomUUID();await previewFinance(db,'second',{actionId,generation:s.generation,revision:s.revision,intent:{kind:'save_overview_view',id:randomUUID(),create:true,name:'Synthetic Overview',definition:defaultOverview(),isDefault:false}});await commitFinance(db,'second',{actionId});},'second');assert.equal((await within(db=>overviewViews(db,'second'),'second')).views.length,1);
 });
+
+test('complete widget tables page past chart limits without widening scope, exposing other users or transferring the full graph',async()=>{
+ await within(db=>syntheticOperations(db,'first',125,account,category));const widget={...defaultOverview().widgets[0]!,grouping:'operation',topN:3};
+ const chart=await request('/finance/overview',{widgets:[widget]});assert.equal(chart.statusCode,200,chart.body);assert.equal(chart.json().widgets[0].points.length,3);assert.equal(chart.json().widgets[0].tablePoints,undefined);
+ const collected:string[]=[];let offset:number|null=0;while(offset!==null){const response=await request('/finance/overview',{widgets:[widget],table:{widgetId:widget.id,offset,limit:40}});assert.equal(response.statusCode,200,response.body);const result=response.json().widgets[0];assert.ok(result.tablePoints.length<=40);assert.equal(result.tableOffset,offset);collected.push(...result.tablePoints.map((p:{key:string})=>p.key));offset=result.tableNextOffset;}
+ assert.equal(collected.length,127);assert.equal(new Set(collected).size,127);const empty=await request('/finance/overview',{filter:{from:'2020-01-01',through:'2020-01-02'},widgets:[widget],table:{widgetId:widget.id,offset:0,limit:100}});assert.deepEqual(empty.json().widgets[0].tablePoints,[]);
+ for(const table of [{widgetId:randomUUID(),offset:0,limit:100},{widgetId:widget.id,offset:-1,limit:100},{widgetId:widget.id,offset:0,limit:101},{widgetId:widget.id,offset:0,limit:10,sql:'invalid'}])assert.equal((await request('/finance/overview',{widgets:[widget],table})).statusCode,400);
+});
