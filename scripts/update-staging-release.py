@@ -97,13 +97,19 @@ def rebind_classification_settings(previous, installed_sha, next_sha):
     return rebound
 
 
-def pause_expired_ai(previous, dropin, now=None):
-    """UI/read-calculator releases cannot renew expired paid authority or dispatch a probe."""
+def admission_expired(previous, now=None):
     try:
         expires = datetime.fromisoformat(previous['expiresAt'].replace('Z', '+00:00'))
-        if expires.tzinfo is None or expires > (now or datetime.now(timezone.utc)):
-            raise ValueError('not expired')
+        if expires.tzinfo is None:
+            raise ValueError('timezone required')
     except (KeyError, TypeError, ValueError, AttributeError):
+        raise m.InstallationError('EXPIRED_AI_ADMISSION_REQUIRED')
+    return expires <= (now or datetime.now(timezone.utc))
+
+
+def pause_expired_ai(previous, dropin, now=None):
+    """UI/read-calculator releases cannot renew expired paid authority or dispatch a probe."""
+    if not admission_expired(previous, now):
         raise m.InstallationError('EXPIRED_AI_ADMISSION_REQUIRED')
     commands = re.findall(rb'(?m)^ExecStart=(.+)$', dropin)
     if len(commands) != 1 or not re.search(rb'^/usr/bin/env CREDENTIALS_DIRECTORY=\S+ ASSISTANT_ENABLED=[01] AI_ENABLED=0 /usr/bin/node --import tsx src/main\.ts$', commands[0]):
@@ -146,7 +152,45 @@ def validate_admission_pair(previous, next_settings, fallback, installed_sha, te
         raise m.InstallationError('CLASSIFICATION_ADMISSION_PROJECT_CHANGED')
 
 
-def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False):
+def prepare_admission(args):
+    # The helper prints only its closed public receipt. Keep stderr/private
+    # exceptions out of the terminal while preserving a useful refusal code.
+    with tempfile.TemporaryFile() as output:
+        try:
+            m.run(args, output=output, timeout=60)
+        except m.InstallationError:
+            output.seek(0)
+            lines = output.read(32769)
+            if len(lines) <= 32768:
+                for line in reversed(lines.splitlines()):
+                    try:
+                        value = json.loads(line)
+                    except (ValueError, UnicodeDecodeError):
+                        continue
+                    code = value.get('code') if isinstance(value, dict) else None
+                    if isinstance(value, dict) and value.get('status') == 'STOP' and isinstance(code, str) and re.fullmatch(r'(CLASSIFICATION|ASSISTANT)_[A-Z0-9_]{1,75}', code):
+                        raise m.InstallationError(code) from None
+            raise
+        output.seek(0)
+        value = json.loads(output.read(32768))
+        public = {key: value[key] for key in ['cases','evidenceSha256','paidCalls','sourceSha256','expiresAt','maximumCallsRemaining'] if key in value}
+        print(json.dumps(public, ensure_ascii=False), flush=True)
+
+
+def activate_ai(dropin):
+    commands = re.findall(rb'(?m)^ExecStart=(.+)$', dropin)
+    sections = re.findall(rb'(?m)^\[([^\]]+)\]$', dropin)
+    if not sections or sections[-1] != b'Service' or len(commands) != 1 or not re.fullmatch(rb'/usr/bin/env CREDENTIALS_DIRECTORY=\S+ ASSISTANT_ENABLED=[01] AI_ENABLED=0 /usr/bin/node --import tsx src/main\.ts', commands[0]):
+        raise m.InstallationError('AI_RESUME_DROPIN_CHANGED')
+    value = re.sub(rb'(?m)^Environment=(?:ASSISTANT_ENABLED|CLASSIFICATION_ENABLED|AI_ENABLED)=[01]\n', b'', dropin)
+    return value.replace(b'ASSISTANT_ENABLED=0', b'ASSISTANT_ENABLED=1').rstrip() + b'\nEnvironment=ASSISTANT_ENABLED=1\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
+
+
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False):
+    if resume_ai:
+        if keep_ai_paused or enable_classification or not evidence or not tested_sha:
+            raise m.InstallationError('AI_RESUME_ARGUMENTS_INVALID')
+        enable_classification = True
     if keep_ai_paused and (enable_classification or evidence or tested_sha):
         raise m.InstallationError('PAUSED_AI_ARGUMENTS_CONFLICT')
     if bool(evidence) != bool(tested_sha) or evidence and (not enable_classification or not re.fullmatch('[a-f0-9]{64}', tested_sha)):
@@ -194,7 +238,9 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     if release.exists():
         raise m.InstallationError('RELEASE_ALREADY_EXISTS_REQUIRES_REVIEW')
     backup = create_backup_directory(Path('/var/lib/cashneuro'), sha)
-    metadata = rollback_files(backup, enable_classification or keep_ai_paused, bool(evidence), old_dropin, paused_dropin)
+    # A failed renewal must not roll back to enabled but already expired keys.
+    rollback_paused = pause_expired_ai(original_settings, old_dropin) if resume_ai and admission_expired(original_settings) else paused_dropin
+    metadata = rollback_files(backup, enable_classification or keep_ai_paused, bool(evidence), old_dropin, rollback_paused)
     services = m.run(['systemctl', 'list-units', '--all', '--plain', '--no-legend', '--type=service', 'cashneuro*import*']).decode().splitlines()
     existing = [line.split()[0] for line in services if len(line.split()) > 3 and line.split()[2] == 'active']
     metadata['workerManaged'] = not existing or existing == [WORKER]
@@ -234,17 +280,23 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     m.run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
     rollback = 'sudo /usr/bin/python3 ' + shlex.quote(str(release / 'scripts/update-staging-release.py')) + ' --rollback ' + shlex.quote(str(backup))
     print('Откат: ' + rollback, flush=True)
+    resume_blocker = None
     if evidence:
         print('Проверяем два сохранённых ответа и оплаченные квитанции; новых модельных запросов: 0.', flush=True)
         next_path, fallback_path = backup / 'assistantConfig.next', backup / 'assistantConfig.rollbackFresh'
-        m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-admit-main.ts', '--prepare', evidence, next_path, fallback_path, tested_sha, binding], output=sys.stdout.buffer, timeout=60)
-        rebound = json.loads(next_path.read_text())
-        fallback = json.loads(fallback_path.read_text())
-        validate_admission_pair(original_settings, rebound, fallback, binding, tested_sha)
-        # Original expired settings remain in assistantConfig.original. The
-        # service rollback uses fresh authority bound to the previous runtime,
-        # with the same carried costs/call ceiling as the candidate.
-        m.atomic_replace(backup / 'assistantConfig', fallback_path.read_bytes(), 0o600)
+        try:
+            prepare_admission(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-admit-main.ts', '--prepare', evidence, next_path, fallback_path, tested_sha, binding])
+        except m.InstallationError as error:
+            if not resume_ai or str(error) not in ('CLASSIFICATION_RECONCILIATION_REQUIRED', 'CLASSIFICATION_ORIGINAL_LIMIT_EXHAUSTED') or not rollback_paused:
+                raise
+            resume_blocker = str(error)
+            keep_ai_paused, enable_classification, paused_dropin = True, False, rollback_paused
+            print('ИИ пока не возобновлён: ' + resume_blocker + '. Интерфейс обновится отдельно; квитанции, резерв и лимит вызовов сохраняются.', flush=True)
+        else:
+            rebound = json.loads(next_path.read_text())
+            fallback = json.loads(fallback_path.read_text())
+            validate_admission_pair(original_settings, rebound, fallback, binding, tested_sha)
+            m.atomic_replace(backup / 'assistantConfig', fallback_path.read_bytes(), 0o600)
     print('2/3: подключение собранного интерфейса к API и проверка обработчика импорта.', flush=True)
     try:
         new_dropin = (paused_dropin if keep_ai_paused else old_dropin).replace(str(current).encode(), str(release).encode())
@@ -252,13 +304,13 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             m.atomic_replace(m.CONFIG, json.dumps(rebound).encode(), 0o600)
             print('Срок допуска ИИ истёк. Обновляем интерфейс и расчёты с отключённой моделью; прежние квитанции, резерв и лимиты сохранены. Платных вызовов: 0.', flush=True)
         if enable_classification:
+            new_dropin = activate_ai(new_dropin)
             m.atomic_replace(m.CONFIG, json.dumps(rebound).encode(), 0o600)
             if evidence:
                 print('Категоризация: два сохранённых PASS приняты на проверенном runtime; повторных POST нет.', flush=True)
             else:
                 print('Проверка категоризации: два платных запроса на синтетике в пределах прежнего лимита.', flush=True)
                 m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-smoke-main.ts', '--live'], output=sys.stdout.buffer, timeout=180)
-            new_dropin += b'\n[Service]\nEnvironment=CLASSIFICATION_ENABLED=1\n'
         m.atomic_replace(m.DROPIN, new_dropin)
         if metadata['workerManaged']:
             # Copy only the scoped DB connection, never auth/KMS/AI credentials.
@@ -267,7 +319,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             m.atomic_replace(WORKER_UNIT, worker_unit(release).encode())
         m.run(['systemctl', 'daemon-reload'])
         m.run(['systemctl', 'restart', m.UNIT])
-        m.wait_health(True)
+        wait_release_health(release, keep_ai_paused)
         if metadata['workerManaged']:
             m.run(['systemctl', 'enable', WORKER])
             m.run(['systemctl', 'restart', WORKER])
@@ -277,7 +329,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         info = m.CADDY.stat()
         m.atomic_replace(m.CADDY, candidate.read_bytes(), stat.S_IMODE(info.st_mode), info.st_uid, info.st_gid)
         m.run(['systemctl', 'reload', 'caddy'])
-        m.wait_health(True)
+        wait_release_health(release, keep_ai_paused)
         actual = m.frontend_root(json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty'])))
         if actual != str(new_root):
             raise m.InstallationError('FRONTEND_SWITCH_FAILED')
@@ -286,7 +338,17 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         restore(backup)
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
-    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'paused_preserving_usage' if keep_ai_paused else 'continued_with_prior_usage' if evidence else 'unchanged', 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+
+
+def wait_release_health(release, keep_ai_paused):
+    # /health deliberately omits `assistant` when no provider is loaded.
+    # Requiring an enabled assistant here caused a healthy paused API to roll back.
+    # Verify the selected release independently instead of weakening the enabled check.
+    actual = m.run(['systemctl', 'show', m.UNIT, '--property=WorkingDirectory', '--value']).decode().strip()
+    if actual != str(release / 'apps/api'):
+        raise m.InstallationError('API_RELEASE_DIRECTORY_MISMATCH')
+    m.wait_health(not keep_ai_paused, assistant_enabled=False if keep_ai_paused else None)
 
 
 def main():
@@ -299,6 +361,7 @@ def main():
     parser.add_argument('--rollback')
     parser.add_argument('--enable-classification', action='store_true')
     parser.add_argument('--keep-ai-paused', action='store_true')
+    parser.add_argument('--resume-ai', action='store_true')
     parser.add_argument('--classification-evidence')
     parser.add_argument('--tested-runtime-sha')
     args = parser.parse_args()
@@ -310,7 +373,7 @@ def main():
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 
