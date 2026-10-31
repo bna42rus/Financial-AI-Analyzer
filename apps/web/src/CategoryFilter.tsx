@@ -5,14 +5,14 @@ import type {FinanceState} from './finance-client';
 import styles from './CompactFilters.module.css';
 type Category=FinanceState['categories'][number];
 const fold=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru').replace(/ё/g,'е').trim();
-export function CategoryFilter({categories,value,onChange,disabled}:{categories:Category[];value:string[];onChange:(ids:string[])=>void;disabled:boolean}){
+export function CategoryFilter({categories,value,onChange,disabled,emptyLabel}:{categories:Category[];value:string[];onChange:(ids:string[])=>void;disabled:boolean;emptyLabel?:string}){
  const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[position,setPosition]=useState({left:12,top:12,width:340,height:420});
  const trigger=useRef<HTMLButtonElement>(null),search=useRef<HTMLInputElement>(null),hint=useId();
  const selected=new Set(value),byId=new Map(categories.map(c=>[c.id,c])),available=categories.filter(c=>!c.hidden||selected.has(c.id)),needle=fold(query);
  const matches=(c:Category)=>!needle||fold(c.name).includes(needle);
  const branches=categories.filter(c=>!c.parentId).map(root=>({root,children:available.filter(c=>c.parentId===root.id)})).filter(b=>(!b.root.hidden||selected.has(b.root.id)||b.children.length)&&(matches(b.root)||b.children.some(matches)));
  const orphans=available.filter(c=>c.parentId&&!byId.has(c.parentId)&&matches(c)),missing=value.filter(id=>!byId.has(id));
- const label=value.length>1?'Выбрано несколько':value.length===1?byId.get(value[0]!)?.name??'Недоступная категория':'Все категории';
+ const label=value.length>1?'Выбрано несколько':value.length===1?byId.get(value[0]!)?.name??'Недоступная категория':emptyLabel??'Все категории';
  useEffect(()=>{if(disabled)setOpen(false);},[disabled]);
  useLayoutEffect(()=>{
   if(!open)return;

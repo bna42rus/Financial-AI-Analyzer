@@ -21,3 +21,4 @@
 @media(pointer:coarse){.header .navigation a{min-height:44px;box-sizing:border-box}.headerActions button{min-width:40px;min-height:40px}}
 
 @media(max-width:760px){.titleLine{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center}.titleActions{display:contents}.titleActions>div{grid-column:2;grid-row:1;justify-self:end}.titleActions>button{grid-column:1/-1;grid-row:2;justify-self:end}}
+.siteFooter{display:flex;align-items:center;justify-content:space-between;gap:10px 24px;flex-wrap:wrap;padding:24px max(20px,calc((100vw - 1440px)/2));margin-top:28px;border-top:1px solid var(--color-border);color:var(--color-secondary-text);font-size:12px}.siteFooter a{color:var(--color-primary);text-decoration:none}.siteFooter span:first-child{font-weight:600;color:var(--color-text)}

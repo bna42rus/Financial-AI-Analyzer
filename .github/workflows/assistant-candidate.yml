@@ -137,8 +137,8 @@ jobs:
           retention-days: 14
       - name: Install browser for focused release interaction checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
-      - name: Check factory defaults and canceling a draft on desktop and mobile
-        run: pnpm --filter @finance/web exec playwright test e2e/workspace-feedback.spec.ts --grep 'factory defaults|widget defaults' --workers=2
+      - name: Check Overview editor and canvas contracts on desktop and mobile
+        run: pnpm --filter @finance/web exec playwright test e2e/workspace-feedback.spec.ts e2e/overview-connected.spec.ts --grep 'factory defaults|widget defaults|global filters do not|metric choices fit|group limit accepts|closing an edited|task presets preserve|coordinates and mobile|hovering another|local category tree' --workers=2
       - name: Preserve focused release interaction diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
