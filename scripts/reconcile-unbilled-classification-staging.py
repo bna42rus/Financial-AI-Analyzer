@@ -15,7 +15,7 @@ from pathlib import Path
 
 REQUEST = '115403a1-e063-4b2e-9876-f7e6123b26b1'
 RESERVE = '2328657920'
-PROJECT = 'staging/assistant-5859b601e6fd1b2c01bed1d'
+PROJECT = 'staging/assistant-5859b601e6fd1b12c01bed1d'
 PERIOD = '2026-10-29T15:25:53.587Z'
 
 def fail(code):
