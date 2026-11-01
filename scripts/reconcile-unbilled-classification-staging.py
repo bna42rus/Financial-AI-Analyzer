@@ -61,7 +61,32 @@ SELECT json_build_object(
  'unknownCost',(SELECT count(*)=1 FROM commerce.ai_cost_reservation WHERE request_id='{request}' AND step='classification' AND state='unknown' AND reserved_atoms={reserve} AND settled_atoms IS NULL AND reported_input_tokens IS NULL AND reported_output_tokens IS NULL AND project_id='{project}' AND project_period_start='{period}'),
  'projectReserveMatches',(SELECT count(*)=1 FROM commerce.ai_project_budget WHERE project_id='{project}' AND period_start='{period}' AND reserved_atoms={reserve} AND blocked=false),
  'runUnknown',(SELECT count(*)=1 FROM finance.classification_run WHERE id='{request}' AND state='unknown'),
- 'otherUnknownRequests',(SELECT count(*) FROM commerce.analyzer_request WHERE (state='sent' OR usage_state='unknown') AND request_id<>'{request}')
+ 'otherUnknownRequests',(SELECT count(*) FROM commerce.analyzer_request WHERE (state='sent' OR usage_state='unknown') AND request_id<>'{request}'),
+ 'costFields',(SELECT json_build_object(
+   'state',c.state,
+   'projectId',c.project_id,
+   'projectPeriod',c.project_period_start,
+   'reservedAtoms',c.reserved_atoms::text,
+   'settledAtoms',c.settled_atoms::text,
+   'reportedInput',c.reported_input_tokens,
+   'reportedOutput',c.reported_output_tokens,
+   'projectIdMatches',c.project_id='{project}',
+   'periodMatches',c.project_period_start='{period}'::timestamptz,
+   'reserveMatches',c.reserved_atoms={reserve},
+   'stateMatches',c.state='unknown')
+  FROM commerce.ai_cost_reservation c
+  WHERE c.request_id='{request}' AND c.step='classification'),
+ 'budgetFields',(SELECT json_build_object(
+   'projectId',b.project_id,
+   'period',b.period_start,
+   'reservedAtoms',b.reserved_atoms::text,
+   'blocked',b.blocked,
+   'projectIdMatches',b.project_id='{project}',
+   'periodMatches',b.period_start='{period}'::timestamptz,
+   'reserveMatches',b.reserved_atoms={reserve})
+  FROM commerce.ai_project_budget b
+  JOIN commerce.ai_cost_reservation c ON b.project_id=c.project_id AND b.period_start=c.project_period_start
+  WHERE c.request_id='{request}' AND c.step='classification')
 );
 ROLLBACK;
 """.format(request=REQUEST,reserve=RESERVE,project=PROJECT,period=PERIOD)
