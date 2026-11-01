@@ -145,6 +145,7 @@ def main():
     p=argparse.ArgumentParser()
     p.add_argument('--apply',action='store_true')
     p.add_argument('--evidence-sha256')
+    p.add_argument('--attest-unbilled',action='store_true',help='Owner confirms the unbilled result from provider accounting')
     args=p.parse_args()
     if os.geteuid()!=0:
         fail('ROOT_REQUIRED')
@@ -156,9 +157,11 @@ def main():
         fail('PRECONDITIONS_FAILED')
     if not args.apply:
         return
-    evidence=args.evidence_sha256 or ''
-    if not re.fullmatch('[a-f0-9]{64}',evidence):
-        fail('EXTERNAL_EVIDENCE_HASH_REQUIRED')
+    if not args.attest_unbilled:
+        fail('EXPLICIT_OPERATOR_ATTESTATION_REQUIRED')
+    evidence=args.evidence_sha256
+    if evidence is not None and not re.fullmatch('[a-f0-9]{64}',evidence):
+        fail('EVIDENCE_HASH_INVALID')
     directory=Path('/var/lib/cashneuro')
     root=directory.lstat()
     if not stat.S_ISDIR(root.st_mode) or root.st_uid!=0 or root.st_mode & 0o022:
