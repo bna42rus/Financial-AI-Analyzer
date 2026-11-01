@@ -115,6 +115,7 @@ jobs:
           # the same ownership checks as the actual privileged deployment.
           sudo /usr/bin/python3 -B scripts/test-update-staging-release.py
           python3 scripts/test-diagnose-classification-staging.py
+          sudo /usr/bin/python3 -B scripts/test-authorize-assistant-staging-calls.py
           bash -n scripts/prepare-staging-release.sh
           bash -n scripts/run-classification-check.sh
       - name: Prepare the experiment without network or credentials
