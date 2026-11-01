@@ -137,7 +137,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           await guard(db);
           await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['cloud-task-dispatch:' + userId]);
           if ((await db.query('SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3', [userId, id, step(index)])).rowCount) throw new HttpError(409, 'AI_DELIVERY_UNKNOWN');
-          if ((await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND (state='sent' OR usage_state='unknown') LIMIT 1", [userId])).rowCount) throw new HttpError(409, 'AI_COST_RECONCILIATION_REQUIRED');
+          if ((await db.query("SELECT 1 FROM commerce.analyzer_request r WHERE r.user_id=$1 AND (r.state='sent' OR r.usage_state='unknown') AND NOT (r.state='failed' AND EXISTS (SELECT 1 FROM commerce.ai_cost_reservation c WHERE c.user_id=r.user_id AND c.request_id=r.request_id AND c.step=r.step AND c.state='released' AND c.settled_atoms=0 AND c.reported_input_tokens IS NULL AND c.reported_output_tokens IS NULL)) LIMIT 1", [userId])).rowCount) throw new HttpError(409, 'AI_COST_RECONCILIATION_REQUIRED');
           if (index === 0) { const quota = await analyzerQuota(db, userId, true); if (!quota.available || !quota.remaining) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED'); }
           await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
             VALUES($1,$2,$3,$4,'sent','cashneuro-assistant/1',$5,$6,$7,'not_sent')`, [userId, id, step(index), fingerprint, bound.modelVersion, claim.periodExact, claim.anchorExact]);
