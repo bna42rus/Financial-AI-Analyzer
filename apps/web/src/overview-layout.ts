@@ -7,7 +7,7 @@ export function packOverview(items:LayoutItem[],container:number,device:'desktop
  const width=Math.max(1,container),gap=layoutLimits.gap,placed:Placement[]=[];
  for(const item of items.filter(i=>!i.hidden)){
   const desired=(width+gap)*layoutWidth(item,device)/100-gap,w=device==='mobile'?width:Math.min(width,Math.max(Math.min(layoutLimits.minimumWidth,width),desired));
-  const height=device==='mobile'?(heights[item.id]??450):(item.heightPx??heights[item.id]??(item.size==='compact'?320:item.size==='tall'?620:450));
+  const height=device==='mobile'?(heights[item.id]??450):Math.max(layoutLimits.minimumHeight,item.heightPx??heights[item.id]??(item.size==='compact'?320:item.size==='tall'?620:450));
   const wanted={id:item.id,x:device==='desktop'?Math.min(width-w,Math.max(0,(item.xPercent??0)/100*width)):0,y:device==='desktop'?item.y??0:0,width:w,height};
   if(device==='desktop'&&item.xPercent!==undefined&&item.y!==undefined&&!placed.some(p=>overlaps(wanted,p))){placed.push(wanted);continue;}
   const candidates=[0,...placed.map(p=>p.x+p.width+gap)].filter(x=>x+w<=width+.5);let best={x:0,y:Infinity};
