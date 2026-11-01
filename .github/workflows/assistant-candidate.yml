@@ -138,9 +138,11 @@ jobs:
       - name: Install browser for focused release interaction checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
       - name: Check Overview editor and canvas contracts on desktop and mobile
-        run: pnpm --filter @finance/web exec playwright test e2e/workspace-feedback.spec.ts e2e/overview-connected.spec.ts e2e/server-workspace.spec.ts --grep 'factory defaults|widget defaults|global filters do not|metric choices fit|group limit accepts|closing an edited|task presets preserve|coordinates and mobile|hovering another|local category tree|success notices offer|custom widget keeps|unsaved workspace navigation|navigation during the initial finance read' --workers=2
+        run: pnpm --filter @finance/web exec playwright test e2e/workspace-feedback.spec.ts e2e/overview-connected.spec.ts e2e/server-workspace.spec.ts --grep 'widget visibility|reset restores|save and Undo remain|named views|widget copies|compact header|late default view|a stale view|widget defaults|global filters do not|metric choices fit|group limit accepts|closing an edited|task presets preserve|coordinates and mobile|hovering another|local category tree|success notices offer|custom widget keeps|unsaved workspace navigation|navigation during the initial finance read' --workers=2
+      - name: Check saved-view management and recovery on desktop and mobile
+        run: pnpm --filter @finance/web exec playwright test e2e/overview-views.spec.ts --workers=2 --output=test-results/views
       - name: Preserve focused release interaction diagnostics
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: release-interaction-diagnostics
