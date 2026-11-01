@@ -8,6 +8,7 @@ shift 2
 while (($#)); do
   case "$1" in
     --resume-ai) resume_ai=true; extra+=("$1"); shift ;;
+    --monthly-ai-budget=100) extra+=("$1"); shift ;;
     --enable-classification|--keep-ai-paused) extra+=("$1"); shift ;;
     --classification-evidence|--tested-runtime-sha) test "$#" -ge 2; extra+=("$1" "$2"); shift 2 ;;
     *) exit 2 ;;

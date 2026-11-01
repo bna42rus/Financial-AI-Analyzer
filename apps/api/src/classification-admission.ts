@@ -24,6 +24,7 @@ export async function confirmClassificationPaidReceipt(db:PoolClient,userId:stri
 export function classificationRuntimeAdmission(original:AssistantStagingSettings,totals:PilotTotals,sourceSha256:string,tariff:ClassificationTariffVerification,now=new Date()){
  if(!Number.isSafeInteger(totals.calls)||totals.calls<0||![totals.spentAtoms,totals.reservedAtoms].every(n=>typeof n==='string'&&/^(0|[1-9]\d{0,29})$/.test(n)))throw Error('CLASSIFICATION_ACCOUNTING_INVALID');
  if(totals.blocked)throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
+ if(original.monthly)return checkAssistantStagingSettings({...original,sourceSha256},now);
  // A still-valid source-only rebind does not renew authority, roll budgets
  // over or settle reservations. Saved, paid evidence may deploy UI fixes while
  // the existing runtime/dispatch guards continue to block unknown receipts.
@@ -31,6 +32,12 @@ export function classificationRuntimeAdmission(original:AssistantStagingSettings
  if(BigInt(totals.reservedAtoms)!==0n)throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
  const next=continuedClassificationSettings(original,totals,sourceSha256,tariff,now),expiresAt=new Date(Date.parse(tariff.checkedAt)+86400000).toISOString();
  return checkAssistantStagingSettings({...next,expiresAt,cost:{...next.cost,projectPeriodEnd:expiresAt}},now);
+}
+
+/** Explicit owner authorization, distinct from renewing an earlier trial. */
+export function monthlyClassificationAdmission(original:AssistantStagingSettings,totals:PilotTotals,sourceSha256:string,now=new Date()){
+ if(totals.blocked||BigInt(totals.reservedAtoms)!==0n)throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
+ return checkAssistantStagingSettings({...original,sourceSha256,monthly:original.monthly??{version:'cashneuro-staging-monthly/1',limitRub:'100',activatedAt:now.toISOString()}},now);
 }
 
 export async function validateClassificationEvidence(directory:string,confirm:(fingerprint:string,usage:Usage,from:Date,through:Date)=>Promise<boolean>,names:readonly typeof classificationSmokeNames[number][]=classificationSmokeNames){

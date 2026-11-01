@@ -98,6 +98,8 @@ def rebind_classification_settings(previous, installed_sha, next_sha):
 
 
 def admission_expired(previous, now=None):
+    if previous.get('monthly', {}).get('version') == 'cashneuro-staging-monthly/1':
+        return False
     try:
         expires = datetime.fromisoformat(previous['expiresAt'].replace('Z', '+00:00'))
         if expires.tzinfo is None:
@@ -139,8 +141,18 @@ def restore(backup):
         m.run(['systemctl', 'start', WORKER])
 
 
-def validate_admission_pair(previous, next_settings, fallback, installed_sha, tested_sha):
-    if next_settings.get('sourceSha256') != tested_sha or fallback.get('sourceSha256') != installed_sha or {**fallback, 'sourceSha256': tested_sha} != next_settings:
+def validate_admission_pair(previous, next_settings, fallback, installed_sha, tested_sha, monthly_budget=None):
+    converting = monthly_budget == '100'
+    if not converting and previous.get('monthly') != next_settings.get('monthly'):
+        raise m.InstallationError('CLASSIFICATION_MONTHLY_AUTHORIZATION_REQUIRED')
+    if converting:
+        monthly = next_settings.get('monthly', {})
+        if monthly.get('version') != 'cashneuro-staging-monthly/1' or monthly.get('limitRub') != '100' or set(monthly) != {'version', 'limitRub', 'activatedAt'} or fallback != previous:
+            raise m.InstallationError('CLASSIFICATION_MONTHLY_AUTHORIZATION_CHANGED')
+        expected = {**previous, 'sourceSha256': tested_sha, 'monthly': monthly}
+        if next_settings != expected:
+            raise m.InstallationError('CLASSIFICATION_MONTHLY_HISTORY_CHANGED')
+    if next_settings.get('sourceSha256') != tested_sha or fallback.get('sourceSha256') != installed_sha or not converting and {**fallback, 'sourceSha256': tested_sha} != next_settings:
         raise m.InstallationError('CLASSIFICATION_ADMISSION_BINDING_CHANGED')
     for key in ['realm', 'apiKey', 'allowedEmails', 'modelMetadataSha256', 'tariffSource']:
         if previous.get(key) != next_settings.get(key):
@@ -173,7 +185,7 @@ def prepare_admission(args):
             raise
         output.seek(0)
         value = json.loads(output.read(32768))
-        public = {key: value[key] for key in ['cases','evidenceSha256','paidCalls','sourceSha256','expiresAt','maximumCallsRemaining'] if key in value}
+        public = {key: value[key] for key in ['cases','evidenceSha256','paidCalls','sourceSha256','expiresAt','maximumCallsRemaining','operatingMode','monthlyLimitRub'] if key in value}
         print(json.dumps(public, ensure_ascii=False), flush=True)
 
 
@@ -186,7 +198,9 @@ def activate_ai(dropin):
     return value.replace(b'ASSISTANT_ENABLED=0', b'ASSISTANT_ENABLED=1').rstrip() + b'\nEnvironment=ASSISTANT_ENABLED=1\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
 
 
-def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False):
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None):
+    if monthly_budget is not None and (monthly_budget != '100' or not resume_ai):
+        raise m.InstallationError('MONTHLY_AI_ARGUMENTS_INVALID')
     if resume_ai:
         if keep_ai_paused or enable_classification or not evidence or not tested_sha:
             raise m.InstallationError('AI_RESUME_ARGUMENTS_INVALID')
@@ -285,7 +299,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         print('Проверяем два сохранённых ответа и оплаченные квитанции; новых модельных запросов: 0.', flush=True)
         next_path, fallback_path = backup / 'assistantConfig.next', backup / 'assistantConfig.rollbackFresh'
         try:
-            prepare_admission(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-admit-main.ts', '--prepare', evidence, next_path, fallback_path, tested_sha, binding])
+            prepare_admission(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-admit-main.ts', '--prepare-monthly-100' if monthly_budget else '--prepare', evidence, next_path, fallback_path, tested_sha, binding])
         except m.InstallationError as error:
             if not resume_ai or str(error) not in ('CLASSIFICATION_RECONCILIATION_REQUIRED', 'CLASSIFICATION_ORIGINAL_LIMIT_EXHAUSTED') or not rollback_paused:
                 raise
@@ -295,7 +309,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         else:
             rebound = json.loads(next_path.read_text())
             fallback = json.loads(fallback_path.read_text())
-            validate_admission_pair(original_settings, rebound, fallback, binding, tested_sha)
+            validate_admission_pair(original_settings, rebound, fallback, binding, tested_sha, monthly_budget)
             m.atomic_replace(backup / 'assistantConfig', fallback_path.read_bytes(), 0o600)
     print('2/3: подключение собранного интерфейса к API и проверка обработчика импорта.', flush=True)
     try:
@@ -338,7 +352,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         restore(backup)
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
-    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
 
 
 def wait_release_health(release, keep_ai_paused):
@@ -362,6 +376,7 @@ def main():
     parser.add_argument('--enable-classification', action='store_true')
     parser.add_argument('--keep-ai-paused', action='store_true')
     parser.add_argument('--resume-ai', action='store_true')
+    parser.add_argument('--monthly-ai-budget', choices=['100'])
     parser.add_argument('--classification-evidence')
     parser.add_argument('--tested-runtime-sha')
     args = parser.parse_args()
@@ -373,7 +388,7 @@ def main():
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

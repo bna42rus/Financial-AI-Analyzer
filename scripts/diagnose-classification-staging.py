@@ -32,6 +32,9 @@ def command(args, *, data=None, timeout=6):
 def receipt_query(settings):
     emails = settings.get('allowedEmails')
     cost = settings.get('cost', {})
+    if settings.get('monthly'):
+        now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=3)))
+        cost = {**cost, 'projectPeriodStart': now.replace(day=1, hour=0, minute=0, second=0, microsecond=0).astimezone(datetime.timezone.utc).isoformat()}
     if (not isinstance(emails, list) or not 1 <= len(emails) <= 100
             or any(not isinstance(v, str) or not 1 <= len(v) <= 254 for v in emails)
             or not isinstance(cost, dict)):
@@ -60,6 +63,8 @@ WITH config AS (SELECT '%s'::jsonb AS value),
   USING(user_id,request_id,step)
   WHERE r.user_id=(SELECT id FROM test_account)
    AND (r.state='sent' OR r.usage_state='unknown')
+   AND NOT COALESCE((r.state='failed' AND c.state='released' AND c.settled_atoms=0
+     AND c.reported_input_tokens IS NULL AND c.reported_output_tokens IS NULL),false)
  )
 SELECT json_build_object('databaseMatches',current_database()='finance_staging',
  'classificationMigrationPresent',to_regclass('finance.classification_run') IS NOT NULL,
@@ -134,8 +139,11 @@ def inspect():
         if parsed.tzinfo is None:
             raise InspectionError('CONFIGURATION_TIMESTAMP_INVALID')
         return parsed
-    emit('2/4', status='OK', admissionExpired=stamp('expiresAt') <= now,
-         tariffOlderThan24Hours=(now - stamp('tariffCheckedAt')).total_seconds() > 86400)
+    monthly = settings.get('monthly', {}).get('version') == 'cashneuro-staging-monthly/1'
+    emit('2/4', status='OK', admissionExpired=False if monthly else stamp('expiresAt') <= now,
+         tariffOlderThan24Hours=None if monthly else (now - stamp('tariffCheckedAt')).total_seconds() > 86400,
+         operatingMode='monthly' if monthly else 'trial', monthlyLimitRub='100' if monthly else None,
+         tariffRefresh='automatic before dispatch' if monthly else 'manual admission')
 
     emit('3/4', status='START')
     identifiers = command(['docker', 'ps', '--format', '{{.ID}}']).splitlines()

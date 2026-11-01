@@ -36,7 +36,8 @@ export async function classificationStatus(db:PoolClient,userId:string,input:unk
  const now=Date.now(),bound=enabled?provider!.forRequest('classification').bound:null,required=bound?tokenCost(provider!.policy.price,bound.inputTokens,bound.outputTokens):0n;
  const dispatchAllowed=enabled&&(!binding?.expiresAt||new Date(binding.expiresAt).getTime()>now)&&(!binding?.tariffCheckedAt||now-new Date(binding.tariffCheckedAt).getTime()<86400000)&&new Date(provider!.policy.projectPeriodEnd).getTime()>now&&new Date(provider!.policy.projectPeriodStart).getTime()<=now&&(!budget?required<=rubAmount(provider!.policy.projectLimitRub):!budget.blocked&&(binding?.maximumCalls===undefined||Number(budget.dispatch_count)<binding.maximumCalls)&&BigInt(budget.spent_atoms)+BigInt(budget.reserved_atoms)+required<=BigInt(budget.limit_atoms));
  const unresolvedReceipt=!!(await db.query("SELECT 1 FROM commerce.analyzer_request r WHERE r.user_id=$1 AND (r.state='sent' OR r.usage_state='unknown') AND NOT (r.state='failed' AND EXISTS (SELECT 1 FROM commerce.ai_cost_reservation c WHERE c.user_id=r.user_id AND c.request_id=r.request_id AND c.step=r.step AND c.state='released' AND c.settled_atoms=0 AND c.reported_input_tokens IS NULL AND c.reported_output_tokens IS NULL)) LIMIT 1",[userId])).rowCount;
- const available=enabled&&(!work.requiresModel||dispatchAllowed)&&!unresolvedReceipt;
+ const operatingBudget=await provider?.budgetState?.(db);
+ const available=enabled&&(!work.requiresModel||dispatchAllowed&&(!operatingBudget||BigInt(operatingBudget.remainingAtoms)>=required))&&!unresolvedReceipt;
  const importing=!!(await db.query("SELECT 1 FROM finance.ingestion_batch WHERE user_id=$1 AND status IN ('accepted','processing') LIMIT 1",[userId])).rowCount;
  const canStart=available&&!importing&&dispatch?.state!=='queued'&&Number(stats.uncertain)===0&&work.needed;
  if(r.start){if(!available)throw new HttpError(503,'CLASSIFICATION_UNAVAILABLE');if(canStart)await enqueueClassification(db,userId);else if(dispatch?.state!=='queued')throw new HttpError(409,'CLASSIFICATION_NOT_NEEDED');}
@@ -126,12 +127,14 @@ export async function runClassificationStage(pool:Pool,provider:AssistantProvide
      if(workspace.generation!==planned.generation||workspace.key_version!==planned.keyVersion||workspace.revision!==planned.revision)throw Error('CLASSIFICATION_CONTEXT_CHANGED');
      await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['cloud-task-dispatch:'+userId]);
      if((await db.query("SELECT 1 FROM commerce.analyzer_request r WHERE r.user_id=$1 AND (r.state='sent' OR r.usage_state='unknown') AND NOT (r.state='failed' AND EXISTS (SELECT 1 FROM commerce.ai_cost_reservation c WHERE c.user_id=r.user_id AND c.request_id=r.request_id AND c.step=r.step AND c.state='released' AND c.settled_atoms=0 AND c.reported_input_tokens IS NULL AND c.reported_output_tokens IS NULL)) LIMIT 1",[userId])).rowCount)throw Error('AI_COST_RECONCILIATION_REQUIRED');
+     const policy=provider.policy;
+     await provider.prepareDispatch?.(db,policy);
      await db.query(`INSERT INTO finance.classification_run(user_id,id,generation,engine,catalog_hash,state) VALUES($1,$2,$3,$4,$5,'sent')`,[userId,id,planned.generation,classificationVersion,planned.plan.catalogHash]);
      for(const group of planned.groups)await db.query('INSERT INTO finance.classification_cache(user_id,signature,run_id) VALUES($1,$2,$3)',[userId,group.signature,id]);
      await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
-     VALUES($1,$2,'classification',$3,'sent','cashneuro-categories/1',$4,$5,$5,'not_sent')`,[userId,id,digest(input),model.bound.modelVersion,provider.policy.projectPeriodStart]);
-     await reserveCost(db,{userId,requestId:id,step:'classification',anchorAt:provider.policy.projectPeriodStart,periodStart:provider.policy.projectPeriodStart},provider.policy,model.bound);
-     await provider.authorizeDispatch(db);
+     VALUES($1,$2,'classification',$3,'sent','cashneuro-categories/1',$4,$5,$5,'not_sent')`,[userId,id,digest(input),model.bound.modelVersion,policy.projectPeriodStart]);
+     await reserveCost(db,{userId,requestId:id,step:'classification',anchorAt:policy.projectPeriodStart,periodStart:policy.projectPeriodStart},policy,model.bound);
+     await provider.authorizeDispatch(db,policy);
     });sent=true;
    });
    if(!sent)throw Error('CLASSIFICATION_DISPATCH_NOT_RECORDED');knownUsage=completed.usage;

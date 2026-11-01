@@ -21,6 +21,25 @@ spec.loader.exec_module(m)
 
 
 class UpdateTests(unittest.TestCase):
+    def test_monthly_mode_requires_explicit_100_rub_authorization_and_cannot_reset_history(self):
+        before = {'realm':'staging/finance','apiKey':'synthetic','allowedEmails':['owner@example.test'],
+                  'sourceSha256':'a'*64,'modelMetadataSha256':'b'*64,'tariffSource':'fixed',
+                  'admission':{'stageCapAtoms':'10000000000','stageMaximumCalls':70,'spentAtoms':'12000000','calls':58},
+                  'maximumCalls':12,'expiresAt':'2026-11-02T13:34:00Z',
+                  'cost':{'projectId':'staging/test','price':{'synthetic':True}}}
+        monthly = {'version':'cashneuro-staging-monthly/1','limitRub':'100','activatedAt':'2026-11-01T14:00:00Z'}
+        after = {**before,'sourceSha256':'d'*64,'monthly':monthly}
+        m.validate_admission_pair(before,after,before,'a'*64,'d'*64,'100')
+        with self.assertRaisesRegex(m.m.InstallationError,'MONTHLY_AUTHORIZATION_REQUIRED'):
+            m.validate_admission_pair(before,after,{**after,'sourceSha256':'a'*64},'a'*64,'d'*64)
+        for key in ['calls','spentAtoms']:
+            changed = {**after,'admission':{**after['admission'],key:0 if key=='calls' else '0'}}
+            with self.assertRaisesRegex(m.m.InstallationError,'MONTHLY_HISTORY_CHANGED'):
+                m.validate_admission_pair(before,changed,before,'a'*64,'d'*64,'100')
+        with self.assertRaisesRegex(m.m.InstallationError,'MONTHLY_AUTHORIZATION_CHANGED'):
+            m.validate_admission_pair(before,{**after,'monthly':{**monthly,'limitRub':'101'}},before,'a'*64,'d'*64,'100')
+        self.assertFalse(m.admission_expired(after,datetime(2028,1,1,tzinfo=timezone.utc)))
+
     def test_paused_rollback_uses_real_snapshot_files_without_recreating_an_existing_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
