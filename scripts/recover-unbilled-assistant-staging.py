@@ -125,11 +125,17 @@ SELECT json_build_object('status',CASE WHEN c.state='released' THEN 'RELEASED' E
  'requestElapsedMs',CASE WHEN r.state='unknown' THEN round(extract(epoch FROM (r.updated_at-r.dispatched_at))*1000) ELSE NULL END,
  'projectReservedAtoms',p.reserved_atoms::text,'userReservedAtoms',b.reserved_atoms::text,
  'latestAssistantCall',(SELECT json_build_object('requestId',ar.request_id,'state',ar.state,
+   'resultCode',t.reply->>'code','resultStatus',a.receipt->'result'->>'status',
+   'calls',(SELECT json_agg(json_build_object('phase',j->>'phase','state',j->>'state','code',j->>'code',
+     'transportCode',j->'transport'->>'code','networkCode',j->'transport'->>'networkCode',
+     'responsePhase',j->'transport'->>'responsePhase','elapsedMs',j->'transport'->>'elapsedMs',
+     'usage',j->'usage')) FROM jsonb_array_elements(COALESCE(a.receipt->'calls','[]'::jsonb)) j),
    'transportCode',a.receipt->'calls'->0->'transport'->>'code',
    'networkCode',a.receipt->'calls'->0->'transport'->>'networkCode',
    'responsePhase',a.receipt->'calls'->0->'transport'->>'responsePhase',
    'elapsedMs',a.receipt->'calls'->0->'transport'->>'elapsedMs')
    FROM commerce.analyzer_request ar LEFT JOIN finance.assistant_run a ON a.user_id=ar.user_id AND a.request_id=ar.request_id
+   LEFT JOIN finance.analyzer_task_request t ON t.user_id=ar.user_id AND t.id=ar.request_id
    WHERE ar.user_id=c.user_id AND ar.provider='cashneuro-assistant/1' AND ar.step='assistant_0'
    ORDER BY ar.created_at DESC LIMIT 1))
  FROM commerce.ai_cost_reservation c JOIN commerce.analyzer_request r USING(user_id,request_id,step)
