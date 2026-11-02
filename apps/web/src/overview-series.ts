@@ -9,8 +9,8 @@ export function widgetSeries(widget:Widget,result:WidgetResult):PlotSeries[]{
    for(const key of widget.budgetMeasures??['plan','used'])out.push({key:'budget_'+key,name:budgetMeasureNames[key],unit:key==='percent'?'percent':'money',previous:false,values:result.points.map(p=>{const indicator=p.budget?.indicator;if(!indicator)return null;return key==='percent'?indicator.percentage:key==='plan'?indicator.limitMinor:key==='used'?indicator.usedMinor:key==='remaining'?(BigInt(indicator.remainingMinor)<0n?'0':indicator.remainingMinor):indicator.overMinor;})});
   }else{
    const unit=['operation_count','attention'].includes(m)?'count' as const:'money' as const;
-   out.push({key:m,name:metricNames[m],unit,previous:false,values:result.points.map(p=>p.values[m]??'0')});
-   if(result.comparisonFilter)out.push({key:m+'_previous',name:metricNames[m]+' · сравнение',unit,previous:true,values:result.points.map(p=>p.previous[m]??'0')});
+   out.push({key:m,name:metricNames[m],unit,previous:false,values:result.points.map(p=>widget.grouping==='time'&&result.comparisonFilter&&p.key.startsWith('comparison-only:')?null:p.values[m]??'0')});
+   if(result.comparisonFilter)out.push({key:m+'_previous',name:metricNames[m]+' · сравнение',unit,previous:true,values:result.points.map(p=>widget.grouping==='time'&&!p.previousFilter?null:p.previous[m]??'0')});
   }
  }
  return out;

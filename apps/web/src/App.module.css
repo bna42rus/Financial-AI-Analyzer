@@ -115,3 +115,5 @@
 /* Center without a transformed containing block: toast overlays inside modal
  * focus scopes still remain fixed to the viewport's upper-right corner. */
 .dialog{inset:0;margin:auto;transform:none;height:fit-content;box-sizing:border-box}
+
+.dialogHead{align-items:center;gap:12px}.dialogHead h2{margin:0;line-height:1.3}.dialogHead>button{align-self:center;flex-shrink:0;margin:0}

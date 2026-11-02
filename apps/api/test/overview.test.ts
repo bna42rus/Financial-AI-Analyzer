@@ -49,3 +49,13 @@ test('complete widget tables page past chart limits without widening scope, expo
  assert.equal(collected.length,127);assert.equal(new Set(collected).size,127);const empty=await request('/finance/overview',{filter:{from:'2020-01-01',through:'2020-01-02'},widgets:[widget],table:{widgetId:widget.id,offset:0,limit:100}});assert.deepEqual(empty.json().widgets[0].tablePoints,[]);
  for(const table of [{widgetId:randomUUID(),offset:0,limit:100},{widgetId:widget.id,offset:-1,limit:100},{widgetId:widget.id,offset:0,limit:101},{widgetId:widget.id,offset:0,limit:10,sql:'invalid'}])assert.equal((await request('/finance/overview',{widgets:[widget],table})).statusCode,400);
 });
+
+test('deleting the last view atomically creates an empty named view and Undo restores the original without changing operations',async()=>{
+ const id=await create(definition(),true,'Last saved view'),before=await within(db=>financeView(db,'first'));
+ const deleted=await command({kind:'delete_overview_view',id});
+ const views=(await within(db=>overviewViews(db,'first'))).views;
+ assert.equal(views.length,1);assert.notEqual(views[0].id,id);assert.equal(views[0].name,'Новое представление');assert.equal(views[0].isDefault,true);assert.deepEqual(views[0].definition.widgets,[]);
+ assert.deepEqual((await within(db=>financeView(db,'first'))).operations,before.operations);
+ await command({kind:'undo',id:randomUUID(),value:deleted.receipt.actionId});
+ const restored=(await within(db=>overviewViews(db,'first'))).views;assert.equal(restored.length,1);assert.equal(restored[0].id,id);assert.equal(restored[0].name,'Last saved view');
+});
