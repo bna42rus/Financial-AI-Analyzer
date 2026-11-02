@@ -15,3 +15,8 @@
 
 .timezone {display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:8px 16px;font-size:13px;overflow-wrap:anywhere;}
 .timezone form {flex-basis:100%;margin-top:0;}
+
+.waiting {display:flex;align-items:center;gap:8px;}
+.spinner {flex-shrink:0;animation:pending-answer-spin 1s linear infinite;}
+@keyframes pending-answer-spin {to {transform:rotate(360deg);}}
+@media(prefers-reduced-motion:reduce){.spinner{animation:none;}}

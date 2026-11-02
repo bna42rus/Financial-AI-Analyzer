@@ -418,16 +418,18 @@ test('an unrelated clause never excuses an unresolved financial condition in a m
   assert.equal(h.state.book.nodes.length, 0);
 });
 
-test('selected-period availability is absent without bounded UI dates, and unresolved selection blocks calculation', async () => {
-  const h = harness(), candidate = { ...plan([set('metric', 'expenses')]), topic: 'mixed' };
-  const reply = await h.execute(662, 'Расходы за выбранный период и погода.', [candidate,
-    { plan: candidate, conditions: [
-      { text: 'выбранный период', scope: 'financial', covered: false },
-      { text: 'погода', scope: 'unrelated', covered: false },
-    ] },
-  ], { global: { revision: 1, filter: {}, touched: { period: 1 } } });
-  assert.equal(reply.status, 'clarification'); assert.equal(h.calculations, 0);
-  for (const call of h.calls) assert.deepEqual((call.input as any).selectedContext, { period: false });
+test('all history and one-sided UI periods are available; use_current removes stale chat bounds without inventing dates', async () => {
+  for(const filter of [{},{from:'2026-09-01'},{through:'2026-09-30'}]){
+    const h=harness();
+    await h.execute(6620,'Расходы в августе 2026',[plan([set('metric','expenses'),set('period','август 2026')])]);
+    const candidate=plan([{field:'period',op:'use_current'}],'continue');
+    const reply=await h.execute(6621,'Сколько я потратил за выбранный период?',[candidate,
+      {plan:candidate,conditions:[{text:'выбранный период',scope:'financial',covered:true}]},
+    ],{global:{revision:1,filter,touched:{period:1}}});
+    assert.equal(reply.status,'query');assert.equal(h.calculations,2);
+    assert.equal(reply.query!.filter.from,filter.from);assert.equal(reply.query!.filter.through,filter.through);
+    for(const call of h.calls)assert.deepEqual((call.input as any).selectedContext,{period:true});
+  }
 });
 
 test('only the exact reserved period marker canonicalizes to use_current, without resetting other task groups', async () => {

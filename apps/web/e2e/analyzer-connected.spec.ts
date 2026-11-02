@@ -100,3 +100,21 @@ test('monthly budget shows the exact ruble remainder and warning independently o
 
 
 test('pending question can be resumed with the composer send button without creating another request',async({page})=>{const h=await setup(page);h.fail();await send(page,'Мои расходы за сентябрь 2026');await expect(page.getByRole('button',{name:'Повторить тот же вопрос',exact:true})).toBeVisible();const resume=page.getByRole('button',{name:'Продолжить предыдущий вопрос',exact:true});await expect(resume).toBeEnabled();await resume.click();await expect(page.getByRole('button',{name:'Отправить вопрос',exact:true})).toBeVisible();const queries=h.calls.filter(c=>c.path==='/finance/analyzer-query');expect(queries).toHaveLength(2);expect(queries[0]!.body.id).toBe(queries[1]!.body.id);expect(h.chats[0]!.messages).toHaveLength(1);});
+
+test('pending question immediately shows the submitted text and waiting state, then becomes one saved message',async({page})=>{
+ const h=await setup(page);let release!:()=>void;const gate=new Promise<void>(resolve=>{release=resolve;});
+ await page.route('http://127.0.0.1:3000/finance/analyzer-query',async route=>{
+  if(route.request().method()==='OPTIONS')return route.fallback();
+  await gate;await route.fallback();
+ });
+ try{
+  await send(page,'Мои расходы за сентябрь 2026');
+  const pending=log(page).locator('article[data-pending-question]');
+  await expect(pending).toBeVisible();await expect(pending).toContainText('Мои расходы за сентябрь 2026');
+  await expect(pending.getByRole('status')).toHaveText('Готовим ответ…');
+ }finally{release();}
+ await expect(log(page)).toContainText('300 ₽');
+ await expect(log(page).locator('article[data-pending-question]')).toHaveCount(0);
+ await expect(log(page).getByText('Мои расходы за сентябрь 2026',{exact:true})).toHaveCount(1);
+ expect(h.calls.filter(c=>c.path==='/finance/analyzer-query')).toHaveLength(1);
+});
