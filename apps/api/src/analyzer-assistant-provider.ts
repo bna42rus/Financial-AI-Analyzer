@@ -14,7 +14,7 @@ import { monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch, authorizeMon
 import type { MonthlyBudgetState } from './assistant-monthly.ts';
 import { verifyClassificationTariff } from './classification-tariff.ts';
 
-export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
+export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
 const providers = new WeakSet<object>();
 export const isAssistantProvider = (value: unknown): value is AssistantProvider => !!value && typeof value === 'object' && providers.has(value);
 /** Isolated HTTP/DB acceptance only. No key loader, default fetch or live switch.
@@ -49,6 +49,7 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
     return { ...result, async complete(...args: Parameters<AssistantModel['complete']>) { await refreshTariff(); return result.complete(...args); } } as AssistantModel;
   };
   const provider: AssistantProvider = Object.freeze({ pool,environment:'staging' as const, model,
+    costPeriod: settings.monthly ? 'project' as const : undefined,
     get policy() { return settings.monthly ? monthlyPolicy(settings.cost, settings.monthly, now()) : settings.cost; },
     allowed: (email: string) => settings.allowedEmails.includes(email.toLowerCase()),
     async budgetState(db: PoolClient) { return settings.monthly ? monthlyBudgetState(db, provider.policy) : undefined; },

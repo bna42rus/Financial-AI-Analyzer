@@ -143,7 +143,12 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
             VALUES($1,$2,$3,$4,'sent','cashneuro-assistant/1',$5,$6,$7,'not_sent')`, [userId, id, step(index), fingerprint, bound.modelVersion, claim.periodExact, claim.anchorExact]);
           const policy = provider.policy;
           await provider.prepareDispatch?.(db, policy);
-          await reserveCost(db, { userId, requestId: id, step: step(index), anchorAt: claim.anchorExact, periodStart: claim.periodExact }, policy, bound);
+          // The owner's monthly Staging money authorization is distinct from
+          // the access-cycle task quota. Keep request/quota keys above intact;
+          // only new monetary reservations use the authorized calendar month.
+          const costAnchor = provider.costPeriod === 'project' ? policy.projectPeriodStart : claim.anchorExact;
+          const costPeriod = provider.costPeriod === 'project' ? policy.projectPeriodStart : claim.periodExact;
+          await reserveCost(db, { userId, requestId: id, step: step(index), anchorAt: costAnchor, periodStart: costPeriod }, policy, bound);
           await provider.authorizeDispatch(db, policy);
         });
       },

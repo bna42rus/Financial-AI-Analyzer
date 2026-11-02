@@ -18,6 +18,7 @@ import { assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
 import { createTestAssistantProvider, createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
+import { monthlyPeriod } from '../src/assistant-monthly.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, config: Config;
 let cookie: string, generation: string, account: string, operationIds: string[], calls = 0, outputs: unknown[], outgoing: any[], behavior = 'normal';
@@ -253,9 +254,9 @@ test('a one-connection pool can complete a request without waiting for a second 
 });
 
 
-async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@example.test'], clock = () => new Date()) {
+async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@example.test'], clock = () => new Date(), monthly = false) {
   const at = clock(), metadata = { id: 'openai/gpt-oss-120b', context_length: 131072, max_model_len: 131072 };
-  const raw = { realm:'staging/finance',apiKey:'synthetic-staging-key-for-tests-only',allowedEmails,
+  const raw = { ...(monthly ? { monthly: { version:'cashneuro-staging-monthly/1',limitRub:'100',activatedAt:at.toISOString() } } : {}), realm:'staging/finance',apiKey:'synthetic-staging-key-for-tests-only',allowedEmails,
     sourceSha256:'a'.repeat(64),modelMetadataSha256:createHash('sha256').update(JSON.stringify(metadata)).digest('hex'),maximumCalls,
     admission:{budgetSha256:'b'.repeat(64),spentAtoms:'0',calls:60-maximumCalls,stageCapAtoms:'10000000000',stageMaximumCalls:60},
     tariffCheckedAt:new Date(at.getTime()-1000).toISOString(),tariffSource:assistantTariffSource,expiresAt:new Date(at.getTime()+3600000).toISOString(),
@@ -273,6 +274,40 @@ async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@e
   return { config:{...config,environment:'staging' as const,baseURL:'https://test.cashneuro.ru',origin:'https://test.cashneuro.ru',assistantProvider:provider,wrappingKey:key.bytes,kmsKey:key},raw };
 }
 const stageRun = (target: Awaited<ReturnType<typeof createServer>>, b: Awaited<ReturnType<typeof body>>) => target.fastify.inject({method:'POST',url:'/finance/analyzer-task',payload:b,headers:{origin:'https://test.cashneuro.ru',cookie,'content-type':'application/json'}});
+
+for (const scenario of ['prior-reported', 'current-reported', 'prior-unknown'] as const) {
+  test(`monthly Staging ledger separates access quota and preserves legacy history: ${scenario}`, async t => {
+    const at = new Date(), month = monthlyPeriod(at), start = Date.parse(month.projectPeriodStart);
+    const accessAnchor = new Date(start - 20 * 86400000).toISOString();
+    await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=$1 WHERE user_id='first'", [accessAnchor]);
+    const legacyId = randomUUID(), created = new Date(start + (scenario === 'current-reported' ? 1 : -86400000)).toISOString();
+    await pg.owner.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,created_at,usage_state,input_tokens,output_tokens,anchor_at,period_start)
+      VALUES('first',$1,'plan',$2,$3,'synthetic-legacy','legacy/1',$4,$5,$6,$7,$8,$8)`,
+      [legacyId,'c'.repeat(64),scenario === 'prior-unknown' ? 'unknown' : 'completed',created,
+        scenario === 'prior-unknown' ? 'unknown' : 'reported',scenario === 'prior-unknown' ? null : 9809,scenario === 'prior-unknown' ? null : 254,accessAnchor]);
+    const old = (await pg.owner.query('SELECT * FROM commerce.analyzer_request WHERE request_id=$1', [legacyId])).rows;
+    const b = await body(), staging = await stagingConfig(t, 2, ['first@example.test'], () => at, true), target = await createServer(staging.config);
+    try {
+      outputs = [plan([set('metric','expenses')])];
+      const result = await stageRun(target,b);
+      assert.equal(result.statusCode,200,result.body);
+      assert.equal(result.json().code,scenario === 'prior-reported' ? 'FINANCIAL_QUERY' : 'AI_COST_RECONCILIATION_REQUIRED',result.body);
+      assert.equal(calls,scenario === 'prior-reported' ? 2 : 0);
+      assert.deepEqual((await pg.owner.query('SELECT * FROM commerce.analyzer_request WHERE request_id=$1', [legacyId])).rows,old);
+      assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation WHERE request_id=$1', [legacyId])).rows[0].n,0);
+      if (scenario === 'prior-reported') {
+        const receipt = (await pg.owner.query(`SELECT c.anchor_at=$2::timestamptz AS money_anchor,c.period_start=$2::timestamptz AS money_period,
+          r.anchor_at=$3::timestamptz AS quota_anchor,r.period_start=$3::timestamptz AS quota_period,c.state
+          FROM commerce.ai_cost_reservation c JOIN commerce.analyzer_request r USING(user_id,request_id,step) WHERE c.request_id=$1`, [b.id,month.projectPeriodStart,accessAnchor])).rows;
+        assert.equal(receipt.length,2);
+        assert.ok(receipt.every(r => r.money_anchor && r.money_period && r.quota_anchor && r.quota_period && r.state === 'settled'));
+        assert.equal((await pg.owner.query("SELECT sum(units)::int AS n FROM commerce.analyzer_usage WHERE user_id='first' AND anchor_at=$1 AND period_start=$1",[accessAnchor])).rows[0].n,1);
+      } else {
+        assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
+      }
+    } finally { await target.close(); }
+  });
+}
 
 test('the real Staging configuration uses KMS, preserves prior call admission and enforces the shared pilot ceiling', async t => {
   const b=await body(),staging=await stagingConfig(t),target=await createServer(staging.config);
