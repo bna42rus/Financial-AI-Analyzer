@@ -123,7 +123,15 @@ END $reconcile$;
 SELECT json_build_object('status',CASE WHEN c.state='released' THEN 'RELEASED' ELSE 'READY' END,
  'requestId',c.request_id,'costState',c.state,'providerUsage',r.usage_state,
  'requestElapsedMs',CASE WHEN r.state='unknown' THEN round(extract(epoch FROM (r.updated_at-r.dispatched_at))*1000) ELSE NULL END,
- 'projectReservedAtoms',p.reserved_atoms::text,'userReservedAtoms',b.reserved_atoms::text)
+ 'projectReservedAtoms',p.reserved_atoms::text,'userReservedAtoms',b.reserved_atoms::text,
+ 'latestAssistantCall',(SELECT json_build_object('requestId',ar.request_id,'state',ar.state,
+   'transportCode',a.receipt->'calls'->0->'transport'->>'code',
+   'networkCode',a.receipt->'calls'->0->'transport'->>'networkCode',
+   'responsePhase',a.receipt->'calls'->0->'transport'->>'responsePhase',
+   'elapsedMs',a.receipt->'calls'->0->'transport'->>'elapsedMs')
+   FROM commerce.analyzer_request ar LEFT JOIN finance.assistant_run a ON a.user_id=ar.user_id AND a.request_id=ar.request_id
+   WHERE ar.user_id=c.user_id AND ar.provider='cashneuro-assistant/1' AND ar.step='assistant_0'
+   ORDER BY ar.created_at DESC LIMIT 1))
  FROM commerce.ai_cost_reservation c JOIN commerce.analyzer_request r USING(user_id,request_id,step)
  JOIN commerce.ai_project_budget p ON p.project_id=c.project_id AND p.period_start=c.project_period_start
  JOIN commerce.ai_user_budget b ON b.user_id=c.user_id AND b.anchor_at=c.anchor_at AND b.period_start=c.period_start
@@ -145,7 +153,9 @@ def main():
     container=database()
     preview=json.loads(sql(container,reconcile_query()).strip())
     emit(step='accounting',**preview)
-    if not args.apply: return
+    if not args.apply:
+        if connection['status']!='OK': raise RuntimeError('CLOUD_CONNECTION_FAILED')
+        return
     directory=Path('/var/lib/cashneuro')
     s=directory.lstat()
     if not stat.S_ISDIR(s.st_mode) or s.st_uid!=0 or s.st_mode&0o022 or directory.resolve()!=directory:
@@ -153,6 +163,7 @@ def main():
     path=directory/('ai-unbilled-reconciliation-'+REQUEST+'.json')
     record={'requestId':REQUEST,'status':'OPERATOR_ATTESTATION','source':'Owner declaration: Cloud.ru did not bill this request',
             'scope':'staging only','reservedAtoms':str(RESERVE),'providerUsage':'unknown','connection':connection,
+            'originalRequestElapsedMs':preview.get('requestElapsedMs'),
             'note':'Allocation released by operator; not a provider-issued zero-usage receipt.'}
     try:
         fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
@@ -160,7 +171,7 @@ def main():
         fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW)
         with os.fdopen(fd) as f:
             s=os.fstat(f.fileno())
-            if s.st_uid!=0 or s.st_mode&0o077 or s.st_nlink!=1 or not stat.S_ISREG(s.st_mode): raise RuntimeError('AUDIT_FILE_INVALID')
+            if s.st_uid!=0 or s.st_mode&0o077 or s.st_nlink!=1 or s.st_size>16384 or not stat.S_ISREG(s.st_mode): raise RuntimeError('AUDIT_FILE_INVALID')
             old=json.load(f)
         if any(old.get(k)!=record[k] for k in ('requestId','source','scope','reservedAtoms','providerUsage')): raise RuntimeError('AUDIT_FILE_CHANGED')
     else:
@@ -171,6 +182,7 @@ def main():
         finally: os.close(fd)
     result=json.loads(sql(container,reconcile_query(True)).strip())
     emit(step='accounting',auditFile=str(path),**result)
+    if connection['status']!='OK': raise RuntimeError('CLOUD_CONNECTION_FAILED')
 
 if __name__=='__main__':
     try: main()
