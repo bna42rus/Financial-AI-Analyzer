@@ -260,7 +260,7 @@ async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@e
     sourceSha256:'a'.repeat(64),modelMetadataSha256:createHash('sha256').update(JSON.stringify(metadata)).digest('hex'),maximumCalls,
     admission:{budgetSha256:'b'.repeat(64),spentAtoms:'0',calls:60-maximumCalls,stageCapAtoms:'10000000000',stageMaximumCalls:60},
     tariffCheckedAt:new Date(at.getTime()-1000).toISOString(),tariffSource:assistantTariffSource,expiresAt:new Date(at.getTime()+3600000).toISOString(),
-    cost:{projectId:'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
+    cost:{projectId:monthly ? 'staging/assistant-monthly' : 'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
       price:{version:'test-staging',currency:'RUB',inputRubPerMillion:'15.86',outputRubPerMillion:'61'}},
   };
   const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => String(url).endsWith('/models') ? new Response(JSON.stringify({data:[metadata]})) : fetcher(url,options),raw.sourceSha256,clock);

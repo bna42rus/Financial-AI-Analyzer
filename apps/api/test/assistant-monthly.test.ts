@@ -66,6 +66,7 @@ test('monthly provider drops trial call/expiry guards, rolls periods without res
   const provider = await createStagingAssistantProvider(pool, settings, fetcher, 'd'.repeat(64), () => now);
   assert.equal((provider.binding as any).maximumCalls, undefined);
   assert.equal((provider.binding as any).expiresAt, undefined);
+  assert.equal(provider.costPeriod, 'project');
   assert.equal(provider.policy.projectLimitRub, '100');
   now = new Date('2026-12-01T00:00:00Z');
   assert.equal(provider.policy.projectPeriodStart, '2026-11-30T21:00:00.000Z');
