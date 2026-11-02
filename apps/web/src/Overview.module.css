@@ -50,3 +50,4 @@
 @media(max-width:700px){.draftBar{overflow:visible;flex-wrap:wrap;justify-content:flex-end}.draftBar>span{flex-basis:100%;min-width:0}.draftBar>button{padding:7px 8px;font-size:12px}.draftBar>button:first-of-type{margin-left:auto}}
 
 .canvasCell[data-custom-size] .chartScroll{display:flex;flex:1 0 80px;min-height:80px}.canvasCell[data-custom-size] .chartScroll>.chart{min-width:100%;flex:1 0 auto}
+.compactDialog>div:first-child{position:static;padding:0;margin-bottom:14px;border:0;box-shadow:none}.compactDialog>p{margin-bottom:0}

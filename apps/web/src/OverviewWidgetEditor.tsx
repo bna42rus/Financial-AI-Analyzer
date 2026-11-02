@@ -5,14 +5,13 @@ import {DateInput} from './DateInput';
 import {OverviewPopover,OverviewDialog} from './OverviewDialogs';
 import {WidgetLocalFilters} from './WidgetLocalFilters';
 import {parseWidget,defaultOverview,metrics,groupings,granularities,metricNames} from '../../../packages/finance-core/src/overview';
-import type {SelectHTMLAttributes} from 'react';
+import {WidgetSelect} from './WidgetSelect';
 import type {Widget} from './overview-client';
 import {periodNames,groupingNames,granularityNames,comparisonNames} from './overview-client';
 import type {FinanceState} from './finance-client';
 import {safeText,sanitizeText} from '../../../packages/privacy/src/text';
 import common from './App.module.css';
 import styles from './Overview.module.css';
-function WidgetSelect(p:SelectHTMLAttributes<HTMLSelectElement>){return <select {...p} onInput={e=>p.onChange?.({...e,target:e.currentTarget})}/>;}
 const sections=[{name:'Деньги',values:['expenses','gross_expenses','income','difference','expense_reductions']},{name:'Операции',values:['operation_count','attention']},{name:'План и факт',values:['budget']},{name:'Другие движения',values:['own_transfers','transfers','transfers_in','transfers_out','loan_payments','loan_principal','loan_costs','fees','cash','cash_in','cash_out']}];
 const budgetNames={plan:'Запланировано',used:'Потрачено по бюджету',remaining:'Осталось',overrun:'Превышение',percent:'Выполнение, %'};
 export type WidgetVisibility={desktop:boolean;mobile:boolean};
