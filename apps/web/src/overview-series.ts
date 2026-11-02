@@ -10,7 +10,7 @@ export function widgetSeries(widget:Widget,result:WidgetResult):PlotSeries[]{
   }else{
    const unit=['operation_count','attention'].includes(m)?'count' as const:'money' as const;
    out.push({key:m,name:metricNames[m],unit,previous:false,values:result.points.map(p=>p.values[m]??'0')});
-   if(result.comparisonFilter)out.push({key:m+'_previous',name:metricNames[m]+' · сравнение',unit,previous:true,values:result.points.map(p=>p.previousFilter?p.previous[m]??'0':null)});
+   if(result.comparisonFilter)out.push({key:m+'_previous',name:metricNames[m]+' · сравнение',unit,previous:true,values:result.points.map(p=>p.previous[m]??'0')});
   }
  }
  return out;

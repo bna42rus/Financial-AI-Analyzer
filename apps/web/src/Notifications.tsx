@@ -1,24 +1,20 @@
 import {createPortal} from 'react-dom';
-import {createContext,useCallback,useContext,useEffect,useLayoutEffect,useMemo,useRef,useState} from 'react';
-import type {CSSProperties,ReactNode} from 'react';
+import {createContext,useCallback,useContext,useEffect,useMemo,useRef,useState} from 'react';
+import type {ReactNode} from 'react';
 import {LoaderCircle,X} from 'lucide-react';
 import styles from './Notifications.module.css';
 export type Notice={id:string;group?:string;title:string;detail?:string;duration?:number;busy?:boolean;progress?:number;secondaryAction?:{label:string;run:()=>void};action?:{label:string;accessibleLabel?:string;run:()=>void}};
 type Notices={push:(notice:Notice)=>void;dismiss:(id:string)=>void;clear:()=>void;dismissGroup:(group:string)=>void};
 const Context=createContext<Notices|null>(null);
 export function Notifications({children}:{children:ReactNode}){
- const [host,setHost]=useState<HTMLElement|null>(null),[placement,setPlacement]=useState<CSSProperties>(),[items,setItems]=useState<Notice[]>([]),closed=useRef(new Set<string>());
+ const [host,setHost]=useState<HTMLElement|null>(null),[items,setItems]=useState<Notice[]>([]),closed=useRef(new Set<string>());
  const dismiss=useCallback((id:string)=>{closed.current.add(id);setItems(items=>items.filter(n=>n.id!==id));},[]);
  const push=useCallback((notice:Notice)=>{if(closed.current.has(notice.id))return;setItems(items=>[...items.filter(n=>n.id!==notice.id&&(!notice.group||n.group!==notice.group)),notice].slice(-3));},[]);
- useEffect(()=>{const place=()=>{const dialogs=[...document.querySelectorAll<HTMLElement>('[role=dialog]')];setHost(dialogs.at(-1)??document.body);};const observer=new MutationObserver(place);observer.observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:['role']});place();return()=>observer.disconnect();},[]);
- useLayoutEffect(()=>{if(!host||host===document.body){setPlacement(undefined);return;}if(host.dataset.notificationsInline==='true'){setPlacement({position:'static',width:'100%',maxHeight:'none',marginTop:12});return;}
-  const chrome=[host.querySelector<HTMLElement>('h1,h2,h3'),host.querySelector<HTMLElement>('button[aria-label^="Закрыть"]:not([aria-label^="Закрыть уведомление"])')].filter((element):element is HTMLElement=>!!element);
-  const place=()=>{const top=host.getBoundingClientRect().top+host.clientTop,offset=Math.max(12,...chrome.map(element=>element.getBoundingClientRect()).filter(rect=>rect.bottom>top&&rect.top<top+host.clientHeight).map(rect=>rect.bottom-top+12));setPlacement({position:'absolute',top:host.scrollTop+offset,right:12,width:Math.min(410,host.clientWidth-24),maxHeight:Math.max(0,host.clientHeight-offset-12)});};
-  const observer=new ResizeObserver(place);observer.observe(host);chrome.forEach(element=>observer.observe(element));host.addEventListener('scroll',place);place();return()=>{observer.disconnect();host.removeEventListener('scroll',place);};},[host]);
+ useEffect(()=>{const place=()=>setHost([...document.querySelectorAll<HTMLElement>('[role=dialog]')].at(-1)??document.body);const observer=new MutationObserver(place);observer.observe(document.body,{childList:true,subtree:true});place();return()=>observer.disconnect();},[]);
  const dismissGroup=useCallback((group:string)=>setItems(items=>items.filter(n=>n.group!==group)),[]);
  const clear=useCallback(()=>{closed.current.clear();setItems([]);},[]);
  const value=useMemo(()=>({push,dismiss,clear,dismissGroup}),[push,dismiss,clear,dismissGroup]);
- return <Context.Provider value={value}>{children}{host&&createPortal(<aside style={host===document.body?undefined:placement} className={styles.viewport} aria-label="Уведомления">{items.map(n=><Toast key={n.id} notice={n} onClose={()=>dismiss(n.id)}/>)}</aside>,host)}</Context.Provider>;
+ return <Context.Provider value={value}>{children}{host&&createPortal(<aside className={styles.viewport} aria-label="Уведомления">{items.map(n=><Toast key={n.id} notice={n} onClose={()=>dismiss(n.id)}/>)}</aside>,host)}</Context.Provider>;
 }
 function Toast({notice:n,onClose}:{notice:Notice;onClose:()=>void}){
  const [paused,setPaused]=useState(false),close=useRef(onClose);close.current=onClose;

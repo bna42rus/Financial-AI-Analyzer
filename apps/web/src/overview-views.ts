@@ -1,5 +1,6 @@
 import {defaultOverview,parseOverviewView} from '../../../packages/finance-core/src/overview';
 import type {OverviewView} from './overview-client';
+export const standardViewId='10000000-0000-4000-8000-999999999999';
 export const standardViewName='Стандартный обзор';
 export const viewNameKey=(name:string)=>name.normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase('ru');
 /** Shared filters live in the workspace; widget-local filters remain in the view. */

@@ -97,3 +97,6 @@ test('monthly budget shows the exact ruble remainder and warning independently o
  await expect(notice).toContainText('01.12.2026');
  await expect(page.getByText('AI-лимит пока не назначен. Точные расчёты его не расходуют.')).toBeVisible();
 });
+
+
+test('pending question can be resumed with the composer send button without creating another request',async({page})=>{const h=await setup(page);h.fail();await send(page,'Мои расходы за сентябрь 2026');await expect(page.getByRole('button',{name:'Повторить тот же вопрос',exact:true})).toBeVisible();const resume=page.getByRole('button',{name:'Продолжить предыдущий вопрос',exact:true});await expect(resume).toBeEnabled();await resume.click();await expect(page.getByRole('button',{name:'Отправить вопрос',exact:true})).toBeVisible();const queries=h.calls.filter(c=>c.path==='/finance/analyzer-query');expect(queries).toHaveLength(2);expect(queries[0]!.body.id).toBe(queries[1]!.body.id);expect(h.chats[0]!.messages).toHaveLength(1);});
