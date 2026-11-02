@@ -14,6 +14,7 @@ import {metricValue,periodNames,pointLabel,timezoneLabel} from './overview-clien
 import type {OverviewData,OverviewPoint,Widget} from './overview-client';
 import type {FinanceState} from './finance-client';
 import {formatMoney} from './demo/overview';
+import {workspaceAccountFilter} from './workspace';
 import type {WorkspaceFilters} from './workspace';
 import type {CommandState,WorkspaceCommand} from './workspace-command';
 import {OverviewWidgetEditor} from './OverviewWidgetEditor';
@@ -22,7 +23,7 @@ import {useOverviewViews} from './useOverviewViews';
 import common from './App.module.css';
 import styles from './Overview.module.css';
 const Chart=lazy(()=>import('./OverviewChart'));
-const rootFilter=(f:WorkspaceFilters):OperationsFilter=>({...f.from?{from:f.from}:{},...f.through?{through:f.through}:{},...f.accountId?{accountIds:[f.accountId]}:f.bankId?{bankId:f.bankId}:{},...f.categoryIds.length?{categoryIds:f.categoryIds}:{}});
+const rootFilter=(f:WorkspaceFilters):OperationsFilter=>({...f.from?{from:f.from}:{},...f.through?{through:f.through}:{},...workspaceAccountFilter(f),...f.categoryIds.length?{categoryIds:f.categoryIds}:{}});
 export function ServerOverview({headerActions,state,filters,ready:parentReady,disabled,systemWarnings=[],timezone,command,commandState,onOperations,onOperation,onImport,onBudgets,onAccessError,onNavigationGuard}:{headerActions:HTMLElement|null;state:FinanceState;filters:WorkspaceFilters;ready:boolean;disabled:boolean;systemWarnings?:string[];timezone:string;command:WorkspaceCommand|null;commandState:CommandState;onOperations:(filter:OperationsFilter,name:string)=>void;onOperation:(id:string)=>void;onImport:()=>void;onBudgets:()=>void;onAccessError:(e:unknown)=>void;onNavigationGuard?:(guard:((action:()=>void)=>boolean)|null)=>void}){
  const [data,setData]=useState<OverviewData|null>(null),[loaded,setLoaded]=useState(''),[error,setError]=useState(''),[reload,setReload]=useState(0),[editing,setEditing]=useState<Widget|null>(null),[editingRevision,setEditingRevision]=useState(state.revision),[point,setPoint]=useState<{widgetId:string;value:OverviewPoint}|null>(null),[device,setDevice]=useState<'desktop'|'mobile'>(()=>matchMedia('(max-width: 700px)').matches?'mobile':'desktop');
  const manager=useOverviewViews({state,disabled,editing:!!editing,command,commandState,onApplied:()=>{setPoint(null);setEditing(null);},onAccessError}),definition=manager.definition;

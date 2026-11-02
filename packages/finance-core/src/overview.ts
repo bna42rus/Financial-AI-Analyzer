@@ -62,8 +62,8 @@ function bucketWindow(at:string,g:string){const d=date(at);if(g==='week')d.setUT
 function granularity(w:Widget,f:OperationsFilter){if(w.granularity!=='auto')return w.granularity;const n=f.from&&f.through?daysBetween(f.from,f.through):99999;return n<=60?'day':n<=210?'week':n<=1460?'month':n<=3650?'quarter':'year';}
 function timeBounds(filter:OperationsFilter,rows:OperationRow[]):OperationsFilter{
  if(!rows.length)return filter;let first='9999-12-31',last='0001-01-01';for(const row of rows){const at=operationDay(row.date);if(at<first)first=at;if(at>last)last=at;}
- const covers=(!filter.from||filter.from<=first)&&(!filter.through||filter.through>=last);
- return {...filter,from:covers?first:filter.from??first,through:covers?last:filter.through??last};
+ const covers=(!filter.from||filter.from<=first)&&(!filter.through||filter.through>=last),wide=!!filter.from&&!!filter.through&&daysBetween(filter.from,filter.through)>Math.max(62,2*(daysBetween(first,last)+1));
+ return {...filter,from:covers&&wide?first:filter.from??first,through:covers&&wide?last:filter.through??last};
 }
 function timeGranularity(w:Widget,f:OperationsFilter){const chosen=granularity(w,f);if(!f.from||!f.through)return chosen;const days=daysBetween(f.from,f.through),step=chosen==='day'?1:chosen==='week'?7:chosen==='month'?28:chosen==='quarter'?84:365;return days/step>20000/Math.max(1,w.metrics.length)?'year':chosen;}
 const clipped=(a:string|undefined,b:string,maximum:boolean)=>a?(maximum?(a>b?a:b):(a<b?a:b)):b;
@@ -82,11 +82,12 @@ export function calculateWidget(w:Widget,rows:OperationRow[],catalog:OverviewCat
  type Bucket={key:string;label:string;rows:Map<string,OperationRow>;filter:OperationsFilter};
  const group=(input:OperationRow[],requested:OperationsFilter)=>{
   const f=requested;
+  const windowAt=(at:string)=>{if(g!=='week'||!previousFilter||!f.from)return bucketWindow(at,g);const from=addDays(f.from,Math.floor(daysBetween(f.from,at)/7)*7);return {from,through:addDays(from,6),next:addDays(from,7)};};
   const buckets=new Map<string,Bucket>();
   const insert=(key:string,label:string,op:OperationRow|null,part:OperationRow['parts'][number]|null,context:OperationsFilter)=>{let b=buckets.get(key);if(!b){b={key,label,rows:new Map(),filter:context};buckets.set(key,b);}if(op&&part){const own=b.rows.get(op.id)??{...op,parts:[]};own.parts.push(part);b.rows.set(op.id,own);}};
   for(const op of input)for(const p of op.parts){if(!w.metrics.some(m=>metricMatches(m,p,op)))continue;let key='',label='Всего',context={...f};
    switch(w.grouping){
-    case 'time':{const window=bucketWindow(operationDay(op.date),g);key=window.from;label=window.from;context={...f,from:clipped(f.from,window.from,true),through:clipped(f.through,window.through,false)};break;}
+    case 'time':{const window=windowAt(operationDay(op.date));key=window.from;label=window.from;context={...f,from:clipped(f.from,window.from,true),through:clipped(f.through,window.through,false)};break;}
     case 'category':key=p.categoryId??'uncategorized';label=category.get(key)??'Без категории';context={...f,...(p.categoryId?{categoryIds:f.categoryIds?f.categoryIds.filter(id=>id===p.categoryId||catalog.categories.find(c=>c.id===id)?.parentId===p.categoryId):[p.categoryId]}:{uncategorized:true})};break;
     case 'subcategory':key=p.subcategoryId??'no_subcategory';label=category.get(key)??'Без подкатегории';context={...f,...(p.subcategoryId?{subcategoryIds:[p.subcategoryId]}:{noSubcategory:true})};break;
     case 'account':key=op.accountId;label=accounts.get(key)?.name??'Счёт';context={...f,accountIds:[key]};break;
@@ -101,7 +102,7 @@ export function calculateWidget(w:Widget,rows:OperationRow[],catalog:OverviewCat
    insert(key,label,op,p,context);
   }
   // Include every zero interval, including gaps for the selected category. Never use only observed buckets.
-  if(w.grouping==='time'&&calendarRows.length&&f.from&&f.through){let at=bucketWindow(f.from,g).from;while(at<=f.through){const window=bucketWindow(at,g);insert(window.from,window.from,null,null,{...f,from:clipped(f.from,window.from,true),through:clipped(f.through,window.through,false)});at=window.next;}}
+  if(w.grouping==='time'&&calendarRows.length&&f.from&&f.through){let at=windowAt(f.from).from;while(at<=f.through){const window=windowAt(at);insert(window.from,window.from,null,null,{...f,from:clipped(f.from,window.from,true),through:clipped(f.through,window.through,false)});at=window.next;}}
 
   return [...buckets.values()].sort((a,b)=>a.key.localeCompare(b.key));
  };
