@@ -36,6 +36,14 @@ export function classificationRuntimeAdmission(original:AssistantStagingSettings
 
 /** Explicit owner authorization, distinct from renewing an earlier trial. */
 export function monthlyClassificationAdmission(original:AssistantStagingSettings,totals:PilotTotals,sourceSha256:string,now=new Date()){
+ // Updating an already-authorized monthly runtime changes only its source
+ // binding. Outstanding receipts/provider freezes remain in the database and
+ // prepareMonthlyDispatch still refuses every new paid call until resolved.
+ // First activation below remains strict: this is not a fresh allowance.
+ if(original.monthly){
+  if(!Number.isSafeInteger(totals.calls)||totals.calls<0||![totals.spentAtoms,totals.reservedAtoms].every(n=>typeof n==='string'&&/^(0|[1-9]\d{0,29})$/.test(n))||typeof totals.blocked!=='boolean')throw Error('CLASSIFICATION_ACCOUNTING_INVALID');
+  return checkAssistantStagingSettings({...original,sourceSha256},now);
+ }
  if(totals.blocked||BigInt(totals.reservedAtoms)!==0n)throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
  return checkAssistantStagingSettings({...original,sourceSha256,monthly:original.monthly??{version:'cashneuro-staging-monthly/1',limitRub:'100',activatedAt:now.toISOString()}},now);
 }

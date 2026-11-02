@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import type { Pool } from 'pg';
-import { monthlyPeriod, monthlyPolicy, monthlyTariffGuard } from '../src/assistant-monthly.ts';
+import type { Pool, PoolClient } from 'pg';
+import { monthlyPeriod, monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch } from '../src/assistant-monthly.ts';
 import { checkAssistantStagingSettings, assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
 import { monthlyClassificationAdmission } from '../src/classification-admission.ts';
 import { createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
@@ -28,6 +28,22 @@ test('monthly approval preserves every historical permit field and requires a si
   assert.throws(() => monthlyClassificationAdmission(old, { ...totals, reservedAtoms: '1' }, 'd'.repeat(64), at), /RECONCILIATION/);
   assert.throws(() => monthlyClassificationAdmission(old, { ...totals, blocked: true }, 'd'.repeat(64), at), /RECONCILIATION/);
   assert.deepEqual(monthlyClassificationAdmission(next, totals, 'e'.repeat(64), new Date('2026-12-01T00:00:00Z')).monthly, monthly);
+});
+
+test('an existing monthly authorization can update code with an outstanding receipt or freeze while paid dispatch still refuses', async () => {
+  const original = monthlyClassificationAdmission(legacy(), totals, 'd'.repeat(64), at), before = structuredClone(original);
+  for (const blocked of [false, true]) {
+    const held = { ...totals, reservedAtoms: '2328657920', blocked };
+    const next = monthlyClassificationAdmission(original, held, 'e'.repeat(64), at);
+    assert.deepEqual(next, { ...original, sourceSha256: 'e'.repeat(64) });
+    assert.deepEqual(original, before);
+    const queries: string[] = [];
+    const db = { async query(sql: string) { queries.push(sql); return { rowCount: sql.includes('ai_project_budget') ? Number(blocked) : sql.includes('ai_cost_reservation') ? 1 : 0 }; } } as unknown as PoolClient;
+    await assert.rejects(prepareMonthlyDispatch(db, monthlyPolicy(next.cost, next.monthly!, at)), /RECONCILIATION_REQUIRED/);
+    assert.ok(queries.every(sql => sql.startsWith('SELECT ')));
+  }
+  assert.throws(() => monthlyClassificationAdmission(original, { ...totals, calls: -1 }, 'e'.repeat(64), at), /ACCOUNTING_INVALID/);
+  assert.throws(() => monthlyClassificationAdmission(original, { ...totals, reservedAtoms: '-1' }, 'e'.repeat(64), at), /ACCOUNTING_INVALID/);
 });
 
 test('operating periods change exactly at Moscow midnight including December and leap February', () => {
