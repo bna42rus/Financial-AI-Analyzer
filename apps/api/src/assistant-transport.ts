@@ -12,7 +12,7 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
       { role: 'system', content: 'Protocol ' + (expected.protocol??assistantVersion) + '\n' + prompt + '\nJSON Schema:\n' + JSON.stringify(schema) },
       { role: 'user', content: JSON.stringify(input) },
     ], temperature: 0, stream: false, n: 1, max_completion_tokens: bound.outputTokens, response_format: { type: 'json_object' } });
-  });
+  }, 90000);
   // Reserve exactly the same output ceiling sent to HTTP. Classification
   // batches need more space than the single assistant plan.
   if(purpose==='classification')transport.bound.outputTokens=4096;

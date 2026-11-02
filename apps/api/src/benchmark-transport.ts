@@ -41,7 +41,38 @@ function responseShape(choice: unknown): ResponseShape {
 export class BenchmarkFailure extends Error {
   code: string; usage?: Usage; fingerprint?: string; referencedParameters?: string[];
   responsePhase?: ResponsePhase; responseShape?: ResponseShape;
+  networkCode?: string; elapsedMs?: number;
   constructor(code: string, usage?: Usage, fingerprint?: string) { super(code); this.code = code; this.usage = usage; this.fingerprint = fingerprint; }
+}
+const networkCodes = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_SOCKET', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'TIMEOUT', 'ABORT', 'OTHER'];
+const parameters = ['max_completion_tokens', 'max_tokens', 'response_format', 'json_schema', 'messages', 'model', 'temperature'];
+const responsePhases = ['BODY', 'USAGE', 'DETAILS', 'MODEL', 'CHOICES', 'FINISH', 'ROLE', 'REFUSAL', 'TOOL_CALLS', 'FUNCTION_CALL', 'CONTENT', 'JSON'];
+export type TransportDiagnostic = { code: string; networkCode?: string; elapsedMs?: number; responsePhase?: ResponsePhase; referencedParameters?: string[] };
+/** Fixed codes only: never retain exception messages, URLs, headers or provider text. */
+export function networkFailureCode(error: unknown): string {
+  const e = error && typeof error === 'object' ? error as { name?: unknown; code?: unknown; cause?: { code?: unknown } } : {};
+  if (e.name === 'TimeoutError') return 'TIMEOUT';
+  if (e.name === 'AbortError') return 'ABORT';
+  const code = e.cause?.code ?? e.code;
+  return typeof code === 'string' && networkCodes.includes(code) ? code : 'OTHER';
+}
+export function checkedTransportDiagnostic(raw: unknown): TransportDiagnostic {
+  const r = object(raw, ['code', 'networkCode', 'elapsedMs', 'responsePhase', 'referencedParameters']);
+  if (typeof r.code !== 'string' || !/^(?:BENCH_DELIVERY_UNKNOWN|BENCH_RESPONSE_INVALID|BENCH_(?:IDENTITY_DENIED|PROVIDER_FAILURE)_HTTP_[45][0-9]{2})$/.test(r.code) ||
+      r.networkCode !== undefined && !networkCodes.includes(String(r.networkCode)) ||
+      r.elapsedMs !== undefined && (!Number.isSafeInteger(r.elapsedMs) || Number(r.elapsedMs) < 0 || Number(r.elapsedMs) > 86400000) ||
+      r.responsePhase !== undefined && !responsePhases.includes(String(r.responsePhase)) ||
+      r.referencedParameters !== undefined && (!Array.isArray(r.referencedParameters) || r.referencedParameters.length > parameters.length || new Set(r.referencedParameters).size !== r.referencedParameters.length || r.referencedParameters.some(p => !parameters.includes(p)))) throw new BenchmarkFailure('BENCH_DIAGNOSTIC_INVALID');
+  return r as TransportDiagnostic;
+}
+export function transportDiagnostic(error: unknown): TransportDiagnostic | undefined {
+  if (!(error instanceof BenchmarkFailure)) return undefined;
+  try { return checkedTransportDiagnostic({ code: error.code,
+    ...(error.networkCode !== undefined ? { networkCode: error.networkCode } : {}),
+    ...(error.elapsedMs !== undefined ? { elapsedMs: error.elapsedMs } : {}),
+    ...(error.responsePhase !== undefined ? { responsePhase: error.responsePhase } : {}),
+    ...(error.referencedParameters !== undefined ? { referencedParameters: error.referencedParameters } : {}) }); }
+  catch { return undefined; }
 }
 export type BenchmarkResult = { value: unknown; usage: Usage; fingerprint: string | null; cachedTokens: number | null; reasoningTokens: number | null; responseShape?: ResponseShape };
 export type BenchmarkTransport = { candidate: Candidate; price: TokenPrice; bound: DispatchBound; replayOnly?: boolean; responseContract?: typeof correctedResponseContractVersion;
@@ -65,8 +96,9 @@ export function replayOnlyBenchmarkTransport(candidate: Candidate, contract: Res
     async complete() { throw new BenchmarkFailure('BENCH_REPLAY_ONLY'); } };
 }
 
-export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy', bodyBuilder: typeof benchmarkRequestBody = benchmarkRequestBody): BenchmarkTransport {
+export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy', bodyBuilder: typeof benchmarkRequestBody = benchmarkRequestBody, timeoutMs = 30000): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 120000) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];
   const r = object(credentials, ['apiKey', 'folderId']);
   if (typeof r.apiKey !== 'string' || !/^[\x21-\x7e]{20,512}$/.test(r.apiKey) ||
@@ -84,9 +116,11 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
       const body = requestBody(prompt, input, schema);
       if (Buffer.byteLength(body) > 65536) throw new BenchmarkFailure('BENCH_CONTEXT_LIMIT');
       await reserve(); // durable reservation must precede every possible dispatch
+      const started = performance.now();
+      const elapsed = () => Math.min(86400000, Math.max(0, Math.round(performance.now() - started)));
       let response: Response;
-      try { response = await fetcher(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body, redirect: 'error', signal: AbortSignal.timeout(30000) }); }
-      catch { throw new BenchmarkFailure('BENCH_DELIVERY_UNKNOWN'); }
+      try { response = await fetcher(endpoint, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body, redirect: 'error', signal: AbortSignal.timeout(timeoutMs) }); }
+      catch (error) { const failure = new BenchmarkFailure('BENCH_DELIVERY_UNKNOWN'); failure.networkCode = networkFailureCode(error); failure.elapsedMs = elapsed(); throw failure; }
       if (!response.ok) {
         // Preserve only the numeric HTTP status, never an untrusted error body.
         const code = [401, 403].includes(response.status) ? 'BENCH_IDENTITY_DENIED' : 'BENCH_PROVIDER_FAILURE';
@@ -102,11 +136,11 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
             }
             const text = Buffer.concat(parts).toString('utf8');
             // Only fixed public parameter names survive; reflected keys/text do not.
-            failure.referencedParameters = ['max_completion_tokens', 'max_tokens', 'response_format', 'json_schema', 'messages', 'model', 'temperature'].filter(name => text.includes(name));
+            failure.referencedParameters = parameters.filter(name => text.includes(name));
           }
         } catch { /* A body read error does not erase the known HTTP status. */ }
         finally { try { await reader?.cancel(); } catch { /* No retry. */ } }
-        throw failure;
+        failure.elapsedMs = elapsed(); throw failure;
       }
       let usage: Usage | undefined; let fingerprint: string | undefined;
       let phase: ResponsePhase = 'BODY', shape: ResponseShape | undefined;
@@ -141,7 +175,7 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
         phase = 'CONTENT'; if (typeof c.message.content !== 'string' || c.message.content.length > 32768) throw new Error();
         phase = 'JSON'; const value = JSON.parse(c.message.content);
         return { value, usage, fingerprint: fingerprint ?? null, cachedTokens, reasoningTokens, responseShape: shape };
-      } catch { const failure = new BenchmarkFailure('BENCH_RESPONSE_INVALID', usage, fingerprint); failure.responsePhase = phase; failure.responseShape = shape; throw failure; }
+      } catch (error) { const failure = new BenchmarkFailure('BENCH_RESPONSE_INVALID', usage, fingerprint); failure.responsePhase = phase; failure.responseShape = shape; failure.elapsedMs = elapsed(); if (phase === 'BODY') failure.networkCode = networkFailureCode(error); throw failure; }
     },
   };
 }

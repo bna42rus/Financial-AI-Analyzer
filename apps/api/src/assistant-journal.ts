@@ -9,6 +9,7 @@ import type { AssistantJournal, AssistantRequest, RunReceipt } from './assistant
 import { assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
 import type { DispatchBound, Usage } from '../../../packages/analyzer/src/cost.ts';
 import { usageTokens } from '../../../packages/analyzer/src/cost.ts';
+import { checkedTransportDiagnostic } from './benchmark-transport.ts';
 
 export type AssistantAccounting = {
   // Must reserve against the separately authorized experiment/project budget.
@@ -36,10 +37,11 @@ export function checkedAssistantReceipt(raw: unknown, fingerprint: string): RunR
   if (v.replayedCalls !== undefined && (!Number.isInteger(v.replayedCalls) || Number(v.replayedCalls) < 0 || Number(v.replayedCalls) > v.calls.length)) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
   if (Boolean(v.result) !== Boolean(v.conversation)) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
   for (const call of v.calls) {
-    const c = object(call, ['fingerprint', 'phase', 'state', 'value', 'usage', 'code']);
+    const c = object(call, ['fingerprint', 'phase', 'state', 'value', 'usage', 'code', 'transport']);
     if (typeof c.fingerprint !== 'string' || !/^[a-f0-9]{64}$/.test(c.fingerprint) || !['understand', 'repair', 'check_changes', 'categories', 'explain'].includes(String(c.phase)) ||
         !['sent', 'received', 'unknown', 'failed'].includes(String(c.state)) || c.state === 'received' && (!c.usage || !('value' in c))) throw new AssistantError('ASSISTANT_JOURNAL_INVALID');
     if (c.usage) { const u = object(c.usage, ['inputTokens', 'outputTokens', 'modelVersion']); usageTokens(u.inputTokens); usageTokens(u.outputTokens); }
+    if (c.transport !== undefined) { try { checkedTransportDiagnostic(c.transport); } catch { throw new AssistantError('ASSISTANT_JOURNAL_INVALID'); } }
   }
   return v as RunReceipt;
 }

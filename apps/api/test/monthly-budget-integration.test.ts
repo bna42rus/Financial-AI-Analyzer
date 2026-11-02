@@ -1,6 +1,8 @@
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import type { PoolClient } from 'pg';
 import { postgresFixture } from './postgres.ts';
 import { reserveCost, settleCost } from '../src/analyzer-cost.ts';
@@ -28,6 +30,45 @@ after(async () => { await pg?.close(); });
 beforeEach(async () => {
   await pg.owner.query('TRUNCATE identity.auth_user,commerce.ai_project_budget CASCADE');
   await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('first','Synthetic','first@example.test',true,now(),now())");
+});
+
+test('owner-attested unbilled assistant recovery releases both exact reserves once, preserves spent cost and unknown provider usage, and rejects changed accounting',async()=>{
+  const script=fileURLToPath(new URL('../../../scripts/recover-unbilled-assistant-staging.py',import.meta.url));
+  const fixture=JSON.parse(execFileSync('python3',['-c',"import runpy,json,sys;m=runpy.run_path(sys.argv[1]);print(json.dumps({k:m[k] for k in ['REQUEST','PROJECT','PERIOD','RESERVE']}|{'preview':m['reconcile_query'](),'apply':m['reconcile_query'](True)}))",script],{encoding:'utf8'}));
+  const chat=randomUUID(),epoch=randomUUID(),generation=randomUUID(),anchor='2026-10-13T22:22:56.424378Z';
+  const params=[fixture.PROJECT,fixture.PERIOD,String(fixture.RESERVE)];
+  await pg.owner.query("INSERT INTO finance.workspace(user_id) VALUES('first')");
+  await pg.owner.query("INSERT INTO finance.analyzer_chat(user_id,id,epoch) VALUES('first',$1,$2)",[chat,epoch]);
+  await pg.owner.query(`INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms,spent_atoms,reserved_atoms)
+    VALUES($1,$2,'2026-11-30T21:00:00Z',100000000000,1234,$3)`,params);
+  await pg.owner.query(`INSERT INTO commerce.ai_user_budget(user_id,anchor_at,period_start,limit_atoms,spent_atoms,reserved_atoms)
+    VALUES('first',$1,$2,100000000000,5678,$3)`,[anchor,fixture.PERIOD,params[2]]);
+  await pg.owner.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,usage_state,dispatched_at,updated_at)
+    VALUES('first',$1,'assistant_0',$2,'unknown','cashneuro-assistant/1','openai/gpt-oss-120b','unknown','2026-11-02T07:37:14.705208Z','2026-11-02T07:37:44.705208Z')`,[fixture.REQUEST,'a'.repeat(64)]);
+  await pg.owner.query(`INSERT INTO commerce.ai_cost_reservation(user_id,request_id,step,project_id,project_period_start,anchor_at,period_start,price,quoted_input_tokens,quoted_output_tokens,quoted_model_version,reserved_atoms,state)
+    VALUES('first',$1,'assistant_0',$2,$3,$4,$3,'{}',131072,1200,'openai/gpt-oss-120b',$5,'unknown')`,[fixture.REQUEST,fixture.PROJECT,fixture.PERIOD,anchor,params[2]]);
+  await pg.owner.query(`INSERT INTO finance.analyzer_task_request(user_id,id,chat_id,chat_epoch,generation,request,input,expected,anchor_at,period_start,state,reply)
+    VALUES('first',$1,$2,$3,$4,'{}','{}','{}',$5,$6,'completed','{"code":"ASSISTANT_DELIVERY_UNKNOWN"}')`,[fixture.REQUEST,chat,epoch,generation,anchor,fixture.PERIOD]);
+  const receipt={calls:[{phase:'understand',state:'unknown',code:'ASSISTANT_DELIVERY_UNKNOWN'}]};
+  await pg.owner.query("INSERT INTO finance.assistant_run(user_id,request_id,workflow,receipt) VALUES('first',$1,'synthetic',$2)",[fixture.REQUEST,JSON.stringify(receipt)]);
+  async function execute(query:string){const db=await pg.owner.connect();try{await db.query(query);}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}}
+  await execute(fixture.preview);
+  assert.equal((await pg.owner.query('SELECT state FROM commerce.ai_cost_reservation')).rows[0].state,'unknown');
+  await pg.owner.query('UPDATE commerce.ai_user_budget SET reserved_atoms=reserved_atoms+1');
+  await assert.rejects(execute(fixture.apply),/BUDGET_RESERVE_CHANGED/);
+  assert.equal((await pg.owner.query('SELECT state FROM commerce.ai_cost_reservation')).rows[0].state,'unknown');
+  await pg.owner.query('UPDATE commerce.ai_user_budget SET reserved_atoms=reserved_atoms-1');
+  await pg.owner.query('UPDATE commerce.analyzer_request SET input_tokens=7');
+  await assert.rejects(execute(fixture.apply),/PRECONDITIONS_FAILED/);
+  await pg.owner.query('UPDATE commerce.analyzer_request SET input_tokens=NULL');
+  await execute(fixture.apply);await execute(fixture.apply);
+  const p=(await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_project_budget')).rows[0];
+  const u=(await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows[0];
+  assert.deepEqual(p,{spent_atoms:'1234',reserved_atoms:'0'});assert.deepEqual(u,{spent_atoms:'5678',reserved_atoms:'0'});
+  const r=(await pg.owner.query('SELECT state,usage_state,input_tokens,output_tokens,dispatched_at::text FROM commerce.analyzer_request')).rows[0];
+  assert.equal(r.state,'failed');assert.equal(r.usage_state,'unknown');assert.equal(r.input_tokens,null);assert.equal(r.output_tokens,null);assert.ok(r.dispatched_at.includes('.705208'));
+  assert.deepEqual((await pg.owner.query('SELECT receipt FROM finance.assistant_run')).rows[0].receipt,receipt);
+  assert.deepEqual((await pg.owner.query('SELECT state,settled_atoms,reported_input_tokens FROM commerce.ai_cost_reservation')).rows[0],{state:'released',settled_atoms:'0',reported_input_tokens:null});
 });
 
 test('prior trial spending counts toward the same monthly cap; concurrent reservations cannot overspend and classification consumes zero customer budget', async () => {

@@ -4,6 +4,7 @@ import {calculateFinancial,calculatorText} from '../../../packages/analyzer/src/
 import type {CalculatorResult} from '../../../packages/analyzer/src/calculators.ts';
 import {calculatorInstructions} from '../../../packages/analyzer/src/assistant-plan.ts';
 import { createHash } from 'node:crypto';
+import { transportDiagnostic } from './benchmark-transport.ts';
 import { isDeepStrictEqual } from 'node:util';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
 import { assistantDisplayText, explanationNeedsReview } from '../../../packages/analyzer/src/assistant-text.ts';
@@ -23,7 +24,7 @@ export type Phase = 'understand' | 'repair' | 'check_changes' | 'categories' | '
 export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown; protocol?: 'cashneuro-category-classification/4' };
 export type ModelReply = { value: unknown; usage: Usage };
 export type AssistantModel = { bound: DispatchBound; complete(input: CompletionInput, beforeDispatch: () => Promise<void>): Promise<ModelReply> };
-export type CallReceipt = { fingerprint: string; phase: Phase; state: 'sent' | 'received' | 'unknown' | 'failed'; value?: unknown; usage?: Usage; code?: string };
+export type CallReceipt = { fingerprint: string; phase: Phase; state: 'sent' | 'received' | 'unknown' | 'failed'; value?: unknown; usage?: Usage; code?: string; transport?: import('./benchmark-transport.ts').TransportDiagnostic };
 export type RunReceipt = { fingerprint: string; calls: CallReceipt[]; result?: AssistantReply; conversation?: Conversation; replayedCalls?: number };
 export type AssistantReply = { status: 'query' | 'answer' | 'redirect' | 'clarification' | 'unsupported' | 'error'; code: string; text: string; query?: Query; result?: unknown; calculation?: CalculatorResult; proposal?: AssistantProposal; modelCalls: number; usage: Usage[] };
 /** The journal lock must be held for the entire workflow. Writes and budget
@@ -111,7 +112,8 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
         await journal.settle(index, usage);
         const responseInvalid = error && typeof error === 'object' && 'responsePhase' in error && error.responsePhase === 'JSON';
         const changed = usage && (usage.modelVersion !== model.bound.modelVersion || usage.inputTokens > model.bound.inputTokens || usage.outputTokens > model.bound.outputTokens);
-        Object.assign(journal.receipt.calls[index]!, { state: usage ? 'failed' : 'unknown', usage, code: usage ? changed ? 'ASSISTANT_PROVIDER_CHANGED' : responseInvalid ? 'ASSISTANT_RESPONSE_INVALID' : 'ASSISTANT_MODEL_ERROR' : 'ASSISTANT_DELIVERY_UNKNOWN' }); await journal.persist();
+        const transport = transportDiagnostic(error);
+        Object.assign(journal.receipt.calls[index]!, { state: usage ? 'failed' : 'unknown', usage, ...(transport ? { transport } : {}), code: usage ? changed ? 'ASSISTANT_PROVIDER_CHANGED' : responseInvalid ? 'ASSISTANT_RESPONSE_INVALID' : 'ASSISTANT_MODEL_ERROR' : 'ASSISTANT_DELIVERY_UNKNOWN' }); await journal.persist();
       }
       if (sent && journal.receipt.calls[index]!.state === 'unknown') throw new AssistantError('ASSISTANT_DELIVERY_UNKNOWN');
       if (sent && journal.receipt.calls[index]!.code === 'ASSISTANT_PROVIDER_CHANGED') throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
