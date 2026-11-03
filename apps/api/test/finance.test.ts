@@ -282,6 +282,30 @@ test('future rule edits leave history unchanged; explicit fixed historical appli
  const history=await request('/finance/history-query',{kinds:['apply_rules']});assert.equal(history.json().actions.length,1);await command({kind:'undo',id:randomUUID(),value:actionId});assert.deepEqual((await pg.owner.query("SELECT id,semantics,analytics_override,review_reasons FROM finance.transaction WHERE user_id='first' ORDER BY id")).rows,before);assert.deepEqual((await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,facts);
 });
 
+test('create historical rule previews without writes, refuses a changed epoch, commits and undoes the rule and matching changes together',async()=>{
+ const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId,unmatched=(await append('1000','transfer_in')).transactionId,id=randomUUID();
+ await command({kind:'operation',id:b,patch:{role:'expense'}});
+ const intent={kind:'create_rule_with_history',id,patch:{name:'Synthetic historical rule',enabled:true,priority:10,conditions:{direction:'out'},assignments:{role:'neutral'}}};
+ const prepare=async()=>{const w=await view(),actionId=randomUUID();const p=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(p.statusCode,200,p.body);return {actionId,details:p.json().impact.details,changes:p.json().impact.changes};};
+ let initial=await view(),draft=await prepare();
+ assert.deepEqual(draft.details.operationIds,[a,b].sort());assert.deepEqual(draft.details.changedOperationIds,[a]);assert.deepEqual(draft.details.protectedOperationIds,[b]);assert.ok(draft.changes.some((c:{kind:string;id:string})=>c.kind==='rule'&&c.id===id));assert.deepEqual((await view()).operations,initial.operations);assert.deepEqual((await view()).rules,[]);
+ await append('3000','transfer_in');assert.equal((await request('/finance/commit',{actionId:draft.actionId})).json().code,'FINANCE_CHANGED');assert.deepEqual((await view()).rules,[]);
+ initial=await view();draft=await prepare();const committed=await request('/finance/commit',{actionId:draft.actionId});assert.equal(committed.statusCode,200,committed.body);
+ const state=await view();assert.equal(state.rules[0].enabled,true);assert.equal(state.operations.find((o:{id:string})=>o.id===a).classification.role.ruleId,id);
+ for(const unchanged of [b,unmatched])assert.deepEqual(state.operations.find((o:{id:string})=>o.id===unchanged),initial.operations.find((o:{id:string})=>o.id===unchanged));
+ const history=await request('/finance/history-query',{kinds:['create_rule_with_history']});assert.equal(history.json().actions.length,1);
+ await command({kind:'undo',id:randomUUID(),value:draft.actionId});assert.deepEqual((await view()).rules,[]);assert.deepEqual((await view()).operations,initial.operations);
+});
+
+test('numbered operations pages keep stable slices and clamp pages after the result shrinks',async()=>{
+ const ids:string[]=[];for(let i=0;i<12;i++)ids.push((await append(String(-(1000+i)),'purchase',null,account,'2026-09-'+String(i+1).padStart(2,'0'))).transactionId);
+ const query={filter:{},sort:'date',direction:'desc',group:'none'};
+ const get=async(page:number)=>(await request('/finance/operations-page',{query,page,displayLimit:10})).json();
+ const a=await get(1),b=await get(2),c=await get(99);
+ assert.equal(a.total,12);assert.equal(a.offset,0);assert.equal(b.offset,10);assert.deepEqual(b,c);assert.deepEqual([...a.operations,...b.operations].map(o=>o.id),ids.reverse());
+ assert.equal((await request('/finance/operations-page',{query,page:0})).statusCode,400);assert.equal((await request('/finance/operations-page',{query,page:2,cursor:a.nextCursor})).statusCode,400);
+});
+
 test('rule deletion preserves past classification, exposes dependencies and is restored through object-version History',async()=>{
  const a=(await append('-1000')).transactionId,id=randomUUID(),patch={name:'Synthetic removable rule',enabled:true,priority:10,conditions:{merchantContains:'Synthetic'},assignments:{role:'neutral'}};await command({kind:'rule',id,patch,create:true});await command({kind:'apply_rules',ruleId:id,operationIds:[a]});const before=(await view()).operations;
  const removed=await command({kind:'delete_rule',id});assert.equal(removed.preview.impact.details.historicalOperationsUnchanged,true);assert.deepEqual(removed.preview.impact.details.operationDependencies,[a]);assert.equal((await view()).rules.length,0);assert.deepEqual((await view()).operations,before);await command({kind:'undo',id:randomUUID(),value:removed.actionId});assert.equal((await view()).rules[0].id,id);assert.deepEqual((await view()).operations,before);

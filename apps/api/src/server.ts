@@ -13,7 +13,7 @@ import { envelope } from './crypto.ts';
 import { isKmsKey } from './kms.ts';
 import { makeAuth, current, requireAdmin, recordAuthResult } from './auth.ts';
 import { resetRequest, resetPassword, recoverAdmin } from './security.ts';
-import { realm, HttpError, fields, string, email, event, outbox } from './types.ts';
+import { realm, HttpError, LinkEditError, fields, string, email, event, outbox } from './types.ts';
 import type { Config } from './types.ts';
 import { isAssistantProvider } from './analyzer-assistant-provider.ts';
 import { isCloudTaskProvider } from './analyzer-task-provider.ts';
@@ -308,7 +308,7 @@ export async function createServer(config: Config) {
       // No raw credentials, identifiers, payloads, SQL errors or reset links in responses/logs.
       const code=error instanceof HttpError ? error.code : 'REQUEST_FAILED';
       const recovery=code==='IMPORT_CONTEXT_CHANGED'?'Данные были сброшены на другом устройстве. Загрузите файл заново.':code==='IMPORT_CONTEXT_EXPIRED'?'Срок подготовки загрузки истёк. Загрузите файл заново.':undefined;
-      return reply.code(error instanceof HttpError ? error.status : 400).send({code,...(recovery?{message:recovery}:{})});
+      return reply.code(error instanceof HttpError ? error.status : 400).send({code,...(error instanceof LinkEditError?{linkIndex:error.linkIndex}:{}),...(recovery?{message:recovery}:{})});
     }
   };
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});

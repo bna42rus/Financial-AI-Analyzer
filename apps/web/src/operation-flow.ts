@@ -6,7 +6,7 @@ type CardIntent={kind:'operation_card';id:string;patch?:OperationPatch;component
 type Intent=CardIntent|{kind:'operation';id:string;patch:OperationPatch}|{kind:'undo';id:string;value:string}|RelationIntent;
 type Attempt={mode:'edit'|'correction'|'undo'|'relation';baseline:FinanceDetail;intent:Intent};
 type Pending={path:string;body:Record<string,unknown>;attempt:Attempt};
-export type OperationFlowState={detail:FinanceDetail;phase:'idle'|'sending'|'retry'|'preview'|'conflict'|'stale'|'unavailable';error:string;errorCode?:string;message:string;preview:FinancePreview|null;conflict:{current:FinanceDetail;attempt:Attempt}|null;undoActionId:string|null};
+export type OperationFlowState={detail:FinanceDetail;phase:'idle'|'sending'|'retry'|'preview'|'conflict'|'stale'|'unavailable';error:string;errorCode?:string;errorLinkId?:string;message:string;preview:FinancePreview|null;conflict:{current:FinanceDetail;attempt:Attempt}|null;undoActionId:string|null};
 export type OperationDependencies={request:(path:string,body:Record<string,unknown>)=>Promise<FinancePreview|FinanceReceipt>;load:(id:string)=>Promise<FinanceDetail>};
 export class OperationFlow{
  private state:OperationFlowState;private pending:Pending|null=null;private disposed=false;
@@ -26,7 +26,7 @@ export class OperationFlow{
  confirm(){if(this.state.phase==='preview'&&this.pending&&!this.disposed)return this.send(this.pending);}
  cancelPreview(){if(this.state.phase==='preview'){this.pending=null;this.publish({phase:'idle',preview:null,error:''});}}
  private async send(pending:Pending):Promise<void>{
-  if(this.disposed)return;this.pending=pending;this.publish({phase:'sending',error:'',errorCode:undefined,message:'',conflict:null});
+  if(this.disposed)return;this.pending=pending;this.publish({phase:'sending',error:'',errorCode:undefined,errorLinkId:undefined,message:'',conflict:null});
   try{
    const result=await this.dependencies.request(pending.path,pending.body);if(this.disposed)return;
    if(result.status==='previewed'){
@@ -39,12 +39,13 @@ export class OperationFlow{
    catch{this.publish({phase:'stale',error:'Изменение сохранено, но карточку не удалось обновить. Обновите её перед следующей правкой.'});}
   }catch(error){if(this.disposed)return;
    const code=error instanceof ApiError?error.code:'NETWORK_ERROR';
+   const linkId=error instanceof ApiError&&error.linkIndex!==undefined&&pending.attempt.intent.kind==='operation_card'?pending.attempt.intent.links[error.linkIndex]?.id:undefined;
    if(['FINANCE_CHANGED','DEPENDENCIES_CHANGED'].includes(code)){
     try{const current=await this.dependencies.load(this.state.detail.id);if(this.disposed)return;this.pending=null;if(current.generation!==pending.attempt.baseline.generation){this.publish({phase:'unavailable',preview:null,error:'Финансовые данные были сброшены. Откройте список заново.'});return;}this.publish({phase:'conflict',preview:null,conflict:{current,attempt:pending.attempt},error:'Операция или связанные данные изменились. Сравните текущую версию и вашу правку.'});}
     catch{this.pending=null;this.publish({phase:'stale',preview:null,error:'Не удалось загрузить текущую версию. Обновите карточку.'});}
-   }else if(['AUTH_REQUIRED','FINANCE_ACCESS_REQUIRED','GENERATION_CHANGED','NOT_FOUND'].includes(code)){this.pending=null;this.publish({phase:'unavailable',preview:null,error:error instanceof Error?error.message:'Операция больше недоступна.'});}
+   }else if(['AUTH_REQUIRED','FINANCE_ACCESS_REQUIRED','GENERATION_CHANGED','NOT_FOUND'].includes(code)&&!(code==='NOT_FOUND'&&linkId)){this.pending=null;this.publish({phase:'unavailable',preview:null,error:error instanceof Error?error.message:'Операция больше недоступна.'});}
    else if(code==='NETWORK_ERROR'){this.publish({phase:'retry',error:'Сервер не подтвердил результат. Повтор использует то же изменение и не выполнит его второй раз.'});}
-   else{this.pending=null;this.publish({phase:'idle',preview:null,errorCode:code,error:error instanceof Error?error.message:'Не удалось сохранить изменение.'});}
+   else{this.pending=null;this.publish({phase:'idle',preview:null,errorCode:code,errorLinkId:linkId,error:error instanceof Error?error.message:'Не удалось сохранить изменение.'});}
   }
  }
  useCurrent(){const conflict=this.state.conflict;if(!conflict||this.disposed)return;this.pending=null;this.publish({detail:conflict.current,phase:'idle',conflict:null,error:'',preview:null,message:'Открыта текущая версия. Ваша правка не применена.'});this.saved(conflict.current);}

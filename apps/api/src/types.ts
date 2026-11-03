@@ -6,6 +6,7 @@ export type Config = { profile: Profile; pool: Pool; baseURL: string; origin: st
 export type Sealer = ReturnType<typeof envelope>;
 export type DB = Pick<PoolClient, 'query'>;
 export class HttpError extends Error { constructor(public status: number, public code: string) { super(code); } }
+export class LinkEditError extends HttpError { constructor(status:number,code:string,public linkIndex:number){super(status,code);} }
 export function fields(request: FastifyRequest, allowed: string[]): Record<string, unknown> {
   const b = request.body;
   if (!b || typeof b !== 'object' || Array.isArray(b) || Object.keys(b).some(k => !allowed.includes(k))) throw new HttpError(400, 'INVALID_INPUT');

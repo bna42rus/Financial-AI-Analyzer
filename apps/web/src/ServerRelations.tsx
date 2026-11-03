@@ -1,13 +1,14 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useMemo,useState} from 'react';
 import type {Category,Link} from '../../../packages/finance-core/src/model';
 import {linkKinds} from '../../../packages/finance-core/src/model';
 import {api} from './server-client';
-import {displayBankDate,displayRole,kindNames,minorToRubles,rublesToMinor} from './finance-client';
+import {bankNames,displayBankDate,displayRole,kindNames,minorToRubles,rublesToMinor} from './finance-client';
 import type {FinanceDetail,FinanceState} from './finance-client';
 import {purchaseDrafts,purchaseBalance,purchaseRemainder,purchaseSplitIntent,newPurchasePart,componentDrafts,componentNames,componentsIntent,endpointKey,endpoints,linkIntent,linkNames,linkStatusNames,newComponent} from './operation-relations';
 import type {ComponentDraft,ComponentsIntent,LinkIntent} from './operation-relations';
 import {formatMoney} from './demo/overview';
 import {OperationDialog,OperationField} from './OperationDialog';
+import {maskedOperationText} from './operation-display';
 import common from './App.module.css';
 import styles from './ServerOperation.module.css';
 
@@ -56,7 +57,7 @@ const abs=(s:string)=>{const n=BigInt(s);return n<0n?-n:n;};
 export function OperationLink({detail,existing,onApply,onClose,onReload,onAccessError,serverError,serverErrorCode}:{detail:FinanceDetail;existing?:Link;onApply:(v:LinkIntent)=>void;onClose:()=>void;onReload:()=>void;onAccessError:(e:unknown)=>void;serverError?:string;serverErrorCode?:string}){
  const [snapshot,setSnapshot]=useState<FinanceState|null>(null),[loadError,setLoadError]=useState(''),[reload,setReload]=useState(0);
  const [initial]=useState(()=>({kind:existing?.kind??(detail.semantics.kind.value==='refund'?'refund':['transfer_in','transfer_out','own_transfer'].includes(detail.semantics.kind.value)?'own_transfer':'reversal') as Link['kind'],status:existing?.status??'confirmed' as const,amount:existing?minorToRubles(existing.amountMinor):'',reverse:existing?existing.targetId===detail.id:detail.semantics.kind.value==='purchase',otherId:existing?(existing.sourceId===detail.id?existing.targetId:existing.sourceId):'',sourceKey:existing?endpointKey(existing.sourceComponentId,existing.sourceAllocationId):'',targetKey:existing?endpointKey(existing.targetComponentId,existing.targetAllocationId):''}));
- const [draft,setDraft]=useState(initial),[search,setSearch]=useState(''),[checked,setChecked]=useState(false),[id]=useState(()=>existing?.id??crypto.randomUUID()),[error,setError]=useState(serverError??'');
+ const [draft,setDraft]=useState(initial),[search,setSearch]=useState(''),[picking,setPicking]=useState(!initial.otherId),[shown,setShown]=useState(40),[checked,setChecked]=useState(false),[id]=useState(()=>existing?.id??crypto.randomUUID()),[error,setError]=useState(serverError??'');
  const {kind,status,amount,reverse,otherId,sourceKey,targetKey}=draft;
  const set=(patch:Partial<typeof draft>)=>{setError('');setDraft(d=>({...d,...patch}));};
  useEffect(()=>{let live=true;setLoadError('');void api<FinanceState>('/finance/state').then(s=>{if(live)setSnapshot(s);}).catch(e=>{onAccessError(e);if(live)setLoadError(e instanceof Error?e.message:'Не удалось загрузить операции.');});return()=>{live=false;};},[reload]);
@@ -65,8 +66,21 @@ export function OperationLink({detail,existing,onApply,onClose,onReload,onAccess
  const options=(op:typeof source,side:'source'|'target')=>op?endpoints(op,existing&&(side==='source'?existing.sourceId:existing.targetId)===op.id?{componentId:side==='source'?existing.sourceComponentId:existing.targetComponentId,allocationId:side==='source'?existing.sourceAllocationId:existing.targetAllocationId}:undefined).filter(e=>e.allocationId!==id):[];
  const sources=options(source,'source'),targets=options(target,'target');
  const se=sources.find(e=>e.key===sourceKey)??(sources.length===1?sources[0]:undefined),te=targets.find(e=>e.key===targetKey)??(targets.length===1?targets[0]:undefined);
- const name=(o:NonNullable<typeof other>)=>`${o.displayName?.compositeLabel||o.classification.merchant.value||kindNames[o.classification.kind.value]} · ${displayBankDate(o.date,'UTC')} · ${formatMoney(o.amountMinor)} · ${snapshot?.accounts.find(a=>a.id===o.accountId)?.name??'Счёт'}`;
- const errorField=serverErrorCode==='CAPACITY_CONFLICT'?'amount':serverErrorCode==='DEPENDENCY_CONFLICT'||serverErrorCode==='AMBIGUOUS_ENDPOINT'?'target':'kind';
+ const searchable=useMemo(()=>{
+  const accounts=new Map(snapshot?.accounts.map(a=>[a.id,a]));
+  return (snapshot?.operations??[]).filter(o=>o.id!==detail.id).map(o=>{
+   const account=accounts.get(o.accountId),iso=o.date.precision==='day'?o.date.date:new Date(Date.parse(o.date.instant)+(o.date.sourceOffsetMinutes??0)*60000).toISOString().slice(0,10),shortDate=iso.split('-').reverse().join('.'),longDate=displayBankDate(o.date,'UTC');
+   const title=maskedOperationText(o.displayName?.compositeLabel||o.classification.merchant.value||kindNames[o.classification.kind.value]||'Операция');
+   const accountName=[account?bankNames[account.bankId]:null,account?.name].filter(Boolean).join(' · ');
+   const amountLabel=formatMoney(o.amountMinor),meta=[shortDate,amountLabel,accountName].filter(Boolean).join(' · ');
+   const words=maskedOperationText([title,o.classification.merchant.value,o.description,o.comment,iso,shortDate,longDate,amountLabel,minorToRubles(o.amountMinor),minorToRubles(o.amountMinor).replace(',','.'),accountName,kindNames[o.classification.kind.value],o.id].filter(Boolean).join(' ')).toLocaleLowerCase('ru').replaceAll('ё','е').replaceAll('−','-');
+   return {id:o.id,title,meta,words};
+  });
+ },[snapshot,detail.id]);
+ const tokens=search.toLocaleLowerCase('ru').replaceAll('ё','е').replaceAll('−','-').trim().split(/\s+/u).filter(Boolean);
+ const matches=picking?searchable.filter(item=>tokens.every(token=>item.words.includes(token))):[];
+ const selected=searchable.find(item=>item.id===otherId);
+ const errorField=serverErrorCode==='CAPACITY_CONFLICT'?'amount':serverErrorCode==='NOT_FOUND'?'other':serverErrorCode==='AMBIGUOUS_ENDPOINT'?'target':serverErrorCode?.startsWith('INCOMPATIBLE_')?'kind':'form';
  const fieldError=(field:string,problem?:string)=>error&&field===errorField?error:checked?problem:undefined;
  const problems:{other?:string;source?:string;target?:string;amount?:string;kind?:string}={};
  if(!other)problems.other='Выберите вторую операцию.';
@@ -83,18 +97,22 @@ export function OperationLink({detail,existing,onApply,onClose,onReload,onAccess
  }
  function apply(){setChecked(true);if(!source||!target||!se||!te||Object.keys(problems).length)return;onApply(linkIntent(id,kind,status,amount,source,target,se,te));}
  const endpoint=(side:'source'|'target',items:typeof sources,chosen:typeof se)=> <OperationField label={'Часть: '+roles[kind][side==='source'?0:1]} error={fieldError(side,problems[side])}><select aria-label={side==='source'?'Часть первой операции':'Часть второй операции'} disabled={!items.length} value={chosen?.key??''} onChange={e=>set(side==='source'?{sourceKey:e.target.value}:{targetKey:e.target.value})}><option value="">Выберите часть</option>{items.map((e,i)=><option key={e.key} value={e.key}>{e.current?'Сохранённая часть связи':`${e.allocationId?'По другой связи':e.componentId?'Часть '+(i+1):'Целая операция или остаток'} · ${formatMoney(e.amountMinor)}${e.categoryId?' · '+(snapshot?.categories.find(c=>c.id===e.categoryId)?.name??''):''}`}</option>)}</select></OperationField>;
- return <OperationDialog title={existing?'Изменение связи':'Связь с другой операцией'} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDraft(initial);setChecked(false);setSearch('');setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} disabled={!snapshot||stale} onClick={apply}>Применить</button></>}>
+ return <OperationDialog title={existing?'Изменение связи':'Связь с другой операцией'} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDraft(initial);setChecked(false);setSearch('');setShown(40);setPicking(!initial.otherId);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} disabled={!snapshot||stale} onClick={apply}>Применить</button></>}>
   {!snapshot&&!loadError&&<p role="status">Загружаем операции…</p>}
   {loadError&&<><p role="alert" className={common.error}>{loadError}</p><button className={common.button} onClick={()=>setReload(n=>n+1)}>Повторить загрузку</button></>}
   {stale&&<><p role="alert" className={common.error}>Список изменился. Обновите карточку перед настройкой связи.</p><button className={common.button} onClick={onReload}>Обновить карточку</button></>}
   <fieldset className={styles.form} disabled={!snapshot||stale}>
    <OperationField label="Вид связи" error={fieldError('kind',problems.kind)}><select value={kind} onChange={e=>set({kind:e.target.value as Link['kind']})}>{linkKinds.map(k=><option key={k} value={k}>{linkNames[k]}</option>)}</select></OperationField>
    <label>Роль открытой операции<select aria-label="Роль открытой операции" value={reverse?'target':'source'} onChange={e=>set({reverse:e.target.value==='target',sourceKey:'',targetKey:''})}><option value="source">{roles[kind][0]}</option><option value="target">{roles[kind][1]}</option></select></label>
-   <label>Найти связанную операцию<input aria-label="Найти связанную операцию" type="search" value={search} onChange={e=>setSearch(e.target.value)}/></label>
-   <OperationField label="Связанная операция" error={checked?problems.other:undefined}><select value={otherId} onChange={e=>set({otherId:e.target.value,sourceKey:'',targetKey:''})}><option value="">Выберите операцию</option>{snapshot?.operations.filter(o=>o.id!==detail.id&&(o.id===otherId||name(o).toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru')))).map(o=><option key={o.id} value={o.id}>{name(o)}</option>)}</select></OperationField>
+   <div className={styles.linkPicker}>
+    {picking?<><OperationField label="Связанная операция" error={fieldError('other',problems.other)}><input type="search" placeholder="Дата, магазин, описание, сумма…" value={search} onChange={e=>{setSearch(e.target.value);setShown(40);}}/></OperationField>
+     {snapshot&&!stale&&<><div className={styles.linkOptions} role="region" aria-label="Результаты поиска операций">{matches.slice(0,shown).map(item=><button type="button" key={item.id} className={common.button} aria-pressed={item.id===otherId} onClick={()=>{set({otherId:item.id,sourceKey:'',targetKey:''});setPicking(false);}}><span>{item.title}</span><small>{item.meta}</small></button>)}{!matches.length&&<p role="status">Операции не найдены.</p>}</div>{matches.length>shown&&<button type="button" className={styles.quietButton} onClick={()=>setShown(n=>n+40)}>Ещё результаты · {shown} из {matches.length}</button>}</>}
+    </>:<OperationField label="Связанная операция" error={fieldError('other',problems.other)}><button type="button" className={common.button+' '+styles.selectedLink} aria-label="Изменить связанную операцию" onClick={()=>{setPicking(true);setSearch('');setShown(40);}}><span>{selected?.title??'Выбрать операцию'}</span>{selected&&<small>{selected.meta}</small>}</button></OperationField>}
+   </div>
    {other&&<>{endpoint('source',sources,se)}{endpoint('target',targets,te)}</>}
    <OperationField label="Сумма связи, ₽" error={fieldError('amount',problems.amount)}><input inputMode="decimal" value={amount} onChange={e=>set({amount:e.target.value})}/></OperationField>
    <label>Статус связи<select aria-label="Статус связи" value={status} onChange={e=>set({status:e.target.value as Link['status']})}>{(['confirmed','candidate','rejected'] as const).map(s=><option key={s} value={s}>{linkStatusNames[s]}</option>)}</select></label>
+   {error&&(errorField==='form'||errorField==='target'&&!other)&&<small className={styles.fieldError} role="alert">{error}</small>}
   </fieldset>
  </OperationDialog>;
 }

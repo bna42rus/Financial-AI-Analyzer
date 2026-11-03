@@ -31,3 +31,7 @@
 .mainRow{user-select:none}
 .contextActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .contextActions>button:last-child{margin-inline-start:auto;color:var(--color-danger,#b42339)}
+.dangerButton{color:var(--color-danger,#b42339);border-color:currentColor}
+.dangerButton:hover:not(:disabled){background:color-mix(in srgb,var(--color-danger,#b42339) 8%,var(--color-surface))}
+.pagination,.pagination>span{display:flex;align-items:center;gap:6px}.pagination{justify-content:center;flex-wrap:wrap;margin-top:12px}
+.pagination button{min-width:38px;padding-inline:8px}.pagination [aria-current=page]{background:var(--color-soft);border-color:var(--color-primary);color:var(--color-primary)}

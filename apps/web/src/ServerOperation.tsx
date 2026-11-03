@@ -58,7 +58,10 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
  const effectiveParts=parts?.parts??op.components;
  const partsMismatch=effectiveParts.length>0&&(!!parts||correctionsChanged)&&effectiveParts.reduce((n,p)=>n+BigInt(p.amountMinor),0n)!==BigInt(effectiveAmount);
  const partError=(checked&&partsMismatch)||state.errorCode==='COMPONENT_SUM_CONFLICT'?'Сумма частей должна совпадать с суммой операции.':undefined;
- const linkError=state.errorCode&&['CAPACITY_CONFLICT','DEPENDENCY_CONFLICT','AMBIGUOUS_ENDPOINT','CYCLIC_DEPENDENCY','VERIFIED_FACET_CONFLICT','INCOMPATIBLE_RETURN','INCOMPATIBLE_REVERSAL','INCOMPATIBLE_TRANSFER','INCOMPATIBLE_REPAYMENT','CATEGORY_CONFLICT','LINK_CONFLICT','SOURCE_ALREADY_PAIRED','ALLOCATION_REFERENCE_CONFLICT'].includes(state.errorCode)&&links.length?state.error:undefined;
+ const linkErrorId=state.errorLinkId;
+ const failedLink=linkErrorId?existingLinks.find(link=>link.id===linkErrorId):undefined;
+ const linkError=failedLink?state.error:undefined;
+ useEffect(()=>{if(failedLink&&state.error)setRelationEditor({kind:'link',link:failedLink});},[linkErrorId,state.error]);
  function prepare(){
   setLocalError('');setChecked(true);
   if(categoryError||subcategoryError||partsMismatch)return;
@@ -131,7 +134,7 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
  </div><footer className={styles.operationFooter}><button className={styles.quietButton} disabled={disabled||editorOpen} onClick={()=>requestLeave(onHistory)}>История операции</button><button className={common.button+' '+styles.rightAction} disabled={!dirty||disabled||editorOpen} onClick={reset}>Сбросить</button><button className={common.primaryButton} disabled={!dirty||disabled||editorOpen} onClick={prepare}>Сохранить</button></footer>
  {correcting&&<OperationCorrection initial={draft} detail={op} accounts={accounts} onClose={()=>setCorrecting(false)} onApply={value=>{setDraft(value);setCorrecting(false);}}/>}
  {relationEditor?.kind==='components'&&<OperationParts detail={editorDetail} purchase={relationEditor.purchase} categories={categories} staged={parts} serverError={partError} onClose={()=>setRelationEditor(null)} onApply={applyParts}/>}
- {relationEditor?.kind==='link'&&<OperationLink detail={linkDetail} existing={relationEditor.link} serverError={linkError} serverErrorCode={state.errorCode} onClose={()=>setRelationEditor(null)} onApply={applyLink} onReload={()=>requestLeave(()=>void flow.current?.reload())} onAccessError={onAccessError}/>}
+ {relationEditor?.kind==='link'&&<OperationLink detail={linkDetail} existing={relationEditor.link} serverError={relationEditor.link?.id===linkErrorId?linkError:undefined} serverErrorCode={relationEditor.link?.id===linkErrorId?state.errorCode:undefined} onClose={()=>setRelationEditor(null)} onApply={applyLink} onReload={()=>requestLeave(()=>void flow.current?.reload())} onAccessError={onAccessError}/>}
  {state.preview&&state.phase!=='retry'&&<OperationDialog compact title={previewTitle} onClose={()=>flow.current?.cancelPreview()} footer={<><button className={common.button} disabled={state.phase!=='preview'} onClick={()=>flow.current?.cancelPreview()}>Отмена</button><button className={common.primaryButton} disabled={state.phase!=='preview'} onClick={()=>void flow.current?.confirm()}>Подтвердить и сохранить</button></>}>
   <section className={styles.preview} aria-label="Последствия изменения">
    {(changedFields.length>0||parts||links.length>0)&&<dl>{changedFields.map(([key,value])=><div key={key}><dt>{patchNames[key]??key}</dt><dd>{describe(key,value)}</dd></div>)}{parts&&<div><dt>Распределение</dt><dd>{parts.parts.length?('Частей: '+parts.parts.length):'Целая операция'}</dd></div>}{links.map(l=><div key={l.id}><dt>{linkNames[l.link.kind]}</dt><dd>{formatMoney(l.link.amountMinor)} · {linkStatusNames[l.link.status]}</dd></div>)}</dl>}

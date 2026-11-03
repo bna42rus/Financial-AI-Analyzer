@@ -19,5 +19,5 @@ export function OperationDialog({title,onClose,children,footer,compact=false}:{t
 }
 export function OperationField({label,error,children}:{label:string;error?:string;children:ReactElement<{'aria-label'?:string;'aria-invalid'?:boolean;'aria-describedby'?:string}>}){
  const id=useId();
- return <label>{label}{cloneElement(children,{'aria-label':children.props['aria-label']??label,'aria-invalid':!!error||undefined,'aria-describedby':error?id:undefined})}{error&&<small className={styles.fieldError} id={id} role="alert">{error}</small>}</label>;
+ return <label>{label}{cloneElement(children,{'aria-label':children.props['aria-label']??label,'aria-invalid':!!error||undefined,'aria-describedby':error?[children.props['aria-describedby'],id].filter(Boolean).join(' '):children.props['aria-describedby']})}{error&&<small className={styles.fieldError} id={id} role="alert">{error}</small>}</label>;
 }

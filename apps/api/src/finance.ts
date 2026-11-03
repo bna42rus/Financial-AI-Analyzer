@@ -26,17 +26,17 @@ import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
-import {object,choice,uuid,dateFact,correction,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
+import {object,choice,uuid,dateFact,correction,effective,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {reconcile,aggregate} from '../../../packages/finance-core/src/graph.ts';
 import type {Filter} from '../../../packages/finance-core/src/graph.ts';
 import {starterCategories,isMarketplaceName} from '../../../packages/finance-core/src/starter.ts';
-import {applyRules,validateRule} from '../../../packages/finance-core/src/rules.ts';
+import {applyRules,ruleMatches,validateRule} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
-import {HttpError} from './types.ts';
+import {HttpError,LinkEditError} from './types.ts';
 import type {Sealer} from './types.ts';
 import {previewReset,commitReset} from './finance-reset.ts';
 import {assertImportEpoch,assertPreparedContext} from './pseudonym-context.ts';
@@ -122,12 +122,14 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
 type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
-type Intent=OperationCardIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type CreateHistoricalRuleIntent={kind:'create_rule_with_history';id:string;patch:Omit<Rule,'id'>};
+type Intent=OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
+  if(k==='create_rule_with_history'){const r=object(value,['kind','id','patch']);return {kind:k,id:uuid(r.id),patch:{...validateRule(r.patch),enabled:true}};}
   if(k==='operation_card'){
    const r=object(value,['kind','id','patch','components','links']),id=uuid(r.id);
    if(!Array.isArray(r.links)||r.links.length>50||!r.links.length&&r.patch===undefined&&r.components===undefined)throw new TypeError('INVALID_INTENT');
@@ -201,18 +203,26 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
  if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
  if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
+ if(intent.kind==='create_rule_with_history'){
+  await applyBase(db,userId,{kind:'rule',id:intent.id,patch:intent.patch as unknown as Record<string,unknown>,create:true},currentRevision);
+  const {graph,rules}=await loadFinance(db,userId),rule={...intent.patch,id:intent.id};
+  const accounts=new Map(graph.accounts.map(account=>[account.id,account]));
+  const operationIds=graph.operations.filter(op=>{const account=accounts.get(effective(op).accountId);return !!account&&ruleMatches(op,account,rule);}).map(op=>op.id).sort();
+  const result=await applyRuleIntent(db,userId,{kind:'apply_rules',id:intent.id,ruleId:intent.id,operationIds},graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));
+  return {...result,details:{...result.details,kind:intent.kind}};
+ }
  if(intent.kind==='operation_card'){
   await row(db,userId,'transaction',intent.id);
   if(intent.patch)await applyBase(db,userId,structuredClone(intent.patch),currentRevision);
   if(intent.components)await applyBase(db,userId,structuredClone(intent.components),currentRevision);
-  for(const edit of intent.links){
+  for(const [linkIndex,edit] of intent.links.entries()){
    const previous=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1 AND id=$2',[userId,edit.id])).rows[0];
    if(previous&&previous.source_id!==intent.id&&previous.target_id!==intent.id)throw new HttpError(404,'NOT_FOUND');
-   await applyBase(db,userId,edit,currentRevision);
+   try{await applyBase(db,userId,edit,currentRevision);}catch(error){if(error instanceof HttpError)throw new LinkEditError(error.status,error.code,linkIndex);throw error;}
   }
   if(intent.links.some(edit=>edit.link!.status==='confirmed')){
    const outcomes=new Map(reconcile((await loadFinance(db,userId)).graph).links.map(link=>[link.id,link]));
-   for(const edit of intent.links)if(edit.link!.status==='confirmed'&&!outcomes.get(edit.id)?.active)throw new HttpError(409,outcomes.get(edit.id)?.reason??'LINK_CONFLICT');
+   for(const [linkIndex,edit] of intent.links.entries())if(edit.link!.status==='confirmed'&&!outcomes.get(edit.id)?.active)throw new LinkEditError(409,outcomes.get(edit.id)?.reason??'LINK_CONFLICT',linkIndex);
   }
   return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
  }
@@ -328,10 +338,11 @@ async function restore(db:PoolClient,userId:string,undo:Undo){
  if(undo.before)await update(db,userId,undo.table,undo.id,undo.before as Record<string,unknown>);else await db.query(`DELETE FROM finance.${undo.table} WHERE user_id=$1 AND id=$2`,[userId,undo.id]);
 }
 function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo,journal:Change[]=[]){
- const cardEdit=undo&&'details'in undo&&undo.details.kind==='operation_card';
+ const cardEdit=undo&&'details'in undo&&['operation_card','bulk_operations','create_rule_with_history'].includes(String(undo.details.kind));
  const beforeLinkReasons=cardEdit?new Map(before.links.map(l=>[l.id,l.reason])):undefined;
- const removedOperationIds=before.operations.filter(o=>!after.operations.some(p=>p.id===o.id)).map(o=>o.id);
- return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null&&(!beforeLinkReasons||beforeLinkReasons.get(l.id)!==l.reason)),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
+ const beforeOperations=new Map(before.operations.map(o=>[o.id,o])),afterIds=new Set(after.operations.map(o=>o.id));
+ const removedOperationIds=before.operations.filter(o=>!afterIds.has(o.id)).map(o=>o.id);
+ return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(beforeOperations.get(p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null&&(!beforeLinkReasons||beforeLinkReasons.get(l.id)!==l.reason)),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
 }
 export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId','generation','revision','intent']),id=uuid(r.actionId),generation=uuid(r.generation),expected=revision(r.revision),state=await prepareFinance(db,userId);
