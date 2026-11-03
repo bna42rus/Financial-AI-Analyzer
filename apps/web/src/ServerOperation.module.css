@@ -12,3 +12,24 @@
 @media(max-width:700px){.operationHead,.operationBody,.operationFooter{padding-inline:12px}.operationFooter{padding-bottom:max(10px,env(safe-area-inset-bottom))}}
 
 .operationBody>*{min-width:0}.operationBody .preview{margin:0}
+.operationDialog{width:min(850px,calc(100vw - 24px));max-width:850px}
+.subDialog{width:min(560px,calc(100vw - 24px));max-width:560px}
+.operationHead,.operationFooter{background:var(--color-surface)}
+.operationBody{gap:10px}
+.operationBody>strong,.operationBody>.tags,.operationBody>section[aria-label="Причины проверки"]{margin:0}
+.operationBody>section[aria-label="Причины проверки"] p,.operationBody>section[aria-label="Причины проверки"] ul{margin:0}
+.operationBody>section[aria-label="Причины проверки"] ul{margin-top:4px;padding-inline-start:21px}
+.operationBody>section[aria-label="Причины проверки"] button{margin-top:7px}
+.operationActions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.operationActions button{min-width:0;line-height:1.35;white-space:normal;padding-inline:8px}
+.quietButton{background:none;border:0;color:var(--color-secondary-text);font:inherit;font-size:13px;padding:7px 9px;cursor:pointer;text-align:start}
+.quietButton:hover:not(:disabled){color:var(--color-primary);background:var(--color-soft);border-radius:7px}
+.quietButton:disabled{opacity:.55;cursor:default}
+.rightAction{margin-inline-start:auto}
+.fieldError,.form .fieldError{color:var(--color-danger,#b42339)}
+.form [aria-invalid=true]{border-color:var(--color-danger,#b42339)}
+.balance{padding:8px 10px;border:1px solid var(--color-border);border-radius:7px;font-size:13px}
+.pending{color:var(--color-secondary-text);font-size:13px}
+.preview dl{margin:0}.preview dl+dl{margin-top:8px}
+.partForm .actions,.form>.actions,.parts .actions{margin-top:0}
+@media(max-width:480px){.operationActions{grid-template-columns:1fr}.operationFooter{gap:4px}.quietButton{padding-inline:5px}.operationFooter .rightAction{min-width:0}}

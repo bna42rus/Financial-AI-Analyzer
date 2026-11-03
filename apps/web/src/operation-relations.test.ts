@@ -39,5 +39,5 @@ test('purchase splitting accepts positive amounts, tracks the exact remainder an
  drafts[1]!.amount=purchaseRemainder(detail,drafts,drafts[1]!.id);expect(drafts[1]!.amount).toBe('39,99');
  const intent=purchaseSplitIntent(detail,drafts);expect(intent).toMatchObject({kind:'components',id:detail.id,parts:[{amountMinor:'-6001',role:'expense',type:'other',categoryId:'food'},{amountMinor:'-3999',role:'expense',categoryId:'clothes'}]});expect(detail).toEqual(before);
  expect(()=>purchaseSplitIntent(detail,[{...drafts[0]!,amount:'-100'}])).toThrow('без знака минус');expect(()=>purchaseSplitIntent(detail,[{...drafts[0]!,amount:'0'}])).toThrow('больше нуля');expect(()=>purchaseSplitIntent(detail,[{...drafts[0]!,amount:'99,99'}])).toThrow('точно совпадать');
- expect(purchaseSplitIntent(detail,[])).toMatchObject({parts:[]});
+ expect(()=>purchaseSplitIntent(detail,[])).toThrow('Оставьте хотя бы одну часть.');
 });

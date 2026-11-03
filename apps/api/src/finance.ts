@@ -118,18 +118,30 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {graph,state,parties}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
  const resolved=reconcile(graph),related=(l:{sourceId:string;targetId:string})=>l.sourceId===op.id||l.targetId===op.id;
  const links=graph.links.filter(related),linkIds=new Set(links.map(l=>l.id));
- const classificationHistory=(await db.query(`SELECT a.id,a.created_at AS "createdAt",r.engine,a.before_facets AS before,a.after_facets AS after FROM finance.classification_assignment a JOIN finance.classification_run r ON (r.user_id,r.id)=(a.user_id,a.run_id) WHERE a.user_id=$1 AND a.transaction_id=$2 ORDER BY a.created_at DESC,a.id DESC LIMIT 20`,[userId,op.id])).rows;
- const safeFacets=(value:Record<string,any>)=>value?.merchant?{...value,merchant:{...value.merchant,value:cleanBankText(value.merchant.value,160)}}:value;
- const safeHistory=classificationHistory.map(r=>({...r,before:safeFacets(r.before),after:safeFacets(r.after)}));
- const {bankRefHmac,...source}=op.source;return {...op,source,displayName:operationDisplayName(op,{counterparties:parties}),classificationHistory:safeHistory,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
+ const {bankRefHmac,...source}=op.source;return {...op,source,displayName:operationDisplayName(op,{counterparties:parties}),generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type Intent=CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
+type Intent=OperationCardIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
+  if(k==='operation_card'){
+   const r=object(value,['kind','id','patch','components','links']),id=uuid(r.id);
+   if(!Array.isArray(r.links)||r.links.length>50||!r.links.length&&r.patch===undefined&&r.components===undefined)throw new TypeError('INVALID_INTENT');
+   const patch=r.patch===undefined?undefined:parseIntent({kind:'operation',id,patch:r.patch}) as BaseIntent;
+   const components=r.components===undefined?undefined:parseIntent({kind:'components',id,parts:r.components}) as BaseIntent;
+   const links=r.links.map(raw=>{
+    const l=object(raw,['kind','id','link']);if(l.kind!=='link')throw new TypeError('INVALID_INTENT');
+    const intent=parseIntent({...l,id:uuid(l.id)}) as BaseIntent;
+    if(intent.link!.sourceId===intent.link!.targetId||![intent.link!.sourceId,intent.link!.targetId].includes(id))throw new TypeError('INVALID_INTENT');
+    return intent;
+   });
+   if(new Set(links.map(l=>l.id)).size!==links.length)throw new TypeError('INVALID_INTENT');
+   return {kind:k,id,patch,components,links};
+  }
   if(k==='merge_duplicate')return parseMergeDuplicate(value);
   if(k==='duplicate_different'){const r=object(value,['kind','id']);return {kind:k,id:uuid(r.id)};}
  }
@@ -189,6 +201,21 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
  if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
  if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
+ if(intent.kind==='operation_card'){
+  await row(db,userId,'transaction',intent.id);
+  if(intent.patch)await applyBase(db,userId,structuredClone(intent.patch),currentRevision);
+  if(intent.components)await applyBase(db,userId,structuredClone(intent.components),currentRevision);
+  for(const edit of intent.links){
+   const previous=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1 AND id=$2',[userId,edit.id])).rows[0];
+   if(previous&&previous.source_id!==intent.id&&previous.target_id!==intent.id)throw new HttpError(404,'NOT_FOUND');
+   await applyBase(db,userId,edit,currentRevision);
+  }
+  if(intent.links.some(edit=>edit.link!.status==='confirmed')){
+   const outcomes=new Map(reconcile((await loadFinance(db,userId)).graph).links.map(link=>[link.id,link]));
+   for(const edit of intent.links)if(edit.link!.status==='confirmed'&&!outcomes.get(edit.id)?.active)throw new HttpError(409,outcomes.get(edit.id)?.reason??'LINK_CONFLICT');
+  }
+  return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
+ }
  if(intent.kind==='bulk_operations'){
   if(intent.reviewScope)await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations);
   const loaded=await loadFinance(db,userId),patches=bulkPatches(intent,loaded.graph);let warnings:unknown[]=[];
@@ -301,8 +328,10 @@ async function restore(db:PoolClient,userId:string,undo:Undo){
  if(undo.before)await update(db,userId,undo.table,undo.id,undo.before as Record<string,unknown>);else await db.query(`DELETE FROM finance.${undo.table} WHERE user_id=$1 AND id=$2`,[userId,undo.id]);
 }
 function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo,journal:Change[]=[]){
+ const cardEdit=undo&&'details'in undo&&undo.details.kind==='operation_card';
+ const beforeLinkReasons=cardEdit?new Map(before.links.map(l=>[l.id,l.reason])):undefined;
  const removedOperationIds=before.operations.filter(o=>!after.operations.some(p=>p.id===o.id)).map(o=>o.id);
- return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
+ return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null&&(!beforeLinkReasons||beforeLinkReasons.get(l.id)!==l.reason)),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
 }
 export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId','generation','revision','intent']),id=uuid(r.actionId),generation=uuid(r.generation),expected=revision(r.revision),state=await prepareFinance(db,userId);

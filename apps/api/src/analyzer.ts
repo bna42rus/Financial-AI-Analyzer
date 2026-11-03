@@ -160,6 +160,7 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  if(intent.kind==='delete_financial'&&intent.scope.kind!=='operations')throw new HttpError(400,'DESTRUCTIVE_FLOW_REQUIRED');
  }
  const intent=parseIntent(raw);
+ if(intent.kind==='operation_card')throw new HttpError(400,'UNSUPPORTED_ACTION');
  const confirmation=!!proposal||actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
  await db.query("UPDATE finance.action SET intent=jsonb_set(intent,'{analyzer}',$3::jsonb) WHERE user_id=$1 AND id=$2",[userId,actionId,JSON.stringify({tool,confirmation,registryVersion})]);
  // New dependencies include linked operations affected outside the original question period.

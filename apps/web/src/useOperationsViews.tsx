@@ -6,6 +6,7 @@ import type {FinanceState} from './finance-client';
 import type {SavedOperationsView} from './operations-client';
 import type {CommandState,WorkspaceCommand,WorkspaceIntent} from './workspace-command';
 import {advancedOperationFilters} from './OperationsFilters';
+import {operationPageSize} from './OperationListSettings';
 import {OverviewDialog} from './OverviewDialogs';
 import {OverviewViewsMenu} from './OverviewViewsMenu';
 import {copyViewName,viewNameKey} from './overview-views';
@@ -13,8 +14,8 @@ import {api} from './server-client';
 import common from './App.module.css';
 import styles from './Overview.module.css';
 
-const visual=(config:OperationsView)=>JSON.stringify([config.columns,config.columns.map(c=>config.widths[c]??null),config.sort,config.direction,config.group,config.pageSize??50]);
-const normalize=(config:OperationsView)=>({...config,filter:advancedOperationFilters(config.filter),period:'all' as const,density:'comfortable' as const});
+const visual=(config:OperationsView)=>JSON.stringify([config.columns,config.columns.map(c=>config.widths[c]??null),config.sort,config.direction,config.group,operationPageSize(config.pageSize)]);
+const normalize=(config:OperationsView)=>({...config,pageSize:operationPageSize(config.pageSize),filter:advancedOperationFilters(config.filter),period:'all' as const,density:'comfortable' as const});
 const builtIn=():SavedOperationsView=>({id:standardOperationsViewId,name:standardOperationsViewName,definition:defaultOperationsView(),isDefault:true,dependencyStatus:'ready',revision:'',position:0,modifiedAt:''});
 type Sheet={kind:'new'|'copy'|'rename'|'delete';view?:SavedOperationsView;name:string;revision:string};
 type Snapshot={active:SavedOperationsView;config:OperationsView};
