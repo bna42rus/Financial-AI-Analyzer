@@ -1,41 +1,117 @@
-import {useEffect,useState} from 'react';
-import type {Link} from '../../../packages/finance-core/src/model';
+import {useEffect,useMemo,useState} from 'react';
+import type {Category,Link} from '../../../packages/finance-core/src/model';
 import {linkKinds} from '../../../packages/finance-core/src/model';
 import {api} from './server-client';
-import {displayBankDate,displayRole,kindNames,minorToRubles,rublesToMinor} from './finance-client';
+import {bankNames,displayBankDate,displayRole,kindNames,minorToRubles,rublesToMinor} from './finance-client';
 import type {FinanceDetail,FinanceState} from './finance-client';
-import {purchaseDrafts,purchaseBalance,purchaseRemainder,purchaseSplitIntent,newPurchasePart,componentDrafts,componentNames,componentsIntent,endpointKey,endpoints,linkIntent,linkNames,linkStatusNames,newComponent} from './operation-relations';
-import type {ComponentDraft,RelationIntent} from './operation-relations';
+import {purchaseDrafts,purchaseBalance,purchaseRemainder,purchaseSplitIntent,newPurchasePart,componentDrafts,componentNames,componentsIntent,endpointKey,endpoints,linkIntent,linkNames,newComponent} from './operation-relations';
+import type {ComponentDraft,ComponentsIntent,LinkIntent} from './operation-relations';
 import {formatMoney} from './demo/overview';
+import {OperationDialog,OperationField} from './OperationDialog';
+import {maskedOperationText} from './operation-display';
 import common from './App.module.css';
 import styles from './ServerOperation.module.css';
 
-export type RelationEditor={kind:'components';purchase?:boolean}|{kind:'link';link?:Link};
-export function ServerRelations({detail,editor,disabled,timezone,onPreview,onClose,onReload,onAccessError}:{detail:FinanceDetail;editor:RelationEditor;disabled:boolean;timezone:string;onPreview:(intent:RelationIntent)=>void;onClose:()=>void;onReload:()=>void;onAccessError:(e:unknown)=>void}){
- const [snapshot,setSnapshot]=useState<FinanceState|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[reload,setReload]=useState(0),[drafts,setDrafts]=useState(()=>editor.kind==='components'&&editor.purchase?purchaseDrafts(detail):componentDrafts(detail));
- const purchase=editor.kind==='components'&&editor.purchase===true,balance=purchase?purchaseBalance(detail,drafts):null;
- const existing=editor.kind==='link'?editor.link:undefined;
- const [id]=useState(()=>existing?.id??crypto.randomUUID()),[kind,setKind]=useState<Link['kind']>(existing?.kind??(detail.semantics.kind.value==='refund'?'refund':['transfer_in','transfer_out','own_transfer'].includes(detail.semantics.kind.value)?'own_transfer':'reversal')),[status,setStatus]=useState<Link['status']>(existing?.status??'confirmed'),[amount,setAmount]=useState(existing?minorToRubles(existing.amountMinor):''),[reverse,setReverse]=useState(existing?existing.targetId===detail.id:false),[otherId,setOtherId]=useState(existing?(existing.sourceId===detail.id?existing.targetId:existing.sourceId):''),[sourceKey,setSourceKey]=useState(existing?endpointKey(existing.sourceComponentId,existing.sourceAllocationId):''),[targetKey,setTargetKey]=useState(existing?endpointKey(existing.targetComponentId,existing.targetAllocationId):''),[search,setSearch]=useState('');
- useEffect(()=>{let live=true;setLoading(true);setError('');void api<FinanceState>('/finance/state').then(s=>{if(live)setSnapshot(s);}).catch(e=>{onAccessError(e);if(live)setError(e instanceof Error?e.message:'Не удалось загрузить операции.');}).finally(()=>{if(live)setLoading(false);});return()=>{live=false;};},[reload]);
- const stale=!!snapshot&&(snapshot.generation!==detail.generation||snapshot.revision!==detail.revision),locked=disabled||loading||!snapshot||stale;
- const cats=snapshot?.categories??[],accounts=snapshot?.accounts??[],other=snapshot?.operations.find(o=>o.id===otherId),own=snapshot?.operations.find(o=>o.id===detail.id),source=reverse?other:own,target=reverse?own:other;
- const sourceOptions=source?endpoints(source,existing&&source.id===existing.sourceId?{componentId:existing.sourceComponentId,allocationId:existing.sourceAllocationId}:undefined).filter(e=>e.allocationId!==id):[],targetOptions=target?endpoints(target,existing&&target.id===existing.targetId?{componentId:existing.targetComponentId,allocationId:existing.targetAllocationId}:undefined).filter(e=>e.allocationId!==id):[];
- const catName=(id:string|null)=>cats.find(c=>c.id===id)?.name??'Без категории';
- const operationName=(o:NonNullable<typeof own>)=>`${o.classification.merchant.value||kindNames[o.classification.kind.value]} · ${displayBankDate(o.date,timezone)} · ${formatMoney(o.amountMinor)} · ${accounts.find(a=>a.id===o.accountId)?.name??'Счёт'}`;
- function changePart(index:number,patch:Partial<ComponentDraft>){setError('');setDrafts(parts=>parts.map((p,i)=>i===index?{...p,...patch}:p));}
- function prepareParts(){try{setError('');onPreview(purchase?purchaseSplitIntent(detail,drafts):componentsIntent(detail,drafts));}catch(e){setError(e instanceof Error?e.message:'Проверьте части операции.');}}
- function prepareLink(){try{setError('');const se=sourceOptions.find(e=>e.key===sourceKey),te=targetOptions.find(e=>e.key===targetKey);if(!source||!target||!se||!te)throw new Error('Выберите связанную операцию и части с обеих сторон.');onPreview(linkIntent(id,kind,status,amount,source,target,se,te));}catch(e){setError(e instanceof Error?e.message:'Проверьте связь.');}}
- const endpointLabel=(e:typeof sourceOptions[number],i:number)=>e.current?'Сохранённая часть связи':`${e.allocationId?'Распределённая часть':e.componentId?'Часть':'Целая операция или остаток'} ${e.key==='root'?'':i+1} · ${formatMoney(e.amountMinor)} · ${catName(e.categoryId)} · ${e.role?displayRole(e.role,e.amountMinor):''}`;
- return <section className={styles.correction} aria-label={editor.kind==='components'?'Редактор частей':'Редактор связи'}><h3>{editor.kind==='components'?(purchase?'Распределение покупки по категориям':'Распределение операции'):existing?'Изменение связи':'Новая связь'}</h3>
-  {loading&&<p role="status">Загружаем актуальные операции…</p>}{error&&<p role="alert" className={common.error}>{error}</p>}{!loading&&!snapshot&&<button className={common.button} disabled={disabled} onClick={()=>setReload(n=>n+1)}>Повторить загрузку операций</button>}{stale&&<p role="alert">Данные изменились. Обновите карточку и заново выберите части и связь. <button className={common.button} disabled={disabled} onClick={onReload}>Обновить карточку</button></p>}
-  {editor.kind==='components'?<>{purchase?<><p>Укажите положительные суммы и категории. Покупка, её магазин и банковские данные сохранятся. В расходах учитываются части вместо целой суммы.</p><p role="status" aria-label="Остаток распределения">Всего: {formatMoney(balance!.total)} · Распределено: {formatMoney(balance!.assigned)} · {BigInt(balance!.remaining)<0n?'Превышение':'Осталось'}: {formatMoney(BigInt(balance!.remaining)<0n?(-BigInt(balance!.remaining)).toString():balance!.remaining)}{balance!.invalid?' · Проверьте суммы частей':''}</p></>:<p>Суммы частей указываются со знаком и в сумме должны равняться {formatMoney(detail.projection.amountMinor)}. В итогах части заменят целую операцию.</p>}<fieldset className={styles.form} disabled={locked}><legend>Состав операции</legend>{drafts.map((d,index)=>{
-   let partAmount='0';try{partAmount=rublesToMinor(d.amount);}catch{}
-   const saved=detail.components.find(c=>c.id===d.id),compatible=(role:string)=>d.role==='auto'||!['expense','income'].includes(d.role)||role==='both'||role===d.role;
-   return <fieldset key={d.id} className={styles.partForm}><legend>Часть {index+1}</legend>{!purchase&&<><label>Тип части<select aria-label={`Тип части ${index+1}`} value={d.type} onChange={e=>changePart(index,{type:e.target.value as ComponentDraft['type']})}>{Object.entries(componentNames).map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label></>}<label>Сумма части, ₽<input aria-label={`Сумма части ${index+1}, ₽`} inputMode="decimal" value={d.amount} onChange={e=>changePart(index,{amount:e.target.value})}/></label>{purchase&&<button className={common.button} onClick={()=>{try{changePart(index,{amount:purchaseRemainder(detail,drafts,d.id)});}catch(e){setError(e instanceof Error?e.message:'Проверьте суммы частей.');}}}>Заполнить остатком часть {index+1}</button>}{!purchase&&<><label>Смысл части<select aria-label={`Смысл части ${index+1}`} value={d.role} onChange={e=>changePart(index,{role:e.target.value as ComponentDraft['role']})}>{(!saved||!saved.role.userVerified)&&<option value="auto">По сохранённой логике</option>}{['expense','income','neutral','unresolved'].map(r=><option key={r} value={r}>{displayRole(r,partAmount)}</option>)}</select></label>{d.role==='auto'&&<small>Сохранится неподтверждённый смысл части. Для нового кредитного платежа применяется режим кредита; для другой новой части смысл остаётся неопределённым.</small>}
-    </>}<label>Категория части<select aria-label={`Категория части ${index+1}`} value={d.categoryId??''} onChange={e=>changePart(index,{categoryId:e.target.value||null,subcategoryId:null,categoryConfirmed:true,subcategoryConfirmed:true})}><option value="">Без категории</option>{cats.filter(c=>c.parentId===null&&((!c.hidden&&compatible(c.role))||c.id===d.categoryId)).map(c=><option key={c.id} value={c.id}>{c.name}{!compatible(c.role)?' (несовместима)':''}</option>)}</select></label><label>Подкатегория части<select aria-label={`Подкатегория части ${index+1}`} disabled={!d.categoryId} value={d.subcategoryId??''} onChange={e=>changePart(index,{subcategoryId:e.target.value||null,subcategoryConfirmed:true})}><option value="">Без подкатегории</option>{cats.filter(c=>c.parentId===d.categoryId&&((!c.hidden&&compatible(c.role))||c.id===d.subcategoryId)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><button className={common.button} onClick={()=>setDrafts(parts=>parts.filter(p=>p.id!==d.id))}>Убрать часть {index+1}</button></fieldset>;
-  })}{!drafts.length&&<p>Распределение будет отключено. Итоги снова используют целую операцию; связи с прежними частями могут потребовать проверки.</p>}<button className={common.button} disabled={drafts.length>=50} onClick={()=>setDrafts(parts=>[...parts,(purchase?newPurchasePart():newComponent())])}>Добавить часть</button>{detail.components.length>0&&<button className={common.button} onClick={()=>setDrafts([])}>Вернуться к целой операции</button>}<button className={common.primaryButton} onClick={prepareParts}>Показать последствия распределения</button></fieldset></>:<><p>Первая операция — возврат, компенсация, отмена или платёж; вторая — исходная покупка или встречный перевод. Сумма связи положительная. Остаток не получает смысл автоматически.</p><fieldset className={styles.form} disabled={locked}><legend>Параметры связи</legend><label>Вид связи<select aria-label="Вид связи" value={kind} onChange={e=>setKind(e.target.value as Link['kind'])}>{linkKinds.map(k=><option key={k} value={k}>{linkNames[k]}</option>)}</select></label><label>Статус связи<select aria-label="Статус связи" value={status} onChange={e=>setStatus(e.target.value as Link['status'])}>{(['confirmed','candidate','rejected'] as const).map(s=><option key={s} value={s}>{linkStatusNames[s]}</option>)}</select></label><label>Роль открытой операции<select aria-label="Роль открытой операции" value={reverse?'target':'source'} onChange={e=>{setReverse(e.target.value==='target');setSourceKey('');setTargetKey('');}}><option value="source">Первая: возврат, отмена или платёж</option><option value="target">Вторая: покупка или встречный перевод</option></select></label>
-   <label>Найти связанную операцию<input aria-label="Найти связанную операцию" value={search} onChange={e=>setSearch(e.target.value)}/></label><small>Выбор охватывает все сохранённые операции независимо от фильтров списка.</small><label>Связанная операция<select aria-label="Связанная операция" value={otherId} onChange={e=>{setOtherId(e.target.value);setSourceKey('');setTargetKey('');}}><option value="">Выберите операцию</option>{snapshot?.operations.filter(o=>o.id!==detail.id&&(o.id===otherId||operationName(o).toLocaleLowerCase('ru').includes(search.toLocaleLowerCase('ru')))).map(o=><option key={o.id} value={o.id}>{operationName(o)}</option>)}</select></label>
-   {source&&<p>Первая: {operationName(source)}</p>}<label>Часть первой операции<select aria-label="Часть первой операции" value={sourceKey} onChange={e=>setSourceKey(e.target.value)}><option value="">Выберите часть</option>{sourceOptions.map((e,i)=><option key={e.key} value={e.key}>{endpointLabel(e,i)}</option>)}</select></label>{target&&<p>Вторая: {operationName(target)}</p>}<label>Часть второй операции<select aria-label="Часть второй операции" value={targetKey} onChange={e=>setTargetKey(e.target.value)}><option value="">Выберите часть</option>{targetOptions.map((e,i)=><option key={e.key} value={e.key}>{endpointLabel(e,i)}</option>)}</select></label><label>Сумма связи, ₽<input aria-label="Сумма связи, ₽" inputMode="decimal" value={amount} onChange={e=>setAmount(e.target.value)}/></label><p>Предполагаемая и отклонённая связи не меняют итоги. Сервер проверит доступные суммы и подтверждённые решения.</p><button className={common.primaryButton} onClick={prepareLink}>Показать последствия связи</button></fieldset></>}
-  <button className={common.button} disabled={disabled} onClick={onClose}>Закрыть редактор</button>
- </section>;
+export type RelationEditor={kind:'components';purchase:boolean}|{kind:'link';link?:Link};
+export function OperationParts({detail,purchase,categories,staged,onApply,onClose,serverError}:{detail:FinanceDetail;purchase:boolean;categories:Category[];staged?:ComponentsIntent;onApply:(v:ComponentsIntent)=>void;onClose:()=>void;serverError?:string}){
+ const [initial]=useState(()=>staged?.parts.length?staged.parts.map(p=>({id:p.id,type:p.type,amount:minorToRubles(purchase?(-BigInt(p.amountMinor)).toString():p.amountMinor),role:p.role??'auto' as const,categoryId:p.categoryId??null,subcategoryId:p.subcategoryId??null,categoryConfirmed:p.categoryId!==undefined,subcategoryConfirmed:p.subcategoryId!==undefined})):purchase?purchaseDrafts(detail):componentDrafts(detail));
+ const [drafts,setDrafts]=useState(initial),[checked,setChecked]=useState(false),[error,setError]=useState(serverError??''),[whole,setWhole]=useState(!purchase&&staged?.parts.length===0);
+ const total=BigInt(detail.projection.amountMinor),balance=purchase?purchaseBalance(detail,drafts):null;
+ const errors=drafts.map(d=>{try{const n=BigInt(rublesToMinor(d.amount));if(purchase&&n<=0n)return 'Укажите положительную сумму.';return undefined;}catch(e){return (e as Error).message;}});
+ const compatible=(d:ComponentDraft,c:Category)=>d.role==='auto'||!['expense','income'].includes(d.role)||c.role==='both'||c.role===d.role;
+ const categoryErrors=drafts.map(d=>d.categoryId&&!categories.some(c=>c.id===d.categoryId&&compatible(d,c))?'Выберите подходящую категорию.':undefined);
+ function change(index:number,patch:Partial<ComponentDraft>){setError('');setDrafts(parts=>parts.map((p,i)=>i===index?{...p,...patch}:p));}
+ function apply(){
+  setChecked(true);setError('');
+  if(!whole&&(errors.some(Boolean)||categoryErrors.some(Boolean)))return;
+  try{onApply(whole?componentsIntent(detail,[]):purchase?purchaseSplitIntent(detail,drafts):componentsIntent(detail,drafts));}
+  catch(e){setError(e instanceof Error?e.message:'Проверьте состав операции.');}
+ }
+ const title=purchase?'Разделение покупки по категориям':'Распределение операции';
+ return <OperationDialog compact title={title} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDrafts(initial);setWhole(!purchase&&staged?.parts.length===0);setChecked(false);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} onClick={apply}>Применить</button></>}>
+  {!whole&&<fieldset className={styles.form}>
+  {drafts.map((d,index)=><fieldset key={d.id} className={styles.partForm}>
+   <legend>Часть {index+1}</legend>
+   {!purchase&&<label>Тип части<select aria-label={`Тип части ${index+1}`} value={d.type} onChange={e=>change(index,{type:e.target.value as ComponentDraft['type']})}>{Object.entries(componentNames).map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}
+   <OperationField label={`Сумма части ${index+1}, ₽`} error={checked?errors[index]:undefined}><input inputMode="decimal" value={d.amount} onChange={e=>change(index,{amount:e.target.value})}/></OperationField>
+   {!purchase&&<label>Смысл части<select aria-label={`Смысл части ${index+1}`} value={d.role} onChange={e=>change(index,{role:e.target.value as ComponentDraft['role']})}>{(!detail.components.find(c=>c.id===d.id)?.role.userVerified)&&<option value="auto">По сохранённой логике</option>}{['expense','income','neutral','unresolved'].map(r=><option key={r} value={r}>{displayRole(r,'0')}</option>)}</select></label>}
+   <OperationField label={`Категория части ${index+1}`} error={checked?categoryErrors[index]:undefined}><select value={d.categoryId??''} onChange={e=>change(index,{categoryId:e.target.value||null,subcategoryId:null,categoryConfirmed:true,subcategoryConfirmed:true})}><option value="">Без категории</option>{categories.filter(c=>!c.parentId&&((!c.hidden&&compatible(d,c))||c.id===d.categoryId)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></OperationField>
+   <label>Подкатегория части {index+1}<select disabled={!d.categoryId} value={d.subcategoryId??''} onChange={e=>change(index,{subcategoryId:e.target.value||null,subcategoryConfirmed:true})}><option value="">Без подкатегории</option>{categories.filter(c=>d.categoryId&&c.parentId===d.categoryId&&((!c.hidden&&compatible(d,c))||c.id===d.subcategoryId)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+   <div className={styles.actions}>
+    {purchase&&<button className={common.button} onClick={()=>{try{change(index,{amount:purchaseRemainder(detail,drafts,d.id)});}catch(e){setError((e as Error).message);}}}>Заполнить остатком часть {index+1}</button>}
+    <button className={common.button} disabled={drafts.length<=1} onClick={()=>{setError('');setDrafts(parts=>parts.filter(p=>p.id!==d.id));}}>Убрать часть {index+1}</button>
+   </div>
+  </fieldset>)}
+  <div className={styles.actions}><button className={common.button} disabled={drafts.length>=50} onClick={()=>{setError('');setDrafts(parts=>[...parts,purchase?newPurchasePart():newComponent()]);}}>Добавить часть</button>
+  {!purchase&&detail.components.length>0&&<button className={common.button} onClick={()=>{setWhole(true);setError('');}}>Вернуться к целой операции</button>}</div>
+  <div className={styles.balance} aria-invalid={!!error||undefined} role="status" aria-label="Остаток распределения">{balance?<>Всего: {formatMoney(balance.total)} · Распределено: {formatMoney(balance.assigned)} · {BigInt(balance.remaining)<0n?'Превышение':'Осталось'}: {formatMoney((BigInt(balance.remaining)<0n?-BigInt(balance.remaining):BigInt(balance.remaining)).toString())}</>:<>Сумма операции: {formatMoney(total.toString())}</>}</div>
+  {error&&<small className={styles.fieldError} role="alert">{error}</small>}
+  </fieldset>}
+  {whole&&<><p>В расчётах снова будет учитываться целая операция.</p><button className={common.button} onClick={()=>setWhole(false)}>Оставить распределение</button></>}
+ </OperationDialog>;
+}
+
+const roles:Record<Link['kind'],[string,string]>={refund:['Возврат','Исходная покупка'],expense_reimbursement:['Компенсация','Исходный расход'],reversal:['Отмена','Исходная операция'],own_transfer:['Первая сторона перевода','Встречный перевод'],credit_card_repayment:['Погашение карты','Вторая сторона платежа'],debt_repayment:['Возврат долга','Встречная операция']};
+const opposite=(a:string,b:string)=>BigInt(a)*BigInt(b)<0n;
+const abs=(s:string)=>{const n=BigInt(s);return n<0n?-n:n;};
+export function OperationLink({detail,existing,onApply,onClose,onReload,onAccessError,serverError,serverErrorCode}:{detail:FinanceDetail;existing?:Link;onApply:(v:LinkIntent)=>void;onClose:()=>void;onReload:()=>void;onAccessError:(e:unknown)=>void;serverError?:string;serverErrorCode?:string}){
+ const [snapshot,setSnapshot]=useState<FinanceState|null>(null),[loadError,setLoadError]=useState(''),[reload,setReload]=useState(0);
+ const [initial]=useState(()=>({kind:existing?.kind??(detail.semantics.kind.value==='refund'?'refund':['transfer_in','transfer_out','own_transfer'].includes(detail.semantics.kind.value)?'own_transfer':'reversal') as Link['kind'],amount:existing?minorToRubles(existing.amountMinor):'',reverse:existing?existing.targetId===detail.id:detail.semantics.kind.value==='purchase',otherId:existing?(existing.sourceId===detail.id?existing.targetId:existing.sourceId):'',sourceKey:existing?endpointKey(existing.sourceComponentId,existing.sourceAllocationId):'',targetKey:existing?endpointKey(existing.targetComponentId,existing.targetAllocationId):''}));
+ const [draft,setDraft]=useState(initial),[search,setSearch]=useState(''),[picking,setPicking]=useState(!initial.otherId),[shown,setShown]=useState(40),[checked,setChecked]=useState(false),[id]=useState(()=>existing?.id??crypto.randomUUID()),[error,setError]=useState(serverError??'');
+ const {kind,amount,reverse,otherId,sourceKey,targetKey}=draft;
+ const set=(patch:Partial<typeof draft>)=>{setError('');setDraft(d=>({...d,...patch}));};
+ useEffect(()=>{let live=true;setLoadError('');void api<FinanceState>('/finance/state').then(s=>{if(live)setSnapshot(s);}).catch(e=>{onAccessError(e);if(live)setLoadError(e instanceof Error?e.message:'Не удалось загрузить операции.');});return()=>{live=false;};},[reload]);
+ const stale=!!snapshot&&(snapshot.generation!==detail.generation||snapshot.revision!==detail.revision);
+ const own=detail.projection,other=snapshot?.operations.find(o=>o.id===otherId),source=reverse?other:own,target=reverse?own:other;
+ const options=(op:typeof source,side:'source'|'target')=>op?endpoints(op,existing&&(side==='source'?existing.sourceId:existing.targetId)===op.id?{componentId:side==='source'?existing.sourceComponentId:existing.targetComponentId,allocationId:side==='source'?existing.sourceAllocationId:existing.targetAllocationId}:undefined).filter(e=>e.allocationId!==id):[];
+ const sources=options(source,'source'),targets=options(target,'target');
+ const se=sources.find(e=>e.key===sourceKey)??(sources.length===1?sources[0]:undefined),te=targets.find(e=>e.key===targetKey)??(targets.length===1?targets[0]:undefined);
+ const searchable=useMemo(()=>{
+  const accounts=new Map(snapshot?.accounts.map(a=>[a.id,a]));
+  return (snapshot?.operations??[]).filter(o=>o.id!==detail.id).map(o=>{
+   const account=accounts.get(o.accountId),iso=o.date.precision==='day'?o.date.date:new Date(Date.parse(o.date.instant)+(o.date.sourceOffsetMinutes??0)*60000).toISOString().slice(0,10),shortDate=iso.split('-').reverse().join('.'),longDate=displayBankDate(o.date,'UTC');
+   const title=maskedOperationText(o.displayName?.compositeLabel||o.classification.merchant.value||kindNames[o.classification.kind.value]||'Операция');
+   const bank=account?bankNames[account.bankId]:undefined,accountName=bank&&!account?.name.startsWith(bank)?[bank,account?.name].filter(Boolean).join(' · '):account?.name??'';
+   const amountLabel=formatMoney(o.amountMinor),meta=[shortDate,amountLabel,accountName].filter(Boolean).join(' · ');
+   const words=maskedOperationText([title,o.classification.merchant.value,o.description,o.comment,iso,shortDate,longDate,amountLabel,minorToRubles(o.amountMinor),minorToRubles(o.amountMinor).replace(',','.'),accountName,kindNames[o.classification.kind.value],o.id].filter(Boolean).join(' ')).toLocaleLowerCase('ru').replaceAll('ё','е').replaceAll('−','-');
+   return {id:o.id,title,meta,words};
+  });
+ },[snapshot,detail.id]);
+ const tokens=search.toLocaleLowerCase('ru').replaceAll('ё','е').replaceAll('−','-').trim().split(/\s+/u).filter(Boolean);
+ const matches=picking?searchable.filter(item=>tokens.every(token=>item.words.includes(token))):[];
+ const selected=searchable.find(item=>item.id===otherId);
+ const errorField=serverErrorCode==='CAPACITY_CONFLICT'?'amount':serverErrorCode==='NOT_FOUND'?'other':serverErrorCode==='AMBIGUOUS_ENDPOINT'?'target':serverErrorCode?.startsWith('INCOMPATIBLE_')?'kind':'form';
+ const fieldError=(field:string,problem?:string)=>error&&field===errorField?error:checked?problem:undefined;
+ const problems:{other?:string;source?:string;target?:string;amount?:string;kind?:string}={};
+ if(!other)problems.other='Выберите вторую операцию.';
+ if(source&&!se)problems.source='Выберите часть операции.';
+ if(target&&!te)problems.target='Выберите часть операции.';
+ try{
+  const n=BigInt(rublesToMinor(amount));
+  if(n<=0n)problems.amount='Укажите положительную сумму связи.';
+  if(se&&te&&!existing&&[se,te].some(e=>n>abs(e.amountMinor)))problems.amount='Сумма превышает доступный остаток выбранной части.';
+ }catch(e){problems.amount=(e as Error).message;}
+ if(se&&te&&!se.current&&!te.current){
+  if(['refund','expense_reimbursement'].includes(kind)&&(BigInt(se.amountMinor)<=0n||BigInt(te.amountMinor)>=0n||te.role!=='expense'))problems.kind='Нужны поступление и исходный расход. Проверьте порядок операций.';
+  else if(['reversal','own_transfer','debt_repayment'].includes(kind)&&!opposite(se.amountMinor,te.amountMinor))problems.kind='Для такой связи нужны суммы с противоположными знаками.';
+ }
+ function apply(){setChecked(true);if(!source||!target||!se||!te||Object.keys(problems).length)return;onApply(linkIntent(id,kind,'confirmed',amount,source,target,se,te));}
+ const endpoint=(side:'source'|'target',items:typeof sources,chosen:typeof se)=> <OperationField label={'Часть: '+roles[kind][side==='source'?0:1]} error={fieldError(side,problems[side])}><select aria-label={side==='source'?'Часть первой операции':'Часть второй операции'} disabled={!items.length} value={chosen?.key??''} onChange={e=>set(side==='source'?{sourceKey:e.target.value}:{targetKey:e.target.value})}><option value="">Выберите часть</option>{items.map((e,i)=><option key={e.key} value={e.key}>{e.current?'Сохранённая часть связи':`${e.allocationId?'По другой связи':e.componentId?'Часть '+(i+1):'Целая операция или остаток'} · ${formatMoney(e.amountMinor)}${e.categoryId?' · '+(snapshot?.categories.find(c=>c.id===e.categoryId)?.name??''):''}`}</option>)}</select></OperationField>;
+ return <OperationDialog compact title={existing?'Изменение связи':'Связь с другой операцией'} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDraft(initial);setChecked(false);setSearch('');setShown(40);setPicking(!initial.otherId);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} disabled={!snapshot||stale} onClick={apply}>Применить</button></>}>
+  {!snapshot&&!loadError&&<p role="status">Загружаем операции…</p>}
+  {loadError&&<><p role="alert" className={common.error}>{loadError}</p><button className={common.button} onClick={()=>setReload(n=>n+1)}>Повторить загрузку</button></>}
+  {stale&&<><p role="alert" className={common.error}>Список изменился. Обновите карточку перед настройкой связи.</p><button className={common.button} onClick={onReload}>Обновить карточку</button></>}
+  <fieldset className={styles.form} disabled={!snapshot||stale}>
+   <OperationField label="Вид связи" error={fieldError('kind',problems.kind)}><select value={kind} onChange={e=>set({kind:e.target.value as Link['kind']})}>{linkKinds.map(k=><option key={k} value={k}>{linkNames[k]}</option>)}</select></OperationField>
+   <label>Роль открытой операции<select aria-label="Роль открытой операции" value={reverse?'target':'source'} onChange={e=>set({reverse:e.target.value==='target',sourceKey:'',targetKey:''})}><option value="source">{roles[kind][0]}</option><option value="target">{roles[kind][1]}</option></select></label>
+   <div className={styles.linkPicker}>
+    {picking?<><OperationField label="Связанная операция" error={fieldError('other',problems.other)}><input type="search" placeholder="Дата, магазин, описание, сумма…" value={search} onChange={e=>{setSearch(e.target.value);setShown(40);}}/></OperationField>
+     {snapshot&&!stale&&<><div className={styles.linkOptions} role="region" aria-label="Результаты поиска операций">{matches.slice(0,shown).map(item=><button type="button" key={item.id} className={common.button} aria-pressed={item.id===otherId} onClick={()=>{set({otherId:item.id,sourceKey:'',targetKey:''});setPicking(false);}}><span>{item.title}</span><small>{item.meta}</small></button>)}{!matches.length&&<p role="status">Операции не найдены.</p>}</div>{matches.length>shown&&<button type="button" className={styles.quietButton} onClick={()=>setShown(n=>n+40)}>Ещё результаты · {shown} из {matches.length}</button>}</>}
+    </>:<OperationField label="Связанная операция" error={fieldError('other',problems.other)}><button type="button" className={common.button+' '+styles.selectedLink} aria-label="Изменить связанную операцию" onClick={()=>{setPicking(true);setSearch('');setShown(40);}}><span>{selected?.title??'Выбрать операцию'}</span>{selected&&<small>{selected.meta}</small>}</button></OperationField>}
+   </div>
+   {other&&<>{endpoint('source',sources,se)}{endpoint('target',targets,te)}</>}
+   <OperationField label="Сумма связи, ₽" error={fieldError('amount',problems.amount)}><input inputMode="decimal" value={amount} onChange={e=>set({amount:e.target.value})}/></OperationField>
+   {error&&(errorField==='form'||errorField==='target'&&!other)&&<small className={styles.fieldError} role="alert">{error}</small>}
+  </fieldset>
+ </OperationDialog>;
 }

@@ -97,7 +97,7 @@ test('appearance reset preserves filters, financial rows and Analyzer conversati
   await page.getByLabel('Тема', { exact: true }).selectOption('dark');
   await page.getByLabel('Плотность', { exact: true }).selectOption('compact');
   await page.getByLabel('Размер текста', { exact: true }).selectOption('large');
-  await page.getByRole('button', { name: 'Сбросить оформление', exact: true }).click();
+  await page.getByRole('button', { name: 'Оформление по умолчанию', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Оформление сброшено. Данные и фильтры сохранены.');
   await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('system');
   await expect(page.getByLabel('Плотность', { exact: true })).toHaveValue('comfortable');
@@ -108,7 +108,7 @@ test('appearance reset preserves filters, financial rows and Analyzer conversati
   await expect(page.getByTestId('expenses')).toHaveText('58 869 ₽');
   await page.getByLabel('Банк', { exact: true }).selectOption('Сбер');
   await section(page, 'Интерфейс');
-  await page.getByRole('button', { name: 'Сбросить оформление', exact: true }).click();
+  await page.getByRole('button', { name: 'Оформление по умолчанию', exact: true }).click();
   await page.getByRole('link', { name: 'Обзор', exact: true }).click();
   await expect(page.getByTestId('expenses')).toHaveText('32 199 ₽');
   await section(page, 'Счета');
@@ -134,7 +134,7 @@ test('settings routes, back navigation, focus and large text fit narrow screens'
   for (const width of [320, 390, 1024, 1440]) {
     await page.setViewportSize({ width, height: 850 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await expect(page.getByRole('button', { name: 'Сбросить оформление', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Оформление по умолчанию', exact: true })).toBeVisible();
   }
   await page.setViewportSize({ width: info.project.name === 'mobile' ? 390 : 1280, height: 850 });
   await page.goBack();

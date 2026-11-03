@@ -5,6 +5,7 @@ import type {Graph} from '../../../packages/finance-core/src/model.ts';
 import {applyRules,ruleMatches} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {HttpError} from './types.ts';
+import {stableJSON} from './finance-history.ts';
 import type {BatchUndo} from './finance-exclusions.ts';
 export type RuleIntent={kind:'delete_rule';id:string}|{kind:'apply_rules';id:string;ruleId:string;operationIds:string[]};
 export function parseRuleIntent(value:unknown):RuleIntent {
@@ -24,15 +25,16 @@ export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleInt
  }
  if(!rule.enabled||rule.dependencyStatus!=='ready')throw new HttpError(409,'RULE_NEEDS_SETUP');
  const active=rules.filter(r=>r.enabled&&r.dependencyStatus==='ready'),changes:Record<string,unknown>[]=[],changedOperationIds:string[]=[],protectedOperationIds:string[]=[],conflictingOperationIds:string[]=[];
+ const operations=new Map(graph.operations.map(o=>[o.id,o])),accounts=new Map(graph.accounts.map(a=>[a.id,a]));
  for(const id of intent.operationIds){
-  const op=graph.operations.find(o=>o.id===id);if(!op)throw new HttpError(404,'NOT_FOUND');
-  const account=graph.accounts.find(a=>a.id===effective(op).accountId)!;
+  const op=operations.get(id);if(!op)throw new HttpError(404,'NOT_FOUND');
+  const account=accounts.get(effective(op).accountId)!;
   if(!ruleMatches(op,account,rule))throw new HttpError(409,'RULE_SCOPE_CHANGED');
   const reconsidered=structuredClone(op);reconsidered.reviewReasons=reconsidered.reviewReasons.filter(r=>r!=='conflicting_rules');
   const next=applyRules(reconsidered,account,active);compatible(next.semantics.role.value,next.semantics.category.value,next.semantics.subcategory.value);
   if(Object.values(op.semantics).some(f=>f.userVerified)||op.analyticsOverride!=='default')protectedOperationIds.push(id);
   if(next.reviewReasons.includes('conflicting_rules'))conflictingOperationIds.push(id);
-  if(JSON.stringify([op.semantics,op.analyticsOverride,op.reviewReasons])!==JSON.stringify([next.semantics,next.analyticsOverride,next.reviewReasons])){
+  if(stableJSON([op.semantics,op.analyticsOverride,op.reviewReasons])!==stableJSON([next.semantics,next.analyticsOverride,next.reviewReasons])){
    changes.push({id,semantics:next.semantics,analyticsOverride:next.analyticsOverride,reviewReasons:next.reviewReasons});changedOperationIds.push(id);
   }
  }

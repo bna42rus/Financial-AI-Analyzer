@@ -1,3 +1,7 @@
+import {extendedCatalogSha256} from '../../../packages/finance-core/src/extended-catalog.ts';
+import {fullCatalogDataSha256} from '../../../packages/finance-core/src/full-catalog.ts';
+import {assessInstallmentContract,installmentPolicyVersion} from '../../../packages/finance-core/src/installment-contract.ts';
+import {activityDecision,activityEngineVersion,activityDataSha256} from '../../../packages/finance-core/src/activity-recognition.ts';
 import {recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
 import {createHash} from 'node:crypto';
 import {object,facet} from '../../../packages/finance-core/src/model.ts';
@@ -8,14 +12,14 @@ import {merchantNames} from '../../../packages/imports/src/safe-source.ts';
 import {ruleMatches} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 
-export const classificationVersion='cashneuro-category-classification/3';
+export const classificationVersion='cashneuro-category-classification/4';
 export const classificationBatchSize=20;
 export const digest=(value:unknown)=>createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const protectedSources=new Set(['user','personal_rule','global_rule']);
 const brands=new Set<string>(Object.values(merchantNames));
 export type Decision={categoryId:string|null;subcategoryId:string|null;confidence:number};
 export type ClassificationPlan=ReturnType<typeof classificationPlan>;
-export const classificationEvidencePolicy='category-service-evidence/3';
+export const classificationEvidencePolicy='category-service-evidence/4';
 /** Broad platforms do not identify a purchased service. Generic retail MCCs
  * add no such evidence. Source clues can resolve ambiguity; model confidence cannot. */
 export function serviceEvidenceMissing(signal:{merchant:string|null;description?:string;bankCategory?:string;mcc?:string|null}){
@@ -31,29 +35,36 @@ export function serviceEvidenceMissing(signal:{merchant:string|null;description?
 
 /** Only locally sanitized /4 merchant evidence is eligible beyond the legacy
  * finite brands. No accounts, amounts, dates, HMACs or user comments. */
-export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[]){
+export function classificationSignal(op:Operation,graph:Graph,rules:Rule[]=[],reconsider=false){
  const s=op.semantics,c=s.category,sub=s.subcategory;
  if(op.decomposition||graph.components.some(p=>p.transactionId===op.id)||!['expense','income'].includes(s.role.value)||
    c.userVerified||sub.userVerified||protectedSources.has(c.source)||protectedSources.has(sub.source)||
    c.value!==null&&c.source==='deterministic_system_rule')return null;
  const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId));
+ if(assessInstallmentContract(op,account).status==='BLOCKED_UNSUPPORTED_CONTRACT')return null;
  // A newer personal rule wins even when created during the model request.
  if(!account||rules.some(r=>r.enabled&&('categoryId'in r.assignments||'subcategoryId'in r.assignments)&&ruleMatches(op,account,r)))return null;
+ // Known evidence with missing/ambiguous own categories or context must not
+ // fall through to the old fuzzy/model path. Only genuinely unknown residuals
+ // are model eligible; locked application re-planning repeats this gate.
+ const activity=activityDecision(op,graph.categories,graph.categoryBindings);
+ if(activity&&activity.evidence?.status!=='unrecognized')return null;
  let details:ReturnType<typeof parseBankDescription>|null=null;
- if(op.source.versions.sourceSanitizer==='bank-source/4'){try{details=parseBankDescription({description:op.source.description,merchantText:op.source.merchantText,bankCategory:op.source.bankCategory,mcc:op.source.sourceMcc??null});}catch{return null;}}
+ if(op.source.versions.sourceSanitizer==='bank-source/5'&&op.source.versions.sourceTextEvidence!=='intact')return null;
+ if(['bank-source/4','bank-source/5'].includes(op.source.versions.sourceSanitizer??'')){try{details=parseBankDescription({description:op.source.description,merchantText:op.source.merchantText,bankCategory:op.source.bankCategory,mcc:op.source.sourceMcc??null});}catch{return null;}}
  const merchant=details?.merchantText|| (brands.has(op.source.merchantText)?op.source.merchantText:null);
  if(!merchant&&!details?.description&&!details?.mcc&&!['fee','interest','insurance','cashback'].includes(s.kind.value))return null;
  const signal={merchant,kind:s.kind.value,role:s.role.value,...(details?{description:details.description,bankCategory:details.bankCategory,mcc:details.mcc}: {})};
- if(c.value!==null&&c.source==='ai'&&c.confidence>=90&&!serviceEvidenceMissing(signal))return null;
+ if(!reconsider&&c.value!==null&&c.source==='ai'&&c.confidence>=90&&!serviceEvidenceMissing(signal))return null;
  return signal;
 }
-export function classificationPlan(graph:Graph,rules:Rule[]=[]){
+export function classificationPlan(graph:Graph,rules:Rule[]=[],reconsider=false){
  const categories=graph.categories.filter(c=>!c.hidden&&(c.parentId===null||graph.categories.some(p=>p.id===c.parentId&&!p.hidden))).sort((a,b)=>a.id.localeCompare(b.id));
  if(categories.length>300)throw Error('CLASSIFICATION_CATALOG_TOO_LARGE');
  const catalog=categories.map((c,i)=>({ref:'c'+(i+1),name:safeText(c.name,160),role:c.role,parent:c.parentId===null?null:'c'+(categories.findIndex(p=>p.id===c.parentId)+1)}));
- const catalogHash=digest({version:classificationVersion,categories});
+ const catalogHash=digest({version:classificationVersion,activityEngineVersion,activityDataSha256,extendedCatalogSha256,fullCatalogDataSha256,installmentPolicyVersion,categories,bindings:graph.categoryBindings});
  const groups=new Map<string,{signature:string;sortKey:string;signal:NonNullable<ReturnType<typeof classificationSignal>>;operationIds:string[]}>();
- for(const op of graph.operations){const signal=classificationSignal(op,graph,rules);if(!signal)continue;
+ for(const op of graph.operations){const signal=classificationSignal(op,graph,rules,reconsider);if(!signal)continue;
   const signature=digest({version:classificationVersion,catalogHash,signal});
   const group=groups.get(signature)??{signature:digest({policy:classificationEvidencePolicy,signature}),sortKey:signature,signal,operationIds:[]};group.operationIds.push(op.id);groups.set(signature,group);
  }

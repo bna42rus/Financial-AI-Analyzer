@@ -1,11 +1,12 @@
 import {ApiError} from './server-client';
 import {rebasePatch,safeOperationPatch} from './finance-client';
 import type {FinanceDetail,FinancePreview,FinanceReceipt,OperationPatch} from './finance-client';
-import type {RelationIntent} from './operation-relations';
-type Intent={kind:'operation';id:string;patch:OperationPatch}|{kind:'undo';id:string;value:string}|RelationIntent;
+import type {ComponentsIntent,LinkIntent,RelationIntent} from './operation-relations';
+type CardIntent={kind:'operation_card';id:string;patch?:OperationPatch;components?:ComponentsIntent['parts'];links:LinkIntent[]};
+type Intent=CardIntent|{kind:'operation';id:string;patch:OperationPatch}|{kind:'undo';id:string;value:string}|RelationIntent;
 type Attempt={mode:'edit'|'correction'|'undo'|'relation';baseline:FinanceDetail;intent:Intent};
 type Pending={path:string;body:Record<string,unknown>;attempt:Attempt};
-export type OperationFlowState={detail:FinanceDetail;phase:'idle'|'sending'|'retry'|'preview'|'conflict'|'stale'|'unavailable';error:string;message:string;preview:FinancePreview|null;conflict:{current:FinanceDetail;attempt:Attempt}|null;undoActionId:string|null};
+export type OperationFlowState={detail:FinanceDetail;phase:'idle'|'sending'|'retry'|'preview'|'conflict'|'stale'|'unavailable';error:string;errorCode?:string;errorLinkId?:string;message:string;preview:FinancePreview|null;conflict:{current:FinanceDetail;attempt:Attempt}|null;undoActionId:string|null};
 export type OperationDependencies={request:(path:string,body:Record<string,unknown>)=>Promise<FinancePreview|FinanceReceipt>;load:(id:string)=>Promise<FinanceDetail>};
 export class OperationFlow{
  private state:OperationFlowState;private pending:Pending|null=null;private disposed=false;
@@ -14,13 +15,18 @@ export class OperationFlow{
  private begin(attempt:Attempt){const d=attempt.baseline,body={actionId:crypto.randomUUID(),generation:d.generation,revision:d.revision,intent:attempt.intent};return this.send({path:attempt.mode==='edit'?'/finance/edit':'/finance/preview',body,attempt});}
  edit(patch:OperationPatch){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'edit',baseline:this.state.detail,intent:{kind:'operation',id:this.state.detail.id,patch:safeOperationPatch(patch)}});}
  correct(patch:OperationPatch){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'correction',baseline:this.state.detail,intent:{kind:'operation',id:this.state.detail.id,patch:safeOperationPatch(patch)}});}
+ saveCard(patch:OperationPatch,components:ComponentsIntent|undefined,links:LinkIntent[]){
+  if(!components&&!links.length)return this.correct(patch);
+  if(this.state.phase!=='idle'||this.disposed)return;
+  return this.begin({mode:'relation',baseline:this.state.detail,intent:{kind:'operation_card',id:this.state.detail.id,...(Object.keys(patch).length?{patch:safeOperationPatch(patch)}:{}),...(components?{components:components.parts}:{}),links:structuredClone(links)}});
+ }
  relation(intent:RelationIntent){if(this.state.phase!=='idle'||this.disposed)return;return this.begin({mode:'relation',baseline:this.state.detail,intent:structuredClone(intent)});}
- undo(){if(this.state.phase!=='idle'||!this.state.undoActionId||this.disposed)return;return this.begin({mode:'undo',baseline:this.state.detail,intent:{kind:'undo',id:crypto.randomUUID(),value:this.state.undoActionId}});}
+ undo(expectedId?:string){if(expectedId&&expectedId!==this.state.undoActionId)return;if(this.state.phase!=='idle'||!this.state.undoActionId||this.disposed)return;return this.begin({mode:'undo',baseline:this.state.detail,intent:{kind:'undo',id:crypto.randomUUID(),value:this.state.undoActionId}});}
  retry(){if(this.state.phase==='retry'&&this.pending&&!this.disposed)return this.send(this.pending);}
  confirm(){if(this.state.phase==='preview'&&this.pending&&!this.disposed)return this.send(this.pending);}
  cancelPreview(){if(this.state.phase==='preview'){this.pending=null;this.publish({phase:'idle',preview:null,error:''});}}
  private async send(pending:Pending):Promise<void>{
-  if(this.disposed)return;this.pending=pending;this.publish({phase:'sending',error:'',message:'',conflict:null});
+  if(this.disposed)return;this.pending=pending;this.publish({phase:'sending',error:'',errorCode:undefined,errorLinkId:undefined,message:'',conflict:null});
   try{
    const result=await this.dependencies.request(pending.path,pending.body);if(this.disposed)return;
    if(result.status==='previewed'){
@@ -33,12 +39,13 @@ export class OperationFlow{
    catch{this.publish({phase:'stale',error:'Изменение сохранено, но карточку не удалось обновить. Обновите её перед следующей правкой.'});}
   }catch(error){if(this.disposed)return;
    const code=error instanceof ApiError?error.code:'NETWORK_ERROR';
+   const linkId=error instanceof ApiError&&error.linkIndex!==undefined&&pending.attempt.intent.kind==='operation_card'?pending.attempt.intent.links[error.linkIndex]?.id:undefined;
    if(['FINANCE_CHANGED','DEPENDENCIES_CHANGED'].includes(code)){
     try{const current=await this.dependencies.load(this.state.detail.id);if(this.disposed)return;this.pending=null;if(current.generation!==pending.attempt.baseline.generation){this.publish({phase:'unavailable',preview:null,error:'Финансовые данные были сброшены. Откройте список заново.'});return;}this.publish({phase:'conflict',preview:null,conflict:{current,attempt:pending.attempt},error:'Операция или связанные данные изменились. Сравните текущую версию и вашу правку.'});}
     catch{this.pending=null;this.publish({phase:'stale',preview:null,error:'Не удалось загрузить текущую версию. Обновите карточку.'});}
-   }else if(['AUTH_REQUIRED','FINANCE_ACCESS_REQUIRED','GENERATION_CHANGED','NOT_FOUND'].includes(code)){this.pending=null;this.publish({phase:'unavailable',preview:null,error:error instanceof Error?error.message:'Операция больше недоступна.'});}
+   }else if(['AUTH_REQUIRED','FINANCE_ACCESS_REQUIRED','GENERATION_CHANGED','NOT_FOUND'].includes(code)&&!(code==='NOT_FOUND'&&linkId)){this.pending=null;this.publish({phase:'unavailable',preview:null,error:error instanceof Error?error.message:'Операция больше недоступна.'});}
    else if(code==='NETWORK_ERROR'){this.publish({phase:'retry',error:'Сервер не подтвердил результат. Повтор использует то же изменение и не выполнит его второй раз.'});}
-   else{this.pending=null;this.publish({phase:'idle',preview:null,error:error instanceof Error?error.message:'Не удалось сохранить изменение.'});}
+   else{this.pending=null;this.publish({phase:'idle',preview:null,errorCode:code,errorLinkId:linkId,error:error instanceof Error?error.message:'Не удалось сохранить изменение.'});}
   }
  }
  useCurrent(){const conflict=this.state.conflict;if(!conflict||this.disposed)return;this.pending=null;this.publish({detail:conflict.current,phase:'idle',conflict:null,error:'',preview:null,message:'Открыта текущая версия. Ваша правка не применена.'});this.saved(conflict.current);}

@@ -92,6 +92,8 @@ async function applyCategory(db:PoolClient,userId:string,intent:Extract<EntityIn
   if(s!==null&&touched.has(s))c=retained.find(x=>x.id===s)!.parentId;
   return [c,s];
  }
+ const bindings=(await db.query('SELECT id,target_key,category_id,subcategory_id FROM finance.category_binding WHERE user_id=$1',[userId])).rows;
+ for(const binding of bindings){if(!touched.has(binding.category_id)&&!touched.has(binding.subcategory_id??''))continue;const [root,leaf]=remap(binding.category_id,binding.subcategory_id);if(root===null)await db.query('DELETE FROM finance.category_binding WHERE user_id=$1 AND id=$2',[userId,binding.id]);else if(root!==binding.category_id||leaf!==binding.subcategory_id)await db.query('UPDATE finance.category_binding SET category_id=$3,subcategory_id=$4,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,binding.id,root,leaf]);}
  const rows=await entityRows(db,userId),before=blank(),changedOperations:string[]=[],changedComponents:string[]=[],rulesMoved:string[]=[],rulesNeedSetup:string[]=[],roleMap=new Map(intent.roleDecisions.map(r=>[r.kind+':'+r.id,r.role])),usedRoles=new Set<string>();
  for(const row of rows.operations){const originalSemantics=row.semantics,affected=touched.has(originalSemantics.category.value??'')||touched.has(originalSemantics.subcategory.value??'');if(!affected)continue;
   const updated=structuredClone(row),sem=updated.semantics,[c,s]=remap(sem.category.value,sem.subcategory.value),decision=roleMap.get('operation:'+row.id);

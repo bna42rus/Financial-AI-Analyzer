@@ -1,0 +1,27 @@
+{
+  "audit": "cashneuro-name-document-audit/1",
+  "status": "PASS_DOCUMENT_CONTRACT_ONLY",
+  "baseline_commit": "55f2f92832b44d1a75c48d87c02bb1b514a2e0c7",
+  "counts": {
+    "rules": 48,
+    "projection_fields": 8,
+    "transformations": 12,
+    "style_bindings": 36,
+    "future_scenario_families": 86,
+    "implementation_findings": 6,
+    "frozen_source_files": 12,
+    "retained_inputs": 36
+  },
+  "retained_inputs_verified": 36,
+  "data_sha256": "45ade9b6f5302b02122d305baa55106f9d6b44928903b3bbf344c3488e1b4bad",
+  "document_sha256": "8487a643c6303382ca3825a28a5311d29cccdcfa426f619df3352f56c19f160d",
+  "baseline_observations_sha256": "6c9092a238faa3502e90449b49713308068d07dffb15f7a4f041b1166fa625a3",
+  "existing_functions_observed_on_synthetic_inputs": 15,
+  "reproduced_implementation_items_not_fixed": 5,
+  "separate_compatibility_item_not_fixed": 1,
+  "new_name_product_scenarios": "NOT_RUN",
+  "ui_tests": "NOT_RUN",
+  "model_tests": "NOT_RUN",
+  "new_paid_calls": 0,
+  "warning": "Structural PASS and baseline observations do not implement/fix/accept NAME, financial behavior or deployment."
+}

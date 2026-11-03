@@ -46,7 +46,7 @@ test('no bank, account, duplicate header or inconsistent issuer is inferred from
  const perRow='Дата операции;Сумма операции;Валюта;Описание;Банк;Номер счета\n2026-09-01;-1.00;RUB;Покупка OZON;Т-Банк;00000000000000000001\n2026-09-01;-1.00;RUB;Покупка OZON;Сбербанк;00000000000000000001';assert.throws(()=>parse(perRow),/AMBIGUOUS_FORMAT/);
 });
 test('timezone and precision are explicit, impossible calendars and naive instants are rejected',()=>{
- assert.deepEqual(tableDate('2026-09-01T23:30:01+03:00'),{precision:'instant',instant:'2026-09-01T20:30:01.000Z'});
+ assert.deepEqual(tableDate('2026-09-01T23:30:01+03:00'),{precision:'instant',instant:'2026-09-01T20:30:01.000Z',sourceOffsetMinutes:180});
  for(const s of ['30.02.2026','2026-02-30T12:00:00Z','2026-09-01T24:00:00Z','2026-09-01 10:00','46200','1e3'])assert.throws(()=>tableDate(s));
 });
 test('the server closes parser metadata and prevents OCR signals from becoming strict evidence',async()=>{

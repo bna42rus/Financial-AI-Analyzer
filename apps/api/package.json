@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node --import tsx src/main.ts",
-    "check": "tsc --noEmit && node --import tsx --test test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts test/task-trial.test.ts test/task-pilot.test.ts test/task-schema-probe.test.ts test/task-json-trial.test.ts test/task-json-cache-audit.test.ts test/task-prepared-contract.test.ts test/task-intent.test.ts test/task-intent-pilot.test.ts",
+    "check": "tsc --noEmit && node --import tsx --test test/classification-pass.test.ts test/crypto.test.ts test/mail-templates.test.ts test/providers.test.ts test/yandex.test.ts test/analyzer-cost-policy.test.ts test/benchmark.test.ts test/benchmark-audit.test.ts test/analyzer-task-workflow.test.ts test/task-trial.test.ts test/task-pilot.test.ts test/task-schema-probe.test.ts test/task-json-trial.test.ts test/task-json-cache-audit.test.ts test/task-prepared-contract.test.ts test/task-intent.test.ts test/task-intent-pilot.test.ts",
     "benchmark": "node --import tsx src/benchmark-main.ts",
     "benchmark:audit-review": "node --import tsx src/benchmark-audit-review-main.ts",
     "kms:init": "node --import tsx src/kms-init.ts",
@@ -33,7 +33,7 @@
     "better-auth": "1.7.7",
     "better-call": "1.4.0",
     "drizzle-orm": "0.45.3",
-    "fastify": "5.12.5",
+    "fastify": "5.12.6",
     "pg": "8.23.1",
     "pg-boss": "12.37.0",
     "reflect-metadata": "0.2.2",

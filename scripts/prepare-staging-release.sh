@@ -3,10 +3,13 @@ set -euo pipefail
 repo=${1:?checkout required}
 sha=${2:?commit required}
 extra=()
+resume_ai=false
 shift 2
 while (($#)); do
   case "$1" in
-    --enable-classification) extra+=("$1"); shift ;;
+    --resume-ai) resume_ai=true; extra+=("$1"); shift ;;
+    --monthly-ai-budget=100) extra+=("$1"); shift ;;
+    --enable-classification|--keep-ai-paused) extra+=("$1"); shift ;;
     --classification-evidence|--tested-runtime-sha) test "$#" -ge 2; extra+=("$1" "$2"); shift 2 ;;
     *) exit 2 ;;
   esac
@@ -21,3 +24,9 @@ git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
 api_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-api-origin)
 (cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")
 sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --source "$build" --sha "$sha" "${extra[@]}"
+if "$resume_ai"; then
+  echo 'Проверяем итоговый статус ИИ и незавершённые квитанции; платных запросов: 0.'
+  if ! sudo timeout 35s /usr/bin/python3 -u -B "$build/scripts/diagnose-classification-staging.py"; then
+    echo "Обновление завершено; дополнительная диагностика ИИ не завершилась за отведённое время."
+  fi
+fi

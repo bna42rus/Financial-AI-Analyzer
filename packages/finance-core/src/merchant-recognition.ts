@@ -1,3 +1,4 @@
+import {applyActivityRecognition} from './activity-recognition.ts';
 import {brandKeys,brandPattern} from './merchant-aliases.ts';
 import {groceryEvidence} from './grocery-evidence.ts';
 import {isMarketplaceName} from './starter.ts';
@@ -108,11 +109,12 @@ export function merchantCategory(recognition:MerchantRecognition,categories:Cate
 const protectedFacet=(f:{userVerified:boolean;source:string})=>f.userVerified||['user','personal_rule','global_rule'].includes(f.source);
 /** For new imports or an explicit classification pass. Never touches bank facts,
  * manual/rule/verified facets, components, monetary roles or links. */
-export function applyMerchantRecognition(operation:Operation,categories:Category[]):Operation{
+export function applyMerchantRecognition(operation:Operation,categories:Category[],bindings?:Readonly<Record<string,{categoryId:string;subcategoryId:string|null}>>):Operation{
+ if(operation.source.versions.sourceSanitizer==='bank-source/5')return applyActivityRecognition(operation,categories,bindings);
  const next=structuredClone(operation);
- if(next.source.versions.sourceSanitizer!=='bank-source/4')return next;
+ if(!['bank-source/4','bank-source/5'].includes(next.source.versions.sourceSanitizer??'')||next.source.versions.sourceSanitizer==='bank-source/5'&&next.source.versions.sourceTextEvidence!=='intact')return next;
  const recognition=recognizeMerchant(next.source.merchantText,next.source.description,{mcc:next.source.sourceMcc,bankCategory:next.source.bankCategory});
- if(!protectedFacet(next.semantics.merchant)&&recognition.name&&next.source.merchantText)next.semantics.merchant=facet(recognition.name,'deterministic_system_rule',false,recognition.matched?recognition.confidence:80);
+ if(next.source.versions.sourceSanitizer==='bank-source/4'&&!protectedFacet(next.semantics.merchant)&&recognition.name&&next.source.merchantText)next.semantics.merchant=facet(recognition.name,'deterministic_system_rule',false,recognition.matched?recognition.confidence:80);
  const category=next.semantics.category,sub=next.semantics.subcategory;
  if(next.semantics.role.value!=='expense'||next.decomposition||protectedFacet(category)||protectedFacet(sub)||category.value!==null&&category.source==='deterministic_system_rule')return next;
  const decision=merchantCategory(recognition,categories);if(!decision)return next;

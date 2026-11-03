@@ -2,11 +2,12 @@ import type {FinanceState} from './finance-client';
 import type {Filter} from '../../../packages/finance-core/src/graph';
 import type {Appearance} from './Settings';
 import {defaultAppearance} from './Settings';
-export type WorkspaceFilters={from:string;through:string;bankId:string;accountId:string;categoryIds:string[]};
+export type WorkspaceFilters={from:string;through:string;bankId:string;accountId:string;categoryIds:string[];accountIds?:string[];search?:string};
 export const allHistory:WorkspaceFilters={from:'',through:'',bankId:'',accountId:'',categoryIds:[]};
+export const workspaceAccountFilter=(f:WorkspaceFilters)=>f.accountIds!==undefined?{accountIds:f.accountIds}:f.accountId?{accountIds:[f.accountId]}:f.bankId?{bankId:f.bankId}:{};
 export function financialFilter(filters:WorkspaceFilters,accounts:FinanceState['accounts']):Filter{
  return {...(filters.from?{from:filters.from}:{}),...(filters.through?{through:filters.through}:{}),
-  ...(filters.accountId?{accountIds:[filters.accountId]}:filters.bankId?{accountIds:accounts.filter(a=>a.bankId===filters.bankId).map(a=>a.id)}:{}),
+  ...(filters.accountIds!==undefined?{accountIds:filters.accountIds}:filters.accountId?{accountIds:[filters.accountId]}:filters.bankId?{accountIds:accounts.filter(a=>a.bankId===filters.bankId).map(a=>a.id)}:{}),
   ...(filters.categoryIds.length?{categoryIds:filters.categoryIds}:{})};
 }
 export type FinanceRoute={screen:'overview'|'operations'|'analyzer'|'settings';section:string|null};

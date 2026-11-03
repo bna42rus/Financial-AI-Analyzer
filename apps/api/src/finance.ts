@@ -1,3 +1,9 @@
+import {parseCategoryBinding,applyCategoryBinding} from './category-bindings.ts';
+import type {CategoryBindingIntent} from './category-bindings.ts';
+import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
+import {parseSelectedCategories,applySelectedCategories} from './selected-categories.ts';
+import type {SelectedCategoryIntent} from './selected-categories.ts';
+import {operationDisplayName} from '../../../packages/finance-core/src/operation-name.ts';
 import {cleanBankText} from '../../../packages/imports/src/bank-description.ts';
 import {parseOverviewIntent,applyOverviewIntent} from './overview.ts';
 import type {OverviewIntent} from './overview.ts';
@@ -20,17 +26,17 @@ import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
-import {object,choice,uuid,dateFact,correction,initialSemantics,defaultRole,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
+import {object,choice,uuid,dateFact,correction,effective,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {reconcile,aggregate} from '../../../packages/finance-core/src/graph.ts';
 import type {Filter} from '../../../packages/finance-core/src/graph.ts';
 import {starterCategories,isMarketplaceName} from '../../../packages/finance-core/src/starter.ts';
-import {applyRules,validateRule} from '../../../packages/finance-core/src/rules.ts';
+import {applyRules,ruleMatches,validateRule} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
-import {HttpError} from './types.ts';
+import {HttpError,LinkEditError} from './types.ts';
 import type {Sealer} from './types.ts';
 import {previewReset,commitReset} from './finance-reset.ts';
 import {assertImportEpoch,assertPreparedContext} from './pseudonym-context.ts';
@@ -80,7 +86,9 @@ export async function loadFinance(db:PoolClient,userId:string){
  const evidence=await sourceEvidence(db,userId),evidenceByOperation=new Map<string,typeof evidence>();
  for(const row of evidence){const own=evidenceByOperation.get(row.transaction_id)??[];own.push(row);evidenceByOperation.set(row.transaction_id,own);}
  const transactionById=new Map(t.map(r=>[r.id,r]));
- const graph:Graph={accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
+ const bindings=(await db.query('SELECT target_key,category_id,subcategory_id FROM finance.category_binding WHERE user_id=$1 ORDER BY target_key',[userId])).rows;
+ const categoryBindings=Object.fromEntries(bindings.map(b=>[b.target_key,{categoryId:b.category_id,subcategoryId:b.subcategory_id}]));
+ const graph:Graph={categoryBindings,accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
   const source=observations.get(r.sourceObservationId!);if(!source)throw new TypeError('SOURCE_MISSING');
   const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
   const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,corrections:r.corrections,semantics:{...r.semantics,merchant:{...r.semantics.merchant,value:cleanBankText(r.semantics.merchant.value,160)}},comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
@@ -95,7 +103,7 @@ export async function financeView(db:PoolClient,userId:string,filter:Filter={},c
  const tombstones=(await db.query('SELECT id,merged_into_id AS "canonicalId" FROM finance.transaction WHERE user_id=$1 AND merged_into_id IS NOT NULL ORDER BY id',[userId])).rows;
  const summary=aggregate(projection.operations,filter);
  const duplicateCandidates=(await db.query("SELECT id,left_id AS \"leftId\",right_id AS \"rightId\" FROM finance.duplicate_candidate WHERE user_id=$1 AND status='candidate' ORDER BY id",[userId])).rows;
- return {operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:o.corrections.postedDate??o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
+ return {categoryBindings:graph.categoryBindings,operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,displayName:operationDisplayName(o,{counterparties:parties}),classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:Object.hasOwn(o.corrections,'postedDate')?o.corrections.postedDate!:o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
 }
 export function parseFilter(value:unknown):Filter{
  const r=object(value,['from','through','accountIds','categoryIds','includeExcluded','compact']),f:Filter={};
@@ -107,19 +115,35 @@ export function parseFilter(value:unknown):Filter{
 }
 export async function operationView(db:PoolClient,userId:string,id:unknown){
  const requested=uuid(id),canonical=(await db.query('SELECT finance.canonical_operation($1,$2) AS id',[userId,requested])).rows[0].id;
- const {graph,state}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
+ const {graph,state,parties}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
  const resolved=reconcile(graph),related=(l:{sourceId:string;targetId:string})=>l.sourceId===op.id||l.targetId===op.id;
  const links=graph.links.filter(related),linkIds=new Set(links.map(l=>l.id));
- const classificationHistory=(await db.query(`SELECT a.id,a.created_at AS "createdAt",r.engine,a.before_facets AS before,a.after_facets AS after FROM finance.classification_assignment a JOIN finance.classification_run r ON (r.user_id,r.id)=(a.user_id,a.run_id) WHERE a.user_id=$1 AND a.transaction_id=$2 ORDER BY a.created_at DESC,a.id DESC LIMIT 20`,[userId,op.id])).rows;
- const safeFacets=(value:Record<string,any>)=>value?.merchant?{...value,merchant:{...value.merchant,value:cleanBankText(value.merchant.value,160)}}:value;
- const safeHistory=classificationHistory.map(r=>({...r,before:safeFacets(r.before),after:safeFacets(r.after)}));
- const {bankRefHmac,...source}=op.source;return {...op,source,classificationHistory:safeHistory,generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
+ const {bankRefHmac,...source}=op.source;return {...op,source,displayName:operationDisplayName(op,{counterparties:parties}),generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type Intent=OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
+type CreateHistoricalRuleIntent={kind:'create_rule_with_history';id:string;patch:Omit<Rule,'id'>};
+type Intent=OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
+ if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
+ if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
+  if(k==='create_rule_with_history'){const r=object(value,['kind','id','patch']);return {kind:k,id:uuid(r.id),patch:{...validateRule(r.patch),enabled:true}};}
+  if(k==='operation_card'){
+   const r=object(value,['kind','id','patch','components','links']),id=uuid(r.id);
+   if(!Array.isArray(r.links)||r.links.length>50||!r.links.length&&r.patch===undefined&&r.components===undefined)throw new TypeError('INVALID_INTENT');
+   const patch=r.patch===undefined?undefined:parseIntent({kind:'operation',id,patch:r.patch}) as BaseIntent;
+   const components=r.components===undefined?undefined:parseIntent({kind:'components',id,parts:r.components}) as BaseIntent;
+   const links=r.links.map(raw=>{
+    const l=object(raw,['kind','id','link']);if(l.kind!=='link')throw new TypeError('INVALID_INTENT');
+    const intent=parseIntent({...l,id:uuid(l.id)}) as BaseIntent;
+    if(intent.link!.sourceId===intent.link!.targetId||![intent.link!.sourceId,intent.link!.targetId].includes(id))throw new TypeError('INVALID_INTENT');
+    return intent;
+   });
+   if(new Set(links.map(l=>l.id)).size!==links.length)throw new TypeError('INVALID_INTENT');
+   return {kind:k,id,patch,components,links};
+  }
   if(k==='merge_duplicate')return parseMergeDuplicate(value);
   if(k==='duplicate_different'){const r=object(value,['kind','id']);return {kind:k,id:uuid(r.id)};}
  }
@@ -173,10 +197,35 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='set_category_binding')return applyCategoryBinding(db,userId,intent,(await loadFinance(db,userId)).graph);
+ if(intent.kind==='add_catalog_categories')return applySelectedCategories(db,userId,intent,(await loadFinance(db,userId)).graph);
  if(intent.kind==='save_overview_view'||intent.kind==='delete_overview_view'||intent.kind==='reorder_overview_views')return applyOverviewIntent(db,userId,intent);
  if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
  if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
  if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
+ if(intent.kind==='create_rule_with_history'){
+  await applyBase(db,userId,{kind:'rule',id:intent.id,patch:intent.patch as unknown as Record<string,unknown>,create:true},currentRevision);
+  const {graph,rules}=await loadFinance(db,userId),rule={...intent.patch,id:intent.id};
+  const accounts=new Map(graph.accounts.map(account=>[account.id,account]));
+  const operationIds=graph.operations.filter(op=>{const account=accounts.get(effective(op).accountId);return !!account&&ruleMatches(op,account,rule);}).map(op=>op.id).sort();
+  const result=await applyRuleIntent(db,userId,{kind:'apply_rules',id:intent.id,ruleId:intent.id,operationIds},graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));
+  return {...result,details:{...result.details,kind:intent.kind}};
+ }
+ if(intent.kind==='operation_card'){
+  await row(db,userId,'transaction',intent.id);
+  if(intent.patch)await applyBase(db,userId,structuredClone(intent.patch),currentRevision);
+  if(intent.components)await applyBase(db,userId,structuredClone(intent.components),currentRevision);
+  for(const [linkIndex,edit] of intent.links.entries()){
+   const previous=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1 AND id=$2',[userId,edit.id])).rows[0];
+   if(previous&&previous.source_id!==intent.id&&previous.target_id!==intent.id)throw new HttpError(404,'NOT_FOUND');
+   try{await applyBase(db,userId,edit,currentRevision);}catch(error){if(error instanceof HttpError)throw new LinkEditError(error.status,error.code,linkIndex);throw error;}
+  }
+  if(intent.links.some(edit=>edit.link!.status==='confirmed')){
+   const outcomes=new Map(reconcile((await loadFinance(db,userId)).graph).links.map(link=>[link.id,link]));
+   for(const [linkIndex,edit] of intent.links.entries())if(edit.link!.status==='confirmed'&&!outcomes.get(edit.id)?.active)throw new LinkEditError(409,outcomes.get(edit.id)?.reason??'LINK_CONFLICT',linkIndex);
+  }
+  return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
+ }
  if(intent.kind==='bulk_operations'){
   if(intent.reviewScope)await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations);
   const loaded=await loadFinance(db,userId),patches=bulkPatches(intent,loaded.graph);let warnings:unknown[]=[];
@@ -289,8 +338,11 @@ async function restore(db:PoolClient,userId:string,undo:Undo){
  if(undo.before)await update(db,userId,undo.table,undo.id,undo.before as Record<string,unknown>);else await db.query(`DELETE FROM finance.${undo.table} WHERE user_id=$1 AND id=$2`,[userId,undo.id]);
 }
 function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo,journal:Change[]=[]){
- const removedOperationIds=before.operations.filter(o=>!after.operations.some(p=>p.id===o.id)).map(o=>o.id);
- return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(before.operations.find(o=>o.id===p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
+ const cardEdit=undo&&'details'in undo&&['operation_card','bulk_operations','create_rule_with_history'].includes(String(undo.details.kind));
+ const beforeLinkReasons=cardEdit?new Map(before.links.map(l=>[l.id,l.reason])):undefined;
+ const beforeOperations=new Map(before.operations.map(o=>[o.id,o])),afterIds=new Set(after.operations.map(o=>o.id));
+ const removedOperationIds=before.operations.filter(o=>!afterIds.has(o.id)).map(o=>o.id);
+ return {before:before.summary,after:after.summary,affectedOperationIds:[...removedOperationIds,...after.operations.filter(p=>JSON.stringify(p)!==JSON.stringify(beforeOperations.get(p.id))).map(p=>p.id)].sort(),removedOperationIds:removedOperationIds.sort(),dependencyConflicts:after.links.filter(l=>l.reason!==null&&(!beforeLinkReasons||beforeLinkReasons.get(l.id)!==l.reason)),reviewOperationIds:after.operations.filter(o=>o.reviewReasons.length).map(o=>o.id),changes:publicChanges(journal),...((undo&&'details'in undo)?{details:undo.details}:{})};
 }
 export async function previewFinance(db:PoolClient,userId:string,input:unknown){
  const r=object(input,['actionId','generation','revision','intent']),id=uuid(r.actionId),generation=uuid(r.generation),expected=revision(r.revision),state=await prepareFinance(db,userId);
@@ -354,13 +406,11 @@ export async function acceptObservation(db:PoolClient,userId:string,epoch:Import
   return {transactionId:existing.transaction_id as string,observationId,projection:reconcile((await loadFinance(db,userId)).graph).operations.find(o=>o.id===existing.transaction_id)};
  }
  const {graph,rules}=await loadFinance(db,userId),account=canonicalAccount(graph,fact.accountId);
- const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialSemantics(kind,fact.merchantText);
+ const id=transactionId===null?randomUUID():uuid(transactionId);let semantics=initialBankSemantics(fact);
  if(transactionId!==null){
-  const previous=await row(db,userId,'transaction',id);semantics=structuredClone(previous.semantics);
-  if(!semantics.kind.userVerified&&semantics.kind.source==='bank'){semantics.kind=facet(kind,'bank');if(!semantics.role.userVerified&&semantics.role.source==='deterministic_system_rule')semantics.role=facet(defaultRole(kind));}
-  if(!semantics.merchant.userVerified&&semantics.merchant.source==='bank')semantics.merchant=facet(fact.merchantText,'bank');
+  const previous=await row(db,userId,'transaction',id);semantics=refreshBankSemantics(previous.semantics,fact);
  }else{
-  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyRules(op,account,rules);
+  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyFinancialRecognition(applyRules(op,account,rules),graph.categories);
   semantics=classified.semantics;await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,observationId,JSON.stringify(semantics),classified.analyticsOverride,JSON.stringify(classified.reviewReasons)]);
  }
  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,merchant_text,description,bank_category,bank_ref_hmac,versions,source_kind,operation_amount_minor,operation_currency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[userId,observationId,id,fact.accountId,JSON.stringify(fact.operationDate),fact.postedDate===null?null:JSON.stringify(fact.postedDate),fact.amountMinor,fact.currency,fact.merchantText,fact.description,fact.bankCategory,fact.bankRefHmac,JSON.stringify(fact.versions),kind,fact.operationAmountMinor,fact.operationCurrency]);

@@ -1,0 +1,11 @@
+import type {ReactNode} from 'react';
+import {Check,MoreHorizontal,Plus} from 'lucide-react';
+import {OverviewPopover} from './OverviewDialogs';
+import type {SavedOverviewView} from './overview-client';
+import common from './App.module.css';
+import styles from './Overview.module.css';
+type ViewItem=Pick<SavedOverviewView,'id'|'name'|'isDefault'|'dependencyStatus'>;
+type Props<T extends ViewItem>={label?:string;extra?:ReactNode;name:string;id:string;views:T[];disabled:boolean;ready:boolean;onSelect:(view:T|null)=>void;onCreate:()=>void;onCopy:(view:T|null)=>void;onRename:(view:T)=>void;onDefault:(view:T|null)=>void;onDelete:(view:T)=>void};
+export function OverviewViewsMenu<T extends ViewItem>(p:Props<T>){
+ return <OverviewPopover label={p.label??"Представления обзора"} triggerText={p.name}><ul className={styles.viewsList} aria-label={p.label??"Представления обзора"}>{p.views.map(v=><li key={v.id}><button type="button" data-close-popover className={styles.viewChoice} aria-label={v.name} aria-description={v.isDefault?'По умолчанию':undefined} aria-pressed={p.id===v.id} disabled={p.disabled} onClick={()=>p.onSelect(v)}><span>{p.id===v.id&&<Check size={16}/>}</span><span>{v.name}{v.isDefault&&<small>По умолчанию</small>}{v.dependencyStatus==='needs_setup'&&<small>Проверьте виджеты</small>}</span></button><OverviewPopover label={'Действия представления: '+v.name} icon={<MoreHorizontal size={18}/>} heading={v.name} side="right" triggerClassName={styles.viewActionTrigger}><div className={styles.viewActionMenu}>{[['Переименовать',()=>p.onRename(v)],['Создать копию',()=>p.onCopy(v)],['Открывать по умолчанию',()=>p.onDefault(v)],['Удалить',()=>p.onDelete(v)]].map(([label,action])=><button key={String(label)} type="button" data-close-popover disabled={p.disabled||!p.ready||label==='Открывать по умолчанию'&&v.isDefault} onClick={action as ()=>void}>{label as string}</button>)}</div></OverviewPopover></li>)}</ul>{!p.ready&&<p role="status">Загружаем представления…</p>}<button type="button" data-close-popover className={common.button+' '+styles.newView} disabled={p.disabled||!p.ready||p.views.length>=100} onClick={p.onCreate}><Plus size={16}/>Создать представление</button>{p.extra}</OverviewPopover>;
+}

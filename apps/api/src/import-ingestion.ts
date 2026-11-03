@@ -1,5 +1,7 @@
+import {sameCalendar} from '../../../packages/finance-core/src/bank-calendar.ts';
+import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
 import {applyMerchantRecognition,recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
-import {sourceFields} from '../../../packages/imports/src/safe-source.ts';
+import {sourceFields,hasBankDescription,merchantSourceSanitizer} from '../../../packages/imports/src/safe-source.ts';
 import {createHash,randomUUID} from 'node:crypto';
 import type {Pool,PoolClient} from 'pg';
 import {ImportContractError,parseContext,validatePreparedBatch} from '../../../packages/imports/src/contract.ts';
@@ -7,7 +9,7 @@ import type {PreparedRow,Bank} from '../../../packages/imports/src/contract.ts';
 import {bankPdfAdapter,pdfParserVersions,legacyPdfParserVersions} from '../../../packages/imports/src/bank-pdf.ts';
 import {matchSource,sameSource,strictSourceDescriptor} from '../../../packages/imports/src/matching.ts';
 import type {SourceCandidate} from '../../../packages/imports/src/matching.ts';
-import {object,uuid,initialSemantics,facet} from '../../../packages/finance-core/src/model.ts';
+import {object,uuid} from '../../../packages/finance-core/src/model.ts';
 import type {Operation,BankFact} from '../../../packages/finance-core/src/model.ts';
 import {applyRules} from '../../../packages/finance-core/src/rules.ts';
 import {reconcile} from '../../../packages/finance-core/src/graph.ts';
@@ -15,6 +17,7 @@ import {prepareFinance,loadFinance,withPreparedImport} from './finance.ts';
 import {canonicalAccount} from './finance-structure.ts';
 import {stableJSON} from './finance-history.ts';
 import {HttpError} from './types.ts';
+import {merchantSourceStorageAvailable} from './import-profiles.ts';
 
 export const IMPORT_CHUNK=50;
 const bankNames:Record<Bank,string>={tbank:'Т-Банк',ozon:'Ozon Банк',sber:'Сбербанк',other:'Другой банк'};
@@ -27,6 +30,7 @@ export async function acceptImport(db:PoolClient,userId:string,input:unknown){
   const state=await prepareFinance(db,userId);
   if(context.generation!==state.generation||context.keyVersion!==state.key_version)throw new HttpError(409,'IMPORT_CONTEXT_CHANGED');
   const {batch}=validatePreparedBatch(input);
+  if(batch.versions.sanitizer===merchantSourceSanitizer&&!await merchantSourceStorageAvailable(db))throw new HttpError(503,'IMPORT_SOURCE_PROFILE_UNAVAILABLE');
   const digest=createHash('sha256').update(stableJSON({...batch,context:{generation:context.generation,keyVersion:context.keyVersion}})).digest('hex');
   const previous=(await db.query('SELECT request_digest FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,batch.batchId])).rows[0];
   if(previous){if(previous.request_digest!==digest)throw new HttpError(409,'IMPORT_BATCH_REUSED');return importReport(db,userId,batch.batchId);}
@@ -119,19 +123,27 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   const descriptor=strictSourceDescriptor(row),fingerprint=descriptor===null?null:createHash('sha256').update(descriptor).digest('hex');
   const match=matchSource(row,entry.file_hmac,candidates,used,fingerprint),transactionId=match.transactionId??randomUUID(),observationId=randomUUID();
   const prior=match.transactionId?(await db.query(`SELECT t.semantics,t.source_observation_id,o.*,r.direction FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.ingestion_row r ON (r.user_id,r.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.id=$2`,[userId,transactionId])).rows[0]:null;
-  if(prior){const current=graph.operations.find(o=>o.id===transactionId)!.source;prior.source_kind=current.sourceKind;prior.merchant_text=current.merchantText;prior.description=current.description;prior.bank_category=current.bankCategory;prior.source_mcc=current.sourceMcc;}
-  const ownSource=sourceFields(row.safeSource),signals=sourceFields(row.safeSource);
+  if(prior){const current=graph.operations.find(o=>o.id===transactionId)!.source;prior.source_kind=current.sourceKind;prior.merchant_text=current.merchantText;prior.description=current.description;prior.bank_category=current.bankCategory;prior.source_mcc=current.sourceMcc;prior.operation_date=current.operationDate;prior.posted_date=current.postedDate;}
+  const ownSource=sourceFields(row.safeSource,batch.versions.sanitizer),signals=sourceFields(row.safeSource,batch.versions.sanitizer);
   // Missing evidence from either profile cannot erase an earlier sanitized source.
   if(prior&&row.safeSource&&prior.source_kind===signals.sourceKind){if(!signals.merchantText)signals.merchantText=prior.merchant_text;if(!signals.bankCategory)signals.bankCategory=prior.bank_category;if(!signals.sourceMcc)signals.sourceMcc=prior.source_mcc;}
-  if(prior&&!row.safeSource?.details&&prior.versions.sourceSanitizer==='bank-source/4'&&prior.source_kind===signals.sourceKind){signals.description=prior.description;signals.bankCategory=prior.bank_category;signals.sourceMcc=prior.source_mcc;}
+  if(prior&&!row.safeSource?.details&&hasBankDescription(prior.versions.sourceSanitizer)&&prior.source_kind===signals.sourceKind){if(prior.versions.sourceSanitizer===merchantSourceSanitizer)signals.merchantText=prior.merchant_text;signals.description=prior.description;signals.bankCategory=prior.bank_category;signals.sourceMcc=prior.source_mcc;}
   const source=prior&&!row.safeSource?{sourceKind:prior.source_kind,merchantText:prior.merchant_text,description:prior.description,bankCategory:prior.bank_category,sourceMcc:prior.source_mcc}:signals;
-  const unchanged=prior&&prior.source_kind===source.sourceKind&&prior.merchant_text===source.merchantText&&prior.description===source.description&&prior.bank_category===(source.bankCategory??prior.bank_category)&&prior.source_mcc===(source.sourceMcc??prior.source_mcc)&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:prior.direction??row.direction});
+  const unchanged=prior&&sameCalendar(row.operationDate,prior.operation_date)&&sameCalendar(row.postedDate,prior.posted_date)&&prior.source_kind===source.sourceKind&&prior.merchant_text===source.merchantText&&prior.description===source.description&&prior.bank_category===(source.bankCategory??prior.bank_category)&&prior.source_mcc===(source.sourceMcc??prior.source_mcc)&&sameSource(row,{transactionId,fileHmac:'',ordinal:0,bankRefHmac:prior.bank_ref_hmac,operationDate:prior.operation_date,postedDate:prior.posted_date,amountMinor:prior.amount_minor,currency:prior.currency,direction:prior.direction??row.direction});
   const parser=row.parser??(bank==='other'?batch.versions.adapter:batch.versions.adapter===bankPdfAdapter?pdfParserVersions[bank]:batch.versions.adapter==='bank-pdf/1'?legacyPdfParserVersions[bank]:batch.versions.adapter);
-  const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,...source,bankCategory:source.bankCategory??prior?.bank_category??'',bankRefHmac:row.bankRefHmac,versions:{sourceStorage:'direct-evidence/1',dedupe:Object.hasOwn(row,'descriptionHmac')?'strict-bank-description/2':'strict-bank-source/1',parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,classification:row.safeSource?(['bank-source/3','bank-source/4'].includes(batch.versions.sanitizer)?'bank-signals/2':'bank-signals/1'):prior?.versions.classification??'unclassified/1',sourceSanitizer:row.safeSource?batch.versions.sanitizer:prior?.versions.sourceSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer,merchantSanitizer:row.safeSource?.merchant||row.safeSource?.details?.merchantText?batch.versions.sanitizer:prior?.versions.merchantSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer}};
+  const inheritedDescription=prior&&!row.safeSource?.details&&prior.source_kind===source.sourceKind&&hasBankDescription(prior.versions.sourceSanitizer);
+  const sourceProfile=inheritedDescription?prior.versions.sourceSanitizer:row.safeSource?batch.versions.sanitizer:prior?.versions.sourceSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer;
+  const textEvidence=row.safeSource?.details&&'textEvidence' in row.safeSource.details?row.safeSource.details.textEvidence:inheritedDescription?prior.versions.sourceTextEvidence:undefined;
+  const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,...source,bankCategory:source.bankCategory??prior?.bank_category??'',bankRefHmac:row.bankRefHmac,versions:{
+   sourceStorage:'direct-evidence/1',dedupe:Object.hasOwn(row,'descriptionHmac')?'strict-bank-description/2':'strict-bank-source/1',parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,
+   classification:row.safeSource?(['bank-source/3','bank-source/4','bank-source/5'].includes(batch.versions.sanitizer)?'bank-signals/2':'bank-signals/1'):prior?.versions.classification??'unclassified/1',
+   sourceSanitizer:sourceProfile,...(textEvidence?{sourceTextEvidence:textEvidence}:{}),
+   merchantSanitizer:row.safeSource?.merchant||row.safeSource?.details?.merchantText?batch.versions.sanitizer:prior?.versions.merchantSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer,
+  }};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
-   const semantics=initialSemantics(fact.sourceKind!,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);if(fact.sourceKind==='other')semantics.kind=facet('other','bank',false,0);
-   const op=applyMerchantRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories);
+   const semantics=initialBankSemantics(fact,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);
+   const op=applyMerchantRecognition(applyFinancialRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories),graph.categories,graph.categoryBindings);
    graph.operations.push(op);
    await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,transactionId,observationId,JSON.stringify(op.semantics),op.analyticsOverride,JSON.stringify(op.reviewReasons)]);
   }
@@ -141,14 +153,9 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   if(prior&&!unchanged){
    const current=graph.operations.find(o=>o.id===transactionId)!,op=structuredClone(current);op.source=fact;
    if(row.safeSource){
-    const fresh=initialSemantics(fact.sourceKind!,fact.merchantText);
-    if(op.semantics.kind.source==='bank'&&!op.semantics.kind.userVerified){
-     const changed=op.semantics.kind.value!==fresh.kind.value;op.semantics.kind=fresh.kind;
-     if(changed&&op.semantics.role.source==='deterministic_system_rule'&&!op.semantics.role.userVerified)op.semantics.role=fresh.role;
-    }
-    if(op.semantics.merchant.source==='bank'&&!op.semantics.merchant.userVerified&&(fact.merchantText||prior.source_kind!==fact.sourceKind))op.semantics.merchant=fresh.merchant;
+    op.semantics=refreshBankSemantics(op.semantics,fact);
    }
-   const classified=applyMerchantRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories);
+   const classified=applyMerchantRecognition(applyFinancialRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories),graph.categories,graph.categoryBindings);
    graph.operations[graph.operations.indexOf(current)]=classified;
    await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
   }

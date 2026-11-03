@@ -6,7 +6,7 @@ import {Pool} from 'pg';
 import {privateJson} from './kms.ts';
 import {stagingDatabase} from './runtime-key.ts';
 import {assistantRuntimeManifest} from './analyzer-assistant-manifest.ts';
-import {classificationRuntimeAdmission,validateClassificationEvidence,confirmClassificationPaidReceipt} from './classification-admission.ts';
+import {classificationRuntimeAdmission,monthlyClassificationAdmission,validateClassificationEvidence,confirmClassificationPaidReceipt} from './classification-admission.ts';
 import {classificationPilotTotals,classificationFailure} from './classification-smoke-support.ts';
 import {verifyClassificationTariff} from './classification-tariff.ts';
 import {digest} from './classification-plan.ts';
@@ -24,7 +24,7 @@ async function writePrivate(path:string,value:unknown){
 }
 async function main(){
  const [action,evidence,output,fallbackOutput,tested,installed,...extra]=process.argv.slice(2);
- if(process.getuid?.()!==0||action!=='--prepare'||extra.length||!evidence||!/^\/var\/lib\/cashneuro\/classification-check-[A-Za-z0-9]+$/.test(evidence)||!output||!fallbackOutput||output===fallbackOutput||![tested,installed].every(s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s)))throw Error('CLASSIFICATION_ADMISSION_ARGUMENTS_INVALID');
+ if(process.getuid?.()!==0||!['--prepare','--prepare-monthly-100'].includes(action??'')||extra.length||!evidence||!/^\/var\/lib\/cashneuro\/classification-check-[A-Za-z0-9]+$/.test(evidence)||!output||!fallbackOutput||output===fallbackOutput||![tested,installed].every(s=>typeof s==='string'&&/^[a-f0-9]{64}$/.test(s)))throw Error('CLASSIFICATION_ADMISSION_ARGUMENTS_INVALID');
  const manifest=await assistantRuntimeManifest();if(manifest.sourceSha256!==tested)throw Error('CLASSIFICATION_TESTED_RELEASE_CHANGED');
  const original=await privateJson('/etc/cashneuro/ai/assistant-staging.json') as AssistantStagingSettings;
  if(original.sourceSha256!==installed)throw Error('ASSISTANT_RELEASE_CHANGED');const originalHash=digest(original);
@@ -44,21 +44,24 @@ async function main(){
    evidenceResult=await validateClassificationEvidence(evidence,(fingerprint,usage,from,through)=>confirmClassificationPaidReceipt(db,user.id,original.cost.projectId,fingerprint,usage,from,through));
    await db.query('COMMIT');
   }catch(error){await db.query('ROLLBACK');throw error;}
-  const totals=await classificationPilotTotals(db,original.cost.projectId,original.cost.projectPeriodStart);
+  const totals=await classificationPilotTotals(db,original.cost.projectId,original.monthly||action==='--prepare-monthly-100'?undefined:original.cost.projectPeriodStart);
   const getOnly:typeof fetch=async(url,options)=>{if(options?.method!=='GET')throw Error('CLASSIFICATION_ADMISSION_HTTP_DENIED');return fetch(url,options);};
-  const tariff=await verifyClassificationTariff(getOnly),settings=classificationRuntimeAdmission(original,totals,manifest.sourceSha256,tariff);
+  const tariff=await verifyClassificationTariff(getOnly),monthly=action==='--prepare-monthly-100';
+  const settings=monthly?monthlyClassificationAdmission(original,totals,manifest.sourceSha256):classificationRuntimeAdmission(original,totals,manifest.sourceSha256,tariff);
   await createStagingAssistantProvider(pool,settings,getOnly,manifest.sourceSha256);
-  const fallback=checkAssistantStagingSettings({...settings,sourceSha256:installed!});
+  // The old runtime cannot understand the new monthly mode. Its exact original
+  // config is the rollback, paired with the installer's expired-admission pause.
+  const fallback=monthly?original:checkAssistantStagingSettings({...settings,sourceSha256:installed!});
   if(digest(await privateJson('/etc/cashneuro/ai/assistant-staging.json'))!==originalHash)throw Error('CLASSIFICATION_ACTIVE_CONFIGURATION_CHANGED');
-  await db.query('BEGIN');
+  if(!monthly&&!settings.monthly){await db.query('BEGIN');
   try{
    await db.query(`INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[settings.cost.projectId,settings.cost.projectPeriodStart,settings.cost.projectPeriodEnd,rubAmount(settings.cost.projectLimitRub).toString()]);
    const budget=(await db.query('SELECT limit_atoms,period_end=$3::timestamptz AS matches_end,blocked FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2 FOR UPDATE',[settings.cost.projectId,settings.cost.projectPeriodStart,settings.cost.projectPeriodEnd])).rows[0];
    if(!budget?.matches_end||budget.blocked||BigInt(budget.limit_atoms)!==rubAmount(settings.cost.projectLimitRub))throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
    await db.query('COMMIT');
-  }catch(error){await db.query('ROLLBACK');throw error;}
+  }catch(error){await db.query('ROLLBACK');throw error;}}
   await writePrivate(output,settings);await writePrivate(fallbackOutput,fallback);
-  console.log(JSON.stringify({...evidenceResult,sourceSha256:manifest.sourceSha256,expiresAt:settings.expiresAt,maximumCallsRemaining:original.admission.stageMaximumCalls-original.admission.calls-totals.calls}));
+  console.log(JSON.stringify({...evidenceResult,sourceSha256:manifest.sourceSha256,...(settings.monthly?{operatingMode:'monthly',monthlyLimitRub:'100',maximumCallsRemaining:null}:{expiresAt:settings.expiresAt,maximumCallsRemaining:original.admission.stageMaximumCalls-original.admission.calls-totals.calls})}));
  }finally{try{await db.query('SELECT pg_advisory_unlock(hashtextextended($1,0))',[lockName]);}finally{db.release();await pool.end();}}
 }
 main().catch(error=>{console.log(JSON.stringify({status:'STOP',...classificationFailure(error)}));process.exitCode=1;});

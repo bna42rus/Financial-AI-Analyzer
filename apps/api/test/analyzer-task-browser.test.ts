@@ -49,7 +49,7 @@ async function within<T>(fn: (db: PoolClient) => Promise<T>) {
   catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
 }
 async function screen(page: Page, name: string) {
-  const opener = page.getByRole('button', { name: 'Открыть экраны приложения' }), link = page.getByRole('link', { name, exact: true });
+  const opener = page.getByRole('button', { name: 'Вернуться к финансам' }), link = page.getByRole('link', { name, exact: true });
   await expect(opener.or(link).first()).toBeVisible();
   if (await opener.isVisible()) await opener.click();
   await link.click();

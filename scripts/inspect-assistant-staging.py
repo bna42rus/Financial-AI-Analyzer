@@ -83,7 +83,7 @@ try:
         raise ValueError()
     with urllib.request.urlopen('http://127.0.0.1:' + str(port) + '/health', timeout=5) as reply:
         health = json.load(reply)
-    result['financeHealth'] = {key: health[key] if health[key] in {'ok', 'finance', 'control', 'cashneuro-assistant-workflow/6'} else 'OTHER' for key in ['status', 'profile', 'assistant'] if key in health}
+    result['financeHealth'] = {key: health[key] if health[key] in {'ok', 'finance', 'control', 'cashneuro-assistant-workflow/7'} else 'OTHER' for key in ['status', 'profile', 'assistant'] if key in health}
 except Exception:
     result['financeHealth'] = {'status': 'UNAVAILABLE'}
 result['stagingPostgres'] = []
