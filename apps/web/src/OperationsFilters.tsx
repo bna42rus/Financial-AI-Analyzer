@@ -1,5 +1,5 @@
 import {useState} from 'react';
-import {searchExpressionError} from '../../../packages/finance-core/src/operations';
+import {operationFilterKinds,searchExpressionError} from '../../../packages/finance-core/src/operations';
 import type {OperationsFilter} from '../../../packages/finance-core/src/operations';
 import type {FinanceState} from './finance-client';
 import {kindNames,roleNames,reviewNames,reviewStatusNames,rublesToMinor,minorToRubles} from './finance-client';
@@ -9,7 +9,7 @@ import {OverviewPopover} from './OverviewDialogs';
 import {WidgetSelect} from './WidgetSelect';
 import filterStyles from './CompactFilters.module.css';
 import styles from './OperationsTable.module.css';
-const kindOrder=['purchase','refund','reversal','cashback','transfer_in','transfer_out','own_transfer','cash_deposit','cash_withdrawal','loan_disbursement','loan_payment','credit_card_repayment','interest','fee','insurance','other'];
+const kindOrder=['purchase','refund','expense_reimbursement','reversal','cashback','transfer_in','transfer_out','own_transfer','cash_deposit','cash_withdrawal','loan_disbursement','loan_payment','credit_card_repayment','interest','fee','insurance','other'];
 const facets:[string,string][]=[['kind','Тип'],['role','Финансовый смысл'],['category','Категория'],['subcategory','Подкатегория'],['merchant','Магазин'],['counterparty','Контрагент']];
 const advancedKeys=['reasons','statuses','attention','uncategorized','refund','transfer','linked','possibleDuplicate','inclusion','kinds','roles','amountFrom','amountThrough','amountBasis','description','merchant','merchantExact','comment','facets','sources','confidenceFrom','confidenceThrough','ruleIds','counterpartyIds'] as const;
 export function advancedOperationFilters(f:OperationsFilter):OperationsFilter {
@@ -17,6 +17,12 @@ export function advancedOperationFilters(f:OperationsFilter):OperationsFilter {
  if(!next.reasons&&f.reason)next.reasons=[f.reason];
  if(!next.statuses&&f.status)next.statuses=[f.status] as OperationsFilter['statuses'];
  if(!next.kinds&&f.kind)next.kinds=[f.kind] as OperationsFilter['kinds'];
+ if(f.refund!==undefined||f.transfer!==undefined){
+  const refunds=['refund','expense_reimbursement','reversal'],transfers=['transfer_in','transfer_out','own_transfer'];
+  const permitted=(next.kinds??operationFilterKinds).filter(k=>(f.refund===undefined||refunds.includes(k)===f.refund)&&(f.transfer===undefined||transfers.includes(k)===f.transfer));
+  if(permitted.length){next.kinds=permitted;delete next.refund;delete next.transfer;}
+ }
+
  if(!next.roles&&f.role)next.roles=[f.role] as OperationsFilter['roles'];
  if(!next.facets&&f.facet)next.facets=[f.facet];
  if(!next.sources&&f.source)next.sources=[f.source] as OperationsFilter['sources'];
@@ -35,7 +41,7 @@ function Multiple({label,options,value,onChange,disabled}:{label:string;options:
 type NumericKey='amountFrom'|'amountThrough'|'confidenceFrom'|'confidenceThrough';
 export function OperationsFilters({state,value,contextFilter,onChange,disabled,onInvalid}:{state:FinanceState;value:OperationsFilter;contextFilter?:OperationsFilter;onChange:(v:OperationsFilter)=>void;disabled:boolean;onInvalid:(invalid:boolean)=>void}){
  const [raw,setRaw]=useState<Partial<Record<NumericKey,string>>>({}),[errors,setErrors]=useState<Partial<Record<NumericKey,string>>>({});
- function change(key:keyof OperationsFilter,v:unknown){const next={...value};if(key==='merchant')delete next.merchantExact;if(v===''||v===undefined||Array.isArray(v)&&!v.length)delete next[key];else Object.assign(next,{[key]:v});onChange(next);}
+ function change(key:keyof OperationsFilter,v:unknown){const next={...value};if(key==='merchant')delete next.merchantExact;if(key==='kinds'){delete next.refund;delete next.transfer;}if(v===''||v===undefined||Array.isArray(v)&&!v.length)delete next[key];else Object.assign(next,{[key]:v});onChange(next);}
  function number(key:NumericKey,text:string,commit:boolean){
   if(commit&&raw[key]===undefined)return;
   const values={...raw,[key]:text};
@@ -54,6 +60,7 @@ export function OperationsFilters({state,value,contextFilter,onChange,disabled,o
  const select=(key:keyof OperationsFilter,name:string,items:[string,string][])=> <label>{name}<WidgetSelect aria-label={name} value={String(value[key]??'')} onChange={e=>change(key,e.target.value)}><option value="">Любое значение</option>{items.map(([id,n])=><option key={id} value={id}>{n}</option>)}</WidgetSelect></label>;
  const summaries:{name:string;labels:string[]}[]=[];
  const context=contextFilter;
+ if(value.refund!==undefined||value.transfer!==undefined)summaries.push({name:'Тип операции',labels:['Условия старого представления несовместимы. Выберите тип заново.']});
  if(context?.metric)summaries.push({name:'Показатель из Обзора',labels:[metricNames[context.metric]]});
  if(context?.operationIds)summaries.push({name:'Заданный набор операций',labels:[String(context.operationIds.length)]});
  if(context?.batchId)summaries.push({name:'Источник',labels:[context.fileId?'Выбранный файл загрузки':'Выбранная загрузка']});
@@ -69,7 +76,7 @@ export function OperationsFilters({state,value,contextFilter,onChange,disabled,o
  return <details className={styles.options}><summary>Дополнительные фильтры{Object.keys(value).length>0&&<small> · {Object.keys(value).length}</small>}</summary>
  <fieldset disabled={disabled} className={styles.advanced}><legend className={filterStyles.srOnly}>Дополнительные фильтры операций</legend>
  {multi('statuses','Состояние проверки',Object.entries(reviewStatusNames))}{multi('reasons','Причина проверки',reasons.map(r=>[r,reviewNames[r]??r]))}
- {multi('kinds','Тип операции',kindOrder.map(k=>[k,kindNames[k]??k]))}{multi('roles','Финансовый смысл',Object.entries(roleNames))}
+ {multi('kinds','Тип операции',kindOrder.map(k=>[k,k==='expense_reimbursement'?'Компенсация расхода':kindNames[k]??k]))}{multi('roles','Финансовый смысл',Object.entries(roleNames))}
  {inputNumber('amountFrom','Сумма от, ₽','Сумма фильтра от, ₽')}{inputNumber('amountThrough','Сумма до, ₽','Сумма фильтра до, ₽')}
  {field('description','Описание операции содержит')}{field('merchant','Магазин содержит')}{field('comment','Комментарий содержит')}
  {multi('counterpartyIds','Контрагенты',state.counterparties.map(p=>[p.id,p.name]))}
@@ -77,7 +84,7 @@ export function OperationsFilters({state,value,contextFilter,onChange,disabled,o
  {inputNumber('confidenceFrom','Уверенность от, %')}{inputNumber('confidenceThrough','Уверенность до, %')}
  {multi('ruleIds','Применённое правило',state.rules.map(r=>[r.id,r.name]))}{select('inclusion','Участие в аналитике',[['included','Включено'],['excluded','Исключено']])}
   {flag('attention','Требуют внимания')}{flag('uncategorized','Без категории')}
- {flag('refund','Возвраты и компенсации')}{flag('transfer','Переводы')}
+
  {(value.linked!==undefined||value.possibleDuplicate!==undefined)&&<>{flag('linked','Есть связь')}{flag('possibleDuplicate','Возможный дубль')}</>}
  {summaries.length>0&&<dl className={styles.filterSummary}>{summaries.map(({name,labels})=><div key={name}><dt>{name}</dt><dd>{labels.join(', ')}</dd></div>)}</dl>}
  <p>В поиске & означает «и», | — «или». Например: такси & аэропорт | поезд.</p>

@@ -40,3 +40,14 @@ test('operator search and multiple filters agree on the exact matching operation
  for(const search of ['такси &','| поезд','такси || поезд'])assert.throws(()=>parseOperationsFilter({search}),/INVALID_SEARCH_EXPRESSION/);
  assert.doesNotThrow(()=>parseOperationsFilter({merchant:'Shop |',merchantExact:true}));
 });
+
+test('one type filter combines refunds, transfers and confirmed reimbursement portions',()=>{
+ const purchase=row(),refund=row(),transfer=row(),reimbursement=row(),link=randomUUID();
+ refund.classification.kind=facet('refund');transfer.classification.kind=facet('transfer_in');
+ reimbursement.classification.kind=facet('other');reimbursement.amountMinor='1500';reimbursement.allocationKinds={[link]:'expense_reimbursement'};
+ reimbursement.parts=[{...reimbursement.parts[0]!,amountMinor:'1000',basis:[link]},{...reimbursement.parts[0]!,id:'income',amountMinor:'500',role:'income'}];
+ const all=[purchase,refund,transfer,reimbursement];
+ assert.deepEqual(new Set(query(all,{kinds:['refund','transfer_in','expense_reimbursement']}).operations.map(o=>o.id)),new Set([refund.id,transfer.id,reimbursement.id]));
+ const selected=query(all,{kinds:['expense_reimbursement']});assert.equal(selected.total,1);assert.equal(selected.summary.netExpensesMinor,'-1000');assert.equal(selected.summary.incomeMinor,'0');
+ assert.equal(query(all,{kinds:['expense_reimbursement'],roles:['income']}).total,0);
+});

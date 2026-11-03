@@ -117,3 +117,6 @@
 .dialog{inset:0;margin:auto;transform:none;height:fit-content;box-sizing:border-box}
 
 .dialogHead{align-items:center;gap:12px}.dialogHead h2{margin:0;line-height:1.3}.dialogHead>button{align-self:center;flex-shrink:0;margin:0}
+
+/* Radix marks covered dialogs hidden from assistive technology while the top dialog owns focus. */
+:global([role=dialog][data-state=open][aria-hidden=true]){filter:brightness(.85)}

@@ -22,3 +22,10 @@
 .operations small{color:var(--color-secondary-text)}
 .effects{margin:5px 0 0;padding-inline-start:18px}
 .warning{padding:9px 11px;border-radius:8px;background:var(--color-warning-surface);color:var(--color-warning)}
+.content form:empty{display:none}
+.impact .counts>div{display:flex;align-items:baseline}
+.impact .counts dd{max-width:58%;margin:0;text-align:end}
+.operationDetails{border:1px solid var(--color-border);border-radius:8px}
+.operationDetails summary{padding:9px 11px;cursor:pointer;font-weight:600}
+.operationDetails .operations{margin:0;border:0;border-top:1px solid var(--color-border);border-radius:0}
+.operationDetails p,.operationDetails>div{padding:8px 11px}

@@ -29,9 +29,27 @@
 .advanced>p,.advanced>button{grid-column:1/-1;justify-self:center;text-align:center}
 .normalChoice,.advanced .filterPick{font-weight:400}
 .mainRow{user-select:none}
-.contextActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
-.contextActions>button:last-child{margin-inline-start:auto;color:var(--color-danger,#b42339)}
+.contextActions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.contextActions>button:last-child{color:var(--color-danger,#b42339)}
 .dangerButton{color:var(--color-danger,#b42339);border-color:currentColor}
 .dangerButton:hover:not(:disabled){background:color-mix(in srgb,var(--color-danger,#b42339) 8%,var(--color-surface))}
 .pagination,.pagination>span{display:flex;align-items:center;gap:6px}.pagination{justify-content:center;flex-wrap:wrap;margin-top:12px}
 .pagination button{min-width:38px;padding-inline:8px}.pagination [aria-current=page]{background:var(--color-soft);border-color:var(--color-primary);color:var(--color-primary)}
+
+.filterLayout>.global>fieldset{margin-bottom:0}
+.columnSettings{padding:10px 12px;border:1px solid var(--color-border);border-radius:9px}
+.columnSettings>summary{cursor:pointer;font-weight:600}
+.columnSettings fieldset{margin:8px 0 0;min-width:0;padding:6px 0 0}
+.columnChoices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 10px}
+.columnChoice{display:grid;grid-template-columns:16px minmax(0,1fr) auto;justify-content:stretch;border:1px solid var(--color-border);border-radius:7px;padding:3px 6px;min-height:40px}
+.columnChoice[data-enabled=true]{background:var(--color-soft)}
+.columnChoice .columnCheck{cursor:pointer;min-width:0}
+.columnChoice .columnCheck input{accent-color:var(--color-primary)}
+.columnDrag{display:grid;place-items:center;color:var(--color-secondary-text)}
+.columnMove{display:flex;gap:3px}
+.columnMove>button{width:30px;min-width:30px;min-height:30px;height:30px;padding:0;display:grid;place-items:center;border:1px solid var(--color-border);border-radius:6px;background:var(--color-surface)}
+.columnMove>button:disabled{opacity:.45}
+.contextDialog[role=dialog]{padding-bottom:26px}
+.contextDialog[role=dialog]>div:first-child{margin-bottom:5px}
+.contextDialog[role=dialog]>p{margin-block:0;font-size:13px;color:var(--color-secondary-text)}
+@media(max-width:700px){.columnChoices{grid-template-columns:minmax(0,1fr)}.columnMove>button{min-height:38px;min-width:38px}}

@@ -4,7 +4,7 @@ import {linkKinds} from '../../../packages/finance-core/src/model';
 import {api} from './server-client';
 import {bankNames,displayBankDate,displayRole,kindNames,minorToRubles,rublesToMinor} from './finance-client';
 import type {FinanceDetail,FinanceState} from './finance-client';
-import {purchaseDrafts,purchaseBalance,purchaseRemainder,purchaseSplitIntent,newPurchasePart,componentDrafts,componentNames,componentsIntent,endpointKey,endpoints,linkIntent,linkNames,linkStatusNames,newComponent} from './operation-relations';
+import {purchaseDrafts,purchaseBalance,purchaseRemainder,purchaseSplitIntent,newPurchasePart,componentDrafts,componentNames,componentsIntent,endpointKey,endpoints,linkIntent,linkNames,newComponent} from './operation-relations';
 import type {ComponentDraft,ComponentsIntent,LinkIntent} from './operation-relations';
 import {formatMoney} from './demo/overview';
 import {OperationDialog,OperationField} from './OperationDialog';
@@ -28,7 +28,7 @@ export function OperationParts({detail,purchase,categories,staged,onApply,onClos
   catch(e){setError(e instanceof Error?e.message:'Проверьте состав операции.');}
  }
  const title=purchase?'Разделение покупки по категориям':'Распределение операции';
- return <OperationDialog title={title} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDrafts(initial);setWhole(!purchase&&staged?.parts.length===0);setChecked(false);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} onClick={apply}>Применить</button></>}>
+ return <OperationDialog compact title={title} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDrafts(initial);setWhole(!purchase&&staged?.parts.length===0);setChecked(false);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} onClick={apply}>Применить</button></>}>
   {!whole&&<fieldset className={styles.form}>
   {drafts.map((d,index)=><fieldset key={d.id} className={styles.partForm}>
    <legend>Часть {index+1}</legend>
@@ -56,9 +56,9 @@ const opposite=(a:string,b:string)=>BigInt(a)*BigInt(b)<0n;
 const abs=(s:string)=>{const n=BigInt(s);return n<0n?-n:n;};
 export function OperationLink({detail,existing,onApply,onClose,onReload,onAccessError,serverError,serverErrorCode}:{detail:FinanceDetail;existing?:Link;onApply:(v:LinkIntent)=>void;onClose:()=>void;onReload:()=>void;onAccessError:(e:unknown)=>void;serverError?:string;serverErrorCode?:string}){
  const [snapshot,setSnapshot]=useState<FinanceState|null>(null),[loadError,setLoadError]=useState(''),[reload,setReload]=useState(0);
- const [initial]=useState(()=>({kind:existing?.kind??(detail.semantics.kind.value==='refund'?'refund':['transfer_in','transfer_out','own_transfer'].includes(detail.semantics.kind.value)?'own_transfer':'reversal') as Link['kind'],status:existing?.status??'confirmed' as const,amount:existing?minorToRubles(existing.amountMinor):'',reverse:existing?existing.targetId===detail.id:detail.semantics.kind.value==='purchase',otherId:existing?(existing.sourceId===detail.id?existing.targetId:existing.sourceId):'',sourceKey:existing?endpointKey(existing.sourceComponentId,existing.sourceAllocationId):'',targetKey:existing?endpointKey(existing.targetComponentId,existing.targetAllocationId):''}));
+ const [initial]=useState(()=>({kind:existing?.kind??(detail.semantics.kind.value==='refund'?'refund':['transfer_in','transfer_out','own_transfer'].includes(detail.semantics.kind.value)?'own_transfer':'reversal') as Link['kind'],amount:existing?minorToRubles(existing.amountMinor):'',reverse:existing?existing.targetId===detail.id:detail.semantics.kind.value==='purchase',otherId:existing?(existing.sourceId===detail.id?existing.targetId:existing.sourceId):'',sourceKey:existing?endpointKey(existing.sourceComponentId,existing.sourceAllocationId):'',targetKey:existing?endpointKey(existing.targetComponentId,existing.targetAllocationId):''}));
  const [draft,setDraft]=useState(initial),[search,setSearch]=useState(''),[picking,setPicking]=useState(!initial.otherId),[shown,setShown]=useState(40),[checked,setChecked]=useState(false),[id]=useState(()=>existing?.id??crypto.randomUUID()),[error,setError]=useState(serverError??'');
- const {kind,status,amount,reverse,otherId,sourceKey,targetKey}=draft;
+ const {kind,amount,reverse,otherId,sourceKey,targetKey}=draft;
  const set=(patch:Partial<typeof draft>)=>{setError('');setDraft(d=>({...d,...patch}));};
  useEffect(()=>{let live=true;setLoadError('');void api<FinanceState>('/finance/state').then(s=>{if(live)setSnapshot(s);}).catch(e=>{onAccessError(e);if(live)setLoadError(e instanceof Error?e.message:'Не удалось загрузить операции.');});return()=>{live=false;};},[reload]);
  const stale=!!snapshot&&(snapshot.generation!==detail.generation||snapshot.revision!==detail.revision);
@@ -71,7 +71,7 @@ export function OperationLink({detail,existing,onApply,onClose,onReload,onAccess
   return (snapshot?.operations??[]).filter(o=>o.id!==detail.id).map(o=>{
    const account=accounts.get(o.accountId),iso=o.date.precision==='day'?o.date.date:new Date(Date.parse(o.date.instant)+(o.date.sourceOffsetMinutes??0)*60000).toISOString().slice(0,10),shortDate=iso.split('-').reverse().join('.'),longDate=displayBankDate(o.date,'UTC');
    const title=maskedOperationText(o.displayName?.compositeLabel||o.classification.merchant.value||kindNames[o.classification.kind.value]||'Операция');
-   const accountName=[account?bankNames[account.bankId]:null,account?.name].filter(Boolean).join(' · ');
+   const bank=account?bankNames[account.bankId]:undefined,accountName=bank&&!account?.name.startsWith(bank)?[bank,account?.name].filter(Boolean).join(' · '):account?.name??'';
    const amountLabel=formatMoney(o.amountMinor),meta=[shortDate,amountLabel,accountName].filter(Boolean).join(' · ');
    const words=maskedOperationText([title,o.classification.merchant.value,o.description,o.comment,iso,shortDate,longDate,amountLabel,minorToRubles(o.amountMinor),minorToRubles(o.amountMinor).replace(',','.'),accountName,kindNames[o.classification.kind.value],o.id].filter(Boolean).join(' ')).toLocaleLowerCase('ru').replaceAll('ё','е').replaceAll('−','-');
    return {id:o.id,title,meta,words};
@@ -89,15 +89,15 @@ export function OperationLink({detail,existing,onApply,onClose,onReload,onAccess
  try{
   const n=BigInt(rublesToMinor(amount));
   if(n<=0n)problems.amount='Укажите положительную сумму связи.';
-  if(status==='confirmed'&&se&&te&&!existing&&[se,te].some(e=>n>abs(e.amountMinor)))problems.amount='Сумма превышает доступный остаток выбранной части.';
+  if(se&&te&&!existing&&[se,te].some(e=>n>abs(e.amountMinor)))problems.amount='Сумма превышает доступный остаток выбранной части.';
  }catch(e){problems.amount=(e as Error).message;}
- if(status==='confirmed'&&se&&te&&!se.current&&!te.current){
+ if(se&&te&&!se.current&&!te.current){
   if(['refund','expense_reimbursement'].includes(kind)&&(BigInt(se.amountMinor)<=0n||BigInt(te.amountMinor)>=0n||te.role!=='expense'))problems.kind='Нужны поступление и исходный расход. Проверьте порядок операций.';
   else if(['reversal','own_transfer','debt_repayment'].includes(kind)&&!opposite(se.amountMinor,te.amountMinor))problems.kind='Для такой связи нужны суммы с противоположными знаками.';
  }
- function apply(){setChecked(true);if(!source||!target||!se||!te||Object.keys(problems).length)return;onApply(linkIntent(id,kind,status,amount,source,target,se,te));}
+ function apply(){setChecked(true);if(!source||!target||!se||!te||Object.keys(problems).length)return;onApply(linkIntent(id,kind,'confirmed',amount,source,target,se,te));}
  const endpoint=(side:'source'|'target',items:typeof sources,chosen:typeof se)=> <OperationField label={'Часть: '+roles[kind][side==='source'?0:1]} error={fieldError(side,problems[side])}><select aria-label={side==='source'?'Часть первой операции':'Часть второй операции'} disabled={!items.length} value={chosen?.key??''} onChange={e=>set(side==='source'?{sourceKey:e.target.value}:{targetKey:e.target.value})}><option value="">Выберите часть</option>{items.map((e,i)=><option key={e.key} value={e.key}>{e.current?'Сохранённая часть связи':`${e.allocationId?'По другой связи':e.componentId?'Часть '+(i+1):'Целая операция или остаток'} · ${formatMoney(e.amountMinor)}${e.categoryId?' · '+(snapshot?.categories.find(c=>c.id===e.categoryId)?.name??''):''}`}</option>)}</select></OperationField>;
- return <OperationDialog title={existing?'Изменение связи':'Связь с другой операцией'} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDraft(initial);setChecked(false);setSearch('');setShown(40);setPicking(!initial.otherId);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} disabled={!snapshot||stale} onClick={apply}>Применить</button></>}>
+ return <OperationDialog compact title={existing?'Изменение связи':'Связь с другой операцией'} onClose={onClose} footer={<><button className={styles.quietButton} onClick={()=>{setDraft(initial);setChecked(false);setSearch('');setShown(40);setPicking(!initial.otherId);setError('');}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} disabled={!snapshot||stale} onClick={apply}>Применить</button></>}>
   {!snapshot&&!loadError&&<p role="status">Загружаем операции…</p>}
   {loadError&&<><p role="alert" className={common.error}>{loadError}</p><button className={common.button} onClick={()=>setReload(n=>n+1)}>Повторить загрузку</button></>}
   {stale&&<><p role="alert" className={common.error}>Список изменился. Обновите карточку перед настройкой связи.</p><button className={common.button} onClick={onReload}>Обновить карточку</button></>}
@@ -111,7 +111,6 @@ export function OperationLink({detail,existing,onApply,onClose,onReload,onAccess
    </div>
    {other&&<>{endpoint('source',sources,se)}{endpoint('target',targets,te)}</>}
    <OperationField label="Сумма связи, ₽" error={fieldError('amount',problems.amount)}><input inputMode="decimal" value={amount} onChange={e=>set({amount:e.target.value})}/></OperationField>
-   <label>Статус связи<select aria-label="Статус связи" value={status} onChange={e=>set({status:e.target.value as Link['status']})}>{(['confirmed','candidate','rejected'] as const).map(s=><option key={s} value={s}>{linkStatusNames[s]}</option>)}</select></label>
    {error&&(errorField==='form'||errorField==='target'&&!other)&&<small className={styles.fieldError} role="alert">{error}</small>}
   </fieldset>
  </OperationDialog>;

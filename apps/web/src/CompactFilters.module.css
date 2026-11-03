@@ -26,3 +26,7 @@
 
 .searchField{flex:0 0 165px;display:flex;padding-left:14px;margin-left:4px;border-left:1px solid var(--color-border)}.searchField input{width:150px;padding:6px 9px}.dateError{margin:0;padding:0 12px 10px;color:var(--color-danger,#b42339);font-size:13px}
 .searchField input[aria-invalid=true]{border-color:var(--color-danger,#b42339)}
+
+.dateField>span:first-child,.dateField input:not([type=date]){font-size:inherit;line-height:1.25}
+.dateField>span:first-child{white-space:nowrap}
+@media(pointer:coarse){.dateField{font-size:calc(16px * var(--text-scale,1))}}

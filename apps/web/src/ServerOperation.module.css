@@ -50,3 +50,13 @@
 .form .linkOptions button{border:0;border-bottom:1px solid var(--color-border);border-radius:0;font-weight:400}
 .form .linkOptions button:last-child{border-bottom:0}
 .linkOptions p{padding:0 10px}
+
+.linkOptions{display:block}
+.form .linkOptions button,.form .selectedLink{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;width:100%;max-width:100%;min-height:46px;height:auto;overflow:visible;text-align:start;overflow-wrap:anywhere}
+.form .linkOptions button>*,.form .selectedLink>*{display:block;min-width:0;max-width:100%;line-height:1.4}
+.form .linkOptions button:focus-visible{outline-offset:-2px}
+.bulkDetails>summary{cursor:pointer;font-size:14px;font-weight:600}
+.bulkDetails>ul{padding-inline-start:20px;margin:10px 0 0}
+.bulkDetails>ul>li+li{margin-top:8px}
+.bulkConfirmation{width:min(510px,calc(100vw - 24px));max-width:510px}
+.srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
