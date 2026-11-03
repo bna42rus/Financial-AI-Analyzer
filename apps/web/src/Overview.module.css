@@ -51,3 +51,21 @@
 
 .canvasCell[data-custom-size] .chartScroll{display:flex;flex:1 0 80px;min-height:80px}.canvasCell[data-custom-size] .chartScroll>.chart{min-width:100%;flex:1 0 auto}
 .compactDialog>div:first-child{position:static;padding:0;margin-bottom:14px;border:0;box-shadow:none}.compactDialog>p{margin-bottom:0}
+
+.visuallyHidden{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.workspaceDialog.containedDialog{display:flex;flex-direction:column;overflow:hidden;padding:0;max-height:calc(100dvh - 28px)}
+.workspaceDialog.containedDialog>div:first-child{position:static;flex:none;margin:0;padding:14px 20px;background:var(--color-surface);box-shadow:none}
+.containedBody{display:flex;flex-direction:column;min-height:0;overflow:hidden}
+.workspaceDialog .editor{display:flex;flex-direction:column;min-height:0;overflow:hidden;gap:0}
+.editorScroll{display:grid;gap:16px;overflow:auto;overscroll-behavior:contain;padding:16px 20px;min-height:0}
+.editorScroll>fieldset{min-width:0;margin:0}
+.editor>.widgetFooter{position:static;flex:none;margin:0;padding:10px 20px;overflow:visible}
+.editor>p[role=alert]{margin:0;padding:7px 20px}
+.editor .metricField{display:grid;align-content:start;gap:7px;font-size:calc(14px * var(--text-scale,1))}
+.editor .formGrid{align-items:start}
+.editor :is(input,select,div)[aria-invalid=true]{border-color:var(--color-danger,#b42339)}
+.editor [aria-invalid=true].metricField button,.editor div[aria-invalid=true].accountChoices{outline:1px solid var(--color-danger,#b42339);border-radius:8px}
+.deleteWidget:hover,.deleteWidget:focus-visible{background:var(--color-soft);border-radius:7px}
+.chartLegend{display:flex;flex-wrap:wrap;gap:6px 16px;list-style:none;margin:0;padding:0 2px 8px;font-size:12px;justify-content:flex-start}
+.chartLegend li{display:flex;gap:6px;align-items:center}.chartLegend li span{width:12px;height:8px;flex:none;border-radius:2px}
+@media(max-width:700px){.editor>.widgetFooter{display:grid;gap:6px;padding:8px 12px}.editor>.widgetFooter>div{flex-wrap:wrap}.editorScroll,.workspaceDialog.containedDialog>div:first-child{padding:12px}.editor>.widgetFooter button{min-height:36px}}

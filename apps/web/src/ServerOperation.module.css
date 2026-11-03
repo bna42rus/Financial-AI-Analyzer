@@ -2,3 +2,13 @@
 @media(max-width:600px){.form input,.form select,.form textarea{font-size:16px}.form button,.actions button{min-height:44px}.preview dl>div{flex-wrap:wrap}.preview dd{max-width:100%}.conflict{padding:12px 8px}}
 
 .partForm{border:1px solid var(--color-border);border-radius:8px;padding:12px;display:grid;gap:10px;min-width:0}.partForm legend{font-size:14px}.correction select{white-space:normal}.correction p{overflow-wrap:anywhere}
+
+.operationDialog{width:min(760px,calc(100vw - 24px));max-width:760px;max-height:calc(100dvh - 28px);padding:0;display:flex;flex-direction:column;overflow:hidden}
+.operationHead{padding:12px 18px;margin:0;border-bottom:1px solid var(--color-border);flex:none}
+.operationBody{min-height:0;overflow:auto;overscroll-behavior:contain;padding:14px 18px;display:grid;gap:12px}
+.operationBody>h3,.operationBody>p{margin:0}.operationBody>button{justify-self:start}
+.operationBody .form{margin:0}.operationBody :is(section,details) h3{margin:0 0 8px}
+.operationFooter{display:flex;justify-content:flex-end;gap:8px;flex:none;border-top:1px solid var(--color-border);padding:10px 18px}
+@media(max-width:700px){.operationHead,.operationBody,.operationFooter{padding-inline:12px}.operationFooter{padding-bottom:max(10px,env(safe-area-inset-bottom))}}
+
+.operationBody>*{min-width:0}.operationBody .preview{margin:0}

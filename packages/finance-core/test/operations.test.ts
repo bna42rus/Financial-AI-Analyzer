@@ -27,3 +27,16 @@ test('whole-result exact totals, BigInt sort and deterministic UUID ties on 15,0
 test('all sort and grouping modes are deterministic and source facts remain unchanged',()=>{const a=row(),b={...structuredClone(a),id:randomUUID(),comment:'Другой',amountMinor:'-20000',date:{precision:'day' as const,date:'2026-09-03'}};const before=structuredClone([a,b]);for(const sort of ['date','amount','merchant','category','confidence','status'])for(const group of ['none','date','category','subcategory','merchant','counterparty','account','kind']){const q={sort,group,direction:'asc'};assert.deepEqual(query([a,b],{},q).operations,query([b,a],{},q).operations);}assert.deepEqual([a,b],before);});
 test('dynamic periods use profile timezone without shifting bank dates, including leap month and year rollover',()=>{const view=parseOperationsView({columns:defaultColumns,period:'current_month'});assert.deepEqual(periodFilter(view,new Date('2026-10-01T00:30:00Z'),'Pacific/Honolulu'),{from:'2026-09-01',through:'2026-09-30'});assert.deepEqual(periodFilter({...view,period:'previous_month'},new Date('2024-03-31T12:00:00Z')),{from:'2024-02-01',through:'2024-02-29'});assert.deepEqual(periodFilter({...view,period:'last_30_days'},new Date('2026-01-05T12:00:00Z')),{from:'2025-12-07',through:'2026-01-05'});});
 test('closed filters reject malformed amounts, dates, boolean coercion, range order, injected properties and identifiers',()=>{for(const f of [{amountFrom:'1.1'},{from:'2026-02-30'},{confidenceFrom:100.1},{linked:'true'},{amountFrom:'2',amountThrough:'1'},{confidenceFrom:90,confidenceThrough:80},{postedFrom:'2026-09-02',postedThrough:'2026-09-01'},{sql:'SELECT'},{search:'person@example.test'},{accountIds:[account,account]},{fileId:'anything'}])assert.throws(()=>parseOperationsQuery({filter:f}));assert.throws(()=>parseOperationsView({columns:['date']}));assert.throws(()=>parseOperationsView({columns:defaultColumns,period:'fixed'}));assert.throws(()=>parseOperationsView({columns:defaultColumns,widths:{date:999}}));});
+
+test('operator search and multiple filters agree on the exact matching operations and financial total',()=>{
+ const a=row(),b=row(),c=row();
+ a.description='Такси из аэропорта';b.description='Такси по городу';c.description='Поезд';
+ b.classification.kind=facet('transfer_out');c.classification.kind=facet('refund');
+ a.classification.category=facet(cat,'personal_rule',false,82);a.classification.category.ruleId=rule;
+ b.classification.category=facet(cat,'bank');c.classification.category=facet(cat,'bank');b.classification.role=facet('expense','bank',false,55);
+ assert.deepEqual(query([a,b,c],{description:'такси & аэропорт | поезд',kinds:['purchase','refund']}).operations.map(x=>x.id).sort(),[a.id,c.id].sort());
+ const narrowed=query([a,b,c],{search:'такси | поезд',kinds:['purchase','transfer_out'],roles:['expense','income'],facets:['category','role'],sources:['personal_rule','ai'],ruleIds:[rule],confidenceFrom:80});
+ assert.deepEqual(narrowed.operations.map(o=>o.id),[a.id]);assert.equal(narrowed.summary.netExpensesMinor,'12345');
+ for(const search of ['такси &','| поезд','такси || поезд'])assert.throws(()=>parseOperationsFilter({search}),/INVALID_SEARCH_EXPRESSION/);
+ assert.doesNotThrow(()=>parseOperationsFilter({merchant:'Shop |',merchantExact:true}));
+});

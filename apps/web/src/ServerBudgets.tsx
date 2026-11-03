@@ -9,7 +9,7 @@ import {rublesToMinor,minorToRubles,bankNames,kindNames,roleNames,reviewNames} f
 import type {FinanceState} from './finance-client';
 import type {WorkspaceCommand,CommandState} from './workspace-command';
 import {formatMoney} from './demo/overview';
-import {OperationsFilters} from './OperationsFilters';
+import {BudgetOperationFilters} from './BudgetOperationFilters';
 import common from './App.module.css';
 import workspace from './Workspace.module.css';
 import styles from './Budgets.module.css';
@@ -29,7 +29,7 @@ function Editor({budget,state,disabled,timezone,onSave,onCancel}:{budget:BudgetC
  <div className={styles.pair}>{multi('accountIds','Счета бюджета',state.accounts)}{multi('categoryIds','Категории бюджета',state.categories.filter(c=>!c.parentId))}<label>Банк бюджета<select aria-label="Банк бюджета" value={filter.bankId??''} onChange={e=>{const next={...filter};if(e.target.value)next.bankId=e.target.value;else delete next.bankId;setFilter(next);}}><option value="">Все банки</option>{[...new Set(state.accounts.map(a=>a.bankId))].map(id=><option key={id} value={id}>{bankNames[id]??id}</option>)}</select></label></div>
  <button type="button" className={common.button} onClick={()=>setFilter({})}>Очистить фильтр бюджета</button>
  <p>Без выбора — все счета и категории. По умолчанию учитываются включённые расходы и их возвраты. Нейтральные и неопределённые суммы не расходуют лимит.</p></fieldset>
- <OperationsFilters state={state} value={filter} onChange={setFilter} disabled={disabled}/>{error&&<p role="alert" className={common.error}>{error}</p>}<div className={workspace.actions}><button className={common.primaryButton} disabled={disabled}>Сохранить бюджет</button><button type="button" className={common.button} onClick={onCancel}>Закрыть форму бюджета</button></div></form>;
+ <BudgetOperationFilters state={state} value={filter} onChange={setFilter} disabled={disabled}/>{error&&<p role="alert" className={common.error}>{error}</p>}<div className={workspace.actions}><button className={common.primaryButton} disabled={disabled}>Сохранить бюджет</button><button type="button" className={common.button} onClick={onCancel}>Закрыть форму бюджета</button></div></form>;
 }
 export function ServerBudgets({state,command,commandState,disabled,timezone,onAccessError,onOperations}:{state:FinanceState;command:WorkspaceCommand|null;commandState:CommandState;disabled:boolean;timezone:string;onAccessError:(e:unknown)=>void;onOperations:(filter:OperationsFilter,name:string)=>void}){
  const [draftRevision,setDraftRevision]=useState(state.revision);

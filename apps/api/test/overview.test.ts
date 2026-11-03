@@ -59,3 +59,14 @@ test('deleting the last view atomically creates an empty named view and Undo res
  await command({kind:'undo',id:randomUUID(),value:deleted.receipt.actionId});
  const restored=(await within(db=>overviewViews(db,'first'))).views;assert.equal(restored.length,1);assert.equal(restored[0].id,id);assert.equal(restored[0].name,'Last saved view');
 });
+
+test('copying the built-in view materializes the original and deleting a default promotes the remaining view',async()=>{
+ const id=randomUUID(),standard='10000000-0000-4000-8000-999999999999';
+ await command({kind:'save_overview_view',id,create:true,name:'Copy of standard',definition:defaultOverview(),isDefault:false,preserveStandard:true});
+ const both=(await within(db=>overviewViews(db,'first'))).views;
+ assert.deepEqual(both.map(v=>[v.id,v.isDefault]),[[standard,true],[id,false]]);
+ const deletion=await command({kind:'delete_overview_view',id:standard});
+ assert.deepEqual((await within(db=>overviewViews(db,'first'))).views.map(v=>[v.id,v.isDefault]),[[id,true]]);
+ await command({kind:'undo',id:randomUUID(),value:deletion.receipt.actionId});
+ assert.deepEqual((await within(db=>overviewViews(db,'first'))).views.map(v=>[v.id,v.isDefault]),[[standard,true],[id,false]]);
+});

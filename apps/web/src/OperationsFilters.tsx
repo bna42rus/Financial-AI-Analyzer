@@ -1,23 +1,69 @@
-import {DateInput} from './DateInput';
+import {useState} from 'react';
+import {searchExpressionError} from '../../../packages/finance-core/src/operations';
 import type {OperationsFilter} from '../../../packages/finance-core/src/operations';
 import type {FinanceState} from './finance-client';
 import {kindNames,roleNames,reviewNames,reviewStatusNames,rublesToMinor,minorToRubles} from './finance-client';
 import {sourceNames} from './operations-client';
-import styles from './Workspace.module.css';
-export function OperationsFilters({state,value,onChange,disabled}:{state:FinanceState;value:OperationsFilter;onChange:(v:OperationsFilter)=>void;disabled:boolean}){
- function change(key:keyof OperationsFilter,v:unknown){const next={...value};if(v===''||v===undefined)delete next[key];else Object.assign(next,{[key]:v});onChange(next);}
- function amount(key:'amountFrom'|'amountThrough',text:string,input:HTMLInputElement){try{input.setCustomValidity('');change(key,text?rublesToMinor(text):'');}catch(e){input.setCustomValidity(e instanceof Error?e.message:'Проверьте сумму.');input.reportValidity();}}
- const reasons=[...new Set([...Object.keys(reviewNames),...state.operations.flatMap(o=>o.reviewReasons)])].sort();
- const select=(key:keyof OperationsFilter,name:string,items:[string,string][])=> <label>{name}<select aria-label={name} value={String(value[key]??'')} onChange={e=>change(key,e.target.value)}><option value="">Любое значение</option>{items.map(([id,n])=><option key={id} value={id}>{n}</option>)}</select></label>;
- return <fieldset className={styles.filters} disabled={disabled}><legend>Поиск и проверка</legend><label>Поиск<input aria-label="Поиск сохранённых операций" maxLength={160} value={value.search??''} onChange={e=>change('search',e.target.value)}/></label><details><summary><span>Дополнительные фильтры</span>{Object.keys(value).filter(k=>k!=='search').length>0&&<small> · активно: {Object.keys(value).filter(k=>k!=='search').length}</small>}</summary><div className={styles.filters}>{select('reason','Причина проверки',reasons.map(r=>[r,reviewNames[r]??r]))}{select('status','Состояние проверки',Object.entries(reviewStatusNames))}<label><input type="checkbox" checked={value.includeExcluded===true} onChange={e=>change('includeExcluded',e.target.checked?true:undefined)}/>Учитывать исключённые в итогах явно</label>
- {select('kind','Тип операции',Object.entries(kindNames))}{select('role','Финансовый смысл',Object.entries(roleNames))}{select('inclusion','Участие в аналитике',[['included','Включено'],['excluded','Исключено']])}
- <label>Подкатегории<select aria-label="Подкатегории" multiple value={value.subcategoryIds??[]} onChange={e=>change('subcategoryIds',Array.from(e.target.selectedOptions,o=>o.value).length?Array.from(e.target.selectedOptions,o=>o.value):undefined)}>{state.categories.filter(c=>c.parentId).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
- <label>Сумма от, ₽<input aria-label="Сумма фильтра от, ₽" defaultValue={value.amountFrom!==undefined?minorToRubles(value.amountFrom):''} key={'from'+value.amountFrom} onBlur={e=>amount('amountFrom',e.target.value,e.target)}/></label><label>Сумма до, ₽<input aria-label="Сумма фильтра до, ₽" defaultValue={value.amountThrough!==undefined?minorToRubles(value.amountThrough):''} key={'through'+value.amountThrough} onBlur={e=>amount('amountThrough',e.target.value,e.target)}/></label>
- <label>Магазин содержит<input maxLength={160} value={value.merchant??''} onChange={e=>change('merchant',e.target.value)}/></label><label>Комментарий содержит<input maxLength={1000} value={value.comment??''} onChange={e=>change('comment',e.target.value)}/></label>
- {select('facet','Поле классификации',[['category','Категория'],['subcategory','Подкатегория'],['kind','Тип'],['role','Финансовый смысл']])}{select('source','Источник классификации',Object.entries(sourceNames))}
- {(['confidenceFrom','confidenceThrough'] as const).map((key,i)=><label key={key}>Уверенность {i?'до':'от'}, %<input aria-label={`Уверенность ${i?'до':'от'}, %`} type="number" min={0} max={100} step={1} value={value[key]??''} onChange={e=>{if(!e.target.value)change(key,undefined);else if(e.target.validity.valid)change(key,Number(e.target.value));}}/></label>)}
- {select('ruleId','Применённое правило',state.rules.map(r=>[r.id,r.name]))}<label>Контрагенты<select aria-label="Контрагенты фильтра" multiple value={value.counterpartyIds??[]} onChange={e=>change('counterpartyIds',e.target.selectedOptions.length?Array.from(e.target.selectedOptions,o=>o.value):undefined)}>{state.counterparties.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
- {(['postedFrom','postedThrough'] as const).map((key,i)=><label key={key}>Проводка {i?'по':'с'}<DateInput  value={value[key]??''} onValueChange={value=>change(key,value)}/></label>)}
- {(['linked','refund','possibleDuplicate','transfer'] as const).map((key,i)=><label key={key}>{['Связи','Возвраты / отмены','Возможные дубли','Переводы'][i]}<select aria-label={['Связи','Возвраты / отмены','Возможные дубли','Переводы'][i]} value={value[key]===undefined?'':String(value[key])} onChange={e=>change(key,e.target.value===''?undefined:e.target.value==='true')}><option value="">Все</option><option value="true">Да</option><option value="false">Нет</option></select></label>)}
- </div></details></fieldset>;
+import {OverviewPopover} from './OverviewDialogs';
+import {WidgetSelect} from './WidgetSelect';
+import filterStyles from './CompactFilters.module.css';
+import styles from './OperationsTable.module.css';
+const kindOrder=['purchase','refund','reversal','cashback','transfer_in','transfer_out','own_transfer','cash_deposit','cash_withdrawal','loan_disbursement','loan_payment','credit_card_repayment','interest','fee','insurance','other'];
+const facets:[string,string][]=[['kind','Тип'],['role','Финансовый смысл'],['category','Категория'],['subcategory','Подкатегория'],['merchant','Магазин'],['counterparty','Контрагент']];
+const advancedKeys=['reason','status','inclusion','kinds','roles','amountFrom','amountThrough','amountBasis','description','merchant','comment','facets','sources','confidenceFrom','confidenceThrough','ruleIds','counterpartyIds'] as const;
+export function advancedOperationFilters(f:OperationsFilter):OperationsFilter {
+ const next=Object.fromEntries(advancedKeys.filter(k=>f[k]!==undefined).map(k=>[k,f[k]])) as OperationsFilter;
+ if(!next.kinds&&f.kind)next.kinds=[f.kind] as OperationsFilter['kinds'];
+ if(!next.roles&&f.role)next.roles=[f.role] as OperationsFilter['roles'];
+ if(!next.facets&&f.facet)next.facets=[f.facet];
+ if(!next.sources&&f.source)next.sources=[f.source] as OperationsFilter['sources'];
+ if(!next.ruleIds&&f.ruleId)next.ruleIds=[f.ruleId];
+ return next;
+}
+export function invalidAdvancedFilter(value:OperationsFilter){return ['description','merchant','comment'].some(k=>!!searchExpressionError(value[k as 'description'|'merchant'|'comment']));}
+function Multiple({label,options,value,onChange,disabled}:{label:string;options:[string,string][];value:string[];onChange:(values:string[])=>void;disabled:boolean}){
+ const [search,setSearch]=useState('');
+ return <div className={styles.multiField}><span>{label}</span><OverviewPopover label={label} triggerText={value.length>1?'Выбрано несколько':value.length?options.find(([id])=>id===value[0])?.[1]??'Недоступное значение':'Любое значение'} triggerClassName={styles.filterPick} disabled={disabled}>
+ <input type="search" aria-label={'Найти: '+label} placeholder="Найти" value={search} onChange={e=>setSearch(e.target.value)}/>
+ <button type="button" className={filterStyles.clear} onClick={()=>{onChange([]);setSearch('');}}>Сбросить</button>
+ {options.filter(([,name])=>name.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru'))).map(([id,name])=><label key={id} className={filterStyles.choice}><input type="checkbox" checked={value.includes(id)} onChange={e=>onChange(e.target.checked?[...value,id]:value.filter(v=>v!==id))}/><span>{name}</span></label>)}
+ </OverviewPopover></div>;
+}
+type NumericKey='amountFrom'|'amountThrough'|'confidenceFrom'|'confidenceThrough';
+export function OperationsFilters({state,value,onChange,disabled,onInvalid}:{state:FinanceState;value:OperationsFilter;onChange:(v:OperationsFilter)=>void;disabled:boolean;onInvalid:(invalid:boolean)=>void}){
+ const [raw,setRaw]=useState<Partial<Record<NumericKey,string>>>({}),[errors,setErrors]=useState<Partial<Record<NumericKey,string>>>({});
+ function change(key:keyof OperationsFilter,v:unknown){const next={...value};if(v===''||v===undefined||Array.isArray(v)&&!v.length)delete next[key];else Object.assign(next,{[key]:v});onChange(next);}
+ function number(key:NumericKey,text:string,commit:boolean){
+  if(commit&&raw[key]===undefined)return;
+  const values={...raw,[key]:text};
+  const next={...value},problems:typeof errors={};
+  for(const [k,v] of Object.entries(values) as [NumericKey,string][]){try{
+   if(!v.trim())delete next[k];
+   else if(k.startsWith('amount'))Object.assign(next,{[k]:rublesToMinor(v)});
+   else if(!/^\d{1,3}$/.test(v)||Number(v)>100)problems[k]='Введите целое число от 0 до 100.';
+   else Object.assign(next,{[k]:Number(v)});
+  }catch{problems[k]='Укажите сумму с точностью до копеек.';}}
+  if(!problems.amountFrom&&!problems.amountThrough&&next.amountFrom!==undefined&&next.amountThrough!==undefined&&BigInt(next.amountFrom)>BigInt(next.amountThrough))problems[key.startsWith('amount')?key:'amountThrough']='Нижняя граница выше верхней.';
+  if(!problems.confidenceFrom&&!problems.confidenceThrough&&next.confidenceFrom!==undefined&&next.confidenceThrough!==undefined&&next.confidenceFrom>next.confidenceThrough)problems[key.startsWith('confidence')?key:'confidenceThrough']='Нижняя граница выше верхней.';
+  setRaw(values);setErrors(problems);onInvalid(!!Object.keys(problems).length);
+  if(commit&&!Object.keys(problems).length){onChange(next);setRaw({});}
+ }
+ const select=(key:keyof OperationsFilter,name:string,items:[string,string][])=> <label>{name}<WidgetSelect aria-label={name} value={String(value[key]??'')} onChange={e=>change(key,e.target.value)}><option value="">Любое значение</option>{items.map(([id,n])=><option key={id} value={id}>{n}</option>)}</WidgetSelect></label>;
+ const multi=(key:'kinds'|'roles'|'facets'|'sources'|'ruleIds'|'counterpartyIds',name:string,options:[string,string][])=> <Multiple label={name} options={options} value={value[key]??[]} onChange={v=>change(key,v)} disabled={disabled}/>;
+ const inputNumber=(key:NumericKey,label:string,accessibleName=label)=>{const v=value[key];return <label>{label}<input aria-label={accessibleName} aria-invalid={!!errors[key]||undefined} inputMode={key.startsWith('amount')?'decimal':'numeric'} value={raw[key]??(v===undefined?'':key.startsWith('amount')?minorToRubles(String(v)):String(v))} onChange={e=>number(key,e.target.value,false)} onBlur={e=>number(key,e.target.value,true)}/>{errors[key]&&<small role="alert">{errors[key]}</small>}</label>;};
+ const field=(key:'description'|'merchant'|'comment',label:string)=>{const message=searchExpressionError(value[key]);return <label>{label}<input maxLength={key==='comment'?1000:160} aria-invalid={!!message||undefined} value={value[key]??''} onChange={e=>change(key,e.target.value)}/>{message&&<small role="alert">{message}</small>}</label>;};
+ const reasons=[...new Set([...Object.keys(reviewNames),...state.operations.flatMap(o=>o.reviewReasons)])];
+ return <details className={styles.options}><summary>Дополнительные фильтры{Object.keys(value).length>0&&<small> · {Object.keys(value).length}</small>}</summary>
+ <fieldset disabled={disabled} className={styles.advanced}><legend className={filterStyles.srOnly}>Дополнительные фильтры операций</legend>
+ {select('status','Состояние проверки',Object.entries(reviewStatusNames))}{select('reason','Причина проверки',reasons.map(r=>[r,reviewNames[r]??r]))}
+ {multi('kinds','Тип операции',kindOrder.map(k=>[k,kindNames[k]??k]))}{multi('roles','Финансовый смысл',Object.entries(roleNames))}
+ {inputNumber('amountFrom','Сумма от, ₽','Сумма фильтра от, ₽')}{inputNumber('amountThrough','Сумма до, ₽','Сумма фильтра до, ₽')}
+ {field('description','Описание операции содержит')}{field('merchant','Магазин содержит')}{field('comment','Комментарий содержит')}
+ {multi('counterpartyIds','Контрагенты',state.counterparties.map(p=>[p.id,p.name]))}
+ {multi('facets','Поле классификации',facets)}{multi('sources','Источник классификации',Object.entries(sourceNames))}
+ {inputNumber('confidenceFrom','Уверенность от, %')}{inputNumber('confidenceThrough','Уверенность до, %')}
+ {multi('ruleIds','Применённое правило',state.rules.map(r=>[r.id,r.name]))}{select('inclusion','Участие в аналитике',[['included','Включено'],['excluded','Исключено']])}
+ <p>В поиске & означает «и», | — «или». Например: такси & аэропорт | поезд.</p>
+ <button type="button" className={filterStyles.reset} onClick={()=>{setRaw({});setErrors({});onInvalid(false);onChange({});}}>Сбросить дополнительные фильтры</button>
+ </fieldset></details>;
 }
