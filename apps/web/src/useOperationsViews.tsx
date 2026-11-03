@@ -19,11 +19,11 @@ const builtIn=():SavedOperationsView=>({id:standardOperationsViewId,name:standar
 type Sheet={kind:'new'|'copy'|'rename'|'delete';view?:SavedOperationsView;name:string;revision:string};
 type Snapshot={active:SavedOperationsView;config:OperationsView};
 type Pending={id:string;kind:'select'|'metadata'|'delete';previousUndo:string|null;after?:()=>void;snapshot:Snapshot};
-export function useOperationsViews({state,config,onConfig,disabled,invalid,command,commandState,onAccessError,onNavigationGuard}:{state:FinanceState;config:OperationsView;onConfig:(v:OperationsView,replaceFilters:boolean)=>void;disabled:boolean;invalid:boolean;command:WorkspaceCommand|null;commandState:CommandState;onAccessError:(e:unknown)=>boolean;onNavigationGuard?:(guard:((action:()=>void)=>boolean)|null)=>void}){
+export function useOperationsViews({state,config,onConfig,disabled,invalid,command,commandState,onAccessError,onNavigationGuard,applyDefaultFilters}:{applyDefaultFilters:boolean;state:FinanceState;config:OperationsView;onConfig:(v:OperationsView,replaceFilters:boolean)=>void;disabled:boolean;invalid:boolean;command:WorkspaceCommand|null;commandState:CommandState;onAccessError:(e:unknown)=>boolean;onNavigationGuard?:(guard:((action:()=>void)=>boolean)|null)=>void}){
  const [active,setActive]=useState(builtIn),[views,setViews]=useState<SavedOperationsView[]>([]),[loaded,setLoaded]=useState(''),[reload,setReload]=useState(0),[sheet,setSheet]=useState<Sheet|null>(null),[name,setName]=useState(''),[error,setError]=useState(''),[leave,setLeave]=useState<(()=>void)|null>(null);
  const current=useRef({active,config,disabled,onConfig,onAccessError,state});current.current={active,config,disabled,onConfig,onAccessError,state};
  const pending=useRef<Pending|null>(null),first=useRef(true),history=useRef(new Map<string,Snapshot>()),appliedUndo=useRef<string|null>(null);
- const dirty=visual(config)!==visual(active.definition),stale=active.revision!==''&&views.some(v=>v.id===active.id&&v.revision!==active.revision&&visual(v.definition)!==visual(active.definition));
+ const dirty=visual(config)!==visual(active.definition),stale=active.revision!==''&&views.some(v=>v.id===active.id&&v.revision!==active.revision&&(visual(v.definition)!==visual(active.definition)||JSON.stringify(advancedOperationFilters(v.definition.filter))!==JSON.stringify(advancedOperationFilters(active.definition.filter))));
  const ready=loaded===state.revision;
  function activate(v:SavedOperationsView){setActive(v);current.current.onConfig(normalize(v.definition),true);setError('');}
  useEffect(()=>{
@@ -42,10 +42,10 @@ export function useOperationsViews({state,config,onConfig,disabled,invalid,comma
     else if(p.kind==='metadata'){const refreshed=next.find(v=>v.id===c.active.id);if(refreshed)setActive(refreshed);}
     p.after?.();return;
    }
-   if(first.current){first.current=false;const chosen=next.find(v=>v.isDefault&&v.dependencyStatus==='ready')??next[0]!;if(visual(c.config)===visual(c.active.definition))activate(chosen);else setActive(chosen);return;}
+   if(first.current){first.current=false;const chosen=next.find(v=>v.isDefault&&v.dependencyStatus==='ready')??next[0]!;if(visual(c.config)===visual(c.active.definition)){setActive(chosen);c.onConfig({...normalize(chosen.definition),...(!applyDefaultFilters?{filter:c.config.filter}:{})},true);}else setActive(chosen);return;}
    const found=next.find(v=>v.id===c.active.id);
    if(!found&&visual(c.config)===visual(c.active.definition))activate(next.find(v=>v.isDefault)??next[0]!);
-   else if(found&&visual(c.config)===visual(c.active.definition)&&found.revision!==c.active.revision&&!p)activate(found);
+   else if(found&&visual(c.config)===visual(c.active.definition)&&found.revision!==c.active.revision&&!p){setActive(found);c.onConfig({...normalize(found.definition),filter:c.config.filter},false);}
   }).catch(e=>{if(live&&!current.current.onAccessError(e))setError('Не удалось загрузить представления.');});
   return()=>{live=false;};
  },[state.revision,reload]);

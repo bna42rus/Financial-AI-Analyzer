@@ -5,7 +5,7 @@ import {OperationRule} from './OperationRule';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import type {KeyboardEvent,CSSProperties,ReactNode} from 'react';
 import {createPortal} from 'react-dom';
-import {defaultOperationsView} from '../../../packages/finance-core/src/operations';
+import {defaultOperationsView,searchExpressionError} from '../../../packages/finance-core/src/operations';
 import type {OperationsFilter} from '../../../packages/finance-core/src/operations';
 import type {FinanceState,OperationPatch} from './finance-client';
 import {displayBankDate,displayRole,kindNames,reviewStatusNames,bankNames,roleNames} from './finance-client';
@@ -21,19 +21,20 @@ import common from './App.module.css';
 import workspace from './Workspace.module.css';
 import styles from './OperationsTable.module.css';
 import overviewStyles from './Overview.module.css';
+import {validDateRange} from './DateInput';
 import {OverviewDialog} from './OverviewDialogs';
 import {useOperationsViews} from './useOperationsViews';
 import {OperationListSettings,OperationTableHeader,operationColumnWidth} from './OperationListSettings';
 import {maskedOperationText} from './operation-display';
 
-export function ServerOperations({state,filter={},onlyReview=false,disabled,timezone,command,commandState,onOpen,onReview,onImport,onQuickFilter,onDelete,onHistory,onAccessError,headerActions,filtersControl,onNavigationGuard}:{headerActions?:HTMLElement|null;filtersControl?:ReactNode;onNavigationGuard?:(guard:((action:()=>void)=>boolean)|null)=>void;state:FinanceState;filter?:OperationsFilter;onlyReview?:boolean;disabled:boolean;timezone:string;command:WorkspaceCommand|null;commandState:CommandState;onOpen:(id:string)=>void;onReview:(ids:string[])=>void;onImport:()=>void;onQuickFilter?:()=>void;onDelete:(ids:string[])=>void;onHistory:(id:string)=>void;onAccessError:(e:unknown)=>boolean}){
+export function ServerOperations({state,filter={},onlyReview=false,disabled,timezone,command,commandState,onOpen,onReview,onImport,onQuickFilter,onDelete,onHistory,onAccessError,headerActions,filtersControl,onNavigationGuard,scoped=false}:{scoped?:boolean;headerActions?:HTMLElement|null;filtersControl?:ReactNode;onNavigationGuard?:(guard:((action:()=>void)=>boolean)|null)=>void;state:FinanceState;filter?:OperationsFilter;onlyReview?:boolean;disabled:boolean;timezone:string;command:WorkspaceCommand|null;commandState:CommandState;onOpen:(id:string)=>void;onReview:(ids:string[])=>void;onImport:()=>void;onQuickFilter?:()=>void;onDelete:(ids:string[])=>void;onHistory:(id:string)=>void;onAccessError:(e:unknown)=>boolean}){
  const [loadedQueryKey,setLoadedQueryKey]=useState('');
  const [reload,setReload]=useState(0);
  const [config,setConfig]=useState<OperationsView>(defaultOperationsView),[page,setPage]=useState<OperationsPage|null>(null),[rows,setRows]=useState<OperationRow[]>([]),[busy,setBusy]=useState(false),[error,setError]=useState(''),[notice,setNotice]=useState(''),[selected,setSelected]=useState<string[]>([]),[editing,setEditing]=useState(false),[editRows,setEditRows]=useState<OperationRow[]>([]),[editRevision,setEditRevision]=useState(state.revision),[formVersion,setFormVersion]=useState(0),[ruleRows,setRuleRows]=useState<OperationRow[]>([]),[inline,setInline]=useState<{id:string;field:Column}|null>(null),[menu,setMenu]=useState<string|null>(null);
  const list=useRef<HTMLUListElement>(null),anchor=useRef<string|null>(null),live=useRef(true),turn=useRef(0),previousRevision=useRef(state.revision),rowsRef=useRef(rows),cursorRef=useRef(page?.nextCursor);rowsRef.current=rows;cursorRef.current=page?.nextCursor;
  const [quick,setQuick]=useState('all'),[numericInvalid,setNumericInvalid]=useState(false),[filterVersion,setFilterVersion]=useState(0),[similar,setSimilar]=useState<string|null>(null);
- const invalid=numericInvalid||invalidAdvancedFilter(config.filter),freeze=disabled||editing||!!ruleRows.length;
- const manager=useOperationsViews({state,config,onConfig:(v,replaceFilters)=>{setConfig(v);if(replaceFilters){setNumericInvalid(false);setFilterVersion(n=>n+1);}},disabled:freeze,invalid,command,commandState,onAccessError,onNavigationGuard});
+ const invalid=numericInvalid||invalidAdvancedFilter(config.filter)||!!searchExpressionError(filter.search)||!validDateRange(filter.from??'',filter.through??''),freeze=disabled||editing||!!ruleRows.length;
+ const manager=useOperationsViews({state,config,onConfig:(v,replaceFilters)=>{setConfig(v);if(replaceFilters){setNumericInvalid(false);setFilterVersion(n=>n+1);}},disabled:freeze,invalid,command,commandState,onAccessError,onNavigationGuard,applyDefaultFilters:!scoped});
  const displayLimit=config.pageSize??50;
  const mergedFilter={...config.filter,...filter,...(onlyReview||quick==='attention'?{attention:true}:{}),...(quick==='unresolved'?{role:'unresolved'}:{}),...(quick==='excluded'?{inclusion:'excluded' as const}:{}),...(quick==='returns'?{refund:true}:{}),...(quick==='transfers'?{transfer:true}:{}),...(similar?{merchant:similar,merchantExact:true}:{})},query:OperationsQuery={filter:mergedFilter,sort:config.sort,direction:config.direction,group:config.group},queryKey=JSON.stringify([query,displayLimit]),queryRef=useRef(query);queryRef.current=query;
 
