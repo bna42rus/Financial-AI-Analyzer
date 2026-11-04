@@ -29,3 +29,8 @@
 .operationDetails summary{padding:9px 11px;cursor:pointer;font-weight:600}
 .operationDetails .operations{margin:0;border:0;border-top:1px solid var(--color-border);border-radius:0}
 .operationDetails p,.operationDetails>div{padding:8px 11px}
+
+.body .checkbox { display:flex; align-items:center; gap:9px; min-height:36px; }
+.body .checkbox input { margin:0; }
+.content :is(input,select,fieldset)[aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
+.fieldError { color:var(--color-danger,#b4233b); }

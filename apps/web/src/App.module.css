@@ -120,3 +120,6 @@
 
 /* Radix marks covered dialogs hidden from assistive technology while the top dialog owns focus. */
 :global([role=dialog][data-state=open][aria-hidden=true]){filter:brightness(.85)}
+
+.dangerButton { composes:button; color:var(--color-danger,#b4233b); }
+.dangerButton:hover:not(:disabled) { border-color:var(--color-danger,#b4233b); }

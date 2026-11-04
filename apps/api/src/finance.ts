@@ -123,12 +123,20 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
 type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
 type CreateHistoricalRuleIntent={kind:'create_rule_with_history';id:string;patch:Omit<Rule,'id'>};
-type Intent=OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type AccountSettingsIntent={kind:'account_settings';id:string;accounts:BaseIntent[]};
+type Intent=AccountSettingsIntent|OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
+  if(k==='account_settings'){
+   const r=object(value,['kind','id','accounts']);
+   if(!Array.isArray(r.accounts)||!r.accounts.length||r.accounts.length>500)throw new TypeError('INVALID_ACCOUNTS');
+   const accounts=r.accounts.map(raw=>{const a=object(raw,['id','patch']);object(a.patch,['name','type','analyticsEnabled','loanMode']);return parseIntent({kind:'account',id:uuid(a.id),patch:a.patch}) as BaseIntent;});
+   if(new Set(accounts.map(a=>a.id)).size!==accounts.length)throw new TypeError('INVALID_ACCOUNTS');
+   return {kind:k,id:uuid(r.id),accounts};
+  }
   if(k==='create_rule_with_history'){const r=object(value,['kind','id','patch']);return {kind:k,id:uuid(r.id),patch:{...validateRule(r.patch),enabled:true}};}
   if(k==='operation_card'){
    const r=object(value,['kind','id','patch','components','links']),id=uuid(r.id);
@@ -197,6 +205,11 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='account_settings'){
+  const loaded=await loadFinance(db,userId);
+  for(const edit of intent.accounts)await applyBase(db,userId,edit,currentRevision,loaded);
+  return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
+ }
  if(intent.kind==='set_category_binding')return applyCategoryBinding(db,userId,intent,(await loadFinance(db,userId)).graph);
  if(intent.kind==='add_catalog_categories')return applySelectedCategories(db,userId,intent,(await loadFinance(db,userId)).graph);
  if(intent.kind==='save_overview_view'||intent.kind==='delete_overview_view'||intent.kind==='reorder_overview_views')return applyOverviewIntent(db,userId,intent);

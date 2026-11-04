@@ -188,7 +188,7 @@ export async function createServer(config: Config) {
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { name: s.user.name,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:await financialProfile!.financialTimezone(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:await financialProfile!.financialTimezone(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
         await requireAdmin(auth,db,request);result=await mailQueue(db);

@@ -74,3 +74,48 @@
   .account { padding:14px; } .account button { margin-left:49px; } .reset,.danger { padding:16px; }
   .sidebarNote { margin:17px 0; } .search input,.appearance select { font-size:calc(16px * var(--text-scale, 1)); }
 }
+
+.search:focus-within { border-color:var(--color-primary); box-shadow:0 0 0 1px var(--color-primary); }
+.search input:focus-visible { outline:none; }
+.menu button:hover { background:var(--color-surface); }
+.menu button[aria-current] { background:var(--color-soft); border-color:var(--color-primary); }
+.sectionHead { margin-bottom:18px; }
+.sectionHead h2:focus { outline:none; }
+.settingsStack { display:grid; gap:14px; }
+.settingsStack p { margin:0; }
+.bankGroup { display:grid; gap:10px; border:1px solid var(--color-border); border-radius:12px; padding:12px; background:var(--color-background); }
+.bankGroup>h3 { font-size:1rem; margin:0 2px; }
+.accountCard { min-width:0; display:grid; gap:12px; padding:14px; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); }
+.accountFields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; border:0; margin:0; padding:0; min-width:0; }
+.fullRow { grid-column:1/-1; }
+.accountFields label,.settingsStack>label:not(.checkboxRow) { display:grid; gap:5px; font-size:.875rem; color:var(--color-secondary-text); }
+.accountFields input,.accountFields select,.settingsStack>label select { min-width:0; width:100%; padding:8px 10px; min-height:40px; border:1px solid var(--color-border); border-radius:8px; color:var(--color-text); background:var(--color-surface); font:inherit; }
+.accountFields [aria-invalid="true"],.choiceGroup[aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
+.cardActions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.saveBar { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-top:12px; border-top:1px solid var(--color-border); }
+.textButton { background:transparent; border:0; color:var(--color-secondary-text); border-radius:7px; padding:9px 10px; }
+.textButton:disabled { opacity:.55; }
+.textButton:hover:not(:disabled) { color:var(--color-primary); background:var(--color-soft); }
+.muted,.emptyState { color:var(--color-secondary-text); }
+.emptyState { padding:14px; margin:0; border:1px dashed var(--color-border); border-radius:10px; }
+.choiceGroup { display:grid; gap:8px; min-width:0; margin:0; padding:10px 12px; border:1px solid var(--color-border); border-radius:9px; }
+.choiceGroup legend { font-weight:600; padding:0 4px; }
+.choiceGroup p { color:var(--color-secondary-text); font-size:.875rem; }
+.choiceGroup h3 { margin:0; font-size:1rem; }
+.choiceGroup ul { margin:0; padding-left:1.2em; }
+.checkboxRow { display:flex; gap:8px; align-items:center; padding:5px 0; }
+.checkboxRow input { margin:0; flex:0 0 auto; }
+.inlineError { color:var(--color-danger,#b4233b); }
+@media(max-width:480px) { .bankGroup,.accountCard { padding:10px; } .accountFields { gap:8px; } .cardActions>* { min-height:40px; } }
+
+.settingsContent { min-width:0; }
+.settingsBox { min-width:0; display:grid; gap:10px; border:1px solid var(--color-border); border-radius:10px; padding:14px; }
+.settingsBox>h3,.settingsBox section>h3 { font-size:1rem; margin:0; }
+.settingsBox>summary,.settingsBox details>summary { cursor:pointer; padding:3px 0; font-weight:550; }
+.settingsBox>label,.entityForm>label:not(.checkboxRow) { display:grid; gap:6px; color:var(--color-secondary-text); font-size:.875rem; }
+.settingsBox>label select,.entityForm>label input:not([type="checkbox"]),.entityForm>label select { min-width:0; width:100%; min-height:40px; padding:8px 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; }
+.entityForm>label input[aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
+.settingsList { border:1px solid var(--color-border); border-radius:10px; padding:0 12px; }
+.settingsRow { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; overflow-wrap:anywhere; }
+.settingsRow+.settingsRow { border-top:1px solid var(--color-border); }
+.settingsRow small { display:block; color:var(--color-secondary-text); margin-top:2px; }

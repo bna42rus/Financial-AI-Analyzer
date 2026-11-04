@@ -60,3 +60,4 @@
 .bulkDetails>ul>li+li{margin-top:8px}
 .bulkConfirmation{width:min(510px,calc(100vw - 24px));max-width:510px}
 .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.operationFooter .leftAction { margin-right:auto; }

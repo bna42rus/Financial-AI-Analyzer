@@ -20,3 +20,20 @@
 .spinner {flex-shrink:0;animation:pending-answer-spin 1s linear infinite;}
 @keyframes pending-answer-spin {to {transform:rotate(360deg);}}
 @media(prefers-reduced-motion:reduce){.spinner{animation:none;}}
+
+.layout {height:clamp(500px,calc(100dvh - 150px),1000px); margin-top:0;}
+.layout [role="log"] {max-width:900px;}
+.layout [role="log"] article {padding-bottom:12px;}
+.layout [role="log"] article p {font-size:calc(14px * var(--text-scale,1));line-height:1.55;white-space:pre-wrap;}
+.chatTools {flex-shrink:0;}
+.editor {margin-top:0;}
+.editor>button {justify-self:start;}
+.editor [aria-invalid="true"] {border-color:var(--color-danger,#b4233b);}
+.fieldError {color:var(--color-danger,#b4233b);}
+.info {display:grid;gap:10px;}
+.info p,.note {color:var(--color-secondary-text);}
+.info button {margin-top:6px;}
+.note {font-size:.875rem;}
+@media(max-width:700px){.layout{height:calc(100dvh - 145px);min-height:480px;}.layout [role="log"] article p{font-size:14px;}.chatTools{gap:3px;}}
+.layout textarea:focus-visible,.layout input[type="search"]:focus-visible { outline:none; }
+.layout label:focus-within { box-shadow:0 0 0 1px var(--color-primary); }
