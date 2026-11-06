@@ -23,10 +23,10 @@ function Toast({notice:n,onClose}:{notice:Notice;onClose:()=>void}){
 }
 export function useNotices(){return useContext(Context);}
 /** Only acknowledged writes produce a success notice; errors and uncertain receipts stay in place. */
-export function useMutationNotice(state:{phase:string;message:string;undoActionId:string|null;bulkResult?:{selectedCount:number;remainingReviewIds:string[]}|null},undo:(id:string)=>void,quiet=false){
+export function useMutationNotice(state:{phase:string;message:string;messageDetail?:string;undoActionId:string|null;bulkResult?:{selectedCount:number;remainingReviewIds:string[]}|null},undo:(id:string)=>void,quiet=false){
  const notices=useNotices(),last=useRef(''),handler=useRef(undo);handler.current=undo;
- useEffect(()=>{if(state.phase==='sending')notices?.dismissGroup('mutation');if(!state.message){last.current='';return;}if(state.phase!=='idle'||quiet||!notices||!['Изменение сохранено.','Представление удалено.','Изменение отменено.','Загрузка отменена. Для восстановления выберите исходные файлы заново.'].includes(state.message))return;
+ useEffect(()=>{if(state.phase==='sending')notices?.dismissGroup('mutation');if(!state.message){last.current='';return;}if(state.phase!=='idle'||quiet||!notices)return;
   const token=state.message+':'+state.undoActionId;if(last.current===token)return;last.current=token;const id=state.undoActionId;
-  notices.push({id:'mutation:'+crypto.randomUUID(),group:'mutation',title:state.message,detail:state.bulkResult?`Обработано операций: ${state.bulkResult.selectedCount}. Требуют проверки: ${state.bulkResult.remainingReviewIds.length}.`:undefined,duration:id?10000:5000,...(id?{action:{label:'Отменить',accessibleLabel:'Отменить последнее изменение',run:()=>handler.current(id)}}:{})});
- },[state.phase,state.message,state.undoActionId,state.bulkResult,quiet,notices]);
+  notices.push({id:'mutation:'+crypto.randomUUID(),group:'mutation',title:state.message,detail:state.messageDetail??(state.bulkResult?`Обработано операций: ${state.bulkResult.selectedCount}. Требуют проверки: ${state.bulkResult.remainingReviewIds.length}.`:undefined),duration:id?10000:5000,...(id?{action:{label:'Отменить',accessibleLabel:'Отменить последнее изменение',run:()=>handler.current(id)}}:{})});
+ },[state.phase,state.message,state.messageDetail,state.undoActionId,state.bulkResult,quiet,notices]);
 }
