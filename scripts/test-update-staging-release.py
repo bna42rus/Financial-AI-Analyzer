@@ -40,6 +40,19 @@ class UpdateTests(unittest.TestCase):
             m.validate_admission_pair(before,{**after,'monthly':{**monthly,'limitRub':'101'}},before,'a'*64,'d'*64,'100')
         self.assertFalse(m.admission_expired(after,datetime(2028,1,1,tzinfo=timezone.utc)))
 
+    def test_active_monthly_preservation_refuses_pause_or_unexpected_service_without_paid_calls(self):
+        original = {'monthly': {'version':'cashneuro-staging-monthly/1', 'limitRub':'100', 'activatedAt':'2026-11-02T13:00:00Z'}}
+        command = b'[Service]\nEnvironment=ASSISTANT_ENABLED=1\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=1 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
+        m.require_active_monthly_ai(original, command)
+        with self.assertRaisesRegex(m.m.InstallationError, 'ACTIVE_MONTHLY_AI_REQUIRED'):
+            m.require_active_monthly_ai({'expiresAt':'2026-10-30T00:00:00Z'}, command)
+        for bad in [command.replace(b'CLASSIFICATION_ENABLED=1',b'CLASSIFICATION_ENABLED=0'), command.replace(b'ASSISTANT_ENABLED=1 AI_ENABLED=0',b'ASSISTANT_ENABLED=0 AI_ENABLED=0')]:
+            with self.assertRaises(m.m.InstallationError):
+                m.require_active_monthly_ai(original, bad)
+        for kw in [dict(keep_ai_paused=True),dict(enable_classification=True),dict(resume_ai=True),dict(monthly_budget='100')]:
+            with self.assertRaisesRegex(m.m.InstallationError, 'ACTIVE_MONTHLY_AI_ARGUMENTS_CONFLICT'):
+                m.install(Path('/not-touched'),'a'*40,preserve_active_ai=True,**kw)
+
     def test_paused_rollback_uses_real_snapshot_files_without_recreating_an_existing_file(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -145,25 +158,28 @@ class UpdateTests(unittest.TestCase):
         with self.assertRaisesRegex(m.m.InstallationError,'AI_RESUME_DROPIN_CHANGED'):
             m.activate_ai(b'ExecStart=unexpected')
 
-    def test_full_install_with_real_backup_and_switch_files_handles_paused_blocked_and_renewed_modes(self):
+    def test_full_install_with_real_backup_and_switch_files_handles_all_ai_modes(self):
         # Run the actual installer orchestration. Only external processes/HTTP
         # and the receipt helper are substituted; snapshots, config/dropin
         # replacements, Caddy selection and release copies use real files.
         from contextlib import ExitStack, redirect_stdout
-        for mode in ['paused','blocked','renewed']:
+        for mode in ['paused','blocked','renewed','preserved']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
                 root=Path(directory);base=root/'staging';current=base/'backend-releases'/('a'*40);source=root/'build';release=base/'backend-releases'/('b'*40)
                 current.mkdir(parents=True);(source/'apps/web/dist').mkdir(parents=True);(source/'apps/api').mkdir(parents=True);(root/'backups').mkdir()
                 origin='https://test.cashneuro.ru';(source/'apps/web/dist/release.json').write_text(json.dumps({'schema':'cashneuro-web-build/1','revision':'b'*40,'profile':'finance','mode':'connected','apiOrigin':origin}))
                 cfg=root/'settings';dropin=root/'dropin';caddy=root/'Caddyfile';worker=root/'worker';worker_env=root/'worker-env'
                 old={'realm':'staging/finance','apiKey':'synthetic-only','allowedEmails':['owner@example.test'],'modelMetadataSha256':'c'*64,'tariffSource':'fixed','sourceSha256':'a'*64,'expiresAt':'2000-01-01T00:00:00Z','maximumCalls':14,'admission':{'stageCapAtoms':'10000000000','stageMaximumCalls':70,'spentAtoms':'100','calls':56},'cost':{'projectId':'staging/synthetic','price':{'input':'15.86'}}}
+                if mode=='preserved':old['monthly']={'version':'cashneuro-staging-monthly/1','limitRub':'100','activatedAt':'2026-11-02T13:00:00Z'}
                 cfg.write_text(json.dumps(old));cfg.chmod(0o600)
                 old_dropin=('[Service]\nWorkingDirectory='+str(current/'apps/api')+'\nExecStart=\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=0 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\nEnvironment=CLASSIFICATION_ENABLED=0\n').encode();dropin.write_bytes(old_dropin)
+                if mode=='preserved':old_dropin=m.activate_ai(old_dropin);dropin.write_bytes(old_dropin)
                 old_root=str(current/'web');caddy.write_text(old_root);worker.write_text('old worker');worker_env.write_text('old scoped env')
                 calls=[];sql_calls=[]
                 def run(args,**kw):
                     args=list(map(str,args));calls.append(args)
                     if args[0]=='/usr/bin/node':
+                        if '--input-type=module' in args:return b'' # Local configuration validator; no provider POST.
                         self.assertEqual(args[-1],'--prepare','No live model command is allowed')
                         return json.dumps({'sourceSha256':'a'*64 if args[-2].startswith(str(current)) else 'b'*64}).encode()
                     if args[:2]==['caddy','adapt']:return json.dumps({'root':caddy.read_text()}).encode()
@@ -188,13 +204,26 @@ class UpdateTests(unittest.TestCase):
                     return io.BytesIO(json.dumps(value).encode())
                 stack.enter_context(patch.object(m.m.urllib.request,'urlopen',side_effect=health_response))
                 output=io.StringIO()
-                with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode!='paused' else None,tested_sha='b'*64 if mode!='paused' else None,keep_ai_paused=mode=='paused',resume_ai=mode!='paused')
+                with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode in ('blocked','renewed') else None,tested_sha='b'*64 if mode in ('blocked','renewed') else None,keep_ai_paused=mode=='paused',resume_ai=mode in ('blocked','renewed'),preserve_active_ai=mode=='preserved')
                 result=json.loads(output.getvalue().splitlines()[-1]);self.assertEqual(result['status'],'UPDATED');self.assertEqual(result['paidCalls'],0)
                 self.assertEqual(caddy.read_text(),str(release/'apps/web/dist'));self.assertIn(str(release/'apps/api'),dropin.read_text());self.assertTrue((release/'apps/api').is_dir())
                 settings=json.loads(cfg.read_text());self.assertEqual(settings['sourceSha256'],'b'*64)
-                if mode=='renewed':self.assertEqual(settings['admission']['calls'],57);self.assertNotIn('ASSISTANT_ENABLED=0',dropin.read_text())
-                else:self.assertEqual({**settings,'sourceSha256':'a'*64},old);self.assertNotIn('ASSISTANT_ENABLED=1',dropin.read_text())
-                backup=next((root/'backups').iterdir());self.assertEqual((backup/'assistantConfig.original').read_text(),json.dumps(old)) if mode!='paused' else None
+                if mode=='renewed':
+                    self.assertEqual(settings['admission']['calls'],57)
+                    self.assertNotIn('ASSISTANT_ENABLED=0',dropin.read_text())
+                elif mode=='preserved':
+                    self.assertEqual(settings, {**old,'sourceSha256':'b'*64})
+                    self.assertNotIn('ASSISTANT_ENABLED=0',dropin.read_text())
+                    self.assertEqual(result['assistantAdmission'],'monthly_active_preserved')
+                else:
+                    self.assertEqual({**settings,'sourceSha256':'a'*64},old)
+                    self.assertNotIn('ASSISTANT_ENABLED=1',dropin.read_text())
+                backup=next((root/'backups').iterdir())
+                if mode in ('blocked','renewed'):
+                    self.assertEqual(json.loads((backup/'assistantConfig.original').read_text()),old)
+                if mode=='preserved':
+                    self.assertEqual(json.loads((backup/'assistantConfig').read_text()),old)
+                    self.assertEqual((backup/'dropin').read_bytes(),old_dropin)
                 self.assertFalse(any('classification-smoke-main.ts' in ' '.join(c) for c in calls))
                 if mode=='blocked':self.assertEqual(result['assistantAdmission'],'blocked_reconciliation');self.assertEqual(result['aiResumeBlocker'],'CLASSIFICATION_RECONCILIATION_REQUIRED')
 
