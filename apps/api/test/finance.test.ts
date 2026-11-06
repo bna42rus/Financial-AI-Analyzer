@@ -380,3 +380,12 @@ test('financial profile is owner scoped, initializes once without AI and stays i
  const denied=await control.fastify.inject({method:'POST',url:'/finance/profile',payload:{timezone:'Etc/UTC'},headers:{origin:'https://admin.example.test'}});assert.equal(denied.statusCode,404);
  await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/profile',{timezone:'Etc/UTC'})).statusCode,403);
 });
+
+test('live review skips persist and refresh restores the first unresolved operation',async()=>{
+ const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId;
+ for(const id of [a,b])await command({kind:'operation',id,patch:{reviewRequested:true}});
+ const first=(await request('/finance/review-queue',{})).json();assert.equal(first.remaining,2);
+ const skip=await request('/finance/review-queue',{generation:first.generation,revision:first.revision,skip:first.anchor});assert.equal(skip.statusCode,200,skip.body);
+ const second=(await request('/finance/review-queue',{})).json();assert.notEqual(second.anchor,first.anchor);assert.equal(second.id,first.id);
+ const reset=await request('/finance/review-queue',{refresh:true});assert.equal(reset.json().anchor,first.anchor);
+});

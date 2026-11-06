@@ -11,7 +11,7 @@ export function packOverview(items:LayoutItem[],container:number,device:'desktop
   const full=device==='mobile'||width<2*layoutLimits.minimumWidth+gap||layoutWidth(item,device)===100;
   const fallback=item.size==='compact'?320:item.size==='tall'?620:450;
   const base=item.heightPx??heights[item.id]??fallback;
-  const height=device==='mobile'?(heights[item.id]??fallback):Math.max(layoutLimits.minimumHeight,base,heights[item.id+':expanded']?heights[item.id]??0:0);
+  const height=device==='mobile'?(item.heightPx===undefined?heights[item.id]??fallback:Math.max(base,heights[item.id+':expanded']?heights[item.id]??0:0)):Math.max(layoutLimits.minimumHeight,base,heights[item.id+':expanded']?heights[item.id]??0:0);
   const column=full?0:columns[0]!<=columns[1]!?0:1,y=full?Math.max(...columns):columns[column]!,w=full?width:(width-gap)/2;
   out.push({id:item.id,x:column*(w+gap),y,width:w,height});
   if(full)columns[0]=columns[1]=y+height+gap;else columns[column]=y+height+gap;

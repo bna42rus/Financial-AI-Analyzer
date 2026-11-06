@@ -250,6 +250,10 @@ def install(args):
         selected.append(next(p for p in migrations if p.name.startswith('0031_')))
     if sql("SELECT to_regclass('finance.category_binding') IS NOT NULL") != 't':
         selected.append(next(p for p in migrations if p.name.startswith('0032_')))
+    if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='review_session' AND column_name='live_queue')") != 't':
+        selected.append(next(p for p in migrations if p.name.startswith('0033_')))
+    if sql("SELECT to_regclass('commerce.ai_pack') IS NOT NULL") != 't':
+        selected.append(next(p for p in migrations if p.name.startswith('0034_')))
     # Do not replace an existing account quota or change its entitlement.
     quota_sql = ''
     if user['quota'] is None:

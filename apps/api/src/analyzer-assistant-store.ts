@@ -7,7 +7,7 @@ import type { Answer } from '../../../packages/analyzer/src/types.ts';
 import { emptyConversation, parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { AssistantError, cleanAssistantQuestion, profileCalendar } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { globalSnapshot } from '../../../packages/analyzer/src/task-context.ts';
-import { runAssistant, assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
+import { runAssistant, exactAssistantPlan, assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
 import type { AssistantRequest, AssistantJournal, AssistantReply, ExpectedAssistantState, RunReceipt } from './assistant-workflow.ts';
 import { checkedAssistantReceipt } from './assistant-journal.ts';
 import { isAssistantProvider } from './analyzer-assistant-provider.ts';
@@ -98,7 +98,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
       const expected: ExpectedAssistantState = { scope, head: conversation.book.nodes.at(-1)?.messageId ?? null, turns: conversation.turns.length, globalRevision, dataRevision: workspace.revision, timezone };
       const cycle = await analyzerCycle(db, userId), quota = await analyzerQuota(db, userId, true);
       if (!cycle || !quota.available) throw new HttpError(409, 'AI_QUOTA_UNAVAILABLE');
-      if (!quota.remaining) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
+      if (!quota.remaining&&!exactAssistantPlan(text)) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
       await db.query(`INSERT INTO finance.analyzer_task_request(user_id,id,chat_id,chat_epoch,generation,request,input,expected,anchor_at,period_start)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [userId, id, chatId, chatEpoch, generation, JSON.stringify(request), JSON.stringify(input), JSON.stringify(expected), cycle.anchorExact, cycle.startExact]);
       return { input, expected, state: 'pending', reply: null, anchorExact: cycle.anchorExact, periodExact: cycle.startExact } as Claim;
@@ -202,7 +202,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
         const book = conversation.book;
         await db.query(`INSERT INTO finance.analyzer_task_book(user_id,chat_id,chat_epoch,generation,book,head,node_count) VALUES($1,$2,$3,$4,$5,$6,$7)
           ON CONFLICT(user_id,chat_id) DO UPDATE SET book=EXCLUDED.book,head=EXCLUDED.head,node_count=EXCLUDED.node_count,generation=EXCLUDED.generation`, [userId, chatId, chatEpoch, generation, JSON.stringify(book), book.nodes.at(-1)?.messageId ?? null, book.nodes.length]);
-        if (reply.status === 'query' || reply.status === 'answer') {
+        if (reply.modelCalls>0&&(reply.status === 'query' || reply.status === 'answer')) {
           const quota = await analyzerQuota(db, userId, true);
           if (!quota.available || quota.limit === null || quota.used >= quota.limit) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
           const billed = await db.query(`INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version)

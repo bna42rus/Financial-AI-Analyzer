@@ -119,3 +119,31 @@
 .settingsRow { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; overflow-wrap:anywhere; }
 .settingsRow+.settingsRow { border-top:1px solid var(--color-border); }
 .settingsRow small { display:block; color:var(--color-secondary-text); margin-top:2px; }
+.searchField { display:flex; align-items:center; gap:8px; min-width:0; min-height:40px; padding:0 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-secondary-text); }
+.searchField:focus-within { border-color:var(--color-primary); box-shadow:0 0 0 1px var(--color-primary); }
+.searchField input { min-width:0; width:100%; padding:8px 0; border:0; outline:0; background:transparent; color:var(--color-text); font:inherit; }
+.searchField input:focus-visible { outline:0; }
+.searchField input::-webkit-search-cancel-button { display:none; }
+.searchField button { display:grid; place-items:center; padding:4px; border:0; background:transparent; color:inherit; }
+.searchField svg { flex:none; }
+.sidebarSearch { margin-bottom:12px; }
+.listToolbar { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:8px; align-items:center; }
+@media(max-width:540px) { .listToolbar { grid-template-columns:minmax(0,1fr) auto; }.listToolbar>.searchField { grid-column:1/-1; } }
+.filterField { display:grid; gap:6px; color:var(--color-secondary-text); font-size:.875rem; }
+.filterField>button { width:100%; }
+.statusPill { justify-self:start; border-radius:6px; padding:3px 8px; background:var(--color-soft); color:var(--color-primary); font-size:.875rem; }
+.sublist { display:grid; gap:6px; }
+.sublist>details { border:1px solid var(--color-border); border-radius:8px; padding:8px 10px; }
+.sublist summary { cursor:pointer; }
+.historyToolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(150px,auto); gap:10px; align-items:center; }
+.historyList { display:grid; gap:9px; list-style:none; padding:0; margin:0; }
+.historyList .settingsRow { padding:0; }
+@media(max-width:480px){ .historyToolbar { grid-template-columns:1fr; } }
+.interfaceGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}
+.interfaceActions{display:flex;flex-wrap:wrap;gap:.55rem;justify-content:flex-end;margin-top:1.25rem}
+.interfaceActions>button:first-child{margin-inline-end:auto}
+@media(max-width:620px){.interfaceGrid{grid-template-columns:minmax(0,1fr)}}
+.reviewHead{display:flex;justify-content:space-between;align-items:center;gap:.6rem}
+.reviewList{list-style:none;padding:0;margin:.4rem 0;max-height:15rem;overflow:auto}
+.reviewChoice{display:flex;align-items:center;gap:.65rem;padding:.45rem .15rem}
+.reviewChoice small{display:block;color:var(--color-secondary-text)}

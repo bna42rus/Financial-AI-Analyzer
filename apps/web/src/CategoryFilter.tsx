@@ -5,10 +5,10 @@ import type {FinanceState} from './finance-client';
 import styles from './CompactFilters.module.css';
 type Category=FinanceState['categories'][number];
 const fold=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru').replace(/ё/g,'е').trim();
-export function CategoryFilter({categories,value,onChange,disabled,emptyLabel,accountMode=false}:{categories:Category[];value:string[];onChange:(ids:string[])=>void;disabled:boolean;emptyLabel?:string;accountMode?:boolean}){
+export function CategoryFilter({categories,value,onChange,disabled,emptyLabel,accountMode=false,flatLabel,single=false}:{categories:Category[];value:string[];onChange:(ids:string[])=>void;disabled:boolean;emptyLabel?:string;accountMode?:boolean;flatLabel?:string;single?:boolean}){
  const [open,setOpen]=useState(false),[query,setQuery]=useState(''),[position,setPosition]=useState({left:12,top:12,width:340,height:420});
  const trigger=useRef<HTMLButtonElement>(null),search=useRef<HTMLInputElement>(null),hint=useId();
- const selected=new Set(value),byId=new Map(categories.map(c=>[c.id,c])),available=categories.filter(c=>!c.hidden||selected.has(c.id)),needle=fold(query);
+ const selected=new Set(value),byId=new Map(categories.map(c=>[c.id,c])),hidden=(c:Category)=>c.hidden||!!(c.parentId&&byId.get(c.parentId)?.hidden),available=categories.filter(c=>!hidden(c)||selected.has(c.id)),needle=fold(query);
  const matches=(c:Category)=>!needle||fold(c.name).includes(needle);
  const branches=categories.filter(c=>!c.parentId).map(root=>({root,children:available.filter(c=>c.parentId===root.id)})).filter(b=>(!b.root.hidden||selected.has(b.root.id)||b.children.length)&&(matches(b.root)||b.children.some(matches)));
  const orphans=available.filter(c=>c.parentId&&!byId.has(c.parentId)&&matches(c)),missing=value.filter(id=>!byId.has(id));
@@ -21,25 +21,26 @@ export function CategoryFilter({categories,value,onChange,disabled,emptyLabel,ac
   return()=>{window.removeEventListener('resize',place);window.removeEventListener('scroll',place,true);};
  },[open]);
  function toggle(c:Category,checked:boolean){
-  const children=categories.filter(child=>child.parentId===c.id&&(!child.hidden||selected.has(child.id))),parent=c.parentId?byId.get(c.parentId):undefined;
+  if(single){onChange([c.id]);setOpen(false);return;}
+  const children=categories.filter(child=>child.parentId===c.id&&(!hidden(child)||selected.has(child.id))),parent=c.parentId?byId.get(c.parentId):undefined;
   // A root toggle is the same operation as checking each visible child by hand.
   // Expand a root ID from an older saved filter before changing one of its children.
   let next=new Set(value);
-  if(parent&&next.has(parent.id)){next.delete(parent.id);categories.filter(child=>child.parentId===parent.id&&!child.hidden).forEach(child=>next.add(child.id));}
+  if(parent&&next.has(parent.id)){next.delete(parent.id);categories.filter(child=>child.parentId===parent.id&&!hidden(child)).forEach(child=>next.add(child.id));}
   if(children.length){next.delete(c.id);children.forEach(child=>checked?next.add(child.id):next.delete(child.id));}
   else if(checked)next.add(c.id);else next.delete(c.id);
   onChange([...next]);
  }
  function choice(c:Category,parent?:Category){
-  const children=categories.filter(child=>child.parentId===c.id&&(!child.hidden||selected.has(child.id))),inherited=!!parent&&selected.has(parent.id),checked=selected.has(c.id)||inherited||!!children.length&&children.every(child=>selected.has(child.id)),mixed=!c.parentId&&!checked&&children.some(child=>selected.has(child.id));
-  return <label key={c.id} className={parent?styles.child:styles.choice}><input type="checkbox" checked={checked} ref={node=>{if(node)node.indeterminate=mixed;}} disabled={disabled||c.hidden&&!selected.has(c.id)} aria-label={parent?`${accountMode?'Счёт':'Подкатегория'} «${c.name}» в «${parent.name}»`:`${accountMode?'Банк':'Категория'} «${c.name}»`} aria-describedby={!c.parentId?hint:undefined} onChange={e=>toggle(c,e.target.checked)}/><span>{c.name}{c.hidden&&<small>Скрытая</small>}</span></label>;
+  const children=categories.filter(child=>child.parentId===c.id&&(!hidden(child)||selected.has(child.id))),inherited=!!parent&&selected.has(parent.id),checked=selected.has(c.id)||inherited||!!children.length&&children.every(child=>selected.has(child.id)),mixed=!c.parentId&&!checked&&children.some(child=>selected.has(child.id));
+  return <label key={c.id} className={parent?styles.child:styles.choice}><input type={single?"radio":"checkbox"} checked={checked} ref={node=>{if(node)node.indeterminate=mixed;}} disabled={disabled||hidden(c)&&!selected.has(c.id)} aria-label={flatLabel?c.name:parent?`${accountMode?'Счёт':'Подкатегория'} «${c.name}» в «${parent.name}»`:`${accountMode?'Банк':'Категория'} «${c.name}»`} aria-describedby={!c.parentId?hint:undefined} onChange={e=>toggle(c,e.target.checked)}/><span>{c.name}{hidden(c)&&<small>Скрытая</small>}</span></label>;
  }
  return <Dialog.Root open={open} onOpenChange={next=>{if(!disabled){setOpen(next);if(next)setQuery('');}}}>
-  <Dialog.Trigger asChild><button ref={trigger} type="button" className={styles.categoryTrigger} aria-label={accountMode?"Банки и счета":"Категории"} disabled={disabled} title={label}><span>{label}</span><ChevronDown size={15} aria-hidden="true"/></button></Dialog.Trigger>
+  <Dialog.Trigger asChild><button ref={trigger} type="button" className={styles.categoryTrigger} aria-label={flatLabel??(accountMode?"Банки и счета":"Категории")} disabled={disabled} title={label}><span>{label}</span><ChevronDown size={15} aria-hidden="true"/></button></Dialog.Trigger>
   <Dialog.Portal><Dialog.Overlay className={styles.overlay}/><Dialog.Content className={styles.menu} aria-describedby={hint} style={{left:position.left,top:position.top,width:position.width,maxHeight:position.height}} onOpenAutoFocus={e=>{e.preventDefault();search.current?.focus();}}>
-   <Dialog.Title className={styles.srOnly}>{accountMode?"Выбор банков и счетов":"Выбор категорий"}</Dialog.Title><Dialog.Description id={hint} className={styles.srOnly}>{accountMode?"Галочка банка выбирает все его счета. Любой счёт можно снять отдельно.":"Галочка категории выбирает все её подкатегории. Любую подкатегорию можно снять отдельно."}</Dialog.Description>
-   <div className={styles.searchRow}><input ref={search} type="search" aria-label={accountMode?"Поиск банков и счетов":"Поиск категорий и подкатегорий"} placeholder={accountMode?"Найти банк или счёт":"Найти категорию"} value={query} onChange={e=>setQuery(e.target.value)} disabled={disabled}/><button type="button" className={styles.clear} disabled={disabled} onClick={()=>{onChange([]);setQuery('');search.current?.focus();}}>Сбросить</button><Dialog.Close asChild><button type="button" className={styles.close} aria-label={accountMode?"Закрыть банки и счета":"Закрыть категории"}><X size={17} aria-hidden="true"/></button></Dialog.Close></div>
-   <div className={styles.menuBody}>{branches.map(({root,children})=><div className={styles.branch} key={root.id}>{choice(root)}{children.filter(child=>matches(root)||matches(child)).map(child=>choice(child,root))}</div>)}{orphans.map(c=>choice(c))}{!needle&&missing.map(id=><label className={styles.choice} key={id}><input type="checkbox" checked disabled={disabled} onChange={()=>onChange(value.filter(v=>v!==id))}/><span>Недоступная категория</span></label>)}{!branches.length&&!orphans.length&&(needle||!missing.length)&&<p className={styles.noMatches}>{needle?accountMode?'Банки и счета не найдены':'Категории не найдены':accountMode?'Счетов пока нет':'Категорий пока нет'}</p>}</div>
+   <Dialog.Title className={styles.srOnly}>{flatLabel??(accountMode?"Выбор банков и счетов":"Выбор категорий")}</Dialog.Title><Dialog.Description id={hint} className={styles.srOnly}>{flatLabel?(single?'Выберите один вариант.':'Отметьте нужные варианты.'):accountMode?"Галочка банка выбирает все его счета. Любой счёт можно снять отдельно.":"Галочка категории выбирает все её подкатегории. Любую подкатегорию можно снять отдельно."}</Dialog.Description>
+   <div className={styles.searchRow}><input ref={search} type="search" aria-label={flatLabel?'Поиск: '+flatLabel:accountMode?"Поиск банков и счетов":"Поиск категорий и подкатегорий"} placeholder={flatLabel?'Поиск':accountMode?"Найти банк или счёт":"Найти категорию"} value={query} onChange={e=>setQuery(e.target.value)} disabled={disabled}/>{!single&&<button type="button" className={styles.clear} disabled={disabled} onClick={()=>{onChange([]);setQuery('');search.current?.focus();}}>Сбросить</button>}<Dialog.Close asChild><button type="button" className={styles.close} aria-label={accountMode?"Закрыть банки и счета":"Закрыть категории"}><X size={17} aria-hidden="true"/></button></Dialog.Close></div>
+   <div className={styles.menuBody}>{branches.map(({root,children})=><div className={styles.branch} key={root.id}>{choice(root)}{children.filter(child=>matches(root)||matches(child)).map(child=>choice(child,root))}</div>)}{orphans.map(c=>choice(c))}{!needle&&missing.map(id=><label className={styles.choice} key={id}><input type="checkbox" checked disabled={disabled} onChange={()=>onChange(value.filter(v=>v!==id))}/><span>Недоступная категория</span></label>)}{!branches.length&&!orphans.length&&(needle||!missing.length)&&<p className={styles.noMatches}>{flatLabel?'Варианты не найдены':needle?accountMode?'Банки и счета не найдены':'Категории не найдены':accountMode?'Счетов пока нет':'Категорий пока нет'}</p>}</div>
   </Dialog.Content></Dialog.Portal>
  </Dialog.Root>;
 }

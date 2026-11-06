@@ -3,3 +3,9 @@
 .editor { margin:0; }
 .editor .checkbox { display:flex; align-items:center; gap:8px; }
 .editor [aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
+.cardButtons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.card details{border-top:1px solid var(--color-border);padding:.65rem 0}
+.card details summary{cursor:pointer}
+.editor details{padding:.75rem;border:1px solid var(--color-border);border-radius:.6rem}
+.editor details summary{cursor:pointer}
+@media(max-width:450px){.cardButtons{grid-template-columns:minmax(0,1fr)}}

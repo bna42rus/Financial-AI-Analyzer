@@ -79,6 +79,7 @@ async function applyCategory(db:PoolClient,userId:string,intent:Extract<EntityIn
  }
  const retained=next.filter(c=>!removed.has(c.id));
  for(const decision of intent.childRoles){const child=retained.find(c=>c.id===decision.id);if(!child||child.parentId!==target?.id)throw new HttpError(409,'INVALID_CHILD_ROLE_SCOPE');child.role=decision.role;touched.add(child.id);}
+ if(target&&!target.parentId&&target.role!=='both')for(const child of retained.filter(c=>c.parentId===target!.id)){child.role=target.role;touched.add(child.id);}
  for(const c of retained)if(c.parentId!==null){const p=retained.find(p=>p.id===c.parentId);if(!p||p.parentId!==null||p.id===c.id)throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');if(p.role!=='both'&&p.role!==c.role)throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');}
  for(const c of retained)if(!same(c,old.find(o=>o.id===c.id)))touched.add(c.id);
  function remap(c:string|null,s:string|null):[string|null,string|null]{

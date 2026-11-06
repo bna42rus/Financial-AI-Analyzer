@@ -7,6 +7,7 @@ import {useEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {X} from 'lucide-react';
 import {kinds} from '../../../packages/finance-core/src/model';
+import {allowedOperationRoles,defaultRole} from '../../../packages/finance-core/src/model';
 import type {Account,Category,Facet,Link} from '../../../packages/finance-core/src/model';
 import {sanitizeText} from '../../../packages/privacy/src/text';
 import {api} from './server-client';
@@ -43,6 +44,7 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
  useEffect(()=>{if(!blocked&&!dirty)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[blocked,dirty]);
  function requestLeave(action=onClose){if(blocked)return;if(dirty)setDiscard(()=>action);else action();}
  const accountName=(id:string)=>sourceAccounts.find(a=>a.id===id)?.name??'Счёт',categoryName=(id:string|null)=>categories.find(c=>c.id===id)?.name??'Без категории',partyName=(id:string|null)=>parties.find(p=>p.id===id)?.name??'Не задан';
+ const editingKind=(fields.kind??op.semantics.kind.value) as FinanceDetail['semantics']['kind']['value'];
  const editingRole=fields.role??op.semantics.role.value,editingCategory=fields.categoryId===undefined?op.semantics.category.value:fields.categoryId,editingSubcategory=fields.subcategoryId===undefined?op.semantics.subcategory.value:fields.subcategoryId;
  const compatible=(c:Category)=>!['expense','income'].includes(editingRole)||c.role==='both'||c.role===editingRole;
  function edit(patch:OperationPatch){
@@ -53,6 +55,7 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
  const editorDetail:FinanceDetail={...op,semantics:{...op.semantics,kind:{...op.semantics.kind,value:(fields.kind??op.semantics.kind.value) as FinanceDetail['semantics']['kind']['value']},role:{...op.semantics.role,value:editingRole as FinanceDetail['semantics']['role']['value']},category:{...op.semantics.category,value:editingCategory},subcategory:{...op.semantics.subcategory,value:editingSubcategory}},projection:{...op.projection,amountMinor:effectiveAmount}};
  const canPurchase=canSplitPurchase(editorDetail)&&(!parts||parts.parts.every(p=>p.type==='other'&&p.role==='expense'&&BigInt(p.amountMinor)<0n));
  const existingLinks=[...op.links.filter(l=>!links.some(d=>d.id===l.id)),...links.map(l=>({...l.link,id:l.id,confidence:100,createdBy:'user' as const}))];
+ const roleError=(fields.kind!==undefined||fields.role!==undefined)&&!allowedOperationRoles(editingKind,effectiveAmount).includes(editingRole as FinanceDetail['semantics']['role']['value'])?'Выберите финансовый смысл, подходящий типу операции.':undefined;
  const categoryError=editingCategory&&!categories.some(c=>c.id===editingCategory&&compatible(c))?'Выберите категорию, подходящую финансовому смыслу.':undefined;
  const subcategoryError=editingSubcategory&&!categories.some(c=>c.id===editingSubcategory&&c.parentId===editingCategory&&compatible(c))?'Выберите подкатегорию выбранной категории.':undefined;
  const effectiveParts=parts?.parts??op.components;
@@ -64,7 +67,7 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
  useEffect(()=>{if(failedLink&&state.error)setRelationEditor({kind:'link',link:failedLink});},[linkErrorId,state.error]);
  function prepare(){
   setLocalError('');setChecked(true);
-  if(categoryError||subcategoryError||partsMismatch)return;
+  if(roleError||categoryError||subcategoryError||partsMismatch)return;
   try{
    const patch={...fields},cleanMerchant=sanitizeText(merchant),cleanComment=sanitizeText(comment);
    if(cleanMerchant!==op.semantics.merchant.value)patch.merchant=cleanMerchant;
@@ -111,8 +114,8 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
   {state.phase==='retry'&&<button className={common.primaryButton} onClick={()=>void flow.current?.retry()}>Повторить то же изменение</button>}{state.phase==='stale'&&<button className={common.button} onClick={()=>void flow.current?.reload()}>Обновить карточку</button>}
   {state.conflict&&<section className={styles.conflict} aria-label="Конфликт изменения"><h3>Данные изменились</h3>{attemptFields.length>0?<table><thead><tr><th>Поле</th><th>Сейчас</th><th>Ваша правка</th></tr></thead><tbody>{attemptFields.map(([key,value])=><tr key={key}><th>{patchNames[key]??key}</th><td>{describe(key,currentValue(key))}</td><td>{describe(key,value)}</td></tr>)}</tbody></table>:<p>{state.conflict.attempt.mode==='relation'?'Связь или распределение не применены. Обновите карточку и заново выберите части по текущим данным.':'Отмена ещё не применена. Сервер повторно проверит, можно ли безопасно отменить прежнее изменение.'}</p>}<div className={styles.actions}><button className={common.button} onClick={()=>flow.current?.useCurrent()}>Обновить карточку</button>{state.conflict.attempt.mode!=='relation'&&<button className={common.primaryButton} onClick={()=>void flow.current?.applyOwn()}>{attempt?.kind==='undo'?'Повторить отмену':'Применить мою правку поверх'}</button>}</div></section>}
   <fieldset className={styles.form} disabled={disabled||editorOpen}><legend>Поля операции</legend><label>Магазин<input aria-label="Магазин" maxLength={160} value={maskedOperationText(merchant)} onChange={e=>setMerchant(e.target.value)}/></label>
-   <label>Тип операции<select aria-label="Тип операции" value={fields.kind??op.semantics.kind.value} onChange={e=>edit({kind:e.target.value})}>{kinds.map(k=><option value={k} key={k}>{kindNames[k]}</option>)}</select></label>
-   <label>Финансовый смысл<select aria-label="Финансовый смысл" value={editingRole} onChange={e=>edit({role:e.target.value})}>{['expense','income','neutral','unresolved'].map(r=><option value={r} key={r}>{displayRole(r,op.projection.amountMinor)}</option>)}</select></label>
+   <label>Тип операции<select aria-label="Тип операции" value={fields.kind??op.semantics.kind.value} onChange={e=>{const kind=e.target.value as typeof editingKind;edit({kind,...(!allowedOperationRoles(kind,effectiveAmount).includes(editingRole as FinanceDetail['semantics']['role']['value'])?{role:defaultRole(kind,effectiveAmount)}:{})});}}>{kinds.map(k=><option value={k} key={k}>{kindNames[k]}</option>)}</select></label>
+   <OperationField label="Финансовый смысл" error={roleError}><select aria-label="Финансовый смысл" value={editingRole} onChange={e=>edit({role:e.target.value})}>{[...new Set([...allowedOperationRoles(editingKind,effectiveAmount),editingRole])].map(r=><option value={r} key={r}>{displayRole(r,op.projection.amountMinor)}</option>)}</select></OperationField>
    <OperationField label="Категория" error={checked?categoryError:undefined}><select aria-label="Категория" value={editingCategory??''} onChange={e=>edit({categoryId:e.target.value||null,...(editingSubcategory?{subcategoryId:null}:{})})}><option value="">Без категории</option>{categories.filter(c=>c.parentId===null&&(compatible(c)||c.id===op.semantics.category.value)&&(!c.hidden||c.id===op.semantics.category.value)).map(c=><option key={c.id} value={c.id}>{c.name}{c.hidden?' (скрыта)':''}{!compatible(c)?' (несовместима)':''}</option>)}</select></OperationField>
    <OperationField label="Подкатегория" error={checked?subcategoryError:undefined}><select aria-label="Подкатегория" value={editingSubcategory??''} disabled={!editingCategory} onChange={e=>edit({subcategoryId:e.target.value||null})}><option value="">Без подкатегории</option>{categories.filter(c=>c.parentId===editingCategory&&compatible(c)&&(!c.hidden||c.id===op.semantics.subcategory.value)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></OperationField>
    <label>Контрагент<select aria-label="Контрагент" value={(fields.counterpartyId===undefined?op.semantics.counterparty.value:fields.counterpartyId)??''} onChange={e=>edit({counterpartyId:e.target.value||null})}><option value="">Не задан</option>{parties.filter(p=>p.state==='registered'||p.id===op.semantics.counterparty.value).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label>

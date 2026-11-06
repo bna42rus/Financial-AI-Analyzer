@@ -8,7 +8,7 @@ import {HttpError} from './types.ts';
 import type {ReviewScope} from './finance-review-group.ts';
 export const verificationFacets=['kind','role','category','subcategory'] as const;
 export type VerificationFacet=typeof verificationFacets[number];
-export type BulkIntent={kind:'bulk_operations';id:string;operationIds:string[];patch:Record<string,unknown>;verify:VerificationFacet[];reviewScope?:ReviewScope};
+export type BulkIntent={kind:'bulk_operations';id:string;operationIds:string[];patch:Record<string,unknown>;verify:VerificationFacet[];reviewScope?:ReviewScope;rememberRule?:boolean};
 export function parseOperationPatch(value:unknown){
  const p=object(value,['corrections','kind','role','categoryId','subcategoryId','merchant','counterpartyId','comment','analyticsOverride','reviewRequested']),out:Record<string,unknown>={};
  if('corrections'in p)out.corrections=p.corrections===null?{}:correction(p.corrections);
@@ -21,13 +21,14 @@ export function parseOperationPatch(value:unknown){
 }
 export function selectionIds(value:unknown){if(!Array.isArray(value)||!value.length||value.length>1000)throw new TypeError('INVALID_SELECTION');const ids=value.map(uuid);if(new Set(ids).size!==ids.length)throw new TypeError('DUPLICATE_SELECTION');return ids;}
 export function parseBulkIntent(value:unknown):BulkIntent {
- const r=object(value,['kind','operationIds','patch','verify','reviewScope']),patch=r.patch===undefined?{}:parseOperationPatch(object(r.patch,['kind','role','categoryId','subcategoryId','counterpartyId','comment','analyticsOverride','reviewRequested']));
+ const r=object(value,['kind','operationIds','patch','verify','reviewScope','rememberRule']),patch=r.patch===undefined?{}:parseOperationPatch(object(r.patch,['kind','role','categoryId','subcategoryId','counterpartyId','comment','analyticsOverride','reviewRequested']));
  const verify=r.verify===undefined?[]:Array.isArray(r.verify)&&r.verify.length<=4?r.verify.map(v=>choice(v,verificationFacets)):(()=>{throw new TypeError('INVALID_VERIFICATION');})();
  if(new Set(verify).size!==verify.length||!verify.length&&!Object.keys(patch).length||verify.length&&Object.keys(patch).length)throw new TypeError('INVALID_BULK_ACTION');
  if('subcategoryId'in patch&&!('categoryId'in patch))throw new TypeError('CATEGORY_REQUIRED');
  if('categoryId'in patch&&!('subcategoryId'in patch))patch.subcategoryId=null;
  let reviewScope:ReviewScope|undefined;if(r.reviewScope!==undefined){const s=object(r.reviewScope,['sessionId','revision','anchorId']);if(Object.keys(s).length!==3||typeof s.revision!=='string'||!/^\d{1,20}$/.test(s.revision))throw new TypeError('INVALID_REVIEW_SCOPE');reviewScope={sessionId:uuid(s.sessionId),revision:s.revision,anchorId:uuid(s.anchorId)};}
- return {kind:'bulk_operations',id:randomUUID(),operationIds:selectionIds(r.operationIds),patch,verify,...(reviewScope?{reviewScope}:{})};
+ if(r.rememberRule!==undefined&&(r.rememberRule!==true||!reviewScope||!Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId'].includes(k))||!Object.keys(patch).length))throw new TypeError('INVALID_BULK_ACTION');
+ return {kind:'bulk_operations',id:randomUUID(),operationIds:selectionIds(r.operationIds),patch,verify,...(reviewScope?{reviewScope}:{}),...(r.rememberRule?{rememberRule:true}:{})};
 }
 export function bulkPatches(intent:BulkIntent,graph:Graph){
  const byId=new Map(graph.operations.map(o=>[o.id,o])),projection=new Map(reconcile(graph).operations.map(o=>[o.id,o]));

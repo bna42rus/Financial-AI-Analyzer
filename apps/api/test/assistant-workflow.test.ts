@@ -469,3 +469,10 @@ test('incomplete or unresolved natural changes never prepare a mutation or widen
  assert.equal(blocked.status,'clarification');assert.equal(prepared,0);
  const missing=await h.execute(981,'Пометь операции этого ответа',[p],{prepareChange:async()=>{throw Error('ASSISTANT_CHANGE_SCOPE_REQUIRED');}});assert.equal(missing.status,'clarification');assert.equal(missing.proposal,undefined);
 });
+
+test('a basic exact question uses the current saved filters without a model call',async()=>{
+ const h=harness(),category=trialId(11);
+ const result=await h.execute(201,'Сколько я потратил за выбранный период?',[],{global:{...global,filter:{...global.filter,categoryIds:[category]}}});
+ assert.equal(result.status,'query');assert.equal(result.modelCalls,0);assert.equal(h.calls.length,0);
+ assert.equal(result.query?.filter.from,global.filter.from);assert.deepEqual(result.query?.filter.categoryIds,[category]);
+});

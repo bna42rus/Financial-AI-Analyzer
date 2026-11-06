@@ -30,3 +30,14 @@
 .dateField>span:first-child,.dateField input:not([type=date]){font-size:inherit;line-height:1.25}
 .dateField>span:first-child{white-space:nowrap}
 @media(pointer:coarse){.dateField{font-size:calc(16px * var(--text-scale,1))}}
+@media(max-width:700px){
+ .bar{align-items:stretch;flex-direction:column}
+ .fields{display:grid;grid-template-columns:minmax(0,1fr);overflow:visible}
+ .fields>.categoryTrigger,.fields>.searchField input{width:100%}
+ .dates{margin:0;padding:0;border:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+ .dateField{min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr);gap:.35rem}
+ .dateField input{width:100%;min-width:0}
+ .searchField{padding:0;margin:0;border:0}
+ .actions{justify-content:flex-end}
+}
+@media(max-width:360px){.dates{grid-template-columns:minmax(0,1fr)}}

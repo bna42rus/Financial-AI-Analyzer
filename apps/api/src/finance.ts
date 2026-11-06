@@ -13,7 +13,7 @@ import {parseViewIntent,applyViewIntent,repairOperationsViews} from './operation
 import type {ViewIntent} from './operations.ts';
 import {parseRuleIntent,applyRuleIntent} from './finance-rules.ts';
 import type {RuleIntent} from './finance-rules.ts';
-import {randomUUID} from 'node:crypto';
+import {createHash,randomUUID} from 'node:crypto';
 import {sourceEvidence,resolveSourceText} from './import-source.ts';
 import {parseCancelImport,cancelImport} from './import-cancellation.ts';
 import type {CancelImportIntent} from './import-cancellation.ts';
@@ -26,7 +26,7 @@ import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
-import {object,choice,uuid,dateFact,correction,effective,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
+import {allowedOperationRoles,object,choice,uuid,dateFact,correction,effective,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
@@ -48,7 +48,7 @@ import {isEntityKind,parseEntityIntent,applyEntity,restoreEntities,partyRows,act
 import type {EntityIntent,EntityUndo} from './finance-entities.ts';
 import {parseExclusionIntent,applyExclusion} from './finance-exclusions.ts';
 import type {ExclusionIntent,BatchUndo} from './finance-exclusions.ts';
-import {parseRestoreIntent,restoreHistory,captureHistory,historyDelta,publicChanges,associatedOperations} from './finance-history.ts';
+import {parseRestoreIntent,restoreHistory,captureHistory,historyDelta,publicChanges,associatedOperations,stableJSON} from './finance-history.ts';
 import type {RestoreIntent,HistoryUndo,Change} from './finance-history.ts';
 export {queryHistory} from './finance-history.ts';
 
@@ -124,11 +124,12 @@ type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'coun
 type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
 type CreateHistoricalRuleIntent={kind:'create_rule_with_history';id:string;patch:Omit<Rule,'id'>};
 type AccountSettingsIntent={kind:'account_settings';id:string;accounts:BaseIntent[]};
-type Intent=AccountSettingsIntent|OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type Intent={kind:'reset_categories';id:string}|AccountSettingsIntent|OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
+  if((value as Record<string,unknown>).kind==='reset_categories'){const r=object(value,['kind','id']);return {kind:'reset_categories',id:uuid(r.id)};}
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
   if(k==='account_settings'){
    const r=object(value,['kind','id','accounts']);
@@ -211,6 +212,29 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
   return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
  }
  if(intent.kind==='set_category_binding')return applyCategoryBinding(db,userId,intent,(await loadFinance(db,userId)).graph);
+ if(intent.kind==='reset_categories'){
+  const {graph}=await loadFinance(db,userId),keep=new Set<string>(),created:string[]=[],removed:string[]=[],unhidden:string[]=[],rulesNeedSetup=new Set<string>();
+  const fold=(name:string)=>name.normalize('NFKC').trim().toLocaleLowerCase('ru').replaceAll('ё','е');
+  function stableId(path:string){const h=createHash('sha256').update(intent.id+':'+path).digest('hex');return h.slice(0,8)+'-'+h.slice(8,12)+'-4'+h.slice(13,16)+'-8'+h.slice(17,20)+'-'+h.slice(20,32);}
+  for(const role of ['expense','income'] as const)for(const [root,...children] of starterCategories[role]){
+   async function ensure(name:string,parentId:string|null){
+    const match=graph.categories.find(c=>c.parentId===parentId&&c.role===role&&fold(c.name)===fold(name));
+    const id=match?.id??stableId(role+':'+(parentId??'')+':'+name);keep.add(id);
+    if(match){if(match.hidden||match.name!==name){await db.query('UPDATE finance.category SET hidden=false,name=$3,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,id,name]);if(match.hidden)unhidden.push(name);}}
+    else {await db.query('INSERT INTO finance.category(user_id,id,name,role,parent_id) VALUES($1,$2,$3,$4,$5)',[userId,id,name,role,parentId]);created.push(name);}
+    return id;
+   }
+   const parent=await ensure(root,null);for(const child of children)await ensure(child,parent);
+  }
+  let current=graph;
+  for(const c of graph.categories.filter(c=>!keep.has(c.id)&&(!c.parentId||keep.has(c.parentId)))){
+   const effect=await applyEntity(db,userId,{kind:'delete_category',id:c.id,replacementId:null,childRoles:[],roleDecisions:[]},current);
+   for(const id of effect.details.categoriesRemoved as string[]){const name=graph.categories.find(c=>c.id===id)?.name;if(name)removed.push(name);await repairOperationsViews(db,userId,{kind:'delete_category',id});}
+   for(const id of effect.details.rulesNeedSetup as string[])rulesNeedSetup.add(id);
+   current={...current,categories:current.categories.filter(c=>!(effect.details.categoriesRemoved as string[]).includes(c.id))};
+  }
+  return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,created,removed,unhidden,rulesNeedSetup:[...rulesNeedSetup],financialOperationsDeleted:0}};
+ }
  if(intent.kind==='add_catalog_categories')return applySelectedCategories(db,userId,intent,(await loadFinance(db,userId)).graph);
  if(intent.kind==='save_overview_view'||intent.kind==='delete_overview_view'||intent.kind==='reorder_overview_views')return applyOverviewIntent(db,userId,intent);
  if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
@@ -240,11 +264,22 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
   return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
  }
  if(intent.kind==='bulk_operations'){
-  if(intent.reviewScope)await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations);
+  const review=intent.reviewScope?await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations):null;
   const loaded=await loadFinance(db,userId),patches=bulkPatches(intent,loaded.graph);let warnings:unknown[]=[];
   if('analyticsOverride'in intent.patch){const result=await applyExclusion(db,userId,{kind:'set_exclusion',id:intent.id,scope:{kind:'operations',operationIds:intent.operationIds},value:intent.patch.analyticsOverride as 'default'|'include'|'exclude',includeRelated:false},loaded.graph);warnings=result.details.warnings as unknown[];}
   for(const item of patches){delete item.patch.analyticsOverride;if(Object.keys(item.patch).length)await applyBase(db,userId,{kind:'operation',id:item.id,patch:item.patch},currentRevision,loaded);}
-  const after=await financeView(db,userId);return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,operationIds:intent.operationIds,selectedCount:intent.operationIds.length,atomic:true,verify:intent.verify,patch:intent.patch,warnings,remainingReviewIds:after.operations.filter(o=>intent.operationIds.includes(o.id)&&o.reviewReasons.length).map(o=>o.id)}};
+  let ruleName:string|undefined;
+  if(intent.rememberRule){
+   const anchor=loaded.graph.operations.find(o=>o.id===intent.reviewScope?.anchorId),merchant=anchor?.semantics.merchant.value.trim();
+   if(!review?.liveQueue||!anchor||!merchant||anchor.semantics.kind.value!=='purchase'||BigInt(effective(anchor).amountMinor)>=0n)throw new HttpError(409,'REVIEW_GROUP_CHANGED');
+   const conditions={merchantEquals:merchant,accountId:effective(anchor).accountId,direction:'out' as const,kind:'purchase' as const},assignments=intent.patch as Rule['assignments'];
+   if(!loaded.rules.some(r=>r.enabled&&stableJSON(r.conditions)===stableJSON(conditions)&&stableJSON(r.assignments)===stableJSON(assignments))){
+    ruleName=safeText('Правило: '+merchant,160);
+    const patch={name:ruleName,enabled:true,priority:0,conditions,assignments};
+    await applyBase(db,userId,{kind:'rule',id:intent.id,create:true,patch},currentRevision,loaded);
+   }
+  }
+  const after=await financeView(db,userId);return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,operationIds:intent.operationIds,selectedCount:intent.operationIds.length,atomic:true,verify:intent.verify,patch:intent.patch,warnings,...(ruleName?{ruleName}:{}),remainingReviewIds:after.operations.filter(o=>intent.operationIds.includes(o.id)&&o.reviewReasons.length).map(o=>o.id)}};
  }
  if(intent.kind==='merge_duplicate')return mergeDuplicate(db,userId,intent);
  if(intent.kind==='cancel_import')return cancelImport(db,userId,intent,actionId);
@@ -271,6 +306,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
   if(p.corrections!==undefined){ownRefs(graph,parties,p.corrections as Record<string,unknown>);values.corrections=p.corrections;}
   const map={kind:'kind',role:'role',categoryId:'category',subcategoryId:'subcategory',merchant:'merchant',counterpartyId:'counterparty'}as const;
   for(const [input,key]of Object.entries(map))if(input in p)(semantics as unknown as Record<string,unknown>)[key]=facet(p[input],'user',true);
+  if('kind' in p||'role' in p){const effectiveAmount=(p.corrections as {amountMinor?:string}|undefined)?.amountMinor??effective(graph.operations.find(o=>o.id===id)!).amountMinor;if(!allowedOperationRoles(semantics.kind.value,effectiveAmount).includes(semantics.role.value))throw new HttpError(409,'OPERATION_KIND_ROLE_CONFLICT');}
   categoryCompatible(graph,semantics.role.value,semantics.category.value,semantics.subcategory.value);
   values.semantics=semantics;if('comment'in p)values.comment=p.comment;if('analyticsOverride'in p)values.analytics_override=p.analyticsOverride;
   const cleared=new Set<string>();if('kind'in p)cleared.add('low_kind_confidence');if('role'in p)for(const r of ['low_role_confidence','unresolved_role','unresolved_transfer'])cleared.add(r);if('categoryId'in p||'subcategoryId'in p)cleared.add('low_category_confidence');

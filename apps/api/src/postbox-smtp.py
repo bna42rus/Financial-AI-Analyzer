@@ -4,8 +4,18 @@ import re
 import smtplib
 import ssl
 import sys
+from email.headerregistry import Address
 from email.message import EmailMessage
 from email.policy import SMTP
+from html import escape
+
+
+def _paragraph(value):
+    return re.sub(
+        r'https?://[^\s<>"]+',
+        lambda match: '<a style="color:#4d3bd4" href="' + match.group(0) + '">' + match.group(0) + '</a>',
+        escape(value),
+    ).replace("\n", "<br>")
 
 
 def send(config, smtp_factory=smtplib.SMTP_SSL):
@@ -13,11 +23,20 @@ def send(config, smtp_factory=smtplib.SMTP_SSL):
     started_data = False
     try:
         message = EmailMessage(policy=SMTP)
-        message["From"] = config["sender"]
+        message["From"] = Address(display_name="CashNeuro", addr_spec=config["sender"])
         message["To"] = config["to"]
         message["Subject"] = config["subject"]
         message["Message-ID"] = "<" + config["id"] + "@cashneuro.ru>"
         message.set_content(config["text"])
+        blocks = "".join("<p style='margin:0 0 16px'>" + _paragraph(part) + "</p>"
+                         for part in config["text"].split("\n\n"))
+        message.add_alternative(
+            "<!doctype html><html lang='ru'><body style='margin:0;background:#f3f3fb;color:#19213b'>"
+            "<main style='max-width:600px;margin:auto;padding:24px;font:16px/1.55 Arial,sans-serif'>"
+            "<div style='padding:18px 22px;background:#4d3bd4;color:white;border-radius:14px 14px 0 0'>"
+            "<span aria-hidden='true' style='margin-right:8px'>&#9673;</span><strong>CashNeuro</strong></div>"
+            "<div style='background:white;padding:22px;border-radius:0 0 14px 14px'><h1 style='font-size:20px;margin:0 0 16px'>"
+            + escape(config["subject"]) + "</h1>" + blocks + "</div></main></body></html>", subtype="html")
         data = message.as_bytes()
         smtp = smtp_factory(
             "postbox.cloud.yandex.net", 465,

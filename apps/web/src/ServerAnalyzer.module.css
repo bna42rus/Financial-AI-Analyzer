@@ -37,3 +37,14 @@
 @media(max-width:700px){.layout{height:calc(100dvh - 145px);min-height:480px;}.layout [role="log"] article p{font-size:14px;}.chatTools{gap:3px;}}
 .layout textarea:focus-visible,.layout input[type="search"]:focus-visible { outline:none; }
 .layout label:focus-within { box-shadow:0 0 0 1px var(--color-primary); }
+.layout{margin-top:1rem}
+.layout .chatTools{margin-inline-start:auto}
+.layout :is(textarea){min-height:24px;max-height:144px;overflow-y:auto}
+.layout form:has(textarea){padding:10px clamp(10px,3vw,28px)}
+.layout form:has(textarea)>div{align-items:center;max-width:52rem;margin-inline:auto;padding:6px 8px 6px 13px}
+.layout form:has(textarea)>label{max-width:52rem;margin-inline:auto}
+.answerRowsFooter{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding-top:.65rem;color:var(--color-secondary-text);font-size:.875rem}
+.aiBudget{max-width:24rem;display:grid;gap:.35rem;margin:0 0 .7rem auto;border:1px solid var(--color-border);border-radius:.75rem;padding:.75rem;background:var(--color-surface);font-size:.875rem}
+.aiBudget>div{display:flex;align-items:center;justify-content:space-between;gap:.65rem}
+.aiBudget meter{width:100%;height:.65rem;accent-color:var(--color-primary)}
+.aiBudget small{color:var(--color-secondary-text)}

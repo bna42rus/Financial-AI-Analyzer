@@ -182,3 +182,19 @@ export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Q
   const answer:Answer={text:result.operationCount?'Расчёт по вашим сохранённым операциям.':'По этим условиям операций нет.',mode:options.mode,registryVersion,query,result,widget,generation:state.generation,revision:state.revision,accountCount:new Set(selected.map(o=>o.accountId)).size,actionOperationCount:queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).total,computedAt:now.toISOString(),periodFromQuestion:options.periodFromQuestion,followUp:options.followUp,...(options.provider?{provider:options.provider}:{})};
  return {answer,dependencyIds};
 }
+
+
+/** Open only the saved answer's exact authorized filter. A changed data revision
+ * requires a new calculation, so expanded rows cannot contradict a saved total. */
+export async function analyzerAnswerRows(db:PoolClient,userId:string,input:unknown){
+ const r=object(input,['answerId','offset']),id=uuid(r.answerId);
+ if(!Number.isSafeInteger(r.offset)||Number(r.offset)<0)throw new HttpError(400,'INVALID_INPUT');
+ const a=(await db.query('SELECT answer FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,id])).rows[0]?.answer as Answer|undefined;
+ if(!a?.query||!a.widget||!a.result||a.query.grouping==='none')throw new HttpError(404,'NOT_FOUND');
+ const {state,operations}=await operationsDataset(db,userId);
+ if(a.generation!==state.generation||a.revision!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');
+ await assertReferences(db,userId,a.query.filter);
+ const result=calculateWidget(a.widget,operations,state,{},new Date(a.computedAt!),await financialTimezone(db,userId)??'Etc/UTC',true);
+ const offset=Number(r.offset),points=result.tablePoints??[],next=offset+50;
+ return {points:points.slice(offset,next),nextOffset:next<points.length?next:null,total:points.length};
+}

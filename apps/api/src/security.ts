@@ -27,7 +27,7 @@ export async function resetPassword(db: PoolClient, config: Config, request: Fas
   await db.query(`UPDATE ${schema}.security_state SET epoch=epoch+1 WHERE user_id=$1`, [entry.user_id]);
   await db.query(`DELETE FROM ${schema}.auth_session WHERE user_id=$1`, [entry.user_id]);
   await db.query(`DELETE FROM ${schema}.reset_token WHERE user_id=$1`, [entry.user_id]);
-  await db.query(`DELETE FROM ${schema}.auth_verification WHERE value=$1`, [entry.user_id]);
+  await db.query(`DELETE FROM ${schema}.auth_verification WHERE value=$1 OR id=$2`, [entry.user_id,'profile-email:'+entry.user_id]);
   await event(db, schema, entry.user_id, 'password_reset');
   await outbox(db, schema, seal, 'security_password_changed', { email: entry.email },{subjectId:entry.user_id});
   return { status: 'login_required' };

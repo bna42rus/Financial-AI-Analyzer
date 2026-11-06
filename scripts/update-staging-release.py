@@ -279,6 +279,10 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0031_merchant_source.sql').read_text() + '\nCOMMIT;')
     if sql("SELECT to_regclass('finance.category_binding') IS NOT NULL") != 't':
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0032_category_bindings.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='review_session' AND column_name='live_queue')") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0033_attention_queue.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('commerce.ai_pack') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0034_commerce_catalog.sql').read_text() + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):

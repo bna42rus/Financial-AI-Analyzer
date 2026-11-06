@@ -4,6 +4,7 @@ import { createServer } from './server.ts';
 import type { Profile } from './types.ts';
 import { runtimeKey, stagingDatabase } from './runtime-key.ts';
 import { loadAssistantProvider } from './analyzer-assistant-config.ts';
+import { testYooKassa } from './yookassa-topups.ts';
 import { loadYandexAnalyzer } from './yandex-config.ts';
 const profile = process.env.API_PROFILE as Profile;
 if (!['finance', 'control'].includes(profile)) throw new Error('API_PROFILE must be finance or control');
@@ -18,8 +19,10 @@ const assistantProvider = await loadAssistantProvider(environment, profile, proc
 if(![undefined,'0','1'].includes(process.env.CLASSIFICATION_ENABLED))throw new Error('CLASSIFICATION_CONFIGURATION_DENIED');
 const classificationEnabled=process.env.CLASSIFICATION_ENABLED==='1';
 if(classificationEnabled&&!assistantProvider)throw new Error('CLASSIFICATION_PROVIDER_REQUIRED');
+const testPayments=environment==='staging'&&profile==='finance'&&process.env.YOOKASSA_TEST_ENABLED==='1'
+ ?testYooKassa(process.env.YOOKASSA_TEST_SHOP_ID??'',process.env.YOOKASSA_TEST_SECRET??'',process.env.WEB_ORIGIN!):undefined;
 const server = await createServer({ profile, pool, baseURL: process.env.API_BASE_URL!, origin: process.env.WEB_ORIGIN!, authSecret: process.env.AUTH_SECRET!,
-  wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider, classificationEnabled });
+  wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider, classificationEnabled,testPayments });
 await server.app.listen(Number(process.env.PORT ?? (profile === 'control' ? 3001 : 3000)), '127.0.0.1');
 const classification=classificationEnabled?await import('./classification-store.ts'):undefined;
 let stopping=false;

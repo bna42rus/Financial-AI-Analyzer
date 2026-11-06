@@ -20,7 +20,7 @@ export const sections = [
   { id: 'counterparties', title: 'Контрагенты', description: 'Люди и организации', keywords: 'получатели переводы человек', icon: Users },
   { id: 'budgets', title: 'Бюджеты', description: 'Планы расходов', keywords: 'лимиты план категории период', icon: Target },
   { id: 'analytics', title: 'Аналитика', description: 'Учёт и исключения', keywords: 'кредиты погашение cashflow economic валюта рубли исключенные', icon: ListFilter },
-  { id: 'interface', title: 'Интерфейс', description: 'Тема, текст и плотность', keywords: 'оформление темная светлая шрифт размер анимация движение сброс представления', icon: Palette },
+  { id: 'interface', title: 'Интерфейс', description: 'Тема, текст, стартовый экран и часовой пояс', keywords: 'оформление темная светлая шрифт размер период', icon: Palette },
   { id: 'privacy', title: 'Конфиденциальность', description: 'Данные и внешние подключения', keywords: 'ai интернет поиск магазинов приватность удалить удаление', icon: ShieldCheck },
   { id: 'history', title: 'История', description: 'Изменения и восстановление', keywords: 'undo откат отменить тридцать 30 дней', icon: History },
 ] as const satisfies readonly { id: string; title: string; description: string; keywords: string; icon: LucideIcon }[];

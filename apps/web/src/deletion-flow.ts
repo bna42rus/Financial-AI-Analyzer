@@ -1,9 +1,9 @@
 import {ApiError} from './server-client';
 import type {FinanceImpact,FinanceReceipt} from './finance-client';
 export type DeleteScope={kind:'operations';operationIds:string[]}|{kind:'period';from:string;through:string;accountIds?:string[]}|{kind:'account';accountId:string;deleteAccount:boolean}|{kind:'counterparty';counterpartyId:string;deleteCard:boolean};
-export type DeletionIntent={kind:'delete_financial';scope:DeleteScope}|{kind:'reset_financial';keepCategories:boolean;keepRules:boolean;keepInterface:boolean};
+export type DeletionIntent={kind:'delete_financial';scope:DeleteScope}|{kind:'reset_financial';keepCategories:boolean;keepRules:boolean;keepInterface:boolean;keepCounterparties?:boolean;keepBudgets?:boolean;keepAccounts?:boolean;keepCredits?:boolean};
 export type DeletionEpoch={generation:string;revision:string;recentAuthenticationRequired?:boolean};
-export type DeletionDetails={kind:'delete_financial'|'reset_financial';counts:Record<string,number>;operationIds?:string[];retainedOperationIds?:string[];survivingRelatedOperationIds?:string[];accountsDeleted?:string[];aliasesDeleted?:number;counterpartiesDeleted?:string[];counterpartyAliasesDeleted?:number;rulesNeedSetup:string[]|number;preserved?:{categories:number;rules:number;interface:boolean}};
+export type DeletionDetails={kind:'delete_financial'|'reset_financial';counts:Record<string,number>;operationIds?:string[];retainedOperationIds?:string[];survivingRelatedOperationIds?:string[];accountsDeleted?:string[];aliasesDeleted?:number;counterpartiesDeleted?:string[];counterpartyAliasesDeleted?:number;rulesNeedSetup:string[]|number;preserved?:{categories:number;rules:number;interface:boolean;counterparties?:number;budgets?:number;accounts?:number;credits?:number}};
 export type DeletionPreview={status:'previewed';actionId:string;impact:Partial<Omit<FinanceImpact,'details'>>&{details:DeletionDetails}};
 export type DeletionReceipt=FinanceReceipt&{interfaceEpoch?:string;cleanup:{destructive:true;undoable:false;interfaceReset?:boolean;counts?:Record<string,number>}};
 export type DeletionState={phase:'draft'|'sending'|'preview'|'retry'|'stale'|'done'|'unavailable';preview:DeletionPreview|null;receipt:DeletionReceipt|null;error:string;requiresPassword:boolean};

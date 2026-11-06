@@ -16,7 +16,7 @@ if(primary!=='5255d758534e74c9329cb8437e8a862f4bf989999172903a862462294b4ce9c8')
 const manifest=await assistantRuntimeManifest(),source=await read('apps/api/src/assistant-workflow.ts'),match=/export const assistantWorkflowVersion = '([^']+)'/u.exec(source.toString());
 if(!match)throw Error('RELEASE_WORKFLOW_MISSING');
 const migrations={};
-for(const name of ['0027_assistant_runtime.sql','0028_ai_classification.sql','0029_bank_description.sql','0030_marketplace_catalog.sql','0031_merchant_source.sql','0032_category_bindings.sql'])migrations[name]=hash(await read('packages/database/migrations/'+name));
+for(const name of ['0027_assistant_runtime.sql','0028_ai_classification.sql','0029_bank_description.sql','0030_marketplace_catalog.sql','0031_merchant_source.sql','0032_category_bindings.sql','0033_attention_queue.sql','0034_commerce_catalog.sql'])migrations[name]=hash(await read('packages/database/migrations/'+name));
 let frontend=null;
 try{frontend=JSON.parse(await read('apps/web/dist/release.json'));}catch(error){if(error.code!=='ENOENT')throw error;}
 const connected=frontend?.schema==='cashneuro-web-build/1'&&frontend?.mode==='connected'&&frontend?.profile==='finance'&&frontend?.apiOrigin==='https://test.cashneuro.ru'&&frontend?.revision===revision;

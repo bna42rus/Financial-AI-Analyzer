@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,uuid,effective} from '../../../packages/finance-core/src/model.ts';
-import type {Graph} from '../../../packages/finance-core/src/model.ts';
+import type {Graph,Operation,Account} from '../../../packages/finance-core/src/model.ts';
 import {applyRules,ruleMatches} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {HttpError} from './types.ts';
@@ -15,6 +15,22 @@ export function parseRuleIntent(value:unknown):RuleIntent {
  if(r.kind!=='apply_rules'||!Array.isArray(r.operationIds)||!r.operationIds.length||r.operationIds.length>1000)throw new TypeError('INVALID_SELECTION');
  const operationIds=r.operationIds.map(uuid);if(new Set(operationIds).size!==operationIds.length)throw new TypeError('DUPLICATE_SELECTION');
  return {kind:r.kind,id:randomUUID(),ruleId:uuid(r.ruleId),operationIds};
+}
+function historicalRuleChange(op:Operation,account:Account,active:Rule[]){
+ const reconsidered={...op,reviewReasons:op.reviewReasons.filter(r=>r!=='conflicting_rules')};
+ const next=applyRules(reconsidered,account,active);
+ const snapshot=(value:Operation)=>[Object.values(value.semantics).map(f=>f.value),value.analyticsOverride,[...value.reviewReasons].sort()];
+ return {next,changed:stableJSON(snapshot(op))!==stableJSON(snapshot(next))};
+}
+export function historicalRuleCandidates(input:unknown,graph:Graph,rules:(Rule&{dependencyStatus:string})[]){
+ const r=object(input,['ruleId']),rule=rules.find(rule=>rule.id===uuid(r.ruleId));if(!rule)throw new HttpError(404,'NOT_FOUND');
+ const active=rules.filter(r=>r.enabled&&r.dependencyStatus==='ready'),accounts=new Map(graph.accounts.map(a=>[a.id,a]));
+ const ids:string[]=[];
+ if(rule.enabled&&rule.dependencyStatus==='ready')for(const op of graph.operations){
+  const account=accounts.get(effective(op).accountId);
+  if(account&&ruleMatches(op,account,rule)&&historicalRuleChange(op,account,active).changed)ids.push(op.id);
+ }
+ return {operationIds:ids.slice(0,1000),total:ids.length};
 }
 export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleIntent,graph:Graph,rules:(Rule&{dependencyStatus:string})[],compatible:(role:string,category:string|null,sub:string|null)=>void):Promise<BatchUndo> {
  const rule=rules.find(r=>r.id===(intent.kind==='delete_rule'?intent.id:intent.ruleId));if(!rule)throw new HttpError(404,'NOT_FOUND');
@@ -30,11 +46,10 @@ export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleInt
   const op=operations.get(id);if(!op)throw new HttpError(404,'NOT_FOUND');
   const account=accounts.get(effective(op).accountId)!;
   if(!ruleMatches(op,account,rule))throw new HttpError(409,'RULE_SCOPE_CHANGED');
-  const reconsidered=structuredClone(op);reconsidered.reviewReasons=reconsidered.reviewReasons.filter(r=>r!=='conflicting_rules');
-  const next=applyRules(reconsidered,account,active);compatible(next.semantics.role.value,next.semantics.category.value,next.semantics.subcategory.value);
+  const {next,changed}=historicalRuleChange(op,account,active);compatible(next.semantics.role.value,next.semantics.category.value,next.semantics.subcategory.value);
   if(Object.values(op.semantics).some(f=>f.userVerified)||op.analyticsOverride!=='default')protectedOperationIds.push(id);
   if(next.reviewReasons.includes('conflicting_rules'))conflictingOperationIds.push(id);
-  if(stableJSON([op.semantics,op.analyticsOverride,op.reviewReasons])!==stableJSON([next.semantics,next.analyticsOverride,next.reviewReasons])){
+  if(changed){
    changes.push({id,semantics:next.semantics,analyticsOverride:next.analyticsOverride,reviewReasons:next.reviewReasons});changedOperationIds.push(id);
   }
  }

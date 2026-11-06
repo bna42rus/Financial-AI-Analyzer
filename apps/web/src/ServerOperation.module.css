@@ -61,3 +61,8 @@
 .bulkConfirmation{width:min(510px,calc(100vw - 24px));max-width:510px}
 .srOnly{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .operationFooter .leftAction { margin-right:auto; }
+.impactStack { display:grid; gap:14px; }
+.impactStack details { padding:10px; border:1px solid var(--color-border); border-radius:8px; }
+.impactStack summary { cursor:pointer; }
+.impactWarning { padding:10px 12px; border-radius:8px; color:var(--color-warning); background:var(--color-warning-surface); }
+.narrowDialog{width:min(100% - 2rem,32rem)}

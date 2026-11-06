@@ -1,6 +1,7 @@
 import type {PoolClient} from 'pg';
-import {object,choice,uuid} from '../../../packages/finance-core/src/model.ts';
+import {object,choice,operationDay,uuid} from '../../../packages/finance-core/src/model.ts';
 import {prepareFinance,financeView} from './finance.ts';
+import {reviewGroupIds} from '../../../packages/finance-core/src/review-group.ts';
 import {selectionIds} from './finance-bulk.ts';
 import {HttpError} from './types.ts';
 type SessionRow={id:string;generation:string;operation_ids:string[];cursor:number;decisions:Record<string,string>;status:'created'|'in_progress'|'paused'|'completed'|'abandoned';revision:string};
@@ -15,7 +16,7 @@ function advance(s:SessionRow,operations:Awaited<ReturnType<typeof financeView>>
  return changed;
 }
 export async function reviewSessions(db:PoolClient,userId:string,input:unknown){
- object(input,[]);const state=await prepareFinance(db,userId),view=await financeView(db,userId),rows=(await db.query<SessionRow>("SELECT * FROM finance.review_session WHERE user_id=$1 AND generation=$2 ORDER BY (status IN ('created','in_progress','paused')) DESC,updated_at DESC,id LIMIT 20 FOR UPDATE",[userId,state.generation])).rows;
+ object(input,[]);const state=await prepareFinance(db,userId),view=await financeView(db,userId),rows=(await db.query<SessionRow>("SELECT * FROM finance.review_session WHERE user_id=$1 AND generation=$2 AND NOT live_queue ORDER BY (status IN ('created','in_progress','paused')) DESC,updated_at DESC,id LIMIT 20 FOR UPDATE",[userId,state.generation])).rows;
  const sessions=[];for(let s of rows){if(['created','in_progress','paused'].includes(s.status)&&advance(s,view.operations))s=await save(db,userId,s);sessions.push(publicSession(s));}return {generation:state.generation,sessions};
 }
 export async function reviewCommand(db:PoolClient,userId:string,input:unknown){
@@ -27,7 +28,7 @@ export async function reviewCommand(db:PoolClient,userId:string,input:unknown){
  if(kind==='create'){
   object(input,['commandId','sessionId','generation','kind','operationIds','financeRevision']);if(r.financeRevision!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');const ids=selectionIds(r.operationIds),byId=new Map(view.operations.map(o=>[o.id,o]));
   for(const opId of ids){if(!byId.has(opId))throw new HttpError(404,'NOT_FOUND');if(!byId.get(opId)!.reviewReasons.length)throw new HttpError(409,'REVIEW_SCOPE_CHANGED');}
-  if((await db.query("SELECT count(*)::int AS n FROM finance.review_session WHERE user_id=$1 AND status IN ('created','in_progress','paused')",[userId])).rows[0].n>=20)throw new HttpError(409,'REVIEW_SESSION_LIMIT');
+  if((await db.query("SELECT count(*)::int AS n FROM finance.review_session WHERE user_id=$1 AND status IN ('created','in_progress','paused') AND NOT live_queue",[userId])).rows[0].n>=20)throw new HttpError(409,'REVIEW_SESSION_LIMIT');
   if((await db.query('SELECT 1 FROM finance.review_session WHERE user_id=$1 AND id=$2',[userId,id])).rowCount)throw new HttpError(409,'ACTION_REUSED');s=(await db.query<SessionRow>('INSERT INTO finance.review_session(user_id,id,generation,operation_ids) VALUES($1,$2,$3,$4) RETURNING *',[userId,id,generation,ids ])).rows[0]!;s.status='in_progress';
  }else{
   object(input,['commandId','sessionId','generation','revision','kind']);s=await session(db,userId,id);if(s.generation!==generation)throw new HttpError(409,'GENERATION_CHANGED');if(String(s.revision)!==r.revision)throw new HttpError(409,'REVIEW_CHANGED');
@@ -38,4 +39,24 @@ export async function reviewCommand(db:PoolClient,userId:string,input:unknown){
  }
  if(s.status!=='abandoned')advance(s,view.operations);s=await save(db,userId,s);const result=publicSession(s);
  await db.query('INSERT INTO finance.review_command(user_id,id,session_id,request,result) VALUES($1,$2,$3,$4,$5)',[userId,commandId,id,JSON.stringify(r),JSON.stringify(result)]);return result;
+}
+
+export async function attentionQueue(db:PoolClient,userId:string,input:unknown){
+ const request=object(input,['refresh','skip','revision','generation']);
+ if(request.refresh!==undefined&&typeof request.refresh!=='boolean')throw new TypeError('INVALID_REVIEW_SCOPE');
+ const state=await prepareFinance(db,userId);
+ if(request.generation!==undefined&&uuid(request.generation)!==state.generation)throw new HttpError(409,'GENERATION_CHANGED');
+ const view=await financeView(db,userId),unresolved=view.operations.filter(o=>o.reviewReasons.length).sort((a,b)=>operationDay(b.date).localeCompare(operationDay(a.date))||a.id.localeCompare(b.id));
+ const ids=unresolved.map(o=>o.id),valid=new Set(ids);
+ let row=(await db.query<SessionRow>('SELECT * FROM finance.review_session WHERE user_id=$1 AND live_queue FOR UPDATE',[userId])).rows[0];
+ if(!row){row=(await db.query<SessionRow>("INSERT INTO finance.review_session(user_id,id,generation,operation_ids,status,live_queue) VALUES($1,gen_random_uuid(),$2,$3,'in_progress',true) RETURNING *",[userId,state.generation,ids])).rows[0]!;}
+ const previous=new Set(row.operation_ids);
+ const next=request.refresh===true?[...ids]:[...row.operation_ids.filter(id=>valid.has(id)),...ids.filter(id=>!previous.has(id))];
+ if(request.skip!==undefined){
+  const skip=uuid(request.skip);if(request.refresh||String(row.revision)!==request.revision||next[0]!==skip)throw new HttpError(409,'REVIEW_CHANGED');
+  next.push(next.shift()!);
+ }
+ if(stable(next)!==stable(row.operation_ids))row=(await db.query<SessionRow>('UPDATE finance.review_session SET operation_ids=$3,cursor=0,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2 RETURNING *',[userId,row.id,next])).rows[0]!;
+ const anchor=next[0],similar=anchor?reviewGroupIds(view.operations,next,anchor,true).slice(0,1000):[],wanted=new Set(anchor?[anchor,...similar]:[]);
+ return {id:row.id,generation:state.generation,financeRevision:state.revision,revision:String(row.revision),remaining:next.length,anchor,operations:unresolved.filter(o=>wanted.has(o.id)),similar};
 }

@@ -56,8 +56,8 @@ export async function importStatus(db:PoolClient,userId:string,input:unknown){
 }
 /** Bounded, paginated tenant history. No payload, filenames, pseudonyms or source text. */
 export async function importHistory(db:PoolClient,userId:string,input:unknown={}){
- await prepareFinance(db,userId);const r=object(input,['before','status']);
- const status=r.status??'all';if(!['all','completed','errors','cancelled'].includes(status as string))throw new TypeError('INVALID_IMPORT_FILTER');
+ await prepareFinance(db,userId);const r=object(input,['before','status','statuses']);
+ const statuses=r.statuses??(r.status===undefined||r.status==='all'?[]:[r.status]);if(!Array.isArray(statuses)||statuses.length>4||statuses.some(v=>!['completed','errors','cancelled','active'].includes(v as string)))throw new TypeError('INVALID_IMPORT_FILTER');
  const before=r.before===undefined?null:uuid(r.before);
  // Preserve PostgreSQL microseconds; a JS Date cursor can skip rows within the same millisecond.
  const cursor=before?(await db.query('SELECT created_at::text AS created_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,before])).rows[0]:null;
@@ -65,8 +65,8 @@ export async function importHistory(db:PoolClient,userId:string,input:unknown={}
  const rows=(await db.query(`SELECT b.id,b.status,b.created_at,b.finished_at,
  (SELECT count(*)::int FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id) AS files,
  (SELECT COALESCE(sum(f.rows_found),0)::int FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id) AS rows_found
- FROM finance.ingestion_batch b WHERE b.user_id=$1 AND ($4='all' OR $4='completed' AND b.status='completed' OR $4='errors' AND b.status IN ('partial','invalidated') OR $4='cancelled' AND EXISTS(SELECT 1 FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id AND f.cancelled_at IS NOT NULL)) AND ($2::timestamptz IS NULL OR (b.created_at,b.id)<($2::timestamptz,$3::uuid))
- ORDER BY b.created_at DESC,b.id DESC LIMIT 51`,[userId,cursor?.created_at??null,before,status])).rows;
+ FROM finance.ingestion_batch b WHERE b.user_id=$1 AND (cardinality($4::text[])=0 OR 'completed'=ANY($4) AND b.status='completed' OR 'errors'=ANY($4) AND b.status IN ('partial','invalidated') OR 'active'=ANY($4) AND b.status IN ('accepted','processing') OR 'cancelled'=ANY($4) AND EXISTS(SELECT 1 FROM finance.ingestion_file f WHERE f.user_id=b.user_id AND f.batch_id=b.id AND f.cancelled_at IS NOT NULL)) AND ($2::timestamptz IS NULL OR (b.created_at,b.id)<($2::timestamptz,$3::uuid))
+ ORDER BY b.created_at DESC,b.id DESC LIMIT 51`,[userId,cursor?.created_at??null,before,statuses])).rows;
  const batches=rows.slice(0,50).map(b=>({batchId:b.id,status:b.status,createdAt:b.created_at,finishedAt:b.finished_at,files:b.files,rowsFound:b.rows_found}));
  return {batches,nextCursor:rows.length>50?batches.at(-1)!.batchId:null};
 }
@@ -74,8 +74,8 @@ async function importReport(db:PoolClient,userId:string,batchId:string){
  const batch=(await db.query('SELECT status,created_at,finished_at FROM finance.ingestion_batch WHERE user_id=$1 AND id=$2',[userId,batchId])).rows[0];
  if(!batch)throw new HttpError(404,'NOT_FOUND');
  const files=(await db.query('SELECT id,bank,rows_found,blocked,error,cancelled_at FROM finance.ingestion_file WHERE user_id=$1 AND batch_id=$2 ORDER BY position',[userId,batchId])).rows;
- const rows=(await db.query(`SELECT r.file_id,r.ordinal,r.status,r.issue,r.outcome,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.ingestion_row r JOIN finance.ingestion_file f ON (f.user_id,f.id)=(r.user_id,r.file_id)
- LEFT JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) WHERE f.user_id=$1 AND f.batch_id=$2 ORDER BY f.position,r.ordinal`,[userId,batchId])).rows;
+ const rows=(await db.query(`SELECT r.file_id,r.ordinal,r.status,r.issue,r.outcome,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id,oa.account_id FROM finance.ingestion_row r JOIN finance.ingestion_file f ON (f.user_id,f.id)=(r.user_id,r.file_id)
+ LEFT JOIN finance.source_observation o ON (o.user_id,o.id)=(r.user_id,r.observation_id) LEFT JOIN finance.observation_account oa ON (oa.user_id,oa.observation_id)=(o.user_id,o.id) WHERE f.user_id=$1 AND f.batch_id=$2 ORDER BY f.position,r.ordinal`,[userId,batchId])).rows;
  const loaded=await loadFinance(db,userId),involved=new Set(rows.map(r=>r.transaction_id).filter(Boolean)),projection=reconcile(loaded.graph);
  const review=new Set(projection.operations.filter(o=>involved.has(o.id)&&o.reviewReasons.length).map(o=>o.id));
  const transactionCounts=(items:typeof rows)=>{
@@ -84,12 +84,17 @@ async function importReport(db:PoolClient,userId:string,batchId:string){
   for(const row of items)if(row.transaction_id&&row.outcome&&(!outcomes.has(row.transaction_id)||rank[row.outcome]!>rank[outcomes.get(row.transaction_id)!]!))outcomes.set(row.transaction_id,row.outcome);
   return {total:outcomes.size,created:[...outcomes.values()].filter(v=>v==='created').length,existing:[...outcomes.values()].filter(v=>v==='existing').length,updated:[...outcomes.values()].filter(v=>v==='updated').length,review:[...outcomes.keys()].filter(id=>review.has(id)).length};
  };
+ const accountStats=(items:typeof rows)=>{
+  const groups=new Map<string,typeof rows>();
+  for(const row of items){if(!row.account_id)continue;const rows=groups.get(row.account_id)??[];rows.push(row);groups.set(row.account_id,rows);}
+  return [...groups].map(([accountId,rows])=>({accountId,counts:{rowsFound:rows.length,removed:0},transactionCounts:transactionCounts(rows)}));
+ };
  const reports=files.map(f=>{
   const own=rows.filter(r=>r.file_id===f.id),imported=own.filter(r=>r.status==='imported'),removed=f.cancelled_at?f.rows_found:f.blocked?0:f.rows_found-own.length;
-  return {fileId:f.id,operationIds:[...new Set<string>(imported.map(r=>r.transaction_id))].sort(),bank:f.bank,blocked:f.blocked,error:f.error,cancelledAt:f.cancelled_at,counts:{rowsFound:f.rows_found,pending:own.filter(r=>r.status==='pending').length,created:imported.filter(r=>r.outcome==='created').length,existing:imported.filter(r=>r.outcome==='existing').length,updated:imported.filter(r=>r.outcome==='updated').length,notImported:f.cancelled_at?0:f.blocked?f.rows_found:own.filter(r=>r.status==='issue').length,removed,review:new Set(imported.filter(r=>review.has(r.transaction_id)).map(r=>r.transaction_id)).size},transactionCounts:transactionCounts(own),issues:own.filter(r=>r.status==='issue').map(r=>({ordinal:r.ordinal,code:r.issue,nextStep:r.issue==='IMPORT_INVALIDATED'?'reupload':'verify_local_source'}))};
+  return {fileId:f.id,accounts:accountStats(own),operationIds:[...new Set<string>(imported.map(r=>r.transaction_id))].sort(),bank:f.bank,blocked:f.blocked,error:f.error,cancelledAt:f.cancelled_at,counts:{rowsFound:f.rows_found,pending:own.filter(r=>r.status==='pending').length,created:imported.filter(r=>r.outcome==='created').length,existing:imported.filter(r=>r.outcome==='existing').length,updated:imported.filter(r=>r.outcome==='updated').length,notImported:f.cancelled_at?0:f.blocked?f.rows_found:own.filter(r=>r.status==='issue').length,removed,review:new Set(imported.filter(r=>review.has(r.transaction_id)).map(r=>r.transaction_id)).size},transactionCounts:transactionCounts(own),issues:own.filter(r=>r.status==='issue').map(r=>({ordinal:r.ordinal,code:r.issue,nextStep:r.issue==='IMPORT_INVALIDATED'?'reupload':'verify_local_source'}))};
  });
  const sum=(key:'rowsFound'|'pending'|'created'|'existing'|'updated'|'notImported'|'removed')=>reports.reduce((n,f)=>n+f.counts[key],0);
- return {schemaVersion:1,batchId,generation:loaded.state.generation,revision:loaded.state.revision,operationIds:[...involved].sort(),stage:'server_accepted',status:batch.status,createdAt:batch.created_at,finishedAt:batch.finished_at,files:reports,counts:{files:files.length,blockedFiles:files.filter(f=>f.blocked).length,rowsFound:sum('rowsFound'),pending:sum('pending'),created:sum('created'),existing:sum('existing'),updated:sum('updated'),notImported:sum('notImported'),removed:sum('removed'),review:review.size},transactionCounts:transactionCounts(rows),newAccountIds:(await db.query('SELECT account_id FROM finance.ingestion_account WHERE user_id=$1 AND batch_id=$2 ORDER BY account_id',[userId,batchId])).rows.map(r=>r.account_id)};
+ return {schemaVersion:1,batchId,generation:loaded.state.generation,revision:loaded.state.revision,operationIds:[...involved].sort(),stage:'server_accepted',status:batch.status,createdAt:batch.created_at,finishedAt:batch.finished_at,accounts:accountStats(rows),files:reports,counts:{files:files.length,blockedFiles:files.filter(f=>f.blocked).length,rowsFound:sum('rowsFound'),pending:sum('pending'),created:sum('created'),existing:sum('existing'),updated:sum('updated'),notImported:sum('notImported'),removed:sum('removed'),review:review.size},transactionCounts:transactionCounts(rows),newAccountIds:(await db.query('SELECT account_id FROM finance.ingestion_account WHERE user_id=$1 AND batch_id=$2 ORDER BY account_id',[userId,batchId])).rows.map(r=>r.account_id)};
 }
 
 /** One atomic checkpoint under access-cycle -> workspace locks. Caller owns the transaction. */

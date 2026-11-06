@@ -2,6 +2,7 @@ import {accountTypes,loanModes} from './SettingsAccounts';
 import type {ImpactChange} from './finance-client';
 import type {FinanceState} from './finance-client';
 import {formatMoney} from './demo/overview';
+import style from './ServerOperation.module.css';
 import {roleNames} from './finance-client';
 const labels:Record<string,string>={merge_accounts:'Объединение счетов',split_account:'Разделение счёта',merge_categories:'Объединение категорий',delete_category:'Удаление категории',migrate_category:'Перенос категории',merge_counterparties:'Объединение контрагентов',split_counterparty:'Разделение контрагента',delete_counterparty:'Удаление контрагента',delete_rule:'Удаление правила',apply_rules:'Применение правил к прошлым операциям'};
 const array=(v:unknown):unknown[]=>Array.isArray(v)?v:[];
@@ -10,7 +11,7 @@ export function SettingsImpact({details:d,finance:s,changes}:{changes?:ImpactCha
  if(d.kind==='account_settings'){
   const fields={display_name:'Название',account_type:'Тип счёта',analytics_enabled:'Участие в аналитике',loan_mode:'Учёт кредита'};
   const value=(key:keyof typeof fields,v:unknown)=>key==='account_type'?accountTypes[v as keyof typeof accountTypes]:key==='analytics_enabled'?(v?'Да':'Нет'):key==='loan_mode'?(loanModes[v as keyof typeof loanModes]??'Общая настройка'):String(v);
-  return <section aria-label="Изменения счетов">{changes?.filter(c=>c.kind==='account'&&c.before&&c.after).map(c=><div key={c.id}><h3>{String(c.before!.values.display_name)}</h3><dl>{(Object.keys(fields) as (keyof typeof fields)[]).filter(k=>c.before!.values[k]!==c.after!.values[k]).map(k=><div key={k}><dt>{fields[k]}</dt><dd>{value(k,c.before!.values[k])} → {value(k,c.after!.values[k])}</dd></div>)}</dl></div>)}</section>;
+  return <section aria-label="Изменения счетов">{changes?.filter(c=>c.kind==='account'&&c.before&&c.after).map(c=><div key={c.id}><h3>Счёт: {String(c.before!.values.display_name)}</h3><dl className={style.delta}>{(Object.keys(fields) as (keyof typeof fields)[]).filter(k=>c.before!.values[k]!==c.after!.values[k]).map(k=><div key={k}><dt>{fields[k]}</dt><dd>{value(k,c.before!.values[k])} → {value(k,c.after!.values[k])}</dd></div>)}</dl></div>)}</section>;
  }
  if(d.kind==='restore_history'){
   const restored=changes?.filter(c=>c.kind==='account'&&c.before?.values.merged_into_id&&c.after?.values.merged_into_id===null)??[];
@@ -26,9 +27,10 @@ export function SettingsImpact({details:d,finance:s,changes}:{changes?:ImpactCha
   const enabledChanged=initial||previous?.enabled!==next?.enabled;
   const definitionChanged=initial||JSON.stringify(previous?.definition)!==JSON.stringify(next?.definition);
   const nameChanged=!!previous&&!!next&&previous.name!==next.name;
-  return <section aria-label="Последствия изменения бюджета">{d.kind==='delete_budget'?<p>Бюджет «{String(d.name)}» будет удалён. Операции сохранятся.</p>:<dl>
+  return <section aria-label="Последствия изменения бюджета">{d.kind==='delete_budget'?<p>Бюджет «{String(d.name)}» будет удалён. Операции сохранятся.</p>:<dl className={style.delta}>
    {nameChanged&&<div><dt>Название</dt><dd>{String(previous.name)} → {String(next.name)}</dd></div>}
-   {limit!==undefined&&<div><dt>Лимит</dt><dd>{formatMoney(String(limit))}{d.effectiveFrom?' с '+String(d.effectiveFrom):''}</dd></div>}
+   {limit!==undefined&&<div><dt>Лимит</dt><dd>{d.kind==='set_budget_limit'&&rows(d.previousLimits).filter(v=>String(v.from)<=String(d.effectiveFrom)).at(-1)?.limitMinor!==undefined?formatMoney(String(rows(d.previousLimits).filter(v=>String(v.from)<=String(d.effectiveFrom)).at(-1)?.limitMinor))+' → ':''}{formatMoney(String(limit))}</dd></div>}
+   {d.effectiveFrom!==undefined&&<div><dt>Вступит в силу</dt><dd>{String(d.effectiveFrom).split('-').reverse().join('.')}</dd></div>}
    {d.kind==='save_budget'&&enabledChanged&&<div><dt>Статус</dt><dd>{d.enabled?'Активен':'Приостановлен'}</dd></div>}
    {d.kind==='save_budget'&&definitionChanged&&<div><dt>Расходы</dt><dd>{definition?.basis==='gross'?'До возвратов':'За вычетом возвратов'}</dd></div>}
    {d.kind==='save_budget'&&definitionChanged&&!initial&&<div><dt>Условия расчёта</dt><dd>Обновятся</dd></div>}
@@ -55,6 +57,6 @@ export function SettingsImpact({details:d,finance:s,changes}:{changes?:ImpactCha
  {rows(d.operations).length>0&&<details><summary>Распределение операций</summary><ul>{rows(d.operations).map((r,i)=><li key={i}>{s?.operations.find(o=>o.id===r.id)?.classification.merchant.value||`Операция ${i+1}`} → {String(destination(r.accountId??r.counterpartyId))}</li>)}</ul></details>}
  {(['observations','aliases'] as const).map(k=>rows(d[k]).length>0&&<details key={k}><summary>{k==='observations'?'Распределение источников':'Распределение банковских псевдонимов'} ({rows(d[k]).length})</summary><ul>{rows(d[k]).map((r,i)=><li key={i}>{k==='observations'?'Источник':'Псевдоним'} {i+1} → {String(destination(r.accountId??r.counterpartyId))}</li>)}</ul></details>)}
  {d.kind==='delete_rule'&&<p>Правило «{String(d.ruleName)}» перестанет работать на новых загрузках. Классификация прошлых операций сохранится; операций со ссылкой на это правило: {array(d.operationDependencies).length}.</p>}
- {d.kind==='apply_rules'&&<><p>Фиксированная выборка: {String(d.selectedCount)} операций. Изменятся: {array(d.changedOperationIds).length}. Применение атомарное; новые операции не добавляются.</p><p>Учитываются включённые правила: {names(d.ruleIds).join(', ')}. Ручные подтверждения и надёжный банковский тип сохраняются.</p><p>Операций с защищёнными ручными решениями: {array(d.protectedOperationIds).length}. Противоречий правил для проверки: {array(d.conflictingOperationIds).length}.</p><details><summary>Выбранные прошлые операции</summary><ul>{array(d.operationIds).map((id,i)=><li key={i}>{s?.operations.find(o=>o.id===id)?.classification.merchant.value||`Операция ${i+1}`}</li>)}</ul></details></>}
+ {d.kind==='apply_rules'&&<><dl className={style.delta}><div><dt>Изменятся операции</dt><dd>{array(d.changedOperationIds).length}</dd></div>{array(d.conflictingOperationIds).length>0&&<div><dt>Потребуется проверка</dt><dd>{array(d.conflictingOperationIds).length}</dd></div>}</dl><details><summary>Что изменится</summary><ul>{array(d.changedOperationIds).map((id,i)=><li key={i}>{s?.operations.find(o=>o.id===id)?.classification.merchant.value||`Операция ${i+1}`}</li>)}</ul></details></>}
  <p>Изменение записывается в историю. Отмена доступна 30 дней, пока нет зависимых новых решений.</p></section>;
 }

@@ -24,6 +24,14 @@ export function defaultRole(kind:Kind,amountMinor?:string):Role {
  if(['own_transfer','cash_withdrawal','cash_deposit','credit_card_repayment','loan_disbursement'].includes(kind))return 'neutral';
  return 'unresolved';
 }
+export function allowedOperationRoles(kind:Kind,amountMinor?:string):readonly Role[]{
+ if(kind==='loan_disbursement'||kind==='own_transfer'||kind==='cash_withdrawal'||kind==='cash_deposit'||kind==='credit_card_repayment')return ['neutral','unresolved'];
+ if(kind==='purchase'||kind==='fee'||kind==='insurance')return ['expense','unresolved'];
+ if(kind==='loan_payment')return ['expense','neutral','unresolved'];
+ if(kind==='cashback')return ['income','unresolved'];
+ if(kind==='interest'&&amountMinor&&defaultRole(kind,amountMinor)!=='unresolved')return [defaultRole(kind,amountMinor),'unresolved'];
+ return ['expense','income','neutral','unresolved'];
+}
 export function initialSemantics(kind:Kind,merchant='',amountMinor?:string):Semantics {return {kind:facet(kind,'bank'),role:facet(defaultRole(kind,amountMinor)),category:facet(null),subcategory:facet(null),merchant:facet(merchant,'bank'),counterparty:facet(null)};}
 export function object(value:unknown,keys:string[]):Record<string,unknown>{
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)))throw new TypeError('INVALID_FIELDS');return value as Record<string,unknown>;

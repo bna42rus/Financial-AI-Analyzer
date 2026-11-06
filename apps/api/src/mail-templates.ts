@@ -17,8 +17,11 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
  switch(kind){
   case 'application_verification':subject='Подтвердите почту';text='Для продолжения заявки откройте ссылку:\n'+link('verify')+'\nСсылка действует 30 минут. Если вы не подавали заявку, проигнорируйте письмо.';break;
   case 'owner_email_verification':if(p.profile!=='control')throw new Error('INVALID_PAYLOAD');subject='Подтвердите создание первого администратора Staging';text='На сервере запущено создание первого администратора тестовой среды CashNeuro.\nВведите этот код только в консоли сервера при выполнении owner:complete:\n'+value(p,'code',100)+'\nКод действует 15 минут. Пароль вы выбираете самостоятельно. После создания аккаунта обязательно настройте TOTP в тестовой админке. Если вы не запускали настройку, проигнорируйте письмо и никому не передавайте код.';break;
-  case 'invitation':subject='Приглашение в Финансовый анализатор';text='Зарегистрируйтесь по ссылке:\n'+link('invite')+'\nСрок ссылки: '+at(p.expiresAt)+'. Пароль вы выбираете самостоятельно. При регистрации потребуется отдельное подтверждение этой почты.';break;
+  case 'invitation':subject='Приглашение в CashNeuro';text='Зарегистрируйтесь по ссылке:\n'+link('invite')+'\nСрок ссылки: '+at(p.expiresAt)+'. Пароль вы выбираете самостоятельно. При регистрации потребуется отдельное подтверждение этой почты.';break;
   case 'registration_verification':subject='Подтверждение почты для регистрации';text='Введите этот код на странице регистрации:\n'+value(p,'proofToken',100)+'\nКод действует 15 минут и подходит только к текущему приглашению. Не передавайте его другим людям.';break;
+  case 'analyzer_topup':if(![1000,2000,5000,10000].includes(Number(p.units)))throw new Error('INVALID_PAYLOAD');subject='Лимит Анализатора пополнен';text='Добавлено '+p.units+' единиц. Неиспользованные единицы пакета переносятся на следующий месяц.';break;
+  case 'profile_email_verification':subject='Подтвердите новую почту';text='Введите код в том же окне CashNeuro, где запросили смену адреса:\n'+value(p,'code',100)+'\nКод действует 15 минут. Если вы не меняли адрес, проигнорируйте письмо.';break;
+  case 'profile_email_changed':subject='Почта для входа изменена';text='У вашего аккаунта CashNeuro изменён адрес для входа. Другие сеансы завершены. Если вы не меняли адрес, обратитесь в поддержку.';break;
   case 'password_reset':subject='Восстановление пароля';text='Задайте новый пароль:\n'+link('reset')+'\nСсылка одноразовая и действует 15 минут. После смены пароля все старые сессии завершатся. Если вы не запрашивали восстановление, проигнорируйте письмо.';break;
   case 'security_password_changed':subject='Пароль изменён';text='Пароль аккаунта изменён '+at(createdAt)+'. Старые сессии завершены. Если это сделали не вы, обратитесь в поддержку.';break;
   case 'security_admin_recovery':subject='Начато восстановление доступа администратора';text='Резервное восстановление начато '+at(createdAt)+'. Прежние сессии и TOTP отключены. Административные действия доступны только после настройки нового TOTP. Если это сделали не вы, обратитесь в поддержку.';break;
@@ -40,7 +43,7 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
   case 'access_expired':subject='Срок доступа закончился';text='Доступ закончился '+at(p.accessEnd)+'. Для восстановления откройте «Продлить доступ» в аккаунте: '+base+'\nОтметка «Я оплатил» не открывает доступ до подтверждения.';break;
   default:throw new Error('INVALID_PAYLOAD');
  }
- return {to,subject,text};
+ return {to,subject,text:text+'\n\nКоманда CashNeuro'};
 }
 export function accessWarning(end:string|null|undefined,indefinite:boolean,now=new Date()):string|null{
  if(indefinite||!end)return null;

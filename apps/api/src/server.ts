@@ -1,3 +1,4 @@
+import {historicalRuleCandidates} from './finance-rules.ts';
 import {assistantWorkflowVersion} from './assistant-workflow.ts';
 import 'reflect-metadata';
 import { Module } from '@nestjs/common';
@@ -7,6 +8,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest,FastifyReply } from 'fastify';
 import { fromNodeHeaders } from 'better-auth/node';
+import {commerceCatalog,updateCommerceCatalog} from './commerce-catalog.ts';
 import {accessWarning,describeDevice} from './mail-templates.ts';
 import {mailQueue,retryMail,resendInvitation} from './mail-admin.ts';
 import { envelope } from './crypto.ts';
@@ -60,6 +62,9 @@ export async function createServer(config: Config) {
   const review = config.profile === 'finance' ? await import('./finance-review.ts') : null;
   const importValidation = config.profile === 'finance' ? await import('./import-validation.ts') : null;
   const importIngestion = config.profile === 'finance' ? await import('./import-ingestion.ts') : null;
+  const accountProfile=config.profile==='finance'?await import('./account-profile.ts'):null;
+  const checkout=config.profile==='finance'?await import('./yookassa-topups.ts'):null;
+  const customerBudget=config.profile==='finance'?await import('./customer-ai-budget.ts'):null;
   const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
   const renewalApplication = config.profile === 'finance' ? await import('./renewal-application.ts') : null;
   const renewalCommerce = config.profile === 'control' ? await import('./renewal-commerce.ts') : null;
@@ -78,8 +83,8 @@ export async function createServer(config: Config) {
       expires_at=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN EXCLUDED.expires_at ELSE ${schema}.rate_limit.expires_at END RETURNING hits`, [seal.rateKey(purpose+':'+userId)]);
     if (result.rows[0].hits>5) throw new HttpError(429,'RATE_LIMITED');
   }
-  const financeReads=new Set(['/finance/analyzer-state','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/operation','/finance/summary','/finance/history-query','/finance/imports','/finance/import-status','/finance/classification','/finance/review-sessions']);
-  const financeWrites=new Set(['/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/review-command']);
+  const financeReads=new Set(['/finance/analyzer-state','/finance/analyzer-answer-rows','/finance/ai-packages','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/operation','/finance/rule-candidates','/finance/summary','/finance/history-query','/finance/imports','/finance/import-status','/finance/classification','/finance/review-queue','/finance/review-sessions']);
+  const financeWrites=new Set(['/finance/ai-topup','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/review-command']);
   async function rate(request: FastifyRequest) {
     if (request.method !== 'POST') return;
     const route = request.url.split('?')[0]!;
@@ -116,14 +121,15 @@ export async function createServer(config: Config) {
     try {
       await rate(request);
       const resetPasswordProof=config.profile==='finance'&&path==='/finance/commit'&&typeof request.body==='object'&&request.body!==null&&'password'in request.body;
-      if (config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)||resetPasswordProof) {
+      const profileEmailProof=config.profile==='finance'&&path.startsWith('/account/email-')&&request.method==='POST';
+      if (config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)||resetPasswordProof||profileEmailProof) {
         // Read the candidate before acquiring the mutation lock, release its connection,
         // then persist the limit. Re-check all authority inside the locked transaction below.
         // A second pool checkout while holding that lock can deadlock a saturated pool.
         const candidate=await config.pool.connect();let userId:string|undefined;
         try { userId=(await current(makeAuth(config,candidate,seal),request))?.user.id; }
         finally { candidate.release(); }
-        if(userId)await subjectRate(userId,resetPasswordProof?'financial-reset':'enrollment');
+        if(userId)await subjectRate(userId,resetPasswordProof?'financial-reset':profileEmailProof?path:'enrollment');
       }
       db = await config.pool.connect(); await db.query('BEGIN');
       // Serialize authentication mutations across instances. This foundation favors correctness over login throughput.
@@ -177,6 +183,12 @@ export async function createServer(config: Config) {
         result = await resetPassword(db, config, request, seal);
       } else if (path === '/control/recovery' && config.profile === 'control' && request.method === 'POST') {
         const recovered = await recoverAdmin(auth, db, config, request, seal); result = recovered.result; cookies = [recovered.cookie];
+      } else if(config.profile==='finance'&&['/account/name','/account/timezone','/account/email-request','/account/email-confirm'].includes(path)&&request.method==='POST'){
+        const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
+        await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
+        if(path==='/account/name')result=await accountProfile!.saveAccountName(db,s.user.id,fields(request,['name']).name);
+        else if(path==='/account/timezone')result=await financialProfile!.financeProfile(db,s.user.id,fields(request,['timezone']));
+        else result=await accountProfile!.accountEmail(db,{id:s.user.id,email:s.user.email,sessionId:s.session.id},fields(request,path.endsWith('-request')?['email','password']:['code']),seal);
       } else if (path === '/session' && request.method === 'GET') {
         if (config.profile === 'control') {
           const s = await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']);
@@ -190,6 +202,10 @@ export async function createServer(config: Config) {
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
           result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:await financialProfile!.financialTimezone(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
+      } else if(config.profile==='control'&&path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)){
+        const s=await requireAdmin(auth,db,request);
+        if(request.method==='POST'){result=await updateCommerceCatalog(db,request.body);await event(db,'control',s.user.id,'commerce_catalog_updated');}
+        else result=await commerceCatalog(db);
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
         await requireAdmin(auth,db,request);result=await mailQueue(db);
       } else if (config.profile==='control'&&path==='/control/delivery-retry'&&request.method==='POST'){
@@ -213,7 +229,7 @@ export async function createServer(config: Config) {
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
-      } else if (finance && ['/finance/profile','/finance/assistant-profile','/finance/analyzer-state','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/classification','/finance/review-sessions','/finance/review-command'].includes(path)) {
+      } else if (finance && ['/finance/profile','/finance/assistant-profile','/finance/analyzer-state','/finance/analyzer-answer-rows','/finance/ai-packages','/finance/ai-topup','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/rule-candidates','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/classification','/finance/review-queue','/finance/review-sessions','/finance/review-command'].includes(path)) {
         const methodAllowed=path==='/finance/imports'?['GET','POST'].includes(request.method):['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method==='GET':request.method==='POST';
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
@@ -239,7 +255,10 @@ export async function createServer(config: Config) {
         else if(tasks&&path==='/finance/analyzer-context')result=await tasks.analyzerTaskContext(db,s.user.id,request.body);
         else if(tasks&&path==='/finance/analyzer-task-cancel')result=await tasks.cancelAnalyzerTask(db,s.user.id,request.body);
         else if(['/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel'].includes(path))throw new HttpError(503,'AI_UNAVAILABLE');
-        else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:assistantWorkflowVersion,assistantProfile:await assistant.assistantProfile(db,s.user.id,{}),operatingBudget:await config.assistantProvider?.budgetState?.(db)}:{}),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
+        else if(path==='/finance/ai-packages')result=await checkout!.aiPackCatalog(db,s.user.id,config.testPayments);
+        else if(path==='/finance/ai-topup')result=await checkout!.aiTopup(db,s.user,request.body,config.testPayments,seal);
+        else if(path==='/finance/analyzer-answer-rows')result=await analyzer!.analyzerAnswerRows(db,s.user.id,request.body);
+        else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:assistantWorkflowVersion,assistantProfile:await assistant.assistantProfile(db,s.user.id,{}),customerBudget:await customerBudget!.customerAiBudget(db,s.user.id)}:{}),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
         else if(path==='/finance/analyzer-chat')result=await analyzer!.analyzerChat(db,s.user.id,request.body);
         else if(path==='/finance/analyzer-query')result=await analyzer!.analyzerQuery(db,s.user.id,request.body,config.analyzerAdapter,config.yandexAnalyzer,s.user.email);
         else if(path==='/finance/analyzer-propose')result=await analyzer!.analyzerPropose(db,s.user.id,request.body);
@@ -253,6 +272,7 @@ export async function createServer(config: Config) {
         else if(path==='/finance/operations-views')result=await operations!.operationsViews(db,s.user.id);
         else if(path==='/finance/summary')result=await finance.financeView(db,s.user.id,finance.parseFilter(request.body),(request.body as {compact?:boolean}).compact===true);
         else if(path==='/finance/operation')result=await finance.operationView(db,s.user.id,fields(request,['id']).id);
+        else if(path==='/finance/review-queue')result=await review!.attentionQueue(db,s.user.id,request.body);
         else if(path==='/finance/review-sessions')result=await review!.reviewSessions(db,s.user.id,request.body);
         else if(path==='/finance/review-command')result=await review!.reviewCommand(db,s.user.id,request.body);
         else if(path==='/finance/preview')result=await finance.previewFinance(db,s.user.id,request.body);
@@ -261,6 +281,7 @@ export async function createServer(config: Config) {
         else if(path==='/finance/import-validation')result=await importValidation!.validateImport(db,s.user.id,request.body);
         else if(path==='/finance/import-accept'){result=await importIngestion!.acceptImport(db,s.user.id,request.body);status=202;}
         else if(path==='/finance/import-status')result=await importIngestion!.importStatus(db,s.user.id,request.body);
+        else if(path==='/finance/rule-candidates'){const snapshot=await finance!.loadFinance(db,s.user.id);result={...historicalRuleCandidates(request.body,snapshot.graph,snapshot.rules),revision:snapshot.state.revision};}
         else if(path==='/finance/imports')result=await importIngestion!.importHistory(db,s.user.id,request.method==='GET'?{}:request.body);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
         else result=await finance.queryHistory(db,s.user.id,(await finance.prepareFinance(db,s.user.id)).generation,path==='/finance/history'?{}:request.body);
@@ -283,7 +304,7 @@ export async function createServer(config: Config) {
       } else if (path === '/security/sessions' && request.method === 'GET') {
         const s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
-        result = { sessions: (await db.query(`SELECT id,created_at,expires_at FROM ${schema}.auth_session WHERE user_id=$1 AND expires_at>clock_timestamp()`, [s.user.id])).rows.map(r => ({ id: r.id, createdAt: r.created_at, expiresAt: r.expires_at, current: r.id === s.session.id })) };
+        result = { sessions: (await db.query(`SELECT id,created_at,expires_at,user_agent FROM ${schema}.auth_session WHERE user_id=$1 AND expires_at>clock_timestamp()`, [s.user.id])).rows.map(r => ({ id: r.id, createdAt: r.created_at, expiresAt: r.expires_at, current: r.id === s.session.id,device:describeDevice(r.user_agent) })) };
       } else if (path === '/security/revoke-session' && request.method === 'POST') {
         const input = fields(request, ['sessionId']), s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');

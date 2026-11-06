@@ -1,0 +1,8 @@
+.page{max-width:1340px}
+.header{padding-bottom:.8rem;margin-bottom:1rem}
+.identity{display:flex;align-items:center;gap:.9rem;font-weight:600}
+.identity>span:last-child{color:var(--color-secondary-text);font-size:.875rem}
+.nav{border:1px solid var(--color-border);background:var(--color-surface);border-radius:.75rem;padding:.35rem;gap:.35rem}
+.nav button{border-color:transparent;padding:.55rem .75rem}
+.nav button[aria-pressed=true]{background:var(--color-soft)}
+@media(max-width:540px){.nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}

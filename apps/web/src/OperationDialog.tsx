@@ -6,11 +6,11 @@ import {cloneElement} from 'react';
 import common from './App.module.css';
 import styles from './ServerOperation.module.css';
 
-export function OperationDialog({title,onClose,children,footer,compact=false}:{title:string;onClose:()=>void;children:ReactNode;footer:ReactNode;compact?:boolean}){
+export function OperationDialog({title,onClose,children,footer,compact=false,narrow=false}:{title:string;onClose:()=>void;children:ReactNode;footer:ReactNode;compact?:boolean;narrow?:boolean}){
  const opener=useRef<HTMLElement|null>(null);
  return <Dialog.Root open onOpenChange={open=>{if(!open)onClose();}}><Dialog.Portal>
   <Dialog.Overlay className={common.overlay}/>
-  <Dialog.Content aria-describedby={undefined} data-notifications-inline="true" className={common.dialog+' '+styles.operationDialog+(compact?' '+styles.subDialog:'')} onInteractOutside={e=>e.preventDefault()} onOpenAutoFocus={()=>{opener.current=document.activeElement as HTMLElement;}} onCloseAutoFocus={e=>{e.preventDefault();if(opener.current?.isConnected)opener.current.focus({preventScroll:true});}}>
+  <Dialog.Content aria-describedby={undefined} data-notifications-inline="true" className={common.dialog+' '+styles.operationDialog+(narrow?' '+styles.narrowDialog:compact?' '+styles.subDialog:'')} onInteractOutside={e=>e.preventDefault()} onOpenAutoFocus={()=>{opener.current=document.activeElement as HTMLElement;}} onCloseAutoFocus={e=>{e.preventDefault();if(opener.current?.isConnected)opener.current.focus({preventScroll:true});}}>
    <header className={common.dialogHead+' '+styles.operationHead}><Dialog.Title>{title}</Dialog.Title><Dialog.Close asChild><button type="button" className={common.iconButton} aria-label={'Закрыть: '+title}><X size={20}/></button></Dialog.Close></header>
    <div className={styles.operationBody}>{children}</div>
    <footer className={styles.operationFooter}>{footer}</footer>
