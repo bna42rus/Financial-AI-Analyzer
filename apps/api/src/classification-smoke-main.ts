@@ -86,8 +86,10 @@ async function main(){
         BigInt(original.admission.spentAtoms)+BigInt(used.spentAtoms)+quote>BigInt(original.admission.stageCapAtoms))throw Error('CLASSIFICATION_ORIGINAL_LIMIT_EXHAUSTED');
       }
       if((await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND (state='sent' OR usage_state='unknown') LIMIT 1",[user.id])).rowCount)throw Error('RECONCILIATION_REQUIRED');
-      await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES($1,$2,'classification',$3,'sent','cashneuro-category-smoke/1',$4,$5,$5,'not_sent')`,[user.id,id,digest(input),model.bound.modelVersion,provider.policy.projectPeriodStart]);
-      await reserveCost(db,{userId:user.id,requestId:id,step:'classification',anchorAt:provider.policy.projectPeriodStart,periodStart:provider.policy.projectPeriodStart},provider.policy,model.bound);await provider.authorizeDispatch(db);
+      const policy=provider.policy;
+      await provider.prepareDispatch?.(db,policy);
+      await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES($1,$2,'classification',$3,'sent','cashneuro-category-smoke/1',$4,$5,$5,'not_sent')`,[user.id,id,digest(input),model.bound.modelVersion,policy.projectPeriodStart]);
+      await reserveCost(db,{userId:user.id,requestId:id,step:'classification',anchorAt:policy.projectPeriodStart,periodStart:policy.projectPeriodStart},policy,model.bound);await provider.authorizeDispatch(db,policy);
      });sent=true;phase=name+':response';console.log(JSON.stringify({case:name,status:'SENT'}));
     });usage=result.usage;phase=name+':settlement';if(!sent||await settle(usage))throw Error('PROVIDER_CHANGED');
     await archive.save(name+'-usage.json',usage);phase=name+':schema';

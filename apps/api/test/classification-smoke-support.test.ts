@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {continuedClassificationSettings,classificationFailure,syntheticClassificationArchive,syntheticClassificationFetch} from '../src/classification-smoke-support.ts';
 import {classificationTariffDocumentSha256,verifyClassificationTariff} from '../src/classification-tariff.ts';
+import {monthlyTariffGuard} from '../src/assistant-monthly.ts';
 const now=new Date('2026-10-24T10:22:00Z');
 const tariff={checkedAt:now.toISOString(),documentSha256:classificationTariffDocumentSha256};
 const original=()=>({realm:'staging/finance',apiKey:'synthetic-key-for-tests-only',allowedEmails:['owner@example.test'],sourceSha256:'a'.repeat(64),modelMetadataSha256:'b'.repeat(64),
@@ -38,6 +39,20 @@ test('tariff preflight makes only a fixed public GET, rejects changed documents 
  await assert.rejects(verifyClassificationTariff(async()=>new Response('private provider text',{status:503})),/TARIFF_UNAVAILABLE/);
  await assert.rejects(verifyClassificationTariff(async()=>{throw Error('private network detail');}),/TARIFF_UNAVAILABLE/);
  await assert.rejects(verifyClassificationTariff(async()=>new Response('%PDF-'+ 'x'.repeat(2097152))),/TARIFF_DOCUMENT_INVALID/);
+});
+test('monthly smoke refresh reaches the public tariff endpoint before any model request and still rejects a changed PDF',async()=>{
+ const url='https://cdn.cloud.ru/docs/legal/tariffs/evolution/current-version/foundation-models.pdf';
+ let gets=0;
+ const fetcher=syntheticClassificationFetch(async(target,options)=>{
+  gets++;assert.equal(String(target),url);assert.equal(options?.method,'GET');assert.equal(options?.redirect,'error');
+  assert.equal(new Headers(options?.headers).get('authorization'),null);return new Response('%PDF-modified');
+ },async()=>assert.fail('Tariff responses are not archived'),()=>undefined);
+ const refresh=monthlyTariffGuard('2026-10-23T10:00:00Z',()=>verifyClassificationTariff(fetcher,()=>now),()=>now);
+ await assert.rejects(refresh(),/CLASSIFICATION_TARIFF_DOCUMENT_CHANGED/);
+ await assert.rejects(fetcher(url,{method:'GET',redirect:'error',headers:{Authorization:'Bearer synthetic-secret'}}),/CLASSIFICATION_SYNTHETIC_ONLY/);
+ await assert.rejects(fetcher(url+'?alternate=1',{method:'GET',redirect:'error'}),/CLASSIFICATION_SYNTHETIC_ONLY/);
+ await assert.rejects(fetcher(url,{method:'GET',redirect:'follow'}),/CLASSIFICATION_SYNTHETIC_ONLY/);
+ assert.equal(gets,1);
 });
 test('safe failure output preserves known transport phase and PostgreSQL code without arbitrary text or stack',()=>{
  assert.deepEqual(classificationFailure({code:'BENCH_RESPONSE_INVALID',responsePhase:'JSON',message:'secret'}),{code:'BENCH_RESPONSE_INVALID',responsePhase:'JSON'});

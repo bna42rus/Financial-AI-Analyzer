@@ -2,7 +2,7 @@
 import {constants} from 'node:fs';
 import {mkdtemp,open,lstat,realpath} from 'node:fs/promises';
 import {join} from 'node:path';
-import {checkAssistantStagingSettings} from './analyzer-assistant-settings.ts';
+import {assistantTariffSource,checkAssistantStagingSettings} from './analyzer-assistant-settings.ts';
 import {digest} from './classification-plan.ts';
 import type {Pool,PoolClient} from 'pg';
 import {classificationTariffDocumentSha256} from './classification-tariff.ts';
@@ -66,6 +66,8 @@ export async function syntheticClassificationArchive(parent:string,apiKey:string
 export function syntheticClassificationFetch(fetcher:typeof fetch,save:(name:string,value:unknown)=>Promise<void>,expected:()=>{name:string;input:unknown}|undefined):typeof fetch{
  return async(url,options)=>{
   if(String(url)==='https://foundation-models.api.cloud.ru/v1/models'&&options?.method==='GET')return fetcher(url,options);
+  // The monthly guard refreshes the public, hash-pinned tariff before any paid dispatch.
+  if(String(url)===assistantTariffSource&&options?.method==='GET'&&options.redirect==='error'&&!new Headers(options.headers).has('authorization'))return fetcher(url,options);
   const current=expected();
   if(!current||String(url)!=='https://foundation-models.api.cloud.ru/v1/chat/completions'||options?.method!=='POST'||typeof options.body!=='string')throw Error('CLASSIFICATION_SYNTHETIC_ONLY');
   const body=JSON.parse(options.body);
