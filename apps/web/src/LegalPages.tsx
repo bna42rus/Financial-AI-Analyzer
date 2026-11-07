@@ -1,5 +1,7 @@
 import {useEffect,useState} from 'react';
 import {Brand} from './Brand';
+import {Mail} from 'lucide-react';
+import {supportEmail as support} from './SupportDialog';
 import {api,apiOrigin} from './server-client';
 import {legalDocuments,legalNotice} from '../../../packages/access/src/legal';
 import {moneyLabel} from '../../../packages/access/src/model';
@@ -9,27 +11,29 @@ import form from './ServerAccess.module.css';
 
 type LegalKind=keyof typeof legalDocuments;
 const texts=import.meta.glob('../../../docs/legal/*.md',{query:'?raw',import:'default',eager:true}) as Record<string,string>;
-const links=[['Тарифы','/tariffs'],['Условия использования','/terms'],['Публичная оферта','/offer'],['Оплата и возврат','/payments'],['Конфиденциальность и данные','/privacy'],['Контакты и реквизиты','/contacts']] as const;
-const support=String(import.meta.env.VITE_PUBLIC_SUPPORT_EMAIL??'support@cashneuro.ru').trim();
+const groups=[
+ ['Сервис',[['Тарифы','/price'],['Оплата и возврат','/payments'],['Контакты','/contacts']]],
+ ['Документы',[['Условия использования','/terms'],['Публичная оферта','/offer'],['Конфиденциальность','/privacy']]],
+] as const;
 const address=String(import.meta.env.VITE_PUBLIC_SELLER_ADDRESS??'').trim();
 const phone=String(import.meta.env.VITE_PUBLIC_SUPPORT_PHONE??'').trim();
 const ready=import.meta.env.VITE_PUBLIC_LEGAL_PUBLISHED==='1';
 export function LegalFooter(){
- return <footer className={styles.footer}><div>Исполнитель: Битнер Никита Андреевич · ИНН 421408478543</div><nav aria-label="Информация о CashNeuro">{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</nav></footer>;
+ return <footer className={styles.footer}><div className={styles.footerTop}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a><nav aria-label="Информация о CashNeuro">{groups.map(([group,links])=><div className={styles.footerGroup} key={group}><strong>{group}</strong><div>{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</div></div>)}</nav></div><div className={styles.requisites}>Исполнитель: Битнер Никита Андреевич · ИНН 421408478543</div></footer>;
 }
 export function usePublicTariffs(enabled=true){
  const [tariffs,setTariffs]=useState<Tariff[]|null>(null),[failed,setFailed]=useState(false);
  useEffect(()=>{if(!enabled||!apiOrigin)return;let active=true;
-  const reload=()=>void api<{tariffs:Tariff[]}>('/access/tariffs').then(r=>{if(active){setTariffs(r.tariffs);setFailed(false);}}).catch(()=>{if(active)setFailed(true);});
+  const reload=()=>void api<{tariffs:Tariff[]}>('/access/tariffs',undefined,AbortSignal.timeout(10000)).then(r=>{if(active){setTariffs(r.tariffs);setFailed(false);}}).catch(()=>{if(active)setFailed(true);});
   reload();window.addEventListener('focus',reload);const timer=window.setInterval(()=>{if(document.visibilityState==='visible')reload();},60000);
   return()=>{active=false;window.removeEventListener('focus',reload);window.clearInterval(timer);};
  },[enabled]);
  return {tariffs,failed};
 }
 export function TariffCards({tariffs,showLink=false}:{tariffs:Tariff[];showLink?:boolean}){
- return <div className={styles.tariffs}>{tariffs.map(t=><article key={t.id}><h3>{t.name}</h3><p className={styles.price}>{moneyLabel(t.priceMinor)}</p><p>{t.aiQuota.toLocaleString('ru-RU')} единиц Анализатора {t.duration.kind==='days'?'за период':'в месяц'}</p>{showLink&&<a href={'/#access?tariff='+encodeURIComponent(t.id)}>Выбрать тариф</a>}</article>)}</div>;
+ return <div className={styles.tariffs}>{tariffs.map(t=><article key={t.id}><h3>{t.name}</h3><p className={styles.price}>{moneyLabel(t.priceMinor)}</p><p>{t.aiQuota.toLocaleString('ru-RU')} единиц Анализатора {t.duration.kind==='days'?'за период':'в месяц'}</p>{showLink&&<a className={styles.tariffAction} href={'/#access?tariff='+encodeURIComponent(t.id)}>Выбрать тариф</a>}</article>)}</div>;
 }
-export function isLegalPath(path:string){return ['/tariffs','/contacts',...Object.values(legalDocuments).map(d=>d.path as string)].includes(path.replace(/\/$/,''));}
+export function isLegalPath(path:string){return ['/price','/tariffs','/contacts',...Object.values(legalDocuments).map(d=>d.path as string)].includes(path.replace(/\/$/,''));}
 function LegalText({body}:{body:string}){
  return <>{body.trim().split(/\n\s*\n/).map((section,i)=>{const lines=section.split('\n'),first=lines[0]??'';
   if(first.startsWith('## '))return <section key={i}><h2>{first.slice(3)}</h2>{lines.slice(1).length>0&&<p>{lines.slice(1).join(' ')}</p>}</section>;
@@ -39,14 +43,16 @@ function LegalText({body}:{body:string}){
 }
 export function LegalPage({path}:{path:string}){
  const normalized=path.replace(/\/$/,''),entry=(Object.entries(legalDocuments) as [LegalKind,(typeof legalDocuments)[LegalKind]][]).find(([,d])=>d.path===normalized);
- const {tariffs,failed}=usePublicTariffs(normalized==='/tariffs'),title=entry?.[1].title??(normalized==='/contacts'?'Контакты и реквизиты':'Тарифы');
+ const legacy=normalized==='/tariffs';
+ useEffect(()=>{if(legacy)location.replace('/price'+location.search+location.hash);},[legacy]);
+ const {tariffs,failed}=usePublicTariffs(normalized==='/price'),title=entry?.[1].title??(normalized==='/contacts'?'Контакты и реквизиты':'Тарифы');
  useEffect(()=>{document.title=title+' — CashNeuro';},[title]);
- return <div className={styles.page}><header className={styles.header}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a><a href="/#access">Получить доступ</a></header>
+ return <div className={styles.page}><header className={styles.header}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a></header>
  <main className={styles.main}><h1>{title}</h1>
- {entry?<><p className={styles.meta}>Редакция {entry[1].version}{!ready&&' · Версия для ознакомления'}</p><LegalText body={texts['../../../docs/legal/'+entry[0]+'.md']??''}/>{entry[0]==='offer'||entry[0]==='payments'?<p><a href="/autorenewal">Условия автопродления</a></p>:null}{entry[0]==='privacy'&&<p><a href="/data-consent">Текст отдельного согласия</a></p>}{entry[0]!=='terms'&&<p><a href="/contacts">Контакты и реквизиты</a></p>}</>:normalized==='/contacts'?<>
- <dl className={styles.details}><div><dt>Исполнитель и оператор</dt><dd>Битнер Никита Андреевич</dd></div><div><dt>ИНН</dt><dd>421408478543</dd></div><div><dt>Налоговый режим</dt><dd>Налог на профессиональный доход</dd></div>{support&&<div><dt>Поддержка, претензии и запросы о данных</dt><dd><a href={'mailto:'+support}>{support}</a></dd></div>}{phone&&<div><dt>Телефон</dt><dd>{phone}</dd></div>}{address&&<div><dt>Почтовый адрес</dt><dd>{address}</dd></div>}</dl>{!support&&<p className={styles.meta}>Контакты поддержки будут опубликованы перед запуском оплаты.</p>}</>:<>
+ {entry?<><p className={styles.meta}>Редакция {entry[1].version}{!ready&&' · Версия для ознакомления'}</p><LegalText body={texts['../../../docs/legal/'+entry[0]+'.md']??''}/>{entry[0]!=='terms'&&<nav className={styles.documentLinks} aria-label="Связанные документы">{(entry[0]==='offer'||entry[0]==='payments')&&<a href="/autorenewal">Условия автопродления</a>}{entry[0]==='privacy'&&<a href="/data-consent">Открыть текст согласия</a>}<a href="/contacts">Контакты и реквизиты</a></nav>}</>:normalized==='/contacts'?<>
+ <dl className={styles.details}><div><dt>Исполнитель и оператор</dt><dd>Битнер Никита Андреевич</dd></div><div><dt>ИНН</dt><dd>421408478543</dd></div><div><dt>Налоговый режим</dt><dd>Налог на профессиональный доход</dd></div>{support&&<div><dt>Поддержка, претензии и запросы о данных</dt><dd><a className={styles.emailLink} href={'mailto:'+support}><Mail size={16} aria-hidden="true"/>{support}</a></dd></div>}{phone&&<div><dt>Телефон</dt><dd>{phone}</dd></div>}{address&&<div><dt>Почтовый адрес</dt><dd>{address}</dd></div>}</dl>{!support&&<p className={styles.meta}>Контакты поддержки будут опубликованы перед запуском оплаты.</p>}</>:<>
  {failed?<p role="alert">Не удалось загрузить тарифы.</p>:tariffs?.length?<TariffCards tariffs={tariffs} showLink/>:tariffs||!apiOrigin?<p>Тарифы пока недоступны.</p>:<p role="status">Загружаем тарифы…</p>}
- <p>Период и итоговую цену показываем до оформления. Автопродление подключается только по желанию.</p></>}</main><LegalFooter/></div>;
+</>}</main><LegalFooter/></div>;
 }
 type LegalStatus={termsAccepted:boolean;privacySeen:boolean;billingChanged?:boolean};
 export function LegalUpdate({signedIn}:{signedIn:boolean}){

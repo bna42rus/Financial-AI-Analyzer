@@ -1,3 +1,4 @@
+import common from './App.module.css';
 import {useState} from 'react';
 import {operationFilterKinds,searchExpressionError} from '../../../packages/finance-core/src/operations';
 import type {OperationsFilter} from '../../../packages/finance-core/src/operations';
@@ -73,7 +74,7 @@ export function OperationsFilters({state,value,contextFilter,onChange,disabled,o
  const inputNumber=(key:NumericKey,label:string,accessibleName=label)=>{const v=value[key];return <label>{label}<input aria-label={accessibleName} aria-invalid={!!errors[key]||undefined} inputMode={key.startsWith('amount')?'decimal':'numeric'} value={raw[key]??(v===undefined?'':key.startsWith('amount')?minorToRubles(String(v)):String(v))} onChange={e=>number(key,e.target.value,false)} onBlur={e=>number(key,e.target.value,true)}/>{errors[key]&&<small role="alert">{errors[key]}</small>}</label>;};
  const field=(key:'description'|'merchant'|'comment',label:string)=>{const message=key==='merchant'&&value.merchantExact?undefined:searchExpressionError(value[key]);return <label>{label}<input maxLength={key==='comment'?1000:160} aria-invalid={!!message||undefined} value={value[key]??''} onChange={e=>change(key,e.target.value)}/>{message&&<small role="alert">{message}</small>}</label>;};
  const reasons=[...new Set([...Object.keys(reviewNames),...state.operations.flatMap(o=>o.reviewReasons)])];
- return <details className={styles.options}><summary>Дополнительные фильтры{Object.keys(value).length>0&&<small> · {Object.keys(value).length}</small>}</summary>
+ return <details className={styles.options}><summary className={common.disclosureTitle}>Дополнительные фильтры{Object.keys(value).length>0&&<small> · {Object.keys(value).length}</small>}</summary>
  <fieldset disabled={disabled} className={styles.advanced}><legend className={filterStyles.srOnly}>Дополнительные фильтры операций</legend>
  {multi('statuses','Состояние проверки',Object.entries(reviewStatusNames))}{multi('reasons','Причина проверки',reasons.map(r=>[r,reviewNames[r]??r]))}
  {multi('kinds','Тип операции',kindOrder.map(k=>[k,k==='expense_reimbursement'?'Компенсация расхода':kindNames[k]??k]))}{multi('roles','Финансовый смысл',Object.entries(roleNames))}

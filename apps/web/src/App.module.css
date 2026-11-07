@@ -69,7 +69,7 @@
 .noResults .button { margin-top: 20px; }
 .muted, .footer { color: var(--color-secondary-text); }
 .footer { font-size:calc(12px * var(--text-scale, 1)); margin-top: 24px; }
-.error { padding: 20px; color: var(--color-warning); background: var(--color-warning-surface); border-radius: 10px; }
+.error { padding: 10px 12px; color: var(--color-danger); background: var(--color-danger-surface); border-radius: 8px; }
 .overlay { background: var(--color-overlay); position: fixed; inset: 0; z-index: 10; }
 .dialog { position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%,-50%); background: var(--color-surface); color: var(--color-text); border: 1px solid var(--color-border); padding: 23px; border-radius: 14px; width: 510px; max-width: calc(100vw - 30px); max-height: calc(100dvh - 40px); overflow-y: auto; box-shadow: 0 20px 70px var(--color-shadow); }
 .dialogHead { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
@@ -123,3 +123,8 @@
 
 .dangerButton { composes:button; color:var(--color-danger,#b4233b); }
 .dangerButton:hover:not(:disabled) { border-color:var(--color-danger,#b4233b); }
+.filteredEmpty { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px 14px; border:1px solid var(--color-border); background:var(--color-surface); border-radius:9px; padding:7px 12px; margin:12px 0; }
+.filteredEmpty p { font-size:calc(14px * var(--text-scale,1)); color:var(--color-secondary-text); }
+.filteredEmpty button { min-height:34px; padding:5px 9px; }
+.disclosureTitle { font-size:calc(14px * var(--text-scale,1)); font-weight:550; }
+a.button,a.primaryButton { text-decoration:none; }

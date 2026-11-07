@@ -37,3 +37,6 @@
 .datePair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .helper{margin:-7px 0 2px;color:var(--color-secondary-text);font-size:.875rem}
 @media(max-width:420px){.datePair{grid-template-columns:minmax(0,1fr)}}
+.operations,.operationDetails { border:0; }
+.operationDetails summary,.operationDetails p,.operationDetails > div { padding-inline:0; }
+.impact .counts > div:last-child { border-bottom:0; }

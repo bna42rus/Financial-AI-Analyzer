@@ -53,3 +53,10 @@
 .contextDialog[role=dialog]>div:first-child{margin-bottom:5px}
 .contextDialog[role=dialog]>p{margin-block:0;font-size:13px;color:var(--color-secondary-text)}
 @media(max-width:700px){.columnChoices{grid-template-columns:minmax(0,1fr)}.columnMove>button{min-height:38px;min-width:38px}}
+.options > summary { font-size:calc(14px * var(--text-scale,1)); font-weight:550; }
+.columnSettings > summary { font-size:calc(13px * var(--text-scale,1)); }
+.columnChoice label { font-size:calc(12px * var(--text-scale,1)); font-weight:400; }
+.contextDialog[role="dialog"] { width:min(690px,calc(100vw - 24px)); max-width:none; }
+.contextActions { flex-wrap:nowrap; overflow-x:auto; padding:4px 3px; }
+.contextActions > button { flex:none; white-space:nowrap; }
+.contextActions > button:last-child { margin-left:auto; }

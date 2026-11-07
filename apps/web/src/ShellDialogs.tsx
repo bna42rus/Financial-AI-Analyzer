@@ -11,8 +11,8 @@ function Modal({ open, onClose, title, description, children, focusSelector }: {
   const content = useRef<HTMLDivElement>(null);
   const sourceHash = useRef('');
   return <Dialog.Root open={open} onOpenChange={next => !next && onClose()}><Dialog.Portal>
-    <Dialog.Overlay className={common.overlay} />
-    <Dialog.Content ref={content} className={`${common.dialog} ${styles.modal}`} onOpenAutoFocus={event => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; sourceHash.current = window.location.hash; if (focusSelector) { event.preventDefault(); content.current?.querySelector<HTMLElement>(focusSelector)?.focus(); } }} onCloseAutoFocus={event => { if (sourceHash.current !== window.location.hash) { event.preventDefault(); return; } if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }); } }}>
+    <Dialog.Overlay data-cashneuro-dialog="overlay" className={common.overlay} />
+    <Dialog.Content data-cashneuro-dialog="content" ref={content} className={`${common.dialog} ${styles.modal}`} onOpenAutoFocus={event => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; sourceHash.current = window.location.hash; if (focusSelector) { event.preventDefault(); content.current?.querySelector<HTMLElement>(focusSelector)?.focus(); } }} onCloseAutoFocus={event => { if (sourceHash.current !== window.location.hash) { event.preventDefault(); return; } if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }); } }}>
       <div className={common.dialogHead}><Dialog.Title>{title}</Dialog.Title><Dialog.Close className={common.iconButton} aria-label={`Закрыть: ${title}`}><X size={20} aria-hidden="true" /></Dialog.Close></div>
       <Dialog.Description>{description}</Dialog.Description>
       {children}

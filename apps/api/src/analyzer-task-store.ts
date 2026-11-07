@@ -101,9 +101,8 @@ export async function executeAnalyzerTask(pool: Pool, userId: string, value: unk
     const now = (await db.query("SELECT to_char(clock_timestamp() AT TIME ZONE 'Europe/Moscow','YYYY-MM-DD') AS day")).rows[0].day;
     const input: TaskInput = { scope, book, global, dataRevision: workspace.revision, messageId: id, question: text, currentDate: now };
     const expected: ExpectedTaskState = { scope, globalRevision, dataRevision: workspace.revision, head: book.nodes.at(-1)?.messageId ?? null, count: book.nodes.length };
-    const cycle = await analyzerCycle(db, userId), quota = await analyzerQuota(db, userId, true);
-    if (!cycle || !quota.available) throw new HttpError(409, 'AI_QUOTA_UNAVAILABLE');
-    if (!quota.remaining) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
+    const cycle = await analyzerCycle(db, userId);
+    if (!cycle) throw new HttpError(409, 'AI_BUDGET_PERIOD_REQUIRED');
     await db.query(`INSERT INTO finance.analyzer_task_request(user_id,id,chat_id,chat_epoch,generation,request,input,expected,anchor_at,period_start)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [userId, id, chatId, chatEpoch, generation, JSON.stringify(request), JSON.stringify(input), JSON.stringify(expected), cycle.anchorExact, cycle.startExact]);
     return { input, expected, anchorExact: cycle.anchorExact, periodExact: cycle.startExact, request, state: 'pending', reply: null } as Claim;
@@ -135,7 +134,7 @@ export async function executeAnalyzerTask(pool: Pool, userId: string, value: unk
     if (book) await db.query(`INSERT INTO finance.analyzer_task_book(user_id,chat_id,chat_epoch,generation,book,head,node_count) VALUES($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT(user_id,chat_id) DO UPDATE SET book=EXCLUDED.book,head=EXCLUDED.head,node_count=EXCLUDED.node_count`, [userId, chatId, chatEpoch, generation, JSON.stringify(parseTaskBook(book, claim.input.scope)), id, book.nodes.length]);
     if (query) {
-      // Only a committed, successful financial answer consumes a customer unit.
+      // Count successful answers for diagnostics. Provider reservations account for the customer cost.
       const billed = await db.query(`INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version)
         SELECT user_id,request_id,anchor_at,period_start,1,(SELECT sum(input_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),
         (SELECT sum(output_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),provider,model,model_version

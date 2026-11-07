@@ -3,7 +3,7 @@ import type {FastifyRequest} from 'fastify';
 import {claimPayment,emptyAccessStore} from '@finance/access';
 import type {AccessRequest,Tariff,AccessStore} from '@finance/access';
 import type {RenewalRow,OwnRenewal} from '../../../packages/access/src/renewal.ts';
-import {lockedCycle} from './entitlement.ts';
+import {extensionAt,lockedCycle} from './entitlement.ts';
 import {clock,fields,string,HttpError,outbox} from './types.ts';
 import type {Sealer} from './types.ts';
 type User={id:string;name:string;email:string};
@@ -21,7 +21,12 @@ function validTariff(value:unknown):value is Tariff {
 async function tariffs(db:PoolClient):Promise<Tariff[]> {return (await db.query(`SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'availableForRenewal'='true' ORDER BY CASE WHEN snapshot->'duration'->>'kind'='days' THEN (snapshot->'duration'->>'count')::int ELSE (snapshot->'duration'->>'count')::int*31 END,id`)).rows.map(r=>r.snapshot).filter(validTariff);}
 export async function ownRenewal(db:PoolClient,userId:string):Promise<OwnRenewal>{
  const cycle=await lockedCycle(db,userId),row=(await db.query(`SELECT data,state FROM commerce.renewal_request WHERE user_id=$1 ORDER BY (state='open') DESC,created_at DESC,id DESC LIMIT 1`,[userId])).rows[0];
- return {cycle,request:row?publicRenewal(row.data,row.state):null,tariffs:cycle.indefinite?[]:await tariffs(db)};
+ const plans=cycle.indefinite?[]:await tariffs(db),plannedEnds:Record<string,string>={};
+ if(cycle.accessEnd&&!cycle.indefinite&&row?.state!=='open'){
+  const now=await clock(db);
+  for(const plan of plans)plannedEnds[plan.id]=(await extensionAt(db,cycle,plan.duration,now,'quote','quote')).extension.accessEnd;
+ }
+ return {cycle,request:row?publicRenewal(row.data,row.state):null,tariffs:plans,plannedEnds};
 }
 async function snapshot(db:PoolClient,id:unknown){const tariff=(await tariffs(db)).find(t=>t.id===string(id,100));if(!tariff)throw new HttpError(409,'TARIFF_UNAVAILABLE');return tariff;}
 export async function renewalApplication(db:PoolClient,request:FastifyRequest,user:User,seal:Sealer,action:'create'|'change'|'cancel'|'claim'){

@@ -13,6 +13,7 @@
  --color-soft:light-dark(#eeecff,#292642);
  --color-warning:light-dark(#80540a,#f1c77e);
  --color-warning-surface:light-dark(#fff5df,#382e21);
+ --color-danger-surface:light-dark(#fff0f2,#402733);
  --color-danger:light-dark(#b52d46,#ffa6b5);
  --color-success:light-dark(#246246,#8ed6b2);
  --color-overlay:light-dark(#131b3899,#060812bf);
@@ -32,3 +33,6 @@ h1,h2,h3,p{margin:0}h1,h2,h3{letter-spacing:-.025em}svg{flex-shrink:0}summary{cu
 :root[data-theme="light"]{color-scheme:light}:root[data-theme="dark"]{color-scheme:dark}:root[data-theme="system"]{color-scheme:light dark}
 :root[data-text-size="large"]{--text-scale:1.142857}
 :root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{scroll-behavior:auto!important;transition:none!important;animation:none!important}
+/* The active dialog owns the backdrop. Keep earlier steps mounted to preserve their drafts. */
+body > [data-cashneuro-dialog="overlay"]:has(~ [data-cashneuro-dialog="overlay"]),
+body > [data-cashneuro-dialog="content"]:has(~ [data-cashneuro-dialog="content"]) { visibility:hidden; }

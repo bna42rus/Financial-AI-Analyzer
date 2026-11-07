@@ -42,3 +42,4 @@
   .info>div { display:block; } .info dd { text-align:left; margin-top:5px; }
   .field input,.field select,.field textarea { font-size:calc(16px * var(--text-scale, 1)); }
 }
+.notice { align-items:center; }

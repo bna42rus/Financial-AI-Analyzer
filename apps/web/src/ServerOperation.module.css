@@ -70,3 +70,11 @@
 .plainPreview p{margin:0 0 7px}
 .preview dl>div:last-child,.delta>div:last-child{border-bottom:0}
 .bulkDetails ul{max-height:min(42dvh,26rem);overflow:auto;overscroll-behavior:contain}
+.plainPreview :is(dl,.delta),.impactStack dl,.delta { margin:0; }
+.plainPreview dl > div,.impactStack dl > div,.delta > div,.bulkDetails dl > div { display:flex; align-items:baseline; justify-content:space-between; gap:8px 16px; padding:5px 0; font-size:inherit; }
+.plainPreview dd,.impactStack dd,.delta dd,.bulkDetails dd { margin:0; text-align:right; max-width:65%; overflow-wrap:anywhere; }
+.plainPreview dt,.impactStack dt,.delta dt { color:var(--color-secondary-text); }
+.plainPreview details,.impactStack details,.bulkDetails { padding:6px 0; border:0; border-radius:0; }
+.plainPreview summary,.impactStack summary,.bulkDetails > summary { font-size:inherit; font-weight:550; }
+.plainPreview details > ul { max-height: min(42dvh,26rem); overflow:auto; overscroll-behavior:contain; margin:6px 0 0; padding-inline-start:20px; }
+.plainPreview section p:last-child { margin-bottom:0; }

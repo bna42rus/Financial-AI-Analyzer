@@ -1,6 +1,11 @@
 import type {PoolClient} from 'pg';
 import {baseMonthlyCost,CostError} from '../../../packages/analyzer/src/cost.ts';
-const unitsPerMonth=10_000;
+export const unitsPerMonth=10_000;
+// Historical development snapshots called request count a quota. Keep any other
+// purchased allowance intact, even when an operator selected the same number.
+export function paidAnalyzerUnits(tariffId:string,kind:string,quota:number){
+ return tariffId==='development-month'&&kind==='calendar_months'&&quota===150?unitsPerMonth:quota;
+}
 const atomsPerUnit=baseMonthlyCost/BigInt(unitsPerMonth);
 
 /** Customer usage is isolated from statement classification and from the

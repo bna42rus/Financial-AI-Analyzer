@@ -74,16 +74,11 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  if(!query&&yandex&&actorEmail&&yandex.transport.allowed(actorEmail)&&!/(?:игнорир(?:уй|уйте).{0,50}(?:правил|инструкц)|ignore.{0,30}(?:instructions|rules)|system prompt|\bSQL\b|HMAC|api[_ -]?key|парол)/iu.test(text)){
   const workspace=(await db.query('SELECT generation,revision FROM finance.workspace WHERE user_id=$1',[userId])).rows[0];
   const binding={request,context,registryVersion,yandexContractVersion,contextVersion,generation:workspace.generation,revision:workspace.revision};
-  const costQuota=yandex.cost?await analyzerQuota(db,userId,true):undefined;
   const costCycle=yandex.cost?await analyzerCycle(db,userId):undefined;
   const costAnchor=yandex.cost?(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0]?.anchor:undefined;
-  if(yandex.cost&&(!costQuota?.periodStart||!costAnchor))throw new HttpError(409,'AI_BUDGET_PERIOD_REQUIRED');
+  if(yandex.cost&&(!costCycle?.startExact||!costAnchor))throw new HttpError(409,'AI_BUDGET_PERIOD_REQUIRED');
   const gate=await yandex.call({userId,chatId,requestId:id,step:'gate',binding,prompt:gatePrompt,input:{question:text,hasFinancialContext:!!context},schema:gateSchema,...(yandex.cost?{periodStart:costCycle!.startExact,anchorAt:costAnchor}:{})},v=>parseGate(v));
   if(['financial','adjacent'].includes(gate.value.relevance)){
-   const quota=await analyzerQuota(db,userId,true);
-   // Existing receipts and terminal outcomes are resolved without a new dispatch.
-   const priorPlan=(await db.query("SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step='plan'",[userId,id])).rowCount;
-   if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining&&!priorPlan)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
    const base=resolveScope(filter,gate.value.followUp&&context?context.filter:undefined,previousGlobal).filter;await assertReferences(db,userId,base);
    const catalog=await yandexCatalog(db,userId),currentDate=new Intl.DateTimeFormat('en-CA',{timeZone:timezone,year:'numeric',month:'2-digit',day:'2-digit'}).format(now);
    const anchorAt=(await db.query('SELECT anchor_at::text AS anchor FROM commerce.access_cycle WHERE user_id=$1',[userId])).rows[0].anchor;
@@ -108,7 +103,7 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  }
  // The external gate sees sanitized text only; unrelated/ambiguous responses never load financial facts or invoke a planner.
  if(query)await assertReferences(db,userId,query.filter);
- if(query&&adapter){if((await db.query('SELECT request_id FROM commerce.analyzer_usage WHERE user_id=$1 AND request_id=$2',[userId,id])).rowCount)throw new HttpError(409,'ACTION_REUSED');const quota=await analyzerQuota(db,userId);if(!quota.available)throw new HttpError(409,'AI_QUOTA_UNAVAILABLE');if(!quota.remaining)throw new HttpError(429,'AI_QUOTA_EXHAUSTED');
+ if(query&&adapter){if((await db.query('SELECT request_id FROM commerce.analyzer_usage WHERE user_id=$1 AND request_id=$2',[userId,id])).rowCount)throw new HttpError(409,'ACTION_REUSED');if(!await analyzerCycle(db,userId))throw new HttpError(409,'AI_BUDGET_PERIOD_REQUIRED');
   const plan=await adapter.plan({text,context,query,registryVersion}),tool=parseTool(plan.tool);if(tool.name!=='query_finances')throw new HttpError(400,'AI_ACTION_REQUIRES_CONFIRMATION');
   // Providers may choose a presentation, never silently widen the user-established scope.
   if(stableJSON(tool)!==stableJSON(query))throw new HttpError(400,'AI_SCOPE_CHANGED');query=tool;usage={inputTokens:tokenUsage(plan.inputTokens),outputTokens:tokenUsage(plan.outputTokens)};

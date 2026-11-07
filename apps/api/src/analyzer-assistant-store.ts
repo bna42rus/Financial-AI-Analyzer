@@ -2,12 +2,13 @@ import {prepareAssistantChange} from './assistant-changes.ts';
 import { isDeepStrictEqual } from 'node:util';
 import type { Pool, PoolClient } from 'pg';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
+import {CostError} from '../../../packages/analyzer/src/cost.ts';
 import { registryVersion } from '../../../packages/analyzer/src/registry.ts';
 import type { Answer } from '../../../packages/analyzer/src/types.ts';
 import { emptyConversation, parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { AssistantError, cleanAssistantQuestion, profileCalendar } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { globalSnapshot } from '../../../packages/analyzer/src/task-context.ts';
-import { runAssistant, exactAssistantPlan, assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
+import { runAssistant, assistantRequestFingerprint, assistantWorkflowVersion } from './assistant-workflow.ts';
 import type { AssistantRequest, AssistantJournal, AssistantReply, ExpectedAssistantState, RunReceipt } from './assistant-workflow.ts';
 import { checkedAssistantReceipt } from './assistant-journal.ts';
 import { isAssistantProvider } from './analyzer-assistant-provider.ts';
@@ -96,9 +97,8 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
       profileCalendar(now, timezone);
       const input: AssistantRequest = { requestId: id, scope, conversation, global, dataRevision: workspace.revision, question: text, now, timezone };
       const expected: ExpectedAssistantState = { scope, head: conversation.book.nodes.at(-1)?.messageId ?? null, turns: conversation.turns.length, globalRevision, dataRevision: workspace.revision, timezone };
-      const cycle = await analyzerCycle(db, userId), quota = await analyzerQuota(db, userId, true);
-      if (!cycle || !quota.available) throw new HttpError(409, 'AI_QUOTA_UNAVAILABLE');
-      if (!quota.remaining&&!exactAssistantPlan(text)) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
+      const cycle = await analyzerCycle(db, userId);
+      if (!cycle) throw new HttpError(409, 'AI_BUDGET_PERIOD_REQUIRED');
       await db.query(`INSERT INTO finance.analyzer_task_request(user_id,id,chat_id,chat_epoch,generation,request,input,expected,anchor_at,period_start)
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, [userId, id, chatId, chatEpoch, generation, JSON.stringify(request), JSON.stringify(input), JSON.stringify(expected), cycle.anchorExact, cycle.startExact]);
       return { input, expected, state: 'pending', reply: null, anchorExact: cycle.anchorExact, periodExact: cycle.startExact } as Claim;
@@ -138,13 +138,12 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['cloud-task-dispatch:' + userId]);
           if ((await db.query('SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3', [userId, id, step(index)])).rowCount) throw new HttpError(409, 'AI_DELIVERY_UNKNOWN');
           if ((await db.query("SELECT 1 FROM commerce.analyzer_request r WHERE r.user_id=$1 AND (r.state='sent' OR r.usage_state='unknown') AND NOT (r.state='failed' AND EXISTS (SELECT 1 FROM commerce.ai_cost_reservation c WHERE c.user_id=r.user_id AND c.request_id=r.request_id AND c.step=r.step AND c.state='released' AND c.settled_atoms=0 AND c.reported_input_tokens IS NULL AND c.reported_output_tokens IS NULL)) LIMIT 1", [userId])).rowCount) throw new HttpError(409, 'AI_COST_RECONCILIATION_REQUIRED');
-          if (index === 0) { const quota = await analyzerQuota(db, userId, true); if (!quota.available || !quota.remaining) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED'); }
           await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
             VALUES($1,$2,$3,$4,'sent','cashneuro-assistant/1',$5,$6,$7,'not_sent')`, [userId, id, step(index), fingerprint, bound.modelVersion, claim.periodExact, claim.anchorExact]);
           const policy = provider.policy;
           await provider.prepareDispatch?.(db, policy);
           // The owner's monthly Staging money authorization is distinct from
-          // the access-cycle task quota. Keep request/quota keys above intact;
+          // the customer's paid allowance. Keep request journal keys intact;
           // only new monetary reservations use the authorized calendar month.
           const costAnchor = provider.costPeriod === 'project' ? policy.projectPeriodStart : claim.anchorExact;
           const costPeriod = provider.costPeriod === 'project' ? policy.projectPeriodStart : claim.periodExact;
@@ -203,8 +202,6 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
         await db.query(`INSERT INTO finance.analyzer_task_book(user_id,chat_id,chat_epoch,generation,book,head,node_count) VALUES($1,$2,$3,$4,$5,$6,$7)
           ON CONFLICT(user_id,chat_id) DO UPDATE SET book=EXCLUDED.book,head=EXCLUDED.head,node_count=EXCLUDED.node_count,generation=EXCLUDED.generation`, [userId, chatId, chatEpoch, generation, JSON.stringify(book), book.nodes.at(-1)?.messageId ?? null, book.nodes.length]);
         if (reply.modelCalls>0&&(reply.status === 'query' || reply.status === 'answer')) {
-          const quota = await analyzerQuota(db, userId, true);
-          if (!quota.available || quota.limit === null || quota.used >= quota.limit) throw new HttpError(429, 'AI_QUOTA_EXHAUSTED');
           const billed = await db.query(`INSERT INTO commerce.analyzer_usage(user_id,request_id,anchor_at,period_start,units,input_tokens,output_tokens,provider,model,provider_version)
             SELECT user_id,request_id,anchor_at,period_start,1,(SELECT sum(input_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),
             (SELECT sum(output_tokens)::int FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2),provider,model,$3
@@ -218,7 +215,8 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
       }),
     });
     return savedReply;
-    } catch (error) {
+    } catch (failure) {
+      const error=failure instanceof CostError?new HttpError(failure.code.endsWith('EXHAUSTED')?429:409,failure.code):failure;
       if (error instanceof HttpError && !['AI_REQUEST_IN_PROGRESS', 'AI_DELIVERY_UNKNOWN', 'AI_COST_RECONCILIATION_REQUIRED'].includes(error.code)) {
         await within(db => cancelAnalyzerTask(db, userId, { id, chatId, chatEpoch }));
       }

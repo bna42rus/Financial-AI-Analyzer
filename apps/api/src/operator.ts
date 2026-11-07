@@ -59,7 +59,7 @@ try {
   } else if(mode==='migrate-operations-views') {
     await db.query(await readFile(new URL('../../../packages/database/migrations/0019_operations_views.sql',import.meta.url),'utf8'));
   } else if(mode==='seed-tariff-example') {
-    const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:150,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
+    const tariff={id:'development-month',name:'Тестовый месяц',duration:{kind:'calendar_months',count:1},priceMinor:'119000',aiQuota:10000,active:true,publicVisible:true,availableForNew:true,availableForRenewal:true};
     await db.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[tariff.id,tariff]);
   } else if (mode === 'seed-admin-example') {
     // Only synthetic address and data. Real owner provisioning is a separate verified-email bootstrap flow.

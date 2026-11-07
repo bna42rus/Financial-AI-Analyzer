@@ -92,7 +92,7 @@ export async function createServer(config: Config) {
   const financeWrites=new Set(['/finance/ai-topup','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/preview','/finance/commit','/finance/edit','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/review-command']);
   async function rate(request: FastifyRequest) {
     if (request.method !== 'POST') return;
-    const route = request.url.split('?')[0]!;
+    const route = request.url.split('?')[0]!.replace(/^\/access\/profile\//,'/account/');
     const address = typeof (request.body as Record<string, unknown> | undefined)?.email === 'string' ? String((request.body as Record<string, unknown>).email).trim().toLowerCase() : '';
     // Interactive finance snapshots and field edits must not consume authentication budgets.
     // Snapshots and writes have separate IP budgets so two devices and widget reads do not exhaust edits.
@@ -120,7 +120,7 @@ export async function createServer(config: Config) {
       return reply.header('access-control-allow-methods', 'GET, POST').header('access-control-allow-headers', 'Content-Type').code(204).send();
     }
     if (request.method === 'POST' && (origin !== config.origin || request.headers['content-type']?.split(';')[0] !== 'application/json')) return reply.code(403).send({ code: 'ORIGIN_DENIED' });
-    const path = request.url.split('?')[0]!;
+    const path = request.url.split('?')[0]!.replace(/^\/access\/profile\//,'/account/');
     if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile, ...(config.assistantProvider?{assistant:assistantWorkflowVersion}:{}) };
     let db: PoolClient | undefined;
     try {
@@ -286,7 +286,7 @@ export async function createServer(config: Config) {
         else if(path==='/finance/ai-packages')result=await checkout!.aiPackCatalog(db,s.user.id,config.testPayments);
         else if(path==='/finance/ai-topup')result=await checkout!.aiTopup(db,s.user,request.body,config.testPayments,seal);
         else if(path==='/finance/analyzer-answer-rows')result=await analyzer!.analyzerAnswerRows(db,s.user.id,request.body);
-        else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:assistantWorkflowVersion,assistantProfile:await assistant.assistantProfile(db,s.user.id,{}),customerBudget:await customerBudget!.customerAiBudget(db,s.user.id)}:{}),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
+        else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:assistantWorkflowVersion,assistantProfile:await assistant.assistantProfile(db,s.user.id,{})}:{}),customerBudget:await customerBudget!.customerAiBudget(db,s.user.id),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};
         else if(path==='/finance/analyzer-chat')result=await analyzer!.analyzerChat(db,s.user.id,request.body);
         else if(path==='/finance/analyzer-query')result=await analyzer!.analyzerQuery(db,s.user.id,request.body,config.analyzerAdapter,config.yandexAnalyzer,s.user.email);
         else if(path==='/finance/analyzer-propose')result=await analyzer!.analyzerPropose(db,s.user.id,request.body);

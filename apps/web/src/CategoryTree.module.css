@@ -15,3 +15,12 @@
 .child{border-left:0;margin-left:12px;padding-left:8px}
 .child+.child{border-top:1px solid var(--color-border)}
 .footer{margin-top:12px}
+.tools > [data-search-field] { min-width:0; }
+.tools > button,.tools select { height:var(--settings-control-height,42px); min-height:var(--settings-control-height,42px); }
+.content { padding:0 0 8px; }
+.subcategories { margin-left:22px; padding-top:4px; border-left:2px solid var(--color-border); background:var(--color-background); }
+.subcategories > p { font-size:12px; color:var(--color-secondary-text); padding:4px 12px 2px; }
+.subcategories .child { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px; align-items:center; margin:0; padding:0 0 0 12px; font-size:calc(12px * var(--text-scale,1)); font-weight:400; }
+.subcategories .child > span { overflow-wrap:anywhere; }
+.subcategories .child small { color:var(--color-secondary-text); margin-left:5px; }
+@media(max-width:540px) { .tools > [data-search-field] { grid-column:1/-1; } }

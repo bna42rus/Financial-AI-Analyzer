@@ -1,3 +1,4 @@
+import {paidAnalyzerUnits} from './customer-ai-budget.ts';
 import {reserveMailRequest} from './mail-cooldown.ts';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
@@ -58,7 +59,7 @@ export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer,
   else await db.query(`UPDATE commerce.manual_grant SET state='active',user_id=$1,activated_at=$2,access_end=$3 WHERE id=$4`,[id,times.start,times.finish,grant.id]);
   await db.query("SELECT set_config('app.user_id',$1,true)",[id]);
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy) VALUES($1,$2,$3,'Europe/Moscow',$4,$5,$6,$7,$8)`,[id,times.start,times.finish,duration.kind==='calendar_months'?duration.count:0,duration.kind==='days'?duration.count:0,indefinite,fixed?times.finish.getTime()-times.start.getTime():0,quotaPolicy]);
-  if(purchase&&times.finish&&!indefinite&&!fixed)await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[id,times.start,times.finish,duration.kind,quotaPolicy.limit]);
+  if(purchase&&times.finish&&!indefinite&&!fixed)await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[id,times.start,times.finish,duration.kind,paidAnalyzerUnits(purchase.data.tariff.id,duration.kind,quotaPolicy.limit)]);
   await db.query(`UPDATE commerce.invitation SET state='used',used_at=$1 WHERE id=$2`,[times.start,invite.id]);
   await db.query('UPDATE access.registration_proof SET consumed_at=$1 WHERE invitation_id=$2',[times.start,invite.id]);
   if(purchase){if(times.finish)await activateFirstAutoRenewal(db,purchase,id,times.finish);await db.query('DELETE FROM access.application_session WHERE request_id=$1',[purchase.request_id]);

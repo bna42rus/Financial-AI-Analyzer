@@ -17,3 +17,12 @@
 .editor .pair button{width:100%}
 @media(max-width:830px){.toolbar{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 @media(max-width:480px){.toolbar{grid-template-columns:minmax(0,1fr)}}
+.toolbar > :is(button,select),.toolbar label input:not([type="date"]) { height:var(--settings-control-height,42px); min-height:var(--settings-control-height,42px); }
+.toolbar [data-search-field] > input[type="search"] { padding:0; border:0; background:transparent; }
+.card .scopeSummary { margin-top:3px; color:var(--color-secondary-text); font-size:.875rem; }
+.calculation > section { margin-top:10px; }
+.calculation > section + section { padding-top:10px; border-top:1px solid var(--color-border); }
+.calculation h4 { margin:0 0 5px; font-size:.9rem; }
+.calculation .metrics { margin:0; gap:4px; font-size:.875rem; }
+.calculation .budgetTotal { padding:5px 7px; border-radius:6px; background:var(--color-soft); }
+.calculation .budgetTotal dt { color:var(--color-text); font-weight:600; }

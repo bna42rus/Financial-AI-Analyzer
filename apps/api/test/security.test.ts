@@ -479,6 +479,19 @@ async function registeredUser(){
  assert.equal((await a.b.post('/auth/sign-in/email',{email:'visitor@example.test',password:testPassword})).statusCode,200);
  const user=(await pg.owner.query('SELECT id FROM identity.auth_user')).rows[0];return {...a,userId:user.id};
 }
+test('account profile alias saves name and timezone and confirms a new email with the same verified session',async()=>{
+ const a=await registeredUser(),path='/access/profile/';
+ assert.equal((await userBrowser().post(path+'name',{name:'Forged'})).statusCode,401);
+ assert.equal((await a.b.post(path+'name',{name:'Новое имя'})).json().name,'Новое имя');
+ assert.equal((await a.b.post(path+'timezone',{timezone:'Europe/Kaliningrad'})).json().timezone,'Europe/Kaliningrad');
+ assert.equal((await a.b.post(path+'email-request',{email:'changed@example.test',password:'incorrect'})).json().code,'INVALID_CREDENTIALS');
+ assert.equal((await a.b.post(path+'email-request',{email:'changed@example.test',password:testPassword})).json().status,'sent');
+ assert.equal((await a.b.get('/session')).json().email,'visitor@example.test');
+ const proof=await mail('identity','profile_email_verification');
+ assert.equal((await a.b.post(path+'email-confirm',{code:proof.code})).json().status,'confirmed');
+ const session=(await a.b.get('/session')).json();
+ assert.equal(session.name,'Новое имя');assert.equal(session.timezone,'Europe/Kaliningrad');assert.equal(session.email,'changed@example.test');
+});
 async function renewal(a:Awaited<ReturnType<typeof registeredUser>>,claim=true){
  const created=await a.b.post('/access/renewal-create',{tariffId:tariff.id});assert.equal(created.statusCode,200);let row=created.json().request;
  if(claim){const r=await a.b.post('/access/renewal-claim',{requestId:row.id,expectedRevision:row.revision,senderName:'Synthetic renewal sender',senderBank:'Synthetic renewal bank'});assert.equal(r.statusCode,200);row=r.json().request;}

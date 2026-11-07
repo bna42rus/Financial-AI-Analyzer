@@ -24,3 +24,10 @@
 .siteFooter{display:flex;align-items:center;justify-content:space-between;gap:10px 24px;flex-wrap:wrap;padding:24px max(20px,calc((100vw - 1440px)/2));margin-top:28px;border-top:1px solid var(--color-border);color:var(--color-secondary-text);font-size:12px}.siteFooter a{color:var(--color-primary);text-decoration:none}.siteFooter span:first-child{font-weight:600;color:var(--color-text)}
 .main:focus{outline:none}
 .operationsScope{margin-block:0 8px}
+.reviewDisclosure { width:100%; margin:14px 0; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); }
+.reviewDisclosure > summary { display:flex; justify-content:space-between; align-items:center; padding:7px 8px 7px 14px; gap:12px; font-weight:600; list-style:none; }
+.reviewDisclosure > summary::-webkit-details-marker { display:none; }
+.reviewDisclosure > summary:hover,.reviewDisclosure[open] > summary { color:var(--color-primary); }
+.reviewToggle { width:36px; height:34px; display:grid; place-items:center; border-radius:7px; color:var(--color-secondary-text); }
+.reviewDisclosure[open] .reviewToggle,.reviewDisclosure > summary:hover .reviewToggle { background:var(--color-soft); }
+.reviewDisclosure[open] .reviewToggle svg { transform:rotate(180deg); }

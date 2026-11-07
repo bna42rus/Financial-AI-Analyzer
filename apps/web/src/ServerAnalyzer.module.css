@@ -44,10 +44,8 @@
 .layout form:has(textarea)>div{align-items:center;max-width:52rem;margin-inline:auto;padding:6px 8px 6px 13px}
 .layout form:has(textarea)>label{max-width:52rem;margin-inline:auto}
 .answerRowsFooter{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding-top:.65rem;color:var(--color-secondary-text);font-size:.875rem}
-.aiBudget{max-width:24rem;display:grid;gap:.35rem;margin:0 0 .7rem auto;border:1px solid var(--color-border);border-radius:.75rem;padding:.75rem;background:var(--color-surface);font-size:.875rem}
-.aiBudget>div{display:flex;align-items:center;justify-content:space-between;gap:.65rem}
+.aiBudget{display:grid;gap:.55rem;font-size:.9rem}
 .aiBudget meter{width:100%;height:.65rem;accent-color:var(--color-primary)}
-.aiBudget small{color:var(--color-secondary-text)}
-
-.privacyHint { display:block; margin-top:5px; font-size:13px; color:var(--color-muted); }
+.aiBudget small,.privacyHint{color:var(--color-secondary-text)}
+.privacyHint{display:block;max-width:52rem;margin:6px auto 0;font-size:.8rem}
 .moreExamples{margin-top:12px}.moreExamples summary{cursor:pointer;color:var(--color-primary);margin-bottom:10px}

@@ -1,3 +1,4 @@
+import {paidAnalyzerUnits} from './customer-ai-budget.ts';
 import {randomUUID} from 'node:crypto';
 import type {Pool,PoolClient} from 'pg';
 import {legalDocuments} from '../../../packages/access/src/legal.ts';
@@ -119,7 +120,7 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
  const base=continuity?new Date(Date.parse(cycle.accessEnd!)-1).toISOString():settled;
  const result=await extensionAt(db,cycle,o.tariff.duration,base,o.id,o.id),e=result.extension;
  await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,user.id,e.mode==='continuous']);
- await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[user.id,start,e.accessEnd,o.tariff.duration.kind,o.tariff.aiQuota]);
+ await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[user.id,start,e.accessEnd,o.tariff.duration.kind,paidAnalyzerUnits(o.tariff.id,o.tariff.duration.kind,o.tariff.aiQuota)]);
  const old=await savedRenewal(db,user.id);
  if(o.mode==='enroll'&&savedMethod){
   // Enablement is tied to the original, explicitly accepted checkout. A disable while it is pending wins.
