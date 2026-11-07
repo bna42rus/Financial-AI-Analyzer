@@ -381,6 +381,10 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
+    # 0041 is a data correction with an exact legacy-source predicate. Replaying
+    # it is safe and also catches old snapshots written after a runtime rollback.
+    allowance = (source / 'packages/database/migrations/0041_legacy_analyzer_allowance.sql').read_text()
+    sql('BEGIN;\n' + allowance + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):

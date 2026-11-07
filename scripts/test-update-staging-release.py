@@ -167,6 +167,9 @@ class UpdateTests(unittest.TestCase):
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
                 root=Path(directory);base=root/'staging';current=base/'backend-releases'/('a'*40);source=root/'build';release=base/'backend-releases'/('b'*40)
                 current.mkdir(parents=True);(source/'apps/web/dist').mkdir(parents=True);(source/'apps/api').mkdir(parents=True);(root/'backups').mkdir()
+                migrations=source/'packages/database/migrations';migrations.mkdir(parents=True)
+                allowance=(Path(__file__).resolve().parent.parent/'packages/database/migrations/0041_legacy_analyzer_allowance.sql').read_text()
+                (migrations/'0041_legacy_analyzer_allowance.sql').write_text(allowance)
                 origin='https://test.cashneuro.ru';(source/'apps/web/dist/release.json').write_text(json.dumps({'schema':'cashneuro-web-build/1','revision':'b'*40,'profile':'finance','mode':'connected','apiOrigin':origin}))
                 cfg=root/'settings';dropin=root/'dropin';caddy=root/'Caddyfile';worker=root/'worker';worker_env=root/'worker-env'
                 old={'realm':'staging/finance','apiKey':'synthetic-only','allowedEmails':['owner@example.test'],'modelMetadataSha256':'c'*64,'tariffSource':'fixed','sourceSha256':'a'*64,'expiresAt':'2000-01-01T00:00:00Z','maximumCalls':14,'admission':{'stageCapAtoms':'10000000000','stageMaximumCalls':70,'spentAtoms':'100','calls':56},'cost':{'projectId':'staging/synthetic','price':{'input':'15.86'}}}
@@ -190,7 +193,14 @@ class UpdateTests(unittest.TestCase):
                     if args[:2]==['systemctl','is-active']:return b'active'
                     if 'pg_dump' in args:kw['output'].write(b'synthetic backup')
                     return b''
-                def sql(query):sql_calls.append(query);self.assertTrue(query.startswith('SELECT'));return 't'
+                def sql(query):
+                    sql_calls.append(query)
+                    if query == 'BEGIN;\n' + allowance + '\nCOMMIT;':
+                        self.assertTrue(any('pg_dump' in args for args in calls))
+                        self.assertEqual(caddy.read_text(),old_root)
+                        return ''
+                    self.assertTrue(query.startswith('SELECT'))
+                    return 't'
                 def admit(args):
                     if mode=='blocked':raise m.m.InstallationError('CLASSIFICATION_RECONCILIATION_REQUIRED')
                     candidate=json.loads(json.dumps(old));candidate.update(sourceSha256='b'*64,maximumCalls=13,expiresAt='2099-01-01T00:00:00Z');candidate['admission'].update(calls=57,spentAtoms='200')
@@ -206,6 +216,7 @@ class UpdateTests(unittest.TestCase):
                 output=io.StringIO()
                 with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode in ('blocked','renewed') else None,tested_sha='b'*64 if mode in ('blocked','renewed') else None,keep_ai_paused=mode=='paused',resume_ai=mode in ('blocked','renewed'),preserve_active_ai=mode=='preserved')
                 result=json.loads(output.getvalue().splitlines()[-1]);self.assertEqual(result['status'],'UPDATED');self.assertEqual(result['paidCalls'],0)
+                self.assertEqual(sql_calls.count('BEGIN;\n' + allowance + '\nCOMMIT;'),1)
                 self.assertEqual(caddy.read_text(),str(release/'apps/web/dist'));self.assertIn(str(release/'apps/api'),dropin.read_text());self.assertTrue((release/'apps/api').is_dir())
                 settings=json.loads(cfg.read_text());self.assertEqual(settings['sourceSha256'],'b'*64)
                 if mode=='renewed':
