@@ -147,3 +147,8 @@
 .reviewList{list-style:none;padding:0;margin:.4rem 0;max-height:15rem;overflow:auto}
 .reviewChoice{display:flex;align-items:center;gap:.65rem;padding:.45rem .15rem}
 .reviewChoice small{display:block;color:var(--color-secondary-text)}
+.historyList{max-height:min(65dvh,48rem);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
+.listToolbar select,.interfaceGrid select{min-width:0;max-width:100%;min-height:38px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);padding:7px 10px;font:inherit}
+.interfaceGrid select{width:100%}
+.settingsRow h3{font-size:1rem;margin:0}
+.trailingAction{margin-inline-start:auto}

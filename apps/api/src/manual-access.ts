@@ -1,3 +1,4 @@
+import {reserveMailRequest} from './mail-cooldown.ts';
 import type {PoolClient} from 'pg';
 import type {FastifyRequest} from 'fastify';
 import type {Cycle} from '../../../packages/access/src/renewal.ts';
@@ -125,7 +126,7 @@ export async function manualInvitationAction(db:PoolClient,request:FastifyReques
  const now=await clock(db);
  if(b.decision==='reissue'&&grant.term.kind==='fixed'&&Date.parse(grant.term.end)<=Date.parse(now))throw new HttpError(409,'INVALID_END');
  await db.query('UPDATE commerce.invitation SET state=$1 WHERE id=$2',[b.decision==='cancel'?'cancelled':'superseded',inviteId]);
- if(b.decision==='reissue')await newInvitation(db,grant.id,ref.email,lifetime,seal,now);
+ if(b.decision==='reissue'){await reserveMailRequest(db,seal,'control','invitation-resend',ref.email);await newInvitation(db,grant.id,ref.email,lifetime,seal,now);}
  await db.query('INSERT INTO commerce.manual_access_audit(action_id,data,created_at) VALUES($1,$2,$3)',[id,{actionId:id,actorId,at:now,email:ref.email,userId:null,mode:'invitation_'+b.decision,reason,before:null,after:null,quota:grant.quota_policy},now]);
  return {status:'committed',...await manualQueue(db)};
 }

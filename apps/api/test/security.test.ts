@@ -22,7 +22,7 @@ before(async () => {
 });
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
-  await pg.owner.query(`TRUNCATE mail.delivery,mail.resend_audit,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
+  await pg.owner.query(`TRUNCATE mail.delivery,mail.resend_audit,mail.request_cooldown,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
     identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
@@ -139,9 +139,34 @@ test('owned application ignores client identifiers and payment claim never grant
 });
 test('duplicate requests remain one snapshot and response does not disclose existing account', async () => {
   const b=userBrowser(), body={name:'Visitor',email:'visitor@example.test',tariffId:tariff.id};
-  const first=await b.post('/access/requests',body), repeat=await b.post('/access/requests',body);assert.equal(first.body,repeat.body);
+  const first=await b.post('/access/requests',body), repeat=await b.post('/access/requests',body);assert.equal(first.statusCode,202);assert.equal(repeat.statusCode,429);assert.equal(repeat.json().code,'MAIL_COOLDOWN');
+  assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM access.outbox WHERE kind='application_verification'")).rows[0].n,1);
   assert.equal((await pg.owner.query('SELECT * FROM access.request')).rowCount,1);
   await seedUser('identity','existing');assert.equal((await b.post('/access/requests',{...body,email:'existing@example.test'})).body,first.body);
+});
+test('mail cooldown is address based across IPs, escalates and keeps unknown accounts private',async()=>{
+  await seedUser('identity');
+  const first=userBrowser(), other=new Browser(finance.fastify,fc.origin,'127.0.0.2');
+  const body={email:'owner@example.test'}, missing={email:'not-registered@example.test'};
+  const races=await Promise.all([first.post('/security/reset-request',body),other.post('/security/reset-request',{email:'OWNER@example.test'})]);
+  assert.deepEqual(races.map(r=>r.statusCode).sort(),[202,429]);
+  assert.equal(races.find(r=>r.statusCode===202)!.json().retryAfterSeconds,30);
+  const blocked=races.find(r=>r.statusCode===429)!;
+  assert.equal(blocked.json().code,'MAIL_COOLDOWN');assert.equal(Number(blocked.headers['retry-after']),blocked.json().retryAfterSeconds);
+  assert.ok(blocked.json().retryAfterSeconds>=29&&blocked.json().retryAfterSeconds<=30);
+  const absent=await other.post('/security/reset-request',missing);assert.equal(absent.body,races.find(r=>r.statusCode===202)!.body);
+  const absentBlocked=await other.post('/security/reset-request',missing);assert.equal(absentBlocked.statusCode,429);assert.equal(absentBlocked.json().code,blocked.json().code);
+  assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM identity.outbox WHERE kind='password_reset'")).rows[0].n,1);
+  await pg.owner.query("UPDATE mail.request_cooldown SET retry_at=clock_timestamp()-interval '1 second'");
+  assert.equal((await first.post('/security/reset-request',body)).json().retryAfterSeconds,60);
+  await pg.owner.query("UPDATE mail.request_cooldown SET retry_at=clock_timestamp()-interval '1 second'");
+  await pg.owner.query('TRUNCATE identity.rate_limit'); // Advance the independent request budget too.
+  assert.equal((await other.post('/security/reset-request',body)).json().retryAfterSeconds,3600);
+  assert.equal((await first.post('/security/reset-request',body)).json().code,'MAIL_COOLDOWN');
+  assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM identity.outbox WHERE kind='password_reset'")).rows[0].n,3);
+  assert.equal((await pg.control.query('SELECT count(*)::int AS n FROM mail.request_cooldown')).rows[0].n,0);
+  await pg.owner.query("UPDATE mail.request_cooldown SET retry_at=clock_timestamp()-interval '2 seconds',expires_at=clock_timestamp()-interval '1 second'");
+  assert.equal((await first.post('/security/reset-request',body)).json().retryAfterSeconds,30);
 });
 test('mandatory TOTP: password/enrollment have no admin capabilities; codes returned only after proof', async () => {
   await seedUser('control');const b=adminBrowser();await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});
@@ -180,6 +205,7 @@ test('recovery verifies fresh password and atomically consumes code, revokes ses
 test('password reset invalidates old password, every reset token and every old session, requires new login', async () => {
   await seedUser('identity');const b=userBrowser();await b.post('/auth/sign-in/email',{email:'owner@example.test',password:testPassword});const old=b.clone();
   await b.post('/security/reset-request',{email:'owner@example.test'});const first=await mail('identity','password_reset');
+  await pg.owner.query("UPDATE mail.request_cooldown SET retry_at=clock_timestamp()-interval '1 second'");
   await b.post('/security/reset-request',{email:'owner@example.test'});const second=await mail('identity','password_reset');
   const newPassword='Another synthetic password 456!';assert.equal((await b.post('/security/reset',{token:first.token,newPassword})).statusCode,200);
   assert.equal((await old.get('/session')).statusCode,401);assert.equal((await b.get('/session')).statusCode,401);
@@ -313,6 +339,13 @@ test('review preview is read-only; commit is TOTP-gated, revision-checked and id
   assert.equal((await pg.owner.query('SELECT * FROM commerce.invitation')).rowCount,1);
   assert.equal((await pg.owner.query('SELECT * FROM identity.auth_user')).rowCount,0);
   assert.equal((await pg.owner.query('SELECT activated_at FROM commerce.purchase')).rows[0].activated_at,null);
+});
+test('registration cooldown blocks new proofs, not use of the code already issued',async()=>{
+ const a=await paidApplication(),proof=await registrationProof(a);
+ const repeat=await new Browser(finance.fastify,fc.origin,'127.0.0.2').post('/access/registration-proof',{invitationToken:a.invitationToken});
+ assert.equal(repeat.statusCode,429);assert.equal(repeat.json().code,'MAIL_COOLDOWN');
+ assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM access.registration_proof')).rows[0].n,1);
+ assert.equal((await a.b.post('/access/register',registrationBody(a.invitationToken,proof))).statusCode,201);
 });
 test('copied invitation alone never verifies email; proof is scoped, secret and independently mailed',async()=>{
   const a=await paidApplication(),attacker=userBrowser();

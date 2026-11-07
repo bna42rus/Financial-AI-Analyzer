@@ -54,6 +54,12 @@ export async function postgresFixture(options: { name?: 'finance_staging' } = {}
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0032_category_bindings.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0033_attention_queue.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0034_commerce_catalog.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0035_launch_legal.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0036_access_checkout.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0037_budget_settings_history.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0038_admin_checkout_projection.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0039_first_checkout_autorenewal.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0040_mail_request_cooldown.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

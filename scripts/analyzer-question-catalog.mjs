@@ -1,4 +1,5 @@
 import {readFile,writeFile} from 'node:fs/promises';
+import {questionVariants} from './analyzer-question-variants.mjs';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';
 
@@ -34,13 +35,13 @@ export function renderQuestionCatalog(raw){
 }
 export async function prepareQuestionCatalog(){
  const bytes=await readFile(catalogUrl),c=validateQuestionCatalog(JSON.parse(bytes));
- return {version:c.version,status:c.status,questionCount:c.cases.length,groups:c.groups.length,catalogSha256:createHash('sha256').update(bytes).digest('hex'),paidCalls:0,modelMeasuredCases:0,byRoute:Object.fromEntries(Object.keys(routes).map(k=>[k,c.cases.filter(x=>x.route===k).length])),cumulativeAdmission:'not_read_and_not_changed',liveRunner:false};
+ return {version:c.version,status:c.status,questionCount:c.cases.length,variantCount:questionVariants().length,totalQuestionCount:c.cases.length+questionVariants().length,groups:c.groups.length,catalogSha256:createHash('sha256').update(bytes).digest('hex'),paidCalls:0,modelMeasuredCases:0,byRoute:Object.fromEntries(Object.keys(routes).map(k=>[k,c.cases.filter(x=>x.route===k).length])),cumulativeAdmission:'not_read_and_not_changed',liveRunner:false};
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  const action=process.argv[2]??'--prepare';
- if(process.argv.length>3||!['--prepare','--check','--write','--questions'].includes(action))throw Error('QUESTION_CATALOG_NO_LIVE_RUNNER');
+ if(process.argv.length>3||!['--prepare','--check','--write','--questions','--variants'].includes(action))throw Error('QUESTION_CATALOG_NO_LIVE_RUNNER');
  const c=validateQuestionCatalog(JSON.parse(await readFile(catalogUrl,'utf8')));
  if(action==='--write')await writeFile(documentUrl,renderQuestionCatalog(c));
  if(action==='--check'&&await readFile(documentUrl,'utf8')!==renderQuestionCatalog(c))throw Error('QUESTION_DOCUMENT_DRIFT');
- console.log(JSON.stringify(action==='--questions'?questionInputs(c):await prepareQuestionCatalog(),null,2));
+ console.log(JSON.stringify(action==='--questions'?questionInputs(c):action==='--variants'?questionVariants():await prepareQuestionCatalog(),null,2));
 }

@@ -2,7 +2,7 @@ import { assertPersistableMinor, parsePersistedMinor } from '../../finance-core/
 
 /** Deterministic domain transitions. Not an authentication, database or delivery adapter. */
 export type Duration = { kind: 'calendar_months' | 'days'; count: number };
-export type Tariff = { id: string; name: string; duration: Duration; priceMinor: string; aiQuota: number; publicVisible: boolean; availableForNew: boolean; availableForRenewal?: boolean; active: boolean };
+export type Tariff = { catalogVersion?:number; id: string; name: string; duration: Duration; priceMinor: string; aiQuota: number; publicVisible: boolean; availableForNew: boolean; availableForRenewal?: boolean; active: boolean };
 export type RequestStatus = 'awaiting_email' | 'awaiting_payment' | 'under_review' | 'needs_topup' | 'paid_not_activated' | 'rejected';
 export type AccessRequest = {
   id: string; revision: number; name: string; email: string; tariff: Tariff; status: RequestStatus; kind?: 'renewal';

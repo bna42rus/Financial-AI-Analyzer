@@ -44,7 +44,7 @@ import type {ImportEpoch,PreparedImportContext} from './pseudonym-context.ts';
 export {importEpoch,prepareImportContext} from './pseudonym-context.ts';
 import {isStructural,parseStructuralIntent,applyStructural,restoreStructure,canonicalAccount,activeAccount} from './finance-structure.ts';
 import type {StructuralIntent,StructuralUndo} from './finance-structure.ts';
-import {isEntityKind,parseEntityIntent,applyEntity,restoreEntities,partyRows,activeParty,canonicalParty} from './finance-entities.ts';
+import {isEntityKind,parseEntityIntent,applyEntity,restoreEntities,partyRows,activeParty,canonicalParty,counterpartyNameKey} from './finance-entities.ts';
 import type {EntityIntent,EntityUndo} from './finance-entities.ts';
 import {parseExclusionIntent,applyExclusion} from './finance-exclusions.ts';
 import type {ExclusionIntent,BatchUndo} from './finance-exclusions.ts';
@@ -273,13 +273,20 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
    const anchor=loaded.graph.operations.find(o=>o.id===intent.reviewScope?.anchorId),merchant=anchor?.semantics.merchant.value.trim();
    if(!review?.liveQueue||!anchor||!merchant||anchor.semantics.kind.value!=='purchase'||BigInt(effective(anchor).amountMinor)>=0n)throw new HttpError(409,'REVIEW_GROUP_CHANGED');
    const conditions={merchantEquals:merchant,accountId:effective(anchor).accountId,direction:'out' as const,kind:'purchase' as const},assignments=intent.patch as Rule['assignments'];
-   if(!loaded.rules.some(r=>r.enabled&&stableJSON(r.conditions)===stableJSON(conditions)&&stableJSON(r.assignments)===stableJSON(assignments))){
+   const matching=loaded.rules.filter(r=>r.enabled&&stableJSON(r.conditions)===stableJSON(conditions));
+   if(matching.some(r=>Object.entries(assignments).some(([key,value])=>key in r.assignments&&stableJSON((r.assignments as Record<string,unknown>)[key])!==stableJSON(value))))throw new HttpError(409,'REVIEW_RULE_CONFLICT');
+   if(!matching.some(r=>stableJSON(r.assignments)===stableJSON(assignments))){
     ruleName=safeText('Правило: '+merchant,160);
     const patch={name:ruleName,enabled:true,priority:0,conditions,assignments};
     await applyBase(db,userId,{kind:'rule',id:intent.id,create:true,patch},currentRevision,loaded);
    }
   }
-  const after=await financeView(db,userId);return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,operationIds:intent.operationIds,selectedCount:intent.operationIds.length,atomic:true,verify:intent.verify,patch:intent.patch,warnings,...(ruleName?{ruleName}:{}),remainingReviewIds:after.operations.filter(o=>intent.operationIds.includes(o.id)&&o.reviewReasons.length).map(o=>o.id)}};
+  const after=await financeView(db,userId);
+  if(review?.liveQueue&&intent.reviewScope&&after.operations.some(o=>o.id===intent.reviewScope!.anchorId&&o.reviewReasons.length)){
+   const scope=intent.reviewScope;
+   await db.query('UPDATE finance.review_session SET operation_ids=array_remove(operation_ids,$3::uuid)||ARRAY[$3::uuid],cursor=0,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2 AND array_length(operation_ids,1)>1',[userId,scope.sessionId,scope.anchorId]);
+  }
+  return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,operationIds:intent.operationIds,selectedCount:intent.operationIds.length,atomic:true,verify:intent.verify,patch:intent.patch,warnings,...(ruleName?{ruleName}:{}),remainingReviewIds:after.operations.filter(o=>intent.operationIds.includes(o.id)&&o.reviewReasons.length).map(o=>o.id)}};
  }
  if(intent.kind==='merge_duplicate')return mergeDuplicate(db,userId,intent);
  if(intent.kind==='cancel_import')return cancelImport(db,userId,intent,actionId);
@@ -362,7 +369,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
   for(const [input,key]of Object.entries({name:'name',role:'role',parentId:'parent_id',hidden:'hidden'}))if(input in p)values[key]=p[input];
   if(intent.create){if(!p.name||!p.role)throw new TypeError('MISSING_CATEGORY');await db.query('INSERT INTO finance.category(user_id,id,name,role,parent_id,hidden) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,p.name,p.role,p.parentId??null,p.hidden??false]);}
  }
- if(table==='counterparty'){if(!intent.create)activeParty(await partyRows(db,userId),id);for(const [input,key]of Object.entries({name:'name',state:'state',isSelf:'is_self'}))if(input in p)values[key]=p[input];if(intent.create){if(!p.name)throw new TypeError('MISSING_NAME');await db.query('INSERT INTO finance.counterparty(user_id,id,name,state,is_self) VALUES($1,$2,$3,$4,$5)',[userId,id,p.name,p.state??'registered',p.isSelf??false]);}}
+ if(table==='counterparty'){const existing=await partyRows(db,userId);if(!intent.create)activeParty(existing,id);if(typeof p.name==='string'&&existing.some(other=>other.id!==id&&!other.merged_into_id&&counterpartyNameKey(other.name)===counterpartyNameKey(p.name as string)))throw new HttpError(409,'COUNTERPARTY_NAME_EXISTS');for(const [input,key]of Object.entries({name:'name',state:'state',isSelf:'is_self'}))if(input in p)values[key]=p[input];if(intent.create){if(!p.name)throw new TypeError('MISSING_NAME');await db.query('INSERT INTO finance.counterparty(user_id,id,name,state,is_self) VALUES($1,$2,$3,$4,$5)',[userId,id,p.name,p.state??'registered',p.isSelf??false]);}}
  if(table==='rule'){
   const rule=p as unknown as Omit<Rule,'id'>;ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);
   categoryCompatible(graph,rule.assignments.role??'unresolved',rule.assignments.categoryId??null,rule.assignments.subcategoryId??null);Object.assign(values,p,{dependency_status:'ready'});

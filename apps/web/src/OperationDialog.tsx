@@ -13,7 +13,7 @@ export function OperationDialog({title,onClose,children,footer,compact=false,nar
   <Dialog.Content aria-describedby={undefined} data-notifications-inline="true" className={common.dialog+' '+styles.operationDialog+(narrow?' '+styles.narrowDialog:compact?' '+styles.subDialog:'')} onInteractOutside={e=>e.preventDefault()} onOpenAutoFocus={()=>{opener.current=document.activeElement as HTMLElement;}} onCloseAutoFocus={e=>{e.preventDefault();if(opener.current?.isConnected)opener.current.focus({preventScroll:true});}}>
    <header className={common.dialogHead+' '+styles.operationHead}><Dialog.Title>{title}</Dialog.Title><Dialog.Close asChild><button type="button" className={common.iconButton} aria-label={'Закрыть: '+title}><X size={20}/></button></Dialog.Close></header>
    <div className={styles.operationBody}>{children}</div>
-   <footer className={styles.operationFooter}>{footer}</footer>
+   {footer!=null&&<footer className={styles.operationFooter}>{footer}</footer>}
   </Dialog.Content>
  </Dialog.Portal></Dialog.Root>;
 }

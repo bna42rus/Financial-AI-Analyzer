@@ -72,7 +72,7 @@ def copy_credentials():
         atomic_replace(RUNTIME / name, source.read_bytes(), 0o600, directory.st_uid, directory.st_gid)
 
 
-def frontend_root(config):
+def frontend_root(config, host="test.cashneuro.ru"):
     found = []
     def visit(node, hosts=()):
         if isinstance(node, dict):
@@ -87,11 +87,11 @@ def frontend_root(config):
             for child in node:
                 visit(child, hosts)
     visit(config)
-    owned = {root for hosts, root in found if hosts == ('test.cashneuro.ru',)}
+    owned = {root for hosts, root in found if hosts == (host,)}
     if len(owned) != 1:
         raise InstallationError('FRONTEND_LAYOUT_CHANGED')
     root = owned.pop()
-    if any(root == other and hosts != ('test.cashneuro.ru',) for hosts, other in found):
+    if any(root == other and hosts != (host,) for hosts, other in found):
         raise InstallationError('SHARED_FRONTEND_ROOT_DENIED')
     return root
 

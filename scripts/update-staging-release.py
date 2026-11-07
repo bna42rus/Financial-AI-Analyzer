@@ -12,6 +12,7 @@ import shutil
 import stat
 import sys
 import tempfile
+import urllib.request
 import time
 from urllib.parse import urlsplit
 
@@ -24,6 +25,42 @@ spec.loader.exec_module(m)
 WORKER = 'cashneuro-staging-import.service'
 WORKER_UNIT = Path('/etc/systemd/system') / WORKER
 WORKER_ENV = Path('/etc/cashneuro/staging/finance-import.env')
+AUX_UNITS = ('cashneuro-staging-api@control.service', 'cashneuro-staging-mail@finance.service',
+             'cashneuro-staging-mail@control.service')
+
+
+def auxiliary_dropin(unit):
+    return Path('/etc/systemd/system') / (unit + '.d') / '99-z-cashneuro-release.conf'
+
+
+def control_settings():
+    values = {}
+    for line in Path('/etc/cashneuro/staging/control-api.env').read_text().splitlines():
+        match = re.fullmatch(r'\s*([A-Z_]+)\s*=\s*(.*?)\s*', line)
+        if match:
+            values[match[1]] = match[2].strip('\"\'')
+    origin = values.get('API_BASE_URL', '').rstrip('/')
+    port = values.get('PORT', '')
+    if origin not in ('https://admin.test.cashneuro.ru', 'https://admin.test.cashneuro.ru/api') or not port.isascii() or not port.isdigit() or not 1 <= int(port) <= 65535 or port == '3000':
+        raise m.InstallationError('CONTROL_STAGING_SETTINGS_CHANGED')
+    return origin, int(port)
+
+
+def check_auxiliary(port, release=None):
+    for _ in range(15):
+        try:
+            if all(m.run(['systemctl', 'show', unit, '--property=ActiveState', '--value']).strip() == b'active' for unit in AUX_UNITS):
+                if release and any(Path(m.run(['systemctl', 'show', unit, '--property=WorkingDirectory', '--value']).decode().strip()).resolve() != release / 'apps/api' for unit in AUX_UNITS):
+                    raise m.InstallationError('AUXILIARY_WORKING_DIRECTORY_CHANGED')
+                with urllib.request.urlopen('http://127.0.0.1:' + str(port) + '/health', timeout=2) as response:
+                    value = json.load(response)
+                if value.get('status') == 'ok' and value.get('profile') == 'control':
+                    return
+        except (OSError, ValueError):
+            pass
+        time.sleep(1)
+    raise m.InstallationError('CONTROL_OR_MAIL_NOT_HEALTHY')
+
 
 
 def settings():
@@ -48,8 +85,8 @@ def validate_origin(value):
     return value.rstrip('/')
 
 
-def validate_manifest(value, sha, origin):
-    if value != {'schema': 'cashneuro-web-build/1', 'revision': sha, 'profile': 'finance', 'mode': 'connected', 'apiOrigin': origin}:
+def validate_manifest(value, sha, origin, profile="finance"):
+    if value != {'schema': 'cashneuro-web-build/1', 'revision': sha, 'profile': profile, 'mode': 'connected', 'apiOrigin': origin}:
         raise m.InstallationError('CONNECTED_FRONTEND_REQUIRED')
 
 
@@ -152,7 +189,19 @@ def restore(backup):
                 path.unlink(missing_ok=True)
             else:
                 m.atomic_replace(path, (backup / name).read_bytes(), previous['mode'], previous['uid'], previous['gid'])
+    if metadata.get('auxiliary'):
+        for unit in AUX_UNITS:
+            path = auxiliary_dropin(unit)
+            previous = metadata['auxiliary'][unit]
+            if previous is None:
+                path.unlink(missing_ok=True)
+            else:
+                m.atomic_replace(path, (backup / unit).read_bytes(), previous['mode'], previous['uid'], previous['gid'])
     m.restore(backup)
+    if metadata.get('auxiliary'):
+        m.run(['systemctl', 'reset-failed', *AUX_UNITS])
+        m.run(['systemctl', 'restart', *AUX_UNITS])
+        check_auxiliary(control_settings()[1])
     if metadata.get('workerManaged') and metadata.get('workerWasActive'):
         m.run(['systemctl', 'start', WORKER])
 
@@ -214,7 +263,7 @@ def activate_ai(dropin):
     return value.replace(b'ASSISTANT_ENABLED=0', b'ASSISTANT_ENABLED=1').rstrip() + b'\nEnvironment=ASSISTANT_ENABLED=1\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
 
 
-def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False):
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False, full_staging=False):
     if preserve_active_ai and (keep_ai_paused or resume_ai or enable_classification or evidence or tested_sha or monthly_budget is not None):
         raise m.InstallationError('ACTIVE_MONTHLY_AI_ARGUMENTS_CONFLICT')
     if monthly_budget is not None and (monthly_budget != '100' or not resume_ai):
@@ -259,7 +308,21 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         validation = 'import {checkAssistantStagingSettings} from ' + json.dumps((source / 'apps/api/src/analyzer-assistant-settings.ts').as_uri()) + ';import {readFileSync} from "node:fs";checkAssistantStagingSettings(JSON.parse(readFileSync(0,"utf8")));'
         m.run(['/usr/bin/node', '--experimental-transform-types', '--input-type=module', '-e', validation], data=json.dumps(rebound).encode())
     original = m.CADDY.read_bytes()
-    old_root = m.frontend_root(json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty'])))
+    caddy_config = json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty']))
+    old_root = m.frontend_root(caddy_config)
+    control_port, old_admin = None, None
+    if full_staging:
+        control_origin, control_port = control_settings()
+        validate_manifest(json.loads((source / 'apps/admin/dist/release.json').read_text()), sha, control_origin, 'control')
+        old_admin = m.frontend_root(caddy_config, 'admin.test.cashneuro.ru')
+        if original.count(old_admin.encode()) != 1:
+            raise m.InstallationError('ADMIN_FRONTEND_LAYOUT_CHANGED')
+        check_auxiliary(control_port)
+        for unit in AUX_UNITS:
+            directory = Path(m.run(['systemctl', 'show', unit, '--property=WorkingDirectory', '--value']).decode().strip())
+            if not directory.is_absolute() or not directory.is_relative_to(m.BASE) or not directory.resolve().is_relative_to(m.BASE):
+                raise m.InstallationError('AUXILIARY_WORKING_DIRECTORY_CHANGED')
+
     if original.count(old_root.encode()) != 1:
         raise m.InstallationError('FRONTEND_LAYOUT_CHANGED')
     old_dropin = m.DROPIN.read_bytes()
@@ -282,6 +345,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     metadata['workerWasActive'] = WORKER in existing
     enabled = m.run(['systemctl', 'show', WORKER, '--property=UnitFileState', '--value']).decode().strip() if WORKER_UNIT.exists() else ''
     metadata['workerWasEnabled'] = enabled == 'enabled'
+    if full_staging:
+        metadata['auxiliary'] = {unit: snapshot(backup, unit, auxiliary_dropin(unit)) for unit in AUX_UNITS}
     m.private_write(backup / 'rollback.json', json.dumps(metadata).encode())
     container, owner, sql = m.docker_database()
     with os.fdopen(os.open(backup / 'database.dump', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as stream:
@@ -304,6 +369,18 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0033_attention_queue.sql').read_text() + '\nCOMMIT;')
     if sql("SELECT to_regclass('commerce.ai_pack') IS NOT NULL") != 't':
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0034_commerce_catalog.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('identity.legal_event') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0035_launch_legal.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('commerce.access_checkout') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0036_access_checkout.sql').read_text() + '\nCOMMIT;')
+    for probe, filename in (
+        ("SELECT to_regprocedure('finance.record_budget_settings()') IS NOT NULL", '0037_budget_settings_history.sql'),
+        ("SELECT to_regprocedure('commerce.control_checkout_queue()') IS NOT NULL", '0038_admin_checkout_projection.sql'),
+        ("SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='commerce.access_checkout'::regclass AND contype='c' AND position('application_id' IN pg_get_constraintdef(oid))>0 AND position('enroll' IN pg_get_constraintdef(oid))>0)", '0039_first_checkout_autorenewal.sql'),
+        ("SELECT to_regclass('mail.request_cooldown') IS NOT NULL", '0040_mail_request_cooldown.sql'),
+    ):
+        if sql(probe) != 't':
+            sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
@@ -315,7 +392,10 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             os.chmod(path, stat.S_IMODE(path.stat().st_mode) & ~0o022 | (0o555 if path.is_dir() else 0o444))
     new_root = release / 'apps/web/dist'
     candidate = backup / 'Caddyfile.candidate'
-    m.private_write(candidate, original.replace(old_root.encode(), str(new_root).encode()))
+    next_caddy = original.replace(old_root.encode(), str(new_root).encode())
+    if old_admin:
+        next_caddy = next_caddy.replace(old_admin.encode(), str(release / 'apps/admin/dist').encode())
+    m.private_write(candidate, next_caddy)
     m.run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
     rollback = 'sudo /usr/bin/python3 ' + shlex.quote(str(release / 'scripts/update-staging-release.py')) + ' --rollback ' + shlex.quote(str(backup))
     print('Откат: ' + rollback, flush=True)
@@ -359,6 +439,11 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             worker_env = 'APP_ENV=staging\nAPI_PROFILE=finance\nDATABASE_URL=' + json.dumps(config['DATABASE_URL']) + '\n'
             m.atomic_replace(WORKER_ENV, worker_env.encode(), 0o600)
             m.atomic_replace(WORKER_UNIT, worker_unit(release).encode())
+        if full_staging:
+            for unit in AUX_UNITS:
+                path = auxiliary_dropin(unit)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                m.atomic_replace(path, ('[Service]\nSupplementaryGroups=cashneuro-staging-code\nWorkingDirectory=' + str(release / 'apps/api') + '\n').encode())
         m.run(['systemctl', 'daemon-reload'])
         m.run(['systemctl', 'restart', m.UNIT])
         wait_release_health(release, keep_ai_paused)
@@ -368,12 +453,16 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             time.sleep(2)
             if m.run(['systemctl', 'is-active', WORKER]).decode().strip() != 'active':
                 raise m.InstallationError('IMPORT_WORKER_NOT_ACTIVE')
+        if full_staging:
+            m.run(['systemctl', 'restart', *AUX_UNITS])
+            check_auxiliary(control_port, release)
         info = m.CADDY.stat()
         m.atomic_replace(m.CADDY, candidate.read_bytes(), stat.S_IMODE(info.st_mode), info.st_uid, info.st_gid)
         m.run(['systemctl', 'reload', 'caddy'])
         wait_release_health(release, keep_ai_paused)
-        actual = m.frontend_root(json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty'])))
-        if actual != str(new_root):
+        active_caddy = json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty']))
+        actual = m.frontend_root(active_caddy)
+        if actual != str(new_root) or full_staging and m.frontend_root(active_caddy, 'admin.test.cashneuro.ru') != str(release / 'apps/admin/dist'):
             raise m.InstallationError('FRONTEND_SWITCH_FAILED')
     except Exception:
         print('Ошибка переключения. Возвращаем прежнюю конфигурацию.', flush=True)
@@ -398,6 +487,8 @@ def main():
         raise m.InstallationError('ROOT_REQUIRED')
     parser = argparse.ArgumentParser()
     parser.add_argument('--inspect-api-origin', action='store_true')
+    parser.add_argument('--inspect-control-origin', action='store_true')
+    parser.add_argument('--full-staging', action='store_true')
     parser.add_argument('--source')
     parser.add_argument('--sha')
     parser.add_argument('--rollback')
@@ -412,12 +503,15 @@ def main():
     if args.inspect_api_origin:
         print(validate_origin(settings()['API_BASE_URL']))
         return
+    if args.inspect_control_origin:
+        print(control_settings()[0])
+        return
     lock = os.open('/run/lock/cashneuro-assistant-install.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai, args.full_staging)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

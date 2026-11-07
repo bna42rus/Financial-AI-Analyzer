@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 285 64" role="img" aria-label="CashNeuro"><rect width="64" height="64" rx="18" fill="#5145d8"/><path d="M43 18a20 20 0 1 0 0 28" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><path d="m24 37 8-10 7 5 9-13" fill="none" stroke="#c6c3ff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="37" r="3" fill="#fff"/><circle cx="48" cy="19" r="3" fill="#fff"/><text x="78" y="43" fill="#1b2440" font-family="Inter,system-ui,-apple-system,Segoe UI,sans-serif" font-size="32" font-weight="750" letter-spacing="-1">Cash<tspan fill="#5145d8">Neuro</tspan></text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 290 64">
+  <title>CashNeuro</title>
+  <g transform="scale(0.3333333333)">
+  <rect width="192" height="192" rx="43" fill="#5145d8"/>
+  <path d="M138.132 131.353 A55 55 0 1 1 138.132 60.647" fill="none" stroke="#fff" stroke-width="14" stroke-linecap="round"/>
+  <path d="M71.849 116.994 A32 32 0 0 1 71.849 75.006 L120.151 116.994 A32 32 0 0 0 120.151 75.006" fill="none" stroke="#b7f2d8" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="80" y="45" font-family="Arial,sans-serif" font-weight="700" font-size="36" letter-spacing="-1.3" fill="#19213b">Cash<tspan fill="#5145d8">Neuro</tspan></text>
+</svg>

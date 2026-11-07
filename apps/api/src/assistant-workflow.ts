@@ -20,9 +20,18 @@ import type { Usage, DispatchBound } from '../../../packages/analyzer/src/cost.t
 import { assertClosedSchema } from '../../../packages/analyzer/src/closed-schema.ts';
 
 export function exactAssistantPlan(question:string){
- const text=question.trim().toLocaleLowerCase('ru').replace(/[?!.,]+$/u,'');
+ const text=question.trim().toLocaleLowerCase('ru').replaceAll('ё','е').replace(/\s+/gu,' ').replace(/[?!.,]+$/u,'');
  const choices:Record<string,readonly [Query['metric'],'total'|'category_totals'|'operation_list','none'|'previous_same']>={
   'сколько я потратил за выбранный период':['expenses','total','none'],
+  'сколько я потратил за этот период':['expenses','total','none'],
+  'сколько я потратила за выбранный период':['expenses','total','none'],
+  'общие расходы за выбранный период':['expenses','total','none'],
+  'сколько я заработал за выбранный период':['income','total','none'],
+  'сколько я заработала за выбранный период':['income','total','none'],
+  'покажи доходы за выбранный период':['income','total','none'],
+  'покажи расходы по категориям за выбранный период':['expenses','category_totals','none'],
+  'покажи операции на проверку за выбранный период':['attention','operation_list','none'],
+  'сравни траты за выбранный период с предыдущим':['expenses','total','previous_same'],
   'доходы за выбранный период':['income','total','none'],
   'расходы по категориям за выбранный период':['expenses','category_totals','none'],
   'какие операции требуют внимания за выбранный период':['attention','operation_list','none'],
@@ -192,7 +201,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
     personalPending = ['personal_finance', 'mixed'].includes(plan.topic) && ['read', 'propose_change', 'unsupported', 'clarification'].includes(plan.action);
     if (['read','propose_change'].includes(plan.action) && incompleteConditions) return finish('clarification', 'CONDITION_UNCLEAR', 'Уточните, пожалуйста, неясное условие или дату события. Без этого расчёт может охватить неверные операции.');
     if (plan.topic === 'unrelated') return finish('redirect', 'UNRELATED', 'Моя специализация — финансы. Могу помочь с расходами, бюджетом и накоплениями.');
-    if (plan.action === 'clarification') return finish('clarification', 'MEANING_UNCLEAR', 'Уточните, пожалуйста, условия или расчёт, который хотите продолжить.');
+    if (plan.action === 'clarification') return finish('clarification', 'MEANING_UNCLEAR', 'Уточните, что нужно посчитать или найти. Если продолжаете расчёт, укажите, что изменить: период, счёт или категорию.');
     if(plan.action==='propose_change'&&services.prepareChange){
       proposalAttachment=await services.prepareChange(plan.change!,state.book.nodes.at(-1)?.messageId??null);await guard();
       personalPending=false;return finish('answer','CHANGE_PROPOSED','Подготовлено предложение. Проверьте последствия и подтвердите изменение. Пока ничего не сохранено.');

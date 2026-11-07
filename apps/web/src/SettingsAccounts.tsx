@@ -11,7 +11,7 @@ import operationStyles from './ServerOperation.module.css';
 import styles from './Settings.module.css';
 
 export const accountTypes:Record<Account['type'],string>={debit_card:'Дебетовая карта',credit_card:'Кредитная карта',bank_account:'Текущий счёт',loan:'Кредит',savings:'Накопительный счёт',deposit:'Вклад',other:'Другой'};
-export const loanModes={cashflow:'Весь платёж как расход',economic:'Проценты и сопутствующие расходы'};
+export const loanModes={cashflow:'Считать расходом весь платёж',economic:'Считать расходом только проценты, комиссии и страховку'};
 type Fields=Pick<Account,'name'|'type'|'analyticsEnabled'|'loanMode'>;
 const bank=(a:Account)=>bankNames[a.bankId]??a.bankId;
 const shortName=(a:Account)=>a.name.startsWith(bank(a)+' · ')?a.name.slice(bank(a).length+3):a.name;
@@ -78,7 +78,7 @@ export function SettingsAccounts({state,disabled,command,commandState,openOperat
      <div className={styles.fullRow}><OperationField label="Название счёта" error={conflict.includes('name')?'Название изменилось. Черновик сохранён.':errors[a.id]}><input aria-label={'Название счёта: '+a.name} value={value.name} maxLength={160} onChange={e=>change(a,{name:e.target.value})}/></OperationField></div>
      <OperationField label="Тип счёта" error={conflict.includes('type')?'Тип счёта изменился.':undefined}><select aria-label={'Тип счёта: '+a.name} value={value.type} onChange={e=>change(a,{type:e.target.value as Account['type']})}>{Object.entries(accountTypes).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></OperationField>
      <OperationField label="Участие в аналитике" error={conflict.includes('analyticsEnabled')?'Участие в аналитике изменилось.':undefined}><select aria-label={'Участие в аналитике: '+a.name} value={String(value.analyticsEnabled)} onChange={e=>change(a,{analyticsEnabled:e.target.value==='true'})}><option value="true">Да</option><option value="false">Нет</option></select></OperationField>
-     {value.type==='loan'&&<OperationField label="Учёт кредита" error={conflict.includes('loanMode')?'Учёт кредита изменился.':undefined}><select value={value.loanMode??''} onChange={e=>change(a,{loanMode:(e.target.value||null) as Account['loanMode']})}><option value="">Общая настройка</option>{Object.entries(loanModes).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></OperationField>}
+     {value.type==='loan'&&<OperationField label="Учёт кредита" error={conflict.includes('loanMode')?'Учёт кредита изменился.':undefined}><select value={value.loanMode??''} onChange={e=>change(a,{loanMode:(e.target.value||null) as Account['loanMode']})}><option value="">Как в настройках аналитики</option>{Object.entries(loanModes).map(([v,label])=><option key={v} value={v}>{label}</option>)}</select></OperationField>}
     </fieldset>
     {conflict.length>0&&<div className={styles.cardActions}><button type="button" className={common.button} onClick={()=>keepCurrent(a)}>Использовать сохранённые значения</button></div>}
     <div className={styles.cardActions}><button type="button" className={common.button} disabled={disabled} onClick={()=>openOperations(a.id)}>Операции счёта</button><button type="button" className={common.button} disabled={disabled} onClick={()=>openStructure(a.id)}>Объединить счёт с другим</button><button type="button" className={common.dangerButton} disabled={disabled} onClick={()=>openDeletion(a.id)}>Удалить данные счёта</button></div>

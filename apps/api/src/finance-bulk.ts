@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import {object,choice,uuid,correction} from '../../../packages/finance-core/src/model.ts';
-import {kinds} from '../../../packages/finance-core/src/model.ts';
-import type {Graph} from '../../../packages/finance-core/src/model.ts';
+import {kinds,allowedOperationRoles,effective} from '../../../packages/finance-core/src/model.ts';
+import type {Graph,Kind,Role,Category} from '../../../packages/finance-core/src/model.ts';
 import {reconcile} from '../../../packages/finance-core/src/graph.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
 import {HttpError} from './types.ts';
@@ -36,6 +36,20 @@ export function bulkPatches(intent:BulkIntent,graph:Graph){
   const op=byId.get(id);if(!op)throw new HttpError(404,'NOT_FOUND');
   const patch=structuredClone(intent.patch),facets={kind:'kind',role:'role',category:'categoryId',subcategory:'subcategoryId'}as const;
   for(const f of intent.verify)patch[facets[f]]=op.semantics[f].value;
+  if(intent.reviewScope&&id!==intent.reviewScope.anchorId){
+   for(const [facet,key] of Object.entries({...facets,counterparty:'counterpartyId'} as const)){
+    if(op.semantics[facet as keyof typeof op.semantics].userVerified)delete patch[key];
+   }
+   if('categoryId'in patch&&op.semantics.subcategory.userVerified)delete patch.categoryId;
+   if(!('categoryId'in patch)&&'subcategoryId'in patch&&op.semantics.category.value!==intent.patch.categoryId)delete patch.subcategoryId;
+   delete patch.comment;delete patch.reviewRequested;
+   if(('kind'in patch||'role'in patch)&&!allowedOperationRoles((patch.kind??op.semantics.kind.value) as Kind,effective(op).amountMinor).includes((patch.role??op.semantics.role.value) as Role)){delete patch.kind;delete patch.role;}
+   const role=patch.role??op.semantics.role.value;
+   const category=graph.categories.find(c=>c.id===('categoryId'in patch?patch.categoryId:op.semantics.category.value));
+   const child=graph.categories.find(c=>c.id===('subcategoryId'in patch?patch.subcategoryId:op.semantics.subcategory.value));
+   const fits=(c:Category|undefined)=>!c||!['expense','income'].includes(String(role))||c.role==='both'||c.role===role;
+   if(!fits(category)||!fits(child)||child&&child.parentId!==category?.id){delete patch.categoryId;delete patch.subcategoryId;delete patch.role;delete patch.kind;}
+  }
   if(projection.get(id)!.decompositionActive&&['role','categoryId','subcategoryId'].some(k=>k in patch))throw new HttpError(409,'BULK_COMPONENT_REVIEW_REQUIRED');
   return {id,patch};
  });

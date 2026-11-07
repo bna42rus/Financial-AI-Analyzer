@@ -6,3 +6,12 @@
 .content { background:var(--color-surface); }
 .child { margin-left:14px; padding-left:12px; border-left:2px solid var(--color-soft); }
 @media(max-width:540px) { .tools { grid-template-columns:minmax(0,1fr) auto; }.tools>.search { grid-column:1/-1; } }
+.tree{margin:0}
+.rootLine{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;background:var(--color-surface)}
+.heading{padding:10px 12px}
+.edit{display:grid;place-items:center;margin-right:7px;width:36px;height:36px;border:0;border-radius:7px;background:transparent;color:var(--color-text)}
+.edit:hover{background:var(--color-soft)}
+.edit:disabled{opacity:.55}
+.child{border-left:0;margin-left:12px;padding-left:8px}
+.child+.child{border-top:1px solid var(--color-border)}
+.footer{margin-top:12px}

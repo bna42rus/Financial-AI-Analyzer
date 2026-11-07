@@ -16,9 +16,8 @@ function Counts({rows,operations}:{rows:Pick<RowCounts,'rowsFound'|'removed'>&Pa
  if(rows.pending)facts.push(['В обработке',rows.pending]);
  return <dl className={styles.counts}>{facts.map(([label,value])=><div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>;
 }
-export function ImportHistoryView({history,report,accounts,timezone,value,onChange,onSelect,onMore,onOperations,onCancel,disabled,reasons}:{history:ImportHistory;report:ImportReport|null;accounts:FinanceState['accounts'];timezone:string;value:string[];onChange:(v:string[])=>void;onSelect:(id:string)=>void;onMore:()=>void;onOperations:(id?:string)=>void;onCancel:(id?:string)=>void;disabled:boolean;reasons:Record<string,string>}){
+export function ImportHistoryView({history,report,timezone,value,onChange,onSelect,onMore,onOperations,onCancel,disabled,reasons}:{history:ImportHistory;report:ImportReport|null;accounts:FinanceState['accounts'];timezone:string;value:string[];onChange:(v:string[])=>void;onSelect:(id:string)=>void;onMore:()=>void;onOperations:(id?:string)=>void;onCancel:(id?:string)=>void;disabled:boolean;reasons:Record<string,string>}){
  const date=(value:string)=>new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:timezone}).format(new Date(value));
- const account=(id:string)=>accounts.find(a=>a.id===id)?.name??'Счёт';
  return <div className={styles.importGrid}>
   <section className={layout.settingsBox} aria-label="История загрузок"><div className={layout.filterField}><span>Статус загрузки</span><SearchFilter label="Все статусы" options={statuses} value={value} onChange={onChange} disabled={disabled}/></div>
    {history.batches.length?<ul className={styles.history}>{history.batches.map(b=><li key={b.batchId}><button type="button" disabled={disabled} aria-pressed={report?.batchId===b.batchId} onClick={()=>onSelect(b.batchId)}><strong>{date(b.createdAt)}</strong><span>{labels[b.status]}</span><small>Файлов: {b.files} · строк: {b.rowsFound}</small></button></li>)}</ul>:<p>Нет загрузок по выбранным статусам.</p>}
@@ -27,10 +26,8 @@ export function ImportHistoryView({history,report,accounts,timezone,value,onChan
   <section className={layout.settingsBox} aria-label="Результат загрузки">{report?<>
    <h3>Загрузка от {date(report.createdAt)}</h3><p role="status" className={layout.statusPill}>{labels[report.status]}</p>
    <Counts rows={report.counts} operations={report.transactionCounts}/>
-   {!!report.accounts?.length&&<div className={layout.sublist}>{report.accounts.map(a=><details key={a.accountId}><summary>{account(a.accountId)}{report.newAccountIds.includes(a.accountId)?' · Новый счёт':''}</summary><Counts rows={a.counts} operations={a.transactionCounts}/></details>)}</div>}
    {!!report.files.length&&<details className={layout.settingsBox}><summary>Файлы загрузки · {report.files.length}</summary><div className={layout.sublist}>{report.files.map((f,i)=><details key={f.fileId}><summary>{bankNames[f.bank]??f.bank} · Файл {i+1}{f.cancelledAt?' · Отменён':''}</summary>
     <Counts rows={f.counts} operations={f.transactionCounts}/>
-    {f.accounts?.map(a=><details key={a.accountId}><summary>{account(a.accountId)}</summary><Counts rows={a.counts} operations={a.transactionCounts}/></details>)}
     {!!f.issues.length&&<details><summary>Ошибки строк · {f.issues.length}</summary><ul>{f.issues.map(issue=><li key={issue.ordinal}>Строка {issue.ordinal}: {reasons[issue.code]??'Не удалось проверить данные'}</li>)}</ul></details>}
     {f.blocked&&<p>Проверьте файл на устройстве и загрузите заново.</p>}
     <div className={layout.cardActions}>{!!f.operationIds?.length&&<button className={common.button} disabled={disabled} onClick={()=>onOperations(f.fileId)}>Открыть операции файла</button>}{!f.cancelledAt&&<button className={common.dangerButton} disabled={disabled} onClick={()=>onCancel(f.fileId)}>Отменить файл</button>}</div>

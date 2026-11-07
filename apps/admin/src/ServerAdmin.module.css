@@ -6,3 +6,19 @@
 .nav button{border-color:transparent;padding:.55rem .75rem}
 .nav button[aria-pressed=true]{background:var(--color-soft)}
 @media(max-width:540px){.nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
+.environment{margin:0 0 12px;color:var(--color-warning-text);font-size:.875rem}
+.workspace{display:grid;grid-template-columns:218px minmax(0,1fr);align-items:start;gap:18px}
+.workspace .nav{position:sticky;top:12px;display:grid;gap:4px;padding:6px}
+.nav a{display:flex;align-items:center;gap:9px;padding:9px 10px;color:var(--color-text);text-decoration:none;border-radius:7px;font-size:.9rem}
+.nav a:hover,.nav a[aria-current=page]{background:var(--color-soft);color:var(--color-primary)}
+.main{min-width:0}
+.sectionHead,.paymentHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.sectionHead{margin-bottom:12px}
+.sectionHead h1{margin:0;font-size:1.5rem}
+.filters{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.filters>*:first-child{flex:1;min-width:9rem}
+.filters select{max-width:100%;border:1px solid var(--color-border);background:var(--color-surface);color:var(--color-text);padding:7px 10px;border-radius:8px;font:inherit}
+.paymentList{max-height:58dvh;overflow:auto;overscroll-behavior:contain}
+.paymentHead .badge,.paymentHead .attention{padding:4px 8px;border-radius:6px;font-size:.8125rem;background:var(--color-soft);color:var(--color-primary)}
+.paymentHead .attention{background:var(--color-warning-surface);color:var(--color-warning-text)}
+@media(max-width:800px){.workspace{grid-template-columns:minmax(0,1fr)}.workspace .nav{position:static;display:flex;flex-wrap:wrap}.nav a{padding:8px}}

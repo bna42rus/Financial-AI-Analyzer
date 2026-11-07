@@ -66,3 +66,7 @@
 .impactStack summary { cursor:pointer; }
 .impactWarning { padding:10px 12px; border-radius:8px; color:var(--color-warning); background:var(--color-warning-surface); }
 .narrowDialog{width:min(100% - 2rem,32rem)}
+.plainPreview{display:grid;gap:8px}
+.plainPreview p{margin:0 0 7px}
+.preview dl>div:last-child,.delta>div:last-child{border-bottom:0}
+.bulkDetails ul{max-height:min(42dvh,26rem);overflow:auto;overscroll-behavior:contain}

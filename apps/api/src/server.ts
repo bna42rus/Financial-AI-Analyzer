@@ -1,3 +1,4 @@
+import {MailCooldownError} from './mail-cooldown.ts';
 import {historicalRuleCandidates} from './finance-rules.ts';
 import {assistantWorkflowVersion} from './assistant-workflow.ts';
 import 'reflect-metadata';
@@ -20,9 +21,13 @@ import type { Config } from './types.ts';
 import { isAssistantProvider } from './analyzer-assistant-provider.ts';
 import { isCloudTaskProvider } from './analyzer-task-provider.ts';
 
+import {accountLegal,recordLegal} from './launch-legal.ts';
+import {checkoutAccountState,disableAutoRenewal,firstCheckoutState,quoteAccess,startAccessCheckout,startFirstCheckout,disableFirstAutoRenewal,syncAccessCheckout} from './access-checkout.ts';
+
 export async function createServer(config: Config) {
   if (config.assistantProvider && (config.profile !== 'finance' || !['test','staging'].includes(config.environment) || !isAssistantProvider(config.assistantProvider) || config.environment !== config.assistantProvider.environment || config.assistantProvider.pool !== config.pool || config.taskProvider || config.yandexAnalyzer || config.analyzerAdapter)) throw new Error('Assistant provider requires explicit matching acceptance configuration');
   if (config.taskProvider && (config.profile !== 'finance' || config.environment !== 'test' || !isCloudTaskProvider(config.taskProvider) || config.taskProvider.pool !== config.pool)) throw new Error('Task provider requires isolated test acceptance');
+  if (config.accessPayments && (config.profile!=='finance'||config.accessPayments.test!==true||!['test','staging'].includes(config.environment)))throw Error('Access checkout requires an isolated test shop');
   if (!['development', 'test', 'staging'].includes(config.environment)) throw new Error('Production requires separate security and release acceptance');
   if (config.environment === 'staging' && !isKmsKey(config.kmsKey, 'staging/' + config.profile, config.wrappingKey)) throw new Error('Staging requires its own KMS key');
   try {
@@ -189,6 +194,25 @@ export async function createServer(config: Config) {
         if(path==='/account/name')result=await accountProfile!.saveAccountName(db,s.user.id,fields(request,['name']).name);
         else if(path==='/account/timezone')result=await financialProfile!.financeProfile(db,s.user.id,fields(request,['timezone']));
         else result=await accountProfile!.accountEmail(db,{id:s.user.id,email:s.user.email,sessionId:s.session.id},fields(request,path.endsWith('-request')?['email','password']:['code']),seal);
+      } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable'].includes(path)&&request.method==='POST'))){
+        const u=await current(auth,request);if(!u||!u.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
+        await db.query("SELECT set_config('app.user_id',$1,true)",[u.user.id]);
+        if(path==='/access/billing')result=await checkoutAccountState(db,u.user.id,config.accessPayments);
+        else if(path==='/access/billing-quote')result=await quoteAccess(db,u.user.id,fields(request,['tariffId']),config.accessPayments);
+        else if(path==='/access/billing-create')result=await startAccessCheckout(db,u.user,request.body,config.accessPayments,config.launchLegal);
+        else if(path==='/access/billing-sync')result=await syncAccessCheckout(db,string(fields(request,['id']).id,36),u.user,config.accessPayments,seal);
+        else {fields(request,[]);result=await disableAutoRenewal(db,u.user.id);}
+      } else if(application&&((path==='/access/first-checkout'&&request.method==='GET')||(['/access/first-checkout-create','/access/first-checkout-sync','/access/first-checkout-disable'].includes(path)&&request.method==='POST'))){
+        const row=await application.ownedApplication(db,config,request);
+        if(path==='/access/first-checkout')result=await firstCheckoutState(db,row,config.accessPayments);
+        else if(path==='/access/first-checkout-disable'){fields(request,[]);result=await disableFirstAutoRenewal(db,row);}
+        else if(path==='/access/first-checkout-create')result=await startFirstCheckout(db,row,request.body,config.accessPayments);
+        else result=await syncAccessCheckout(db,string(fields(request,['id']).id,36),row,config.accessPayments,seal);
+      } else if (config.profile==='finance'&&((path==='/access/legal'&&request.method==='GET')||(path==='/access/legal-accept'&&request.method==='POST'))) {
+        const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
+        await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
+        if(request.method==='POST'){const b=fields(request,['document','version']);await recordLegal(db,s.user.id,b.document,b.version);}
+        result=await accountLegal(db,s.user.id);
       } else if (path === '/session' && request.method === 'GET') {
         if (config.profile === 'control') {
           const s = await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']);
@@ -202,6 +226,9 @@ export async function createServer(config: Config) {
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
           result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:await financialProfile!.financialTimezone(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
+      } else if(config.profile==='control'&&path==='/control/access-checkouts'&&request.method==='GET'){
+        await requireAdmin(auth,db,request);
+        result={orders:(await db.query('SELECT * FROM commerce.control_checkout_queue()')).rows};
       } else if(config.profile==='control'&&path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)){
         const s=await requireAdmin(auth,db,request);
         if(request.method==='POST'){result=await updateCommerceCatalog(db,request.body);await event(db,'control',s.user.id,'commerce_catalog_updated');}
@@ -209,7 +236,7 @@ export async function createServer(config: Config) {
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
         await requireAdmin(auth,db,request);result=await mailQueue(db);
       } else if (config.profile==='control'&&path==='/control/delivery-retry'&&request.method==='POST'){
-        const s=await requireAdmin(auth,db,request);result=await retryMail(db,request,s.user.id);
+        const s=await requireAdmin(auth,db,request);result=await retryMail(db,request,s.user.id,seal);
       } else if (config.profile==='control'&&path==='/control/invitation-resend'&&request.method==='POST'){
         const s=await requireAdmin(auth,db,request);result=await resendInvitation(db,request,s.user.id,seal);
       } else if (manual && path==='/control/accesses' && request.method==='GET') {
@@ -228,6 +255,7 @@ export async function createServer(config: Config) {
         await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
         const state=(await db.query('SELECT CASE WHEN c.user_id IS NOT NULL THEN c.indefinite ELSE s.indefinite END AS indefinite FROM identity.security_state s LEFT JOIN commerce.access_cycle c USING(user_id) WHERE s.user_id=$1',[s.user.id])).rows[0];
         if(!state||state.indefinite&&path!=='/access/renewal')throw new HttpError(409,'CYCLE_UNAVAILABLE');
+        if(config.accessPayments&&path!=='/access/renewal')throw new HttpError(409,'PAYMENT_CHANNEL_CHANGED');
         result=path==='/access/renewal'?await renewalApplication.ownRenewal(db,s.user.id):await renewalApplication.renewalApplication(db,request,s.user,seal,path.slice('/access/renewal-'.length) as 'create'|'change'|'cancel'|'claim');
       } else if (finance && ['/finance/profile','/finance/assistant-profile','/finance/analyzer-state','/finance/analyzer-answer-rows','/finance/ai-packages','/finance/ai-topup','/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel','/finance/analyzer-chat','/finance/analyzer-query','/finance/analyzer-propose','/finance/overview','/finance/overview-views','/finance/budgets','/finance/operations-page','/finance/operations-selection','/finance/operations-views','/finance/state','/finance/epoch','/finance/summary','/finance/operation','/finance/rule-candidates','/finance/preview','/finance/commit','/finance/edit','/finance/history','/finance/history-query','/finance/import-context','/finance/import-validation','/finance/import-accept','/finance/import-status','/finance/imports','/finance/classification','/finance/review-queue','/finance/review-sessions','/finance/review-command'].includes(path)) {
         const methodAllowed=path==='/finance/imports'?['GET','POST'].includes(request.method):['/finance/state','/finance/history','/finance/epoch'].includes(path)?request.method==='GET':request.method==='POST';
@@ -298,9 +326,9 @@ export async function createServer(config: Config) {
       } else if (registration && path==='/access/registration-proof' && request.method==='POST') {
         result=await registration.requestRegistrationProof(db,request,seal);status=202;
       } else if (registration && path==='/access/register' && request.method==='POST') {
-        result=await registration.register(db,request,seal);status=201;
+        result=await registration.register(db,request,seal,config.launchLegal);status=201;
       } else if (application && path==='/access/tariffs' && request.method==='GET') {
-        result={tariffs:(await db.query("SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'publicVisible'='true' AND snapshot->>'availableForNew'='true' ORDER BY id")).rows.map(r=>r.snapshot)};
+        result={tariffs:(await db.query("SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'publicVisible'='true' AND snapshot->>'availableForNew'='true' ORDER BY CASE WHEN snapshot->'duration'->>'kind'='days' THEN (snapshot->'duration'->>'count')::int ELSE (snapshot->'duration'->>'count')::int*31 END,id")).rows.map(r=>r.snapshot)};
       } else if (path === '/security/sessions' && request.method === 'GET') {
         const s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
@@ -312,13 +340,14 @@ export async function createServer(config: Config) {
         if (!revoked.rowCount) throw new HttpError(404, 'NOT_FOUND');
         await event(db, schema, s.user.id, 'session_revoked'); result = { status: 'revoked' };
       } else if (application && path === '/access/requests' && request.method === 'POST') {
-        result = await application.createApplication(db, request, seal); status = 202;
+        result = await application.createApplication(db, request, seal,config.launchLegal); status = 202;
       } else if (application && path === '/access/verify' && request.method === 'POST') {
         const verified = await application.verifyApplication(db, request); result = { status: 'verified' }; cookies = [application.appCookie(config, verified.session)];
       } else if (application && path === '/access/request' && request.method === 'GET') {
         if (request.url.includes('?')) throw new HttpError(400, 'INVALID_INPUT');
         result = { request: application.publicRequest(await application.ownedApplication(db, config, request)) };
       } else if (application && path === '/access/payment-claim' && request.method === 'POST') {
+        if(config.accessPayments)throw new HttpError(409,'PAYMENT_CHANNEL_CHANGED');
         result = { request: await application.applicationClaim(db, config, request, seal) };
       } else throw new HttpError(404, 'NOT_FOUND');
       await db.query('COMMIT'); db.release(); db = undefined;
@@ -329,7 +358,8 @@ export async function createServer(config: Config) {
       // No raw credentials, identifiers, payloads, SQL errors or reset links in responses/logs.
       const code=error instanceof HttpError ? error.code : 'REQUEST_FAILED';
       const recovery=code==='IMPORT_CONTEXT_CHANGED'?'Данные были сброшены на другом устройстве. Загрузите файл заново.':code==='IMPORT_CONTEXT_EXPIRED'?'Срок подготовки загрузки истёк. Загрузите файл заново.':undefined;
-      return reply.code(error instanceof HttpError ? error.status : 400).send({code,...(error instanceof LinkEditError?{linkIndex:error.linkIndex}:{}),...(recovery?{message:recovery}:{})});
+      if(error instanceof MailCooldownError)reply.header('retry-after',String(error.retryAfterSeconds));
+      return reply.code(error instanceof HttpError ? error.status : 400).send({code,...(error instanceof MailCooldownError?{retryAfterSeconds:error.retryAfterSeconds}:{}),...(error instanceof LinkEditError?{linkIndex:error.linkIndex}:{}),...(recovery?{message:recovery}:{})});
     }
   };
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});

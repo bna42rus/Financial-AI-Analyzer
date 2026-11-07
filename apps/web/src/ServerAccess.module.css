@@ -37,3 +37,44 @@
 .registrationSteps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.55rem;font-size:.875rem}
 .registrationSteps li{padding:.65rem;border:1px solid var(--color-border);border-radius:.6rem;color:var(--color-secondary-text)}
 .registrationSteps li[aria-current=step]{background:var(--color-soft);color:var(--color-primary);font-weight:650}
+.legalChoice { display:grid; grid-template-columns:auto 1fr; gap:8px; align-items:start; margin:8px 0; }
+.legalChoice input[type=checkbox] { width:auto; margin:3px 0; }
+.legalChoice label { display:block; }
+
+.entryPage{display:flex;flex-direction:column;max-width:1060px;min-height:100dvh}
+.entryPage>footer{margin-top:auto}
+.entryNav{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+.entryCard,.authWrap{width:100%;max-width:540px;margin:18px auto 32px}
+.authWrap .card{margin-bottom:12px}
+.entryFootnote{text-align:center;color:var(--color-secondary-text)}
+.entryIcon{display:grid;place-items:center;width:44px;height:44px;margin-bottom:14px;border-radius:11px;color:var(--color-primary);background:var(--color-soft)}
+.entryCard h1{margin-bottom:10px}
+.entryCard .legalChoice label,.renewalBody .legalChoice label{margin:0;font-weight:400}
+.entryCard .legalChoice input,.renewalBody .legalChoice input{min-width:auto;width:auto}
+.checkoutFacts{margin:14px 0 18px}
+.checkoutFacts>div{display:flex;justify-content:space-between;gap:12px;padding:9px 0}
+.checkoutFacts>div+div{border-top:1px solid var(--color-border)}
+.checkoutFacts dt{color:var(--color-secondary-text)}
+.checkoutFacts dd{margin:0;text-align:right;overflow-wrap:anywhere;font-weight:600}
+.landing{max-width:690px;margin:clamp(30px,9vw,110px) 0 clamp(50px,12vw,145px);padding:0 4px}
+.landing h1{font-size:clamp(2.25rem,6vw,4.35rem);letter-spacing:-.055em;line-height:1.02;margin:.2em 0 .32em}
+.landing p:not(.eyebrow){max-width:34em;font-size:1.15rem;line-height:1.5;color:var(--color-secondary-text)}
+.landing .eyebrow{color:var(--color-primary);font-weight:700}
+.landing .primary{gap:8px}
+.entryPage .error{background:var(--color-danger-surface,var(--color-surface));color:var(--color-danger);border:1px solid var(--color-danger)}
+@media(max-width:480px){.entryCard,.authWrap{margin-top:6px}.entryNav{gap:8px}.entryPage .header{margin-bottom:12px}.entryCard .actions>*{flex-basis:auto}}
+.landing{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(270px,.75fr);gap:clamp(24px,4vw,64px);align-items:center;max-width:none}
+.landing h1{font-size:clamp(2.35rem,5.05vw,4.1rem)}
+.landingPreview{background:var(--color-surface);border:1px solid var(--color-border);border-radius:17px;padding:20px;box-shadow:0 14px 38px var(--color-shadow)}
+.landingPreviewHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.landingPreviewHead>span{font-size:.75rem;color:var(--color-primary);background:var(--color-soft);border-radius:6px;padding:4px 7px}
+.previewTotal{display:block;font-size:1.85rem;margin:7px 0 10px}
+.previewBars{display:flex;gap:8px;align-items:end;height:110px;padding:0 2px 5px}
+.previewBars i{flex:1;border-radius:5px 5px 2px 2px;background:var(--color-soft)}
+.previewBars i:nth-child(2n){background:var(--color-primary);opacity:.75}
+.previewBreakdown{margin:10px 0 0}
+.previewBreakdown>div{display:flex;justify-content:space-between;gap:10px;padding:8px 0}
+.previewBreakdown>div+div{border-top:1px solid var(--color-border)}
+.previewBreakdown dt{color:var(--color-secondary-text)}
+.previewBreakdown dd{margin:0;font-weight:600}
+@media(max-width:760px){.landing{grid-template-columns:minmax(0,1fr);margin-block:40px}.landingPreview{max-width:450px}}

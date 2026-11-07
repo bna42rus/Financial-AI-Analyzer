@@ -1,5 +1,5 @@
 export type NavigationPreferences={startScreen:'overview'|'operations'|'analyzer'|'last';defaultPeriod:'all'|'current_month'|'last_30_days'|'current_year'};
-export const defaultNavigationPreferences:NavigationPreferences={startScreen:'overview',defaultPeriod:'all'};
+export const defaultNavigationPreferences:NavigationPreferences={startScreen:'overview',defaultPeriod:'current_month'};
 const key='finance-navigation-v1',lastKey='finance-last-screen-v1';
 const mainScreens=['overview','operations','analyzer'] as const;
 export function parseNavigationPreferences(value:unknown):NavigationPreferences{
@@ -9,7 +9,7 @@ export function parseNavigationPreferences(value:unknown):NavigationPreferences{
  return {startScreen:v.startScreen,defaultPeriod:v.defaultPeriod} as NavigationPreferences;
 }
 export function readNavigationPreferences(){try{return parseNavigationPreferences(JSON.parse(localStorage.getItem(key)??'null'));}catch{return {...defaultNavigationPreferences};}}
-export function saveNavigationPreferences(value:NavigationPreferences){try{const v=parseNavigationPreferences(value);if(v.startScreen==='overview'&&v.defaultPeriod==='all'){localStorage.removeItem(key);localStorage.removeItem(lastKey);}else{localStorage.setItem(key,JSON.stringify(v));if(v.startScreen!=='last')localStorage.removeItem(lastKey);}}catch{/* Optional device preferences never block finance. */}}
+export function saveNavigationPreferences(value:NavigationPreferences){try{const v=parseNavigationPreferences(value);if(v.startScreen==='overview'&&v.defaultPeriod===defaultNavigationPreferences.defaultPeriod){localStorage.removeItem(key);localStorage.removeItem(lastKey);}else{localStorage.setItem(key,JSON.stringify(v));if(v.startScreen!=='last')localStorage.removeItem(lastKey);}}catch{/* Optional device preferences never block finance. */}}
 export function resetNavigationPreferences(){try{localStorage.removeItem(key);localStorage.removeItem(lastKey);}catch{/* Memory state can still reset. */}}
 export function rememberMainScreen(value:NavigationPreferences,screen:string){if(value.startScreen!=='last'||!mainScreens.includes(screen as typeof mainScreens[number]))return;try{localStorage.setItem(lastKey,screen);}catch{/* No financial values are persisted. */}}
 export function initialFinanceHash(hash:string,value:NavigationPreferences,last?:string|null){

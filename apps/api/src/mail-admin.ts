@@ -1,3 +1,4 @@
+import {reserveMailRequest} from './mail-cooldown.ts';
 import type {PoolClient} from 'pg';
 import type {FastifyRequest} from 'fastify';
 import {fields,string,HttpError,outbox} from './types.ts';
@@ -9,13 +10,14 @@ export async function mailQueue(db:PoolClient){
  return {deliveries:deliveries.map(r=>({...r,canRetry:r.sourceSchema==='access'&&r.state==='failed'&&retryKinds.includes(r.kind)&&!['STALE','DELIVERY_UNKNOWN','INVALID_PAYLOAD'].includes(r.lastError)})),
   audit:(await db.query('SELECT action_id AS "actionId",delivery_id AS "deliveryId",reason,created_at AS "createdAt" FROM mail.resend_audit ORDER BY created_at DESC LIMIT 100')).rows};
 }
-export async function retryMail(db:PoolClient,request:FastifyRequest,actorId:string){
+export async function retryMail(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer){
  const b=fields(request,['actionId','deliveryId','reason']),id=actionId(b.actionId),delivery=actionId(b.deliveryId),reason=string(b.reason,1000).trim();
  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['mail-retry:'+delivery]);
  if(await remember(db,id,actorId,{kind:'mail_retry',delivery,reason}))return {status:'already_committed',...await mailQueue(db)};
  if(!(await db.query('SELECT mail.retry_delivery($1::uuid) AS changed',[delivery])).rows[0].changed)throw new HttpError(409,'DELIVERY_UNAVAILABLE');
+ const retryAfterSeconds=await reserveMailRequest(db,seal,'control','delivery-retry',delivery);
  await db.query('INSERT INTO mail.resend_audit(action_id,actor_id,delivery_id,reason) VALUES($1,$2,$3,$4)',[id,actorId,delivery,reason]);
- return {status:'queued',...await mailQueue(db)};
+ return {status:'queued',retryAfterSeconds,...await mailQueue(db)};
 }
 /** An intentional resend keeps the current invite/token/lifetime and creates a new delivery. */
 export async function resendInvitation(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer){
@@ -29,7 +31,8 @@ export async function resendInvitation(db:PoolClient,request:FastifyRequest,acto
  const invite=(await db.query(`SELECT i.email,i.sealed_token,i.expires_at FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE i.id=$1 AND i.state='active' AND i.expires_at>clock_timestamp() AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp())) FOR UPDATE OF i`,[invitationId])).rows[0];
  if(!invite)throw new HttpError(409,'INVITATION_UNAVAILABLE');
  if((await db.query("SELECT 1 FROM mail.delivery WHERE kind='invitation' AND subject_id=$1 AND state='queued'",[invitationId])).rowCount)throw new HttpError(409,'DELIVERY_UNAVAILABLE');
+ const retryAfterSeconds=await reserveMailRequest(db,seal,'control','invitation-resend',invite.email);
  const delivery=await outbox(db,'access',seal,'invitation',{email:invite.email,token:seal.open(invite.sealed_token),expiresAt:invite.expires_at.toISOString()},{subjectId:invitationId,expiresAt:invite.expires_at.toISOString()});
  await db.query('INSERT INTO mail.resend_audit(action_id,actor_id,delivery_id,reason) VALUES($1,$2,$3,$4)',[id,actorId,delivery,reason]);
- return {status:'queued'};
+ return {status:'queued',retryAfterSeconds};
 }

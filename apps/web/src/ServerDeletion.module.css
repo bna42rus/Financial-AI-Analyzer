@@ -34,3 +34,6 @@
 .body .checkbox input { margin:0; }
 .content :is(input,select,fieldset)[aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
 .fieldError { color:var(--color-danger,#b4233b); }
+.datePair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.helper{margin:-7px 0 2px;color:var(--color-secondary-text);font-size:.875rem}
+@media(max-width:420px){.datePair{grid-template-columns:minmax(0,1fr)}}

@@ -12,5 +12,5 @@ test('initial period uses the user date and is inclusive across month/year bound
  expect(initialPeriod('last_30_days',now,'Asia/Vladivostok')).toEqual({from:'2025-12-03',through:'2026-01-01'});expect(initialPeriod('all',now,'Etc/UTC')).toEqual({from:'',through:''});
 });
 test('a corrupt or widened preference cannot become a route, filter or record store',()=>{
- for(const v of [null,[],{startScreen:'https://example.test',defaultPeriod:'all'},{startScreen:'overview',defaultPeriod:'fixed',from:'2026-01-01'},{startScreen:'overview',defaultPeriod:'all',operationIds:['x']}])expect(parseNavigationPreferences(v)).toEqual({startScreen:'overview',defaultPeriod:'all'});
+ for(const v of [null,[],{startScreen:'https://example.test',defaultPeriod:'all'},{startScreen:'overview',defaultPeriod:'fixed',from:'2026-01-01'},{startScreen:'overview',defaultPeriod:'all',operationIds:['x']}])expect(parseNavigationPreferences(v)).toEqual({startScreen:'overview',defaultPeriod:'current_month'});
 });

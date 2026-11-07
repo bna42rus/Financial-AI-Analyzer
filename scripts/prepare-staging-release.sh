@@ -4,9 +4,11 @@ repo=${1:?checkout required}
 sha=${2:?commit required}
 extra=()
 resume_ai=false
+full_staging=false
 shift 2
 while (($#)); do
   case "$1" in
+    --full-staging) full_staging=true; extra+=("$1"); shift ;;
     --resume-ai) resume_ai=true; extra+=("$1"); shift ;;
     --monthly-ai-budget=100) extra+=("$1"); shift ;;
     --enable-classification|--keep-ai-paused|--preserve-active-ai) extra+=("$1"); shift ;;
@@ -23,6 +25,10 @@ trap 'rm -rf -- "$build"' EXIT
 git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
 api_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-api-origin)
 (cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")
+if "$full_staging"; then
+  control_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-control-origin)
+  (cd "$build" && VITE_API_ORIGIN="$control_origin" node scripts/build-connected-web.mjs control "$sha")
+fi
 sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --source "$build" --sha "$sha" "${extra[@]}"
 if "$resume_ai"; then
   echo 'Проверяем итоговый статус ИИ и незавершённые квитанции; платных запросов: 0.'

@@ -10,9 +10,10 @@ type RoleDecision={kind:'operation'|'component';id:string;role:Role};
 type CategoryOptions={roleDecisions:RoleDecision[];childRoles:{id:string;role:Category['role']}[];targetRole?:Category['role']};
 type PartyAssignment={id:string;counterpartyId:string|null};
 type NewParty={id:string;name:string;state:'registered'|'ignored';isSelf:boolean};
-export type EntityIntent=({kind:'merge_categories';id:string;sourceIds:string[]}|{kind:'delete_category';id:string;replacementId:string|null}|{kind:'migrate_category';id:string;parentId:string|null;role:Category['role']})&CategoryOptions|{kind:'merge_counterparties';id:string;sourceIds:string[]}|{kind:'split_counterparty';id:string;newParties:NewParty[];observations:PartyAssignment[];operations:PartyAssignment[];aliases:PartyAssignment[]}|{kind:'delete_counterparty';id:string};
+export function counterpartyNameKey(name:string){return name.normalize('NFKC').trim().replace(/\s+/gu,' ').toLocaleLowerCase('ru-RU');}
+export type EntityIntent=({kind:'merge_categories';id:string;sourceIds:string[]}|{kind:'delete_category';id:string;replacementId:string|null}|{kind:'migrate_category';id:string;parentId:string|null;role:Category['role']})&CategoryOptions|{kind:'merge_counterparties';id:string;sourceIds:string[]}|{kind:'split_counterparty';id:string;newParties:NewParty[];observations:PartyAssignment[];operations:PartyAssignment[];aliases:PartyAssignment[]}|{kind:'delete_counterparty';id:string}|{kind:'transfer_counterparty_operations';id:string;targetId:string;operationIds:string[]};
 export type EntityUndo={table:'entities';id:string;before:Record<string,unknown>;details:Record<string,unknown>};
-const kinds=['merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty'] as const;
+const kinds=['merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','transfer_counterparty_operations'] as const;
 export function isEntityKind(kind:string):kind is EntityIntent['kind'] {return (kinds as readonly string[]).includes(kind);}
 function list(v:unknown,min=0,max=10000):unknown[]{if(!Array.isArray(v)||v.length<min||v.length>max)throw new TypeError('INVALID_SELECTION');return v;}
 function unique(ids:string[]){if(new Set(ids).size!==ids.length)throw new TypeError('DUPLICATE_SELECTION');return ids;}
@@ -20,7 +21,7 @@ function bool(v:unknown){if(typeof v!=='boolean')throw new TypeError('INVALID_BO
 const nullableId=(v:unknown)=>v===null?null:uuid(v);
 function partyAssignments(v:unknown,nullable=false){const r=list(v).map(v=>{const a=object(v,['id','counterpartyId']);return {id:uuid(a.id),counterpartyId:nullable?nullableId(a.counterpartyId):uuid(a.counterpartyId)};});unique(r.map(a=>a.id));return r;}
 export function parseEntityIntent(value:unknown):EntityIntent {
- const r=object(value,['kind','id','sourceIds','replacementId','parentId','role','targetRole','childRoles','roleDecisions','newParties','observations','operations','aliases']),kind=choice(r.kind,kinds),id=uuid(r.id);
+ const r=object(value,['kind','id','sourceIds','replacementId','parentId','role','targetRole','childRoles','roleDecisions','newParties','observations','operations','aliases','targetId','operationIds']),kind=choice(r.kind,kinds),id=uuid(r.id);
  if(['merge_categories','delete_category','migrate_category'].includes(kind)){
   const roleDecisions=list(r.roleDecisions??[]).map(v=>{const a=object(v,['kind','id','role']);return {kind:choice(a.kind,['operation','component']),id:uuid(a.id),role:choice(a.role,['expense','income','neutral','unresolved'])};});unique(roleDecisions.map(r=>r.kind+':'+r.id));
   const childRoles=list(r.childRoles??[]).map(v=>{const a=object(v,['id','role']);return {id:uuid(a.id),role:choice(a.role,['expense','income','both'])};});unique(childRoles.map(r=>r.id));
@@ -30,6 +31,7 @@ export function parseEntityIntent(value:unknown):EntityIntent {
   object(value,['kind','id','parentId','role','childRoles','roleDecisions']);return {kind:'migrate_category',id,parentId:nullableId(r.parentId),role:choice(r.role,['expense','income','both']),...options};
  }
  if(kind==='merge_counterparties'){object(value,['kind','id','sourceIds']);const sourceIds=unique(list(r.sourceIds,1,30).map(uuid));if(sourceIds.includes(id))throw new TypeError('SELF_MERGE');return {kind,id,sourceIds};}
+ if(kind==='transfer_counterparty_operations'){object(value,['kind','id','targetId','operationIds']);const targetId=uuid(r.targetId);if(targetId===id)throw new HttpError(409,'INVALID_DESTINATION');return {kind,id,targetId,operationIds:unique(list(r.operationIds,1,1000).map(uuid))};}
  if(kind==='delete_counterparty'){object(value,['kind','id']);return {kind,id};}
  object(value,['kind','id','newParties','observations','operations','aliases']);const newParties=list(r.newParties,1,9).map(v=>{const a=object(v,['id','name','state','isSelf']),name=safeText(a.name,160);if(!name)throw new TypeError('EMPTY_NAME');return {id:a.id===undefined?randomUUID():uuid(a.id),name,state:choice(a.state,['registered','ignored']),isSelf:bool(a.isSelf)};});unique([id,...newParties.map(p=>p.id)]);
  return {kind:'split_counterparty',id,newParties,observations:partyAssignments(r.observations),operations:partyAssignments(r.operations,true),aliases:partyAssignments(r.aliases)};
@@ -55,6 +57,7 @@ async function partyAliases(db:PoolClient,userId:string){return (await db.query<
 async function writeOperation(db:PoolClient,userId:string,row:OperationRow){await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,row.id,JSON.stringify(row.semantics),JSON.stringify(row.review_reasons)]);}
 async function writeRule(db:PoolClient,userId:string,r:RuleRow){await db.query('UPDATE finance.rule SET conditions=$3,assignments=$4,enabled=$5,dependency_status=$6,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,r.id,JSON.stringify(r.conditions),JSON.stringify(r.assignments),r.enabled,r.dependency_status]);}
 function allows(role:string,c:Category){return !['expense','income'].includes(role)||c.role==='both'||c.role===role;}
+function categoryCovers(target:Category,source:Category){return target.role==='both'||target.role===source.role;}
 function compatible(categories:Category[],role:string,categoryId:string|null,subcategoryId:string|null){const c=categories.find(c=>c.id===categoryId),s=categories.find(c=>c.id===subcategoryId);return (categoryId===null||!!c&&c.parentId===null&&allows(role,c))&&(subcategoryId===null||!!s&&s.parentId===c?.id&&allows(role,s));}
 function same(a:unknown,b:unknown){return JSON.stringify(a)===JSON.stringify(b);}
 export async function applyEntity(db:PoolClient,userId:string,intent:EntityIntent,graph:Graph):Promise<EntityUndo>{
@@ -65,13 +68,14 @@ async function applyCategory(db:PoolClient,userId:string,intent:Extract<EntityIn
  const old=graph.categories,category=(id:string)=>{const c=old.find(c=>c.id===id);if(!c)throw new HttpError(404,'NOT_FOUND');return c;},original=category(intent.id),next=structuredClone(old),removed=new Set<string>(),touched=new Set<string>([intent.id]),rootMap=new Map<string,string|null>(),leafMap=new Map<string,string|null>();
  let target:Category|null=null;
  if(intent.kind==='migrate_category'){
-  if(intent.parentId!==null){const parent=category(intent.parentId);if(parent.parentId!==null||parent.id===intent.id||old.some(c=>c.parentId===intent.id))throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');}
+  if((original.parentId===null)!==(intent.parentId===null))throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');
+  if(intent.parentId!==null){const parent=category(intent.parentId);if(parent.parentId!==null||parent.id===intent.id||old.some(c=>c.parentId===intent.id))throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');if(original.parentId!==parent.id&&!categoryCovers(parent,original))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');}
   target=next.find(c=>c.id===intent.id)!;target.parentId=intent.parentId;target.role=intent.role;
  }else{
   const targetId=intent.kind==='merge_categories'?intent.id:intent.replacementId;target=targetId===null?null:next.find(c=>c.id===category(targetId).id)!;
   const donors=intent.kind==='merge_categories'?intent.sourceIds:[intent.id];
   if(target&&((target.parentId===null)!==(original.parentId===null)))throw new HttpError(409,'CATEGORY_LEVEL_CONFLICT');
-  for(const id of donors){const donor=category(id);if((donor.parentId===null)!==(original.parentId===null))throw new HttpError(409,'CATEGORY_LEVEL_CONFLICT');removed.add(id);touched.add(id);
+  for(const id of donors){const donor=category(id);if((donor.parentId===null)!==(original.parentId===null))throw new HttpError(409,'CATEGORY_LEVEL_CONFLICT');if(target&&!intent.targetRole&&!categoryCovers(target,donor))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');removed.add(id);touched.add(id);
    if(donor.parentId===null){rootMap.set(id,target?.id??null);for(const child of next.filter(c=>c.parentId===id)){touched.add(child.id);if(target)child.parentId=target.id;else removed.add(child.id);}}
    else leafMap.set(id,target?.id??null);
   }
@@ -131,8 +135,18 @@ export async function removePartyCard(db:PoolClient,userId:string,ids:string[]){
  await db.query('DELETE FROM finance.observation_counterparty WHERE user_id=$1 AND counterparty_id=ANY($2::uuid[])',[userId,ids]);await db.query('DELETE FROM finance.counterparty_alias WHERE user_id=$1 AND counterparty_id=ANY($2::uuid[])',[userId,ids]);
  await db.query('UPDATE finance.counterparty SET merged_into_id=NULL WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,ids]);await db.query('DELETE FROM finance.counterparty WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,ids]);return before;
 }
-async function applyParty(db:PoolClient,userId:string,intent:Extract<EntityIntent,{kind:'merge_counterparties'|'split_counterparty'|'delete_counterparty'}>,graph:Graph):Promise<EntityUndo>{
- const parties=await partyRows(db,userId),target=activeParty(parties,intent.id),sources=await partySources(db,userId),aliases=await partyAliases(db,userId),rows=await entityRows(db,userId);let before=blank();
+async function applyParty(db:PoolClient,userId:string,intent:Extract<EntityIntent,{kind:'merge_counterparties'|'split_counterparty'|'delete_counterparty'|'transfer_counterparty_operations'}>,graph:Graph):Promise<EntityUndo>{
+ const parties=await partyRows(db,userId),target=activeParty(parties,intent.id);
+ if(intent.kind==='transfer_counterparty_operations'){
+  const destination=activeParty(parties,intent.targetId);
+  if(destination.state!=='registered')throw new HttpError(409,'INVALID_DESTINATION');
+  const rows=(await db.query<OperationRow>("SELECT t.id,t.semantics,t.review_reasons FROM finance.transaction t WHERE t.user_id=$1 AND t.id=ANY($2::uuid[]) AND finance.canonical_operation(t.user_id,t.id)=t.id",[userId,intent.operationIds])).rows;
+  if(rows.length!==intent.operationIds.length||rows.some(r=>r.semantics.counterparty.value!==target.id))throw new HttpError(409,'COUNTERPARTY_OPERATIONS_CHANGED');
+  const before=blank();before.operations=rows;
+  for(const row of rows){const updated=structuredClone(row);updated.semantics.counterparty=facet(destination.id,'user',true);await writeOperation(db,userId,updated);}
+  return {table:'entities',id:intent.id,before:before as unknown as Record<string,unknown>,details:{kind:intent.kind,sourceName:target.name,destinationName:destination.name,operationDependencies:rows.map(r=>r.id)}};
+ }
+ const sources=await partySources(db,userId),aliases=await partyAliases(db,userId),rows=await entityRows(db,userId);let before=blank();
  if(intent.kind==='delete_counterparty'){
   const ids=parties.filter(p=>p.id===intent.id||p.merged_into_id===intent.id).map(p=>p.id);before=await removePartyCard(db,userId,ids);
   return {table:'entities',id:intent.id,before:before as unknown as Record<string,unknown>,details:{kind:intent.kind,counterpartiesRemoved:ids,operationDependencies:before.operations.map(r=>r.id),sourcesRemoved:before.sources.length,aliasesRemoved:before.aliases.length,rulesNeedSetup:before.rules.map(r=>r.id),financialOperationsDeleted:0}};

@@ -1,3 +1,4 @@
+import {reserveMailRequest} from './mail-cooldown.ts';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import { emptyAccessStore, reviewRequest, changeInvitation } from '@finance/access';
@@ -77,6 +78,7 @@ export async function invitationAction(db:PoolClient,request:FastifyRequest,acto
   const actual=(await db.query('SELECT state FROM commerce.invitation WHERE id=$1 FOR UPDATE',[invitationId])).rows[0];
   if(purchase.state!=='paid_not_activated'||actual.state==='used')throw new HttpError(409,'INVITATION_UNAVAILABLE');
   let next:AccessStore;try {next=changeInvitation(before,cmd,await clock(db));}catch {throw new HttpError(409,'INVITATION_UNAVAILABLE');}
+  if(cmd.decision==='reissue')await reserveMailRequest(db,seal,'control','invitation-resend',before.requests[0]!.email);
   await save(db,before,next,seal,lifetime);return {status:'committed',...(await queue(db))};
 }
 export async function copyInvitation(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer) {

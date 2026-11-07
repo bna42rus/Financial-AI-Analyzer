@@ -1,3 +1,4 @@
+import {reserveMailRequest} from './mail-cooldown.ts';
 import { serializeSignedCookie } from 'better-call';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
@@ -10,13 +11,14 @@ const dummyPasswordHash = hashPassword(token());
 
 export async function resetRequest(db: PoolClient, config: Config, request: FastifyRequest, seal: Sealer) {
   const input = fields(request, ['email']), address = email(input.email), schema = realm(config.profile);
+  const retryAfterSeconds=await reserveMailRequest(db,seal,config.profile,'password-reset',address);
   const user = (await db.query(`SELECT u.id,u.email,s.epoch FROM ${schema}.auth_user u JOIN ${schema}.security_state s ON s.user_id=u.id WHERE u.email=$1 AND u.email_verified=true`, [address])).rows[0];
   if (user) {
     const secret = token();
     await db.query(`INSERT INTO ${schema}.reset_token(verifier,user_id,epoch,expires_at) VALUES($1,$2,$3,clock_timestamp()+interval '15 minutes')`, [digest(secret), user.id, user.epoch]);
     await outbox(db, schema, seal, 'password_reset', { email: address, token: secret, profile: config.profile },{subjectId:user.id});
   }
-  return { status: 'accepted' }; // Same response for absent and unverified addresses.
+  return { status: 'accepted',retryAfterSeconds }; // Same response for absent and unverified addresses.
 }
 export async function resetPassword(db: PoolClient, config: Config, request: FastifyRequest, seal: Sealer) {
   const input = fields(request, ['token', 'newPassword']), secret = string(input.token, 100), nextPassword = password(input.newPassword), schema = realm(config.profile);

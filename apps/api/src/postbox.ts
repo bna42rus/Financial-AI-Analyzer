@@ -43,9 +43,10 @@ export function postboxTransport(config: PostboxConfig, bridge: typeof smtpBridg
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id) ||
       !address(message.to) || !recipients.has(message.to.toLowerCase()) ||
       typeof message.subject !== 'string' || /[\r\n]/.test(message.subject) || message.subject.length > 500 ||
-      typeof message.text !== 'string' || Buffer.byteLength(message.text) > 65536) throw new DeliveryFailure('REJECTED');
+      typeof message.text !== 'string' || Buffer.byteLength(message.text) > 65536 ||
+      (message.html !== undefined && (typeof message.html !== 'string' || Buffer.byteLength(message.html) > 65536))) throw new DeliveryFailure('REJECTED');
     const result = await bridge({ sender: config.sender, username: config.username, password: config.password,
-      id, to: message.to, subject: message.subject, text: message.text });
+      id, to: message.to, subject: message.subject, text: message.text, ...(message.html ? { html: message.html } : {}) });
     if (result.acceptance === 'postbox' && !result.error) return { acceptance: 'postbox' };
     if (result.error === 'TEMPORARY') throw new DeliveryFailure('TEMPORARY', true);
     if (result.error === 'REJECTED') throw new DeliveryFailure('REJECTED');

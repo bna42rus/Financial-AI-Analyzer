@@ -8,6 +8,13 @@ const labels:Record<string,string>={merge_accounts:'Объединение сч�
 const array=(v:unknown):unknown[]=>Array.isArray(v)?v:[];
 const rows=(v:unknown)=>array(v).filter((r):r is Record<string,unknown>=>!!r&&typeof r==='object');
 export function SettingsImpact({details:d,finance:s,changes}:{changes?:ImpactChange[];details:{kind:string}&Record<string,unknown>;finance?:FinanceState|null}){
+ if(d.kind==='transfer_counterparty_operations')return <p>Перенести операции ({array(d.operationDependencies).length}) от «{String(d.sourceName)}» к «{String(d.destinationName)}»?</p>;
+ if(d.kind==='delete_counterparty')return <section><p>Карточка будет удалена. Операции сохранятся.</p>{array(d.operationDependencies).length>0&&<p>Операций без этой привязки: {array(d.operationDependencies).length}.</p>}{array(d.rulesNeedSetup).length>0&&<p>Правил потребуется настроить заново: {array(d.rulesNeedSetup).length}.</p>}</section>;
+ if(d.kind==='delete_rule')return <p>Правило перестанет применяться к новым загрузкам. Уже обработанные операции сохранят свои категории и другие значения.</p>;
+ if(d.kind==='apply_rules'){
+  const operations=array(d.changedOperationIds),conflicts=array(d.conflictingOperationIds);
+  return <section><p>{operations.length?'Изменятся операции: '+operations.length+'.':'В выбранных операциях нет изменений.'}</p>{conflicts.length>0&&<p>Потребуется проверка: {conflicts.length}.</p>}</section>;
+ }
  if(d.kind==='account_settings'){
   const fields={display_name:'Название',account_type:'Тип счёта',analytics_enabled:'Участие в аналитике',loan_mode:'Учёт кредита'};
   const value=(key:keyof typeof fields,v:unknown)=>key==='account_type'?accountTypes[v as keyof typeof accountTypes]:key==='analytics_enabled'?(v?'Да':'Нет'):key==='loan_mode'?(loanModes[v as keyof typeof loanModes]??'Общая настройка'):String(v);
@@ -16,7 +23,7 @@ export function SettingsImpact({details:d,finance:s,changes}:{changes?:ImpactCha
  if(d.kind==='restore_history'){
   const restored=changes?.filter(c=>c.kind==='account'&&c.before?.values.merged_into_id&&c.after?.values.merged_into_id===null)??[];
   const conflicts=array(d.conflicts);
-  return <section aria-label="Последствия отмены">{conflicts.length?<p role="alert">Отмена недоступна: есть более поздние изменения или связанные данные.</p>:<dl>{restored.length>0&&<div><dt>Будут восстановлены счета</dt><dd>{restored.map(c=>c.after!.values.display_name).join(', ')}</dd></div>}{array(d.objects).length>0&&<div><dt>Изменятся записи</dt><dd>{array(d.objects).length}</dd></div>}</dl>}</section>;
+  return <section aria-label="Последствия отмены">{conflicts.length?<p role="alert">Отмена недоступна: есть более поздние изменения или связанные данные.</p>:!restored.length&&array(d.objects).length===1?<p>Будет восстановлено предыдущее значение.</p>:<dl>{restored.length>0&&<div><dt>Будут восстановлены счета</dt><dd>{restored.map(c=>c.after!.values.display_name).join(', ')}</dd></div>}{array(d.objects).length>1&&<div><dt>Изменятся записи</dt><dd>{array(d.objects).length}</dd></div>}</dl>}</section>;
  }
  if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(d.kind))return <section aria-label="Последствия настройки Обзора"><h3>Представление Обзора</h3><p>{d.kind==='delete_overview_view'?'Настройка представления будет удалена.':d.kind==='reorder_overview_views'?'Изменится порядок представлений.':'Сохраняется представление «'+String(d.name)+'». Виджетов: '+String(d.widgets)+'. Компьютер и телефон сохраняют отдельное расположение блоков.'}</p><p>Изменение записывается в историю. Его можно отменить 30 дней, пока нет конфликтующих новых решений.</p></section>;
  if(['save_budget','set_budget_limit','delete_budget'].includes(d.kind)){
@@ -29,7 +36,7 @@ export function SettingsImpact({details:d,finance:s,changes}:{changes?:ImpactCha
   const nameChanged=!!previous&&!!next&&previous.name!==next.name;
   return <section aria-label="Последствия изменения бюджета">{d.kind==='delete_budget'?<p>Бюджет «{String(d.name)}» будет удалён. Операции сохранятся.</p>:<dl className={style.delta}>
    {nameChanged&&<div><dt>Название</dt><dd>{String(previous.name)} → {String(next.name)}</dd></div>}
-   {limit!==undefined&&<div><dt>Лимит</dt><dd>{d.kind==='set_budget_limit'&&rows(d.previousLimits).filter(v=>String(v.from)<=String(d.effectiveFrom)).at(-1)?.limitMinor!==undefined?formatMoney(String(rows(d.previousLimits).filter(v=>String(v.from)<=String(d.effectiveFrom)).at(-1)?.limitMinor))+' → ':''}{formatMoney(String(limit))}</dd></div>}
+   {limit!==undefined&&<div><dt>Лимит</dt><dd>{rows(d.previousLimits).filter(v=>String(v.from)<=String(d.effectiveFrom)).at(-1)?.limitMinor!==undefined?formatMoney(String(rows(d.previousLimits).filter(v=>String(v.from)<=String(d.effectiveFrom)).at(-1)?.limitMinor))+' → ':''}{formatMoney(String(limit))}</dd></div>}
    {d.effectiveFrom!==undefined&&<div><dt>Вступит в силу</dt><dd>{String(d.effectiveFrom).split('-').reverse().join('.')}</dd></div>}
    {d.kind==='save_budget'&&enabledChanged&&<div><dt>Статус</dt><dd>{d.enabled?'Активен':'Приостановлен'}</dd></div>}
    {d.kind==='save_budget'&&definitionChanged&&<div><dt>Расходы</dt><dd>{definition?.basis==='gross'?'До возвратов':'За вычетом возвратов'}</dd></div>}

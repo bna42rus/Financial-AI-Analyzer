@@ -1,8 +1,13 @@
+import {reserveMailRequest} from './mail-cooldown.ts';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import { fields,string,password,HttpError,outbox,event } from './types.ts';
 import type { Sealer } from './types.ts';
 import { token,digest,hashPassword } from './crypto.ts';
+
+import {legalDocuments} from '../../../packages/access/src/legal.ts';
+import {activateFirstAutoRenewal} from './access-checkout.ts';
+import {checkLegalVersion,recordLegal} from './launch-legal.ts';
 
 async function invitation(db:PoolClient,secret:string) {
   // Lock purchase before invitation consistently with control reissue/cancel.
@@ -19,13 +24,15 @@ export async function requestRegistrationProof(db:PoolClient,request:FastifyRequ
   const b=fields(request,['invitationToken']);const {invite}=await invitation(db,string(b.invitationToken,100));
   // A new independently random proof goes only to the expected address; never return it via this API.
   // Do not revoke earlier proofs on request: someone with a copied invite must not block its owner.
+  const retryAfterSeconds=await reserveMailRequest(db,seal,'finance','registration',invite.email);
   const secret=token();
   await db.query(`INSERT INTO access.registration_proof(verifier,invitation_id,expires_at) VALUES($1,$2,clock_timestamp()+interval '15 minutes')`,[digest(secret),invite.id]);
   await outbox(db,'access',seal,'registration_verification',{email:invite.email,proofToken:secret},{subjectId:invite.id});
-  return {status:'accepted'};
+  return {status:'accepted',retryAfterSeconds};
 }
-export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer) {
-  const b=fields(request,['invitationToken','proofToken','name','password']);
+export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer,legalRequired=false) {
+  const b=fields(request,['invitationToken','proofToken','name','password','termsVersion']);
+  checkLegalVersion(b.termsVersion,legalDocuments.terms.version,legalRequired);
   const chosen=password(b.password), name=string(b.name,100).trim();
   const {invite,purchase,grant}=await invitation(db,string(b.invitationToken,100));
   const proof=(await db.query(`SELECT verifier,expires_at FROM access.registration_proof WHERE verifier=$1 AND invitation_id=$2 AND consumed_at IS NULL AND expires_at>clock_timestamp() FOR UPDATE`,[digest(string(b.proofToken,100)),invite.id])).rows[0];
@@ -51,10 +58,12 @@ export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer)
   else await db.query(`UPDATE commerce.manual_grant SET state='active',user_id=$1,activated_at=$2,access_end=$3 WHERE id=$4`,[id,times.start,times.finish,grant.id]);
   await db.query("SELECT set_config('app.user_id',$1,true)",[id]);
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy) VALUES($1,$2,$3,'Europe/Moscow',$4,$5,$6,$7,$8)`,[id,times.start,times.finish,duration.kind==='calendar_months'?duration.count:0,duration.kind==='days'?duration.count:0,indefinite,fixed?times.finish.getTime()-times.start.getTime():0,quotaPolicy]);
+  if(purchase&&times.finish&&!indefinite&&!fixed)await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[id,times.start,times.finish,duration.kind,quotaPolicy.limit]);
   await db.query(`UPDATE commerce.invitation SET state='used',used_at=$1 WHERE id=$2`,[times.start,invite.id]);
   await db.query('UPDATE access.registration_proof SET consumed_at=$1 WHERE invitation_id=$2',[times.start,invite.id]);
-  if(purchase){await db.query('DELETE FROM access.application_session WHERE request_id=$1',[purchase.request_id]);
+  if(purchase){if(times.finish)await activateFirstAutoRenewal(db,purchase,id,times.finish);await db.query('DELETE FROM access.application_session WHERE request_id=$1',[purchase.request_id]);
   await db.query('UPDATE access.email_token SET consumed_at=$1 WHERE request_id=$2',[times.start,purchase.request_id]);}
+  if(b.termsVersion)await recordLegal(db,id,'terms',b.termsVersion);
   await event(db,'identity',id,'invitation_registration');
   await outbox(db,'identity',seal,'access_activated',{email:invite.email,activatedAt:times.start,accessEnd:times.finish,indefinite},{subjectId:id});
   // No implicit login/session. The chosen password must be used for a fresh normal sign-in.

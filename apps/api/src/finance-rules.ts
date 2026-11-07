@@ -25,12 +25,12 @@ function historicalRuleChange(op:Operation,account:Account,active:Rule[]){
 export function historicalRuleCandidates(input:unknown,graph:Graph,rules:(Rule&{dependencyStatus:string})[]){
  const r=object(input,['ruleId']),rule=rules.find(rule=>rule.id===uuid(r.ruleId));if(!rule)throw new HttpError(404,'NOT_FOUND');
  const active=rules.filter(r=>r.enabled&&r.dependencyStatus==='ready'),accounts=new Map(graph.accounts.map(a=>[a.id,a]));
- const ids:string[]=[];
+ const ids:string[]=[];const rows:{id:string;date:ReturnType<typeof effective>['operationDate'];amountMinor:string;name:string}[]=[];
  if(rule.enabled&&rule.dependencyStatus==='ready')for(const op of graph.operations){
   const account=accounts.get(effective(op).accountId);
-  if(account&&ruleMatches(op,account,rule)&&historicalRuleChange(op,account,active).changed)ids.push(op.id);
+  if(account&&ruleMatches(op,account,rule)&&historicalRuleChange(op,account,active).changed){ids.push(op.id);const bank=effective(op);if(rows.length<1000)rows.push({id:op.id,date:bank.operationDate,amountMinor:bank.amountMinor,name:op.semantics.merchant.value||bank.description||'Операция'});}
  }
- return {operationIds:ids.slice(0,1000),total:ids.length};
+ return {operationIds:ids.slice(0,1000),total:ids.length,rows};
 }
 export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleIntent,graph:Graph,rules:(Rule&{dependencyStatus:string})[],compatible:(role:string,category:string|null,sub:string|null)=>void):Promise<BatchUndo> {
  const rule=rules.find(r=>r.id===(intent.kind==='delete_rule'?intent.id:intent.ruleId));if(!rule)throw new HttpError(404,'NOT_FOUND');

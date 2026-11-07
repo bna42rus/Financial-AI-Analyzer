@@ -1,3 +1,4 @@
+import {Brand} from '../../web/src/Brand';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -53,7 +54,7 @@ export function AdminApp() {
   const title=sections.find(s=>s.id===section)!.label;
   return <div className={styles.app}>
     <a href="#main-content" className={styles.skip}>Перейти к содержимому</a>
-    <header className={styles.header}><div className={styles.brand}><ShieldCheck size={27} aria-hidden="true"/><div>Финансовый анализатор<span>Администрирование</span></div></div><div className={styles.headerActions}><span className={styles.previewLabel}>Первая версия интерфейса</span><button className={styles.iconButton} onClick={()=>setDark(v=>!v)} aria-label={dark?'Включить светлую тему':'Включить тёмную тему'}>{dark?<Sun size={18} aria-hidden="true"/>:<Moon size={18} aria-hidden="true"/>}</button></div></header>
+    <header className={styles.header}><div className={styles.brand}><Brand compact/><div>Финансовый анализатор<span>Администрирование</span></div></div><div className={styles.headerActions}><span className={styles.previewLabel}>Первая версия интерфейса</span><button className={styles.iconButton} onClick={()=>setDark(v=>!v)} aria-label={dark?'Включить светлую тему':'Включить тёмную тему'}>{dark?<Sun size={18} aria-hidden="true"/>:<Moon size={18} aria-hidden="true"/>}</button></div></header>
     <div className={styles.workspace}><nav className={styles.nav} aria-label="Разделы админки">{sections.map(s=><a href={'#'+s.id} key={s.id} aria-current={section===s.id?'page':undefined} onClick={event=>{event.preventDefault();navigate(s.id);}}><s.icon size={18} aria-hidden="true"/>{s.label}{s.id==='requests'&&demo&&<span>{reviewing}</span>}</a>)}<div className={styles.navNote}><ShieldCheck size={18} aria-hidden="true"/><p>Отдельный административный интерфейс. Финансовые операции и чаты клиентов здесь недоступны.</p></div></nav>
       <main id="main-content" className={styles.main} tabIndex={-1}>
         <div className={styles.title}><div><span className={styles.eyebrow}>Управление доступом</span><h1>{title}</h1><p>{section==='requests'?'Новые пользователи: сверка оплаты и подготовка приглашений.':section==='payments'?'Журнал вручную сверенных переводов.':section==='invitations'?'Срок ссылки и оплаченный период учитываются отдельно.':section==='history'?'Изменения доступа, оплат и приглашений.':section==='renewals'?'Продления существующих аккаунтов — отдельный процесс.':'Заявки, оплаты и приглашения в одном месте.'}</p></div>{demo&&<button className={styles.secondary} onClick={clearExample}>Закрыть пример</button>}</div>
