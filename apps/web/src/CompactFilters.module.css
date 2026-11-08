@@ -44,3 +44,7 @@
 .dateField input:not([type="date"]) { padding-left:9px; }
 @media(max-width:700px) { .dateField { grid-template-columns:minmax(1.5em,auto) minmax(0,1fr); } }
 @media(max-width:380px) { .dates { grid-template-columns:minmax(0,1fr); } }
+
+.dateField input:not([type=date]){padding-inline-start:10px;}
+
+.fullWidthTrigger{width:100%;flex:auto;font-size:calc(14px * var(--text-scale,1));}

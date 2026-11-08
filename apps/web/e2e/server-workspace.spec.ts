@@ -53,12 +53,19 @@ test('live Review preserves a draft when selecting some similar operations',asyn
  await page.getByText('Проверка операций',{exact:true}).click();
  const review=page.getByRole('region',{name:'Нужно проверить',exact:true});
  await expect(review).toContainText('Осталось разобрать: 3');
- await review.getByLabel('Категория',{exact:true}).selectOption(category);
- await review.getByText('Похожие операции: 2',{exact:true}).click();
+ const future=review.getByRole('checkbox',{name:'Запомнить для будущих операций'});
+ await expect(future).not.toBeChecked();
+ await expect(review.getByRole('checkbox',{name:'Применить к похожим операциям (2)'})).not.toBeChecked();
+ await review.getByRole('button',{name:'Категория',exact:true}).click();
+ await page.getByRole('radio',{name:'Тестовая категория',exact:true}).click();
+ await review.getByRole('checkbox',{name:'Применить к похожим операциям (2)'}).check();
+ await expect(review.getByText('Выбрано: 0/2')).toBeVisible();
+ await expect(review.getByRole('button',{name:'Применить',exact:true})).toBeDisabled();
  await review.getByRole('list').getByRole('checkbox').first().check();
- await expect(review.getByLabel('Категория',{exact:true})).toHaveValue(category);
- const future=review.getByRole('checkbox',{name:'Применять к будущим операциям'});if(await future.isVisible())await future.uncheck();
+ await expect(review.getByRole('button',{name:'Категория',exact:true})).toHaveText('Тестовая категория');
  await review.getByRole('button',{name:'Применить',exact:true}).click();
+ await expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);
+ await page.getByRole('dialog',{name:'Решение при проверке'}).getByRole('button',{name:'Сохранить',exact:true}).click();
  await expect.poll(()=>h.calls.filter(c=>c.path==='/finance/commit').length).toBe(1);
  expect(h.calls.find(c=>c.path==='/finance/preview')?.body.intent).toMatchObject({operationIds:[first.id,similar[0]!.id],patch:{categoryId:category},reviewScope:{sessionId:id,revision:'1',anchorId:first.id}});
 });
@@ -68,9 +75,10 @@ test('bulk preview works on the first finance response without another navigatio
 test('fixed bulk selection supports ranges, exact count and preview cancellation without adding a new matching row',async({page})=>{
  const h=await setup(page),first=h.state.operations[0]!;h.state.operations=[1,2,3].map(i=>({...structuredClone(first),id:crypto.randomUUID(),classification:{...structuredClone(first.classification),merchant:{...first.classification.merchant,value:'Тестовая покупка '+i}}}));h.state.categories=[{id:crypto.randomUUID(),name:'Тестовая категория',role:'expense',parentId:null,hidden:false}];let intent:Record<string,unknown>|null=null;
  await page.route('http://127.0.0.1:3000/finance/preview',async route=>{if(route.request().method()==='OPTIONS'){await route.fallback();return;}const b=route.request().postDataJSON(),i=b.intent;intent=i;const summary=aggregate(h.state.operations);await route.fulfill({headers:{'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true'},json:{status:'previewed',actionId:b.actionId,impact:{before:summary,after:summary,affectedOperationIds:i.operationIds,dependencyConflicts:[],changes:i.operationIds.map((id:string)=>({id,kind:'operation',before:{values:{semantics:{category:{value:null}}}},after:{values:{semantics:{category:{value:i.patch.categoryId}}}}})),details:{kind:'bulk_operations',operationIds:i.operationIds,selectedCount:i.operationIds.length,atomic:true,patch:i.patch,verify:[],remainingReviewIds:i.operationIds,warnings:[]}}}});});
- await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await expect(page.getByRole('list',{name:'Сохранённые операции'}).getByRole('button')).toHaveCount(3);await page.getByLabel('Выбрать операцию 1',{exact:true}).check();await page.getByLabel('Выбрать операцию 3',{exact:true}).click({modifiers:['Shift']});await expect(page.getByRole('status').filter({hasText:'Выбрано: 3'})).toBeVisible();await page.getByRole('button',{name:'Изменить выбранные',exact:true}).click();await page.getByLabel('Новая категория',{exact:true}).selectOption(h.state.categories[0]!.id);await page.getByRole('button',{name:'Применить',exact:true}).click();await expect(page.getByRole('region',{name:'Последствия массовой правки'})).toContainText(/Выбрано операций\s*3/);const confirmation=page.getByRole('dialog',{name:'Подтвердить правку операций'});
- await expect(confirmation.getByLabel('Последствия изменения').getByText('Что изменится',{exact:true})).toHaveCount(0);
- await confirmation.getByText('Что изменится',{exact:true}).click();
+ await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await expect(page.getByRole('list',{name:'Сохранённые операции'}).getByRole('button')).toHaveCount(3);await page.getByLabel('Выбрать операцию 1',{exact:true}).check();await page.getByLabel('Выбрать операцию 3',{exact:true}).click({modifiers:['Shift']});await expect(page.getByRole('status').filter({hasText:'Выбрано: 3'})).toBeVisible();await page.getByRole('button',{name:'Изменить выбранные',exact:true}).click();await page.getByLabel('Новая категория',{exact:true}).selectOption(h.state.categories[0]!.id);await page.getByRole('button',{name:'Применить',exact:true}).click();const confirmation=page.getByRole('dialog',{name:'Подтвердить правку операций'});
+ await expect(confirmation.getByLabel('Последствия изменения')).toContainText(/Затронутые операции\s*3/);
+ await expect(confirmation.getByLabel('Последствия изменения').getByText('Подробнее',{exact:true})).toHaveCount(0);
+ await confirmation.getByText('Подробнее',{exact:true}).click();
  await expect(confirmation.getByText('Без категории → Тестовая категория',{exact:true})).toHaveCount(3);
  const fixed=(intent as unknown as {operationIds:string[]}).operationIds;expect(fixed).toHaveLength(3);h.state.operations.push({...structuredClone(first),id:crypto.randomUUID()});expect((intent as unknown as {operationIds:string[]}).operationIds).toEqual(fixed);await page.getByRole('button',{name:'Назад',exact:true}).click();expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);await expect(page.getByRole('region',{name:'Массовая правка'})).toBeVisible();
 });
@@ -507,11 +515,11 @@ test('counterparty split shows one dialog and one search frame; operation checkb
  await expect(edit).toBeVisible();
 });
 
-test('public pricing routes to a preselected manual renewal and shares the support dialog',async({page})=>{
+test('public pricing opens the selected renewal and shares the support dialog',async({page})=>{
  await setup(page);
  const tariffs=[{id:'first',name:'1 месяц',duration:{kind:'calendar_months',count:1},priceMinor:'39900',aiQuota:10000,active:true,publicVisible:true,availableForNew:true},{id:'long',name:'3 месяца',duration:{kind:'calendar_months',count:3},priceMinor:'104900',aiQuota:10000,active:true,publicVisible:true,availableForNew:true}];
  const cycle={anchorAt:'2026-10-05T12:00:00Z',accessEnd:'2026-12-05T12:00:00Z',timezone:'Europe/Moscow',calendarMonths:2,extraDays:0,revision:1};
- let selected='';
+ const paymentWrites:string[]=[];
  await page.route('http://127.0.0.1:3000/access/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname,headers={'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
@@ -519,10 +527,7 @@ test('public pricing routes to a preselected manual renewal and shares the suppo
   if(path.endsWith('/tariffs'))return route.fulfill({headers,json:{tariffs}});
   if(path.endsWith('/billing'))return route.fulfill({headers,json:{enabled:false,tariffs,renewal:null,order:null}});
   if(path.endsWith('/renewal'))return route.fulfill({headers,json:baseState});
-  if(path.endsWith('/renewal-create')){
-   selected=req.postDataJSON().tariffId;
-   return route.fulfill({headers,json:{...baseState,request:{id:'synthetic-renewal',tariff:tariffs.find(t=>t.id===selected),renewalState:'open',status:'awaiting_payment'}}});
-  }
+  if(req.method()==='POST')paymentWrites.push(path);
   return route.fallback();
  });
  await page.goto(new URL('/tariffs',base).href);
@@ -531,13 +536,18 @@ test('public pricing routes to a preselected manual renewal and shares the suppo
  await page.getByRole('article').filter({hasText:'3 месяца'}).getByRole('link',{name:'Выбрать тариф',exact:true}).click();
  const renewal=page.getByRole('dialog',{name:'Продление доступа',exact:true});
  await expect(renewal.getByRole('combobox',{name:'Период продления',exact:true})).toHaveValue('long');
- await expect(renewal).toContainText('После подтверждения доступ будет до');
+ await expect(renewal).toContainText('После продления — до');
  await expect(page.getByRole('heading',{name:'Аккаунт',exact:true})).toHaveCount(0);
- await renewal.getByRole('button',{name:'Продлить доступ',exact:true}).click();
- await expect.poll(()=>selected).toBe('long');
+ await expect(renewal.getByRole('button',{name:/Перейти к оплате · 1.?049/})).toBeDisabled();
+ await expect(renewal.getByLabel('Имя отправителя')).toHaveCount(0);
+ expect(paymentWrites).toHaveLength(0);
  await renewal.getByRole('button',{name:'Закрыть: Продление доступа',exact:true}).click();
  await page.getByRole('button',{name:'Поддержка',exact:true}).click();
- await expect(page.getByRole('dialog',{name:'Поддержка CashNeuro'}).getByRole('link',{name:'Написать письмо'})).toHaveAttribute('href','mailto:support@cashneuro.ru');
+ const support=page.getByRole('dialog',{name:'Поддержка CashNeuro'});
+ await expect(support.getByText('Напишите нам — поможем разобраться.')).toBeVisible();
+ await support.getByRole('button',{name:'Написать письмо'}).click();
+ for(const name of ['Gmail','Яндекс Почта','Mail','Почтовое приложение'])await expect(support.getByRole('link',{name,exact:true})).toBeVisible();
+ await expect(support.getByRole('link',{name:'Почтовое приложение'})).toHaveAttribute('href','mailto:support@cashneuro.ru');
 });
 
 test('credit accounting confirmation explains both models even when totals stay equal',async({page})=>{
@@ -582,4 +592,62 @@ test('exclusion uses matching impact rows and Back restores the selected operati
  await confirm.getByRole('button',{name:'Назад',exact:true}).click();
  await expect(checkbox).toBeChecked();
  expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);
+});
+
+test('operation actions fit without horizontal scrolling',async({page})=>{
+ await setup(page);
+ await page.getByRole('link',{name:'Операции',exact:true}).click();
+ await page.locator('button[data-operation]').first().click({button:'right'});
+ const dialog=page.getByRole('dialog',{name:'Действия операции'});
+ const buttons=await dialog.getByRole('button').filter({hasText:/Копировать ID|История операции|Создать правило|Удалить операцию/}).all();
+ expect(buttons).toHaveLength(4);
+ const boxes=await Promise.all(buttons.map(button=>button.boundingBox()));
+ expect(boxes.every(Boolean)).toBe(true);
+ if(page.viewportSize()!.width>680)expect(new Set(boxes.map(box=>box?.y)).size).toBe(1);
+ expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth)).toBe(true);
+ for(const button of buttons)await expect(button).toBeInViewport();
+});
+
+test('public footer and contacts show a plain support address with copy control',async({page})=>{
+ await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+ await page.goto(base+'contacts');
+ const footer=page.getByRole('contentinfo');
+ await expect(footer.getByText('Поможем разобраться')).toBeVisible();
+ await expect(footer.getByRole('navigation').getByRole('link')).toHaveCount(6);
+ const main=page.getByRole('main');
+ await expect(main.getByText('support@cashneuro.ru',{exact:true})).toBeVisible();
+ await expect(main.getByRole('link',{name:'support@cashneuro.ru'})).toHaveCount(0);
+ await main.getByRole('button',{name:'Скопировать адрес'}).click();
+ await expect(main.getByRole('status')).toHaveText('Адрес скопирован.');
+ expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe('support@cashneuro.ru');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
+});
+
+test('device timezone stays selected and shows the actual zone in the account',async({page})=>{
+ await setup(page);
+ const browserZone=await page.evaluate(()=>Intl.DateTimeFormat().resolvedOptions().timeZone);
+ let preference={timezone:'Pacific/Honolulu',followsDevice:false};
+ const saved:unknown[]=[];
+ const headers={'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true'};
+ await page.route('http://127.0.0.1:3000/session',route=>route.fulfill({headers,json:{name:'Искусственный пользователь',scope:'active',capabilities:['finance'],indefinite:true,...preference}}));
+ await page.route('http://127.0.0.1:3000/access/profile/timezone',async route=>{
+  if(route.request().method()==='OPTIONS')return route.fallback();
+  const body=route.request().postDataJSON();
+  saved.push(body);
+  preference={timezone:body.timezone,followsDevice:body.followsDevice};
+  await route.fulfill({headers,json:preference});
+ });
+ await page.getByRole('button',{name:'Аккаунт',exact:true}).click();
+ await page.getByRole('button',{name:'Изменить: часовой пояс'}).click();
+ let dialog=page.getByRole('dialog',{name:'Часовой пояс'});
+ await dialog.getByRole('button',{name:'Часовой пояс',exact:true}).click();
+ await page.getByRole('radio',{name:'Как на устройстве',exact:true}).click();
+ await dialog.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect(dialog).toBeHidden();
+ expect(saved).toEqual([{timezone:browserZone,followsDevice:true}]);
+ const account=page.getByRole('dialog',{name:'Аккаунт',exact:true});
+ await expect(account.getByText(/UTC/)).toBeVisible();
+ await page.getByRole('button',{name:'Изменить: часовой пояс'}).click();
+ dialog=page.getByRole('dialog',{name:'Часовой пояс'});
+ await expect(dialog.getByRole('button',{name:'Часовой пояс',exact:true})).toHaveText('Как на устройстве');
 });

@@ -2,7 +2,7 @@ import {useMailCooldown,mailAddressKey} from './use-mail-cooldown';
 import type {MailSend} from './use-mail-cooldown';
 import {useEffect,useState} from 'react';
 import {ArrowLeft,CalendarDays,LogOut,Monitor,Pencil,ShieldCheck,UserRound} from 'lucide-react';
-import {timezoneLabel} from './InterfaceSettings';
+import {deviceZone,timezoneLabel} from './InterfaceSettings';
 import {AccountProfileEditor} from './AccountProfileEditor';
 import type {AccountProfileField} from './AccountProfileEditor';
 import {OperationDialog} from './OperationDialog';
@@ -27,7 +27,7 @@ export function ServerAccount({session,refresh,signOut,back,busy,accountError,as
  }
  async function reset(){if(pending||!session.email||mail.seconds)return;setError('');setPending(true);try{mail.remember(await api<MailSend>('/security/reset-request',{email:session.email}));setSent(true);}catch(e){mail.remember(e);setError(e instanceof Error?e.message:'Не удалось запросить письмо.');}finally{setPending(false);}}
  const content=<div className={styles.accountStack}>{accountError&&<p className={styles.error} role="alert">{accountError}</p>}
-  <section className={styles.accountSection}><h2><UserRound size={18}/>Профиль</h2><dl>{([['name','Имя',session.name],['email','Почта',session.email],['timezone','Часовой пояс',session.timezone?timezoneLabel(session.timezone):'Как на устройстве']] as const).map(([field,label,value])=>value&&<div key={field}><dt>{label}</dt><dd className={styles.profileValue}><span>{value}</span><button className={common.iconButton} disabled={busy} aria-label={'Изменить: '+label.toLocaleLowerCase('ru')} onClick={()=>setProfile(field)}><Pencil size={16}/></button></dd></div>)}</dl></section>
+  <section className={styles.accountSection}><h2><UserRound size={18}/>Профиль</h2><dl>{([['name','Имя',session.name],['email','Почта',session.email],['timezone','Часовой пояс',timezoneLabel(session.timezone??deviceZone())]] as const).map(([field,label,value])=>value&&<div key={field}><dt>{label}</dt><dd className={styles.profileValue}><span>{value}</span><button className={common.iconButton} disabled={busy} aria-label={'Изменить: '+label.toLocaleLowerCase('ru')} onClick={()=>setProfile(field)}><Pencil size={16}/></button></dd></div>)}</dl></section>
   <section className={styles.accountSection}><h2><CalendarDays size={18}/>Доступ</h2><dl><div><dt>Статус</dt><dd>{session.blocked?'Заблокирован':session.scope==='active'?'Активен':session.accessEnd?'Срок истёк':'Не активен'}</dd></div><div><dt>Срок</dt><dd>{session.indefinite?'Бессрочно':session.accessEnd?'До '+date(session.accessEnd,session.timezone):'Не задан'}</dd></div></dl>{session.accessWarning&&<p className={styles.accountWarning}>{session.accessWarning}</p>}{session.blocked&&<p className={styles.accountWarning}>Продление не снимает блокировку.</p>}<div className={styles.accountActions}>{!session.indefinite&&<button className={common.primaryButton} disabled={busy||session.blocked} onClick={()=>open('renew')}>Продлить доступ</button>}</div></section>
   <section className={styles.accountSection}><h2><ShieldCheck size={18}/>Безопасность</h2><div className={styles.accountActions}><button className={common.button} onClick={()=>open('sessions')}>Активные сеансы</button>{session.email&&<button className={common.button} onClick={()=>open('password')}>Сменить пароль</button>}</div></section>
  </div>;

@@ -27,7 +27,7 @@
 .reviewDisclosure { width:100%; margin:14px 0; border:1px solid var(--color-border); border-radius:10px; background:var(--color-surface); }
 .reviewDisclosure > summary { display:flex; justify-content:space-between; align-items:center; padding:7px 8px 7px 14px; gap:12px; font-weight:600; list-style:none; }
 .reviewDisclosure > summary::-webkit-details-marker { display:none; }
-.reviewDisclosure > summary:hover,.reviewDisclosure[open] > summary { color:var(--color-primary); }
 .reviewToggle { width:36px; height:34px; display:grid; place-items:center; border-radius:7px; color:var(--color-secondary-text); }
-.reviewDisclosure[open] .reviewToggle,.reviewDisclosure > summary:hover .reviewToggle { background:var(--color-soft); }
 .reviewDisclosure[open] .reviewToggle svg { transform:rotate(180deg); }
+
+@media(max-width:360px){.header{grid-template-columns:minmax(0,1fr)}.headerActions{grid-column:1;grid-row:2}.header .navigation{grid-row:3}}

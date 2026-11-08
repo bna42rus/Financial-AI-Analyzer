@@ -1,7 +1,6 @@
 import {useEffect,useState} from 'react';
 import {Brand} from './Brand';
-import {Mail} from 'lucide-react';
-import {supportEmail as support} from './SupportDialog';
+import {CopySupportAddress,supportEmail as support} from './SupportDialog';
 import {api,apiOrigin} from './server-client';
 import {legalDocuments,legalNotice} from '../../../packages/access/src/legal';
 import {moneyLabel} from '../../../packages/access/src/model';
@@ -12,14 +11,23 @@ import form from './ServerAccess.module.css';
 type LegalKind=keyof typeof legalDocuments;
 const texts=import.meta.glob('../../../docs/legal/*.md',{query:'?raw',import:'default',eager:true}) as Record<string,string>;
 const groups=[
- ['Сервис',[['Тарифы','/price'],['Оплата и возврат','/payments'],['Контакты','/contacts']]],
- ['Документы',[['Условия использования','/terms'],['Публичная оферта','/offer'],['Конфиденциальность','/privacy']]],
+ [['Тарифы','/price'],['Оплата и возврат','/payments'],['Контакты','/contacts']],
+ [['Условия использования','/terms'],['Публичная оферта','/offer'],['Конфиденциальность','/privacy']],
 ] as const;
 const address=String(import.meta.env.VITE_PUBLIC_SELLER_ADDRESS??'').trim();
 const phone=String(import.meta.env.VITE_PUBLIC_SUPPORT_PHONE??'').trim();
 const ready=import.meta.env.VITE_PUBLIC_LEGAL_PUBLISHED==='1';
 export function LegalFooter(){
- return <footer className={styles.footer}><div className={styles.footerTop}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a><nav aria-label="Информация о CashNeuro">{groups.map(([group,links])=><div className={styles.footerGroup} key={group}><strong>{group}</strong><div>{links.map(([label,path])=><a key={path} href={path}>{label}</a>)}</div></div>)}</nav></div><div className={styles.requisites}>Исполнитель: Битнер Никита Андреевич · ИНН 421408478543</div></footer>;
+ return <footer className={styles.footer}>
+  <div className={styles.footerTop}>
+   <div className={styles.footerSupport}>
+    <a href="/" aria-label="CashNeuro — на главную"><Brand/></a>
+    {support&&<div><p>Поможем разобраться</p><strong>{support}</strong></div>}
+   </div>
+   <nav aria-label="Информация о CashNeuro">{groups.map(links=><ul className={styles.footerGroup} key={links[0][1]}>{links.map(([label,path])=><li key={path}><a href={path}>{label}</a></li>)}</ul>)}</nav>
+  </div>
+  <div className={styles.requisites}>Исполнитель: Битнер Никита Андреевич · ИНН 421408478543</div>
+ </footer>;
 }
 export function usePublicTariffs(enabled=true){
  const [tariffs,setTariffs]=useState<Tariff[]|null>(null),[failed,setFailed]=useState(false);
@@ -50,7 +58,7 @@ export function LegalPage({path}:{path:string}){
  return <div className={styles.page}><header className={styles.header}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a></header>
  <main className={styles.main}><h1>{title}</h1>
  {entry?<><p className={styles.meta}>Редакция {entry[1].version}{!ready&&' · Версия для ознакомления'}</p><LegalText body={texts['../../../docs/legal/'+entry[0]+'.md']??''}/>{entry[0]!=='terms'&&<nav className={styles.documentLinks} aria-label="Связанные документы">{(entry[0]==='offer'||entry[0]==='payments')&&<a href="/autorenewal">Условия автопродления</a>}{entry[0]==='privacy'&&<a href="/data-consent">Открыть текст согласия</a>}<a href="/contacts">Контакты и реквизиты</a></nav>}</>:normalized==='/contacts'?<>
- <dl className={styles.details}><div><dt>Исполнитель и оператор</dt><dd>Битнер Никита Андреевич</dd></div><div><dt>ИНН</dt><dd>421408478543</dd></div><div><dt>Налоговый режим</dt><dd>Налог на профессиональный доход</dd></div>{support&&<div><dt>Поддержка, претензии и запросы о данных</dt><dd><a className={styles.emailLink} href={'mailto:'+support}><Mail size={16} aria-hidden="true"/>{support}</a></dd></div>}{phone&&<div><dt>Телефон</dt><dd>{phone}</dd></div>}{address&&<div><dt>Почтовый адрес</dt><dd>{address}</dd></div>}</dl>{!support&&<p className={styles.meta}>Контакты поддержки будут опубликованы перед запуском оплаты.</p>}</>:<>
+ <dl className={styles.details}><div><dt>Исполнитель и оператор</dt><dd>Битнер Никита Андреевич</dd></div><div><dt>ИНН</dt><dd>421408478543</dd></div><div><dt>Налоговый режим</dt><dd>Налог на профессиональный доход</dd></div>{support&&<div><dt>Поддержка, претензии и запросы о данных</dt><dd className={styles.contactEmail}><span>{support}</span><CopySupportAddress iconOnly/></dd></div>}{phone&&<div><dt>Телефон</dt><dd>{phone}</dd></div>}{address&&<div><dt>Почтовый адрес</dt><dd>{address}</dd></div>}</dl>{!support&&<p className={styles.meta}>Контакты поддержки будут опубликованы перед запуском оплаты.</p>}</>:<>
  {failed?<p role="alert">Не удалось загрузить тарифы.</p>:tariffs?.length?<TariffCards tariffs={tariffs} showLink/>:tariffs||!apiOrigin?<p>Тарифы пока недоступны.</p>:<p role="status">Загружаем тарифы…</p>}
 </>}</main><LegalFooter/></div>;
 }

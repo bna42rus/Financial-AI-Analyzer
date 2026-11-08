@@ -70,3 +70,6 @@
 .chartLegend li{display:flex;gap:6px;align-items:center}.chartLegend li span{width:12px;height:8px;flex:none;border-radius:2px}
 @media(max-width:700px){.editor>.widgetFooter{display:grid;gap:6px;padding:8px 12px}.editor>.widgetFooter>div{flex-wrap:wrap}.editorScroll,.workspaceDialog.containedDialog>div:first-child{padding:12px}.editor>.widgetFooter button{min-height:36px}}
 .popoverToolbar{display:flex;align-items:flex-start;gap:4px}.popoverToolbar>div{flex:1;min-width:0}.popoverToolbar>button{flex:none}
+
+.widgetTotals,.widgetTotals .comparisonDate,.widgetTable th,.widgetTable td { font-size:calc(14px * var(--text-scale,1)); }
+.widgetTotals .comparisonDate { margin-top:0; }

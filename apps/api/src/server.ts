@@ -192,7 +192,7 @@ export async function createServer(config: Config) {
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
         if(path==='/account/name')result=await accountProfile!.saveAccountName(db,s.user.id,fields(request,['name']).name);
-        else if(path==='/account/timezone')result=await financialProfile!.financeProfile(db,s.user.id,fields(request,['timezone']));
+        else if(path==='/account/timezone')result=await financialProfile!.financeProfile(db,s.user.id,fields(request,['timezone','followsDevice','syncDevice']));
         else result=await accountProfile!.accountEmail(db,{id:s.user.id,email:s.user.email,sessionId:s.session.id},fields(request,path.endsWith('-request')?['email','password']:['code']),seal);
       } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable'].includes(path)&&request.method==='POST'))){
         const u=await current(auth,request);if(!u||!u.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
@@ -224,7 +224,7 @@ export async function createServer(config: Config) {
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,timezone:await financialProfile!.financialTimezone(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,...await financialProfile!.financialTimezonePreference(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
       } else if(config.profile==='control'&&path==='/control/access-checkouts'&&request.method==='GET'){
         await requireAdmin(auth,db,request);

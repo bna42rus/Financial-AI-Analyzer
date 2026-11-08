@@ -7,6 +7,14 @@ export const foldSearch=(value:string)=>value.normalize('NFKC').toLocaleLowerCas
 export function SearchField({value,onValueChange,...props}:Omit<InputHTMLAttributes<HTMLInputElement>,'value'|'onChange'|'type'>&{value:string;onValueChange:(v:string)=>void}){
  return <div className={styles.searchField} data-search-field><Search size={17} aria-hidden="true"/><input {...props} type="search" value={value} onChange={e=>onValueChange(e.target.value)}/>{value&&<button type="button" disabled={props.disabled} aria-label="Очистить поиск" onClick={()=>onValueChange('')}><X size={16}/></button>}</div>;
 }
-export function SearchFilter({label,options,value,onChange,disabled,single}:{label:string;options:readonly (readonly [string,string])[];value:string[];onChange:(ids:string[])=>void;disabled:boolean;single?:boolean}){
- return <CategoryFilter categories={options.map(([id,name])=>({id,name,parentId:null,role:'both',hidden:false}))} value={value} onChange={onChange} disabled={disabled} emptyLabel={label} flatLabel={label} single={single}/>;
+export function SearchFilter({label,options,value,onChange,disabled,single,fullWidth,...accessibility}:{label:string;options:readonly (readonly [string,string])[];value:string[];onChange:(ids:string[])=>void;disabled:boolean;single?:boolean;fullWidth?:boolean;'aria-label'?:string;'aria-invalid'?:boolean;'aria-describedby'?:string}){
+ return <CategoryFilter categories={options.map(([id,name])=>({id,name,parentId:null,role:'both',hidden:false}))} value={value} onChange={onChange} disabled={disabled} emptyLabel={label} flatLabel={label} single={single} fullWidth={fullWidth} {...accessibility}/>;
+}
+
+type SingleOptions=readonly (readonly [string,string])[];
+export function FormSelect({label,options,value,onValueChange,disabled,...accessibility}:{label:string;options:SingleOptions;value:string;onValueChange:(value:string)=>void;disabled?:boolean;'aria-label'?:string;'aria-invalid'?:boolean;'aria-describedby'?:string}){
+ if(options.length>10)return <SearchFilter label={label} options={options} value={[value]} onChange={ids=>onValueChange(ids[0]??'')} disabled={!!disabled} single fullWidth {...accessibility}/>;
+ return <select aria-label={label} {...accessibility} disabled={disabled} value={value} onChange={e=>onValueChange(e.target.value)}>
+  {options.map(([id,name])=><option key={id} value={id}>{name}</option>)}
+ </select>;
 }

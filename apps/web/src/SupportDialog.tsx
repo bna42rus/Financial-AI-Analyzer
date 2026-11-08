@@ -1,10 +1,45 @@
-import {useState} from 'react';
-import {Mail} from 'lucide-react';
+import {useId,useState} from 'react';
+import {Copy,LifeBuoy,Mail} from 'lucide-react';
 import {OperationDialog} from './OperationDialog';
 import common from './App.module.css';
 
 export const supportEmail=String(import.meta.env.VITE_PUBLIC_SUPPORT_EMAIL||'support@cashneuro.ru').trim();
-export function SupportLink({className=common.button,children='Поддержка'}:{className?:string;children?:string}){
- const [open,setOpen]=useState(false),[copied,setCopied]=useState(false);
- return <><button type="button" className={className} onClick={()=>{setCopied(false);setOpen(true);}}>{children}</button>{open&&<OperationDialog compact title="Поддержка CashNeuro" onClose={()=>setOpen(false)} footer={<><button type="button" className={common.button} onClick={()=>void navigator.clipboard.writeText(supportEmail).then(()=>setCopied(true)).catch(()=>setCopied(false))}>Скопировать адрес</button><a className={common.primaryButton} href={'mailto:'+supportEmail}><Mail size={16}/>Написать письмо</a></>}><p>Напишите, если возникли вопросы об аккаунте, оплате или персональных данных либо если что-то не работает.</p><strong>{supportEmail}</strong>{copied&&<p role="status">Адрес скопирован.</p>}</OperationDialog>}</>;
+
+export function CopySupportAddress({iconOnly=false}:{iconOnly?:boolean}){
+ const [status,setStatus]=useState('');
+ async function copy(){
+  try{await navigator.clipboard.writeText(supportEmail);setStatus('Адрес скопирован.');}
+  catch{setStatus('Не удалось скопировать адрес.');}
+ }
+ return <>
+  <button type="button" className={iconOnly?common.iconButton:common.button} aria-label={iconOnly?'Скопировать адрес':undefined} title={iconOnly?'Скопировать адрес':undefined} onClick={()=>void copy()}>
+   {iconOnly?<Copy size={16} aria-hidden="true"/>:'Скопировать адрес'}
+  </button>
+  {status&&<span role="status">{status}</span>}
+ </>;
+}
+
+const recipient=encodeURIComponent(supportEmail);
+const mailOptions=[
+ ['Gmail','https://mail.google.com/mail/?view=cm&fs=1&to='+recipient],
+ ['Яндекс Почта','https://mail.yandex.ru/compose?to='+recipient],
+ ['Mail','https://e.mail.ru/compose/?To='+recipient],
+] as const;
+
+export function SupportLink({className=common.button,children='Поддержка',showIcon=false}:{className?:string;children?:string;showIcon?:boolean}){
+ const [open,setOpen]=useState(false),[mail,setMail]=useState(false),optionsId=useId();
+ return <>
+  <button type="button" className={className} aria-label={showIcon?children:undefined} onClick={()=>{setMail(false);setOpen(true);}}>{showIcon?<><LifeBuoy size={17} aria-hidden="true"/><span>{children}</span></>:children}</button>
+  {open&&<OperationDialog compact title="Поддержка CashNeuro" onClose={()=>setOpen(false)} footer={<>
+   <CopySupportAddress/>
+   <button type="button" className={common.primaryButton} aria-expanded={mail} aria-controls={optionsId} onClick={()=>setMail(v=>!v)}><Mail size={16}/>Написать письмо</button>
+  </>}>
+   <p>Напишите нам — поможем разобраться.</p>
+   <strong>{supportEmail}</strong>
+   {mail&&<ul id={optionsId}>
+    {mailOptions.map(([label,href])=><li key={label}><a href={href} target="_blank" rel="noreferrer">{label}</a></li>)}
+    <li><a href={'mailto:'+supportEmail}>Почтовое приложение</a></li>
+   </ul>}
+  </OperationDialog>}
+ </>;
 }

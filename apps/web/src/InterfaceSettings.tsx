@@ -8,9 +8,7 @@ import type {NavigationPreferences} from './navigation-preferences';
 import common from './App.module.css';
 import styles from './Settings.module.css';
 
-const deviceZone=()=>Intl.DateTimeFormat().resolvedOptions().timeZone||'Etc/UTC';
-const zoneModeKey='cashneuro-timezone-device';
-export function followsDeviceTimezone(){try{return localStorage.getItem(zoneModeKey)==='yes';}catch{return false;}}
+export const deviceZone=()=>Intl.DateTimeFormat().resolvedOptions().timeZone||'Etc/UTC';
 const cities:Record<string,string>={'Europe/Moscow':'Москва','Europe/Kaliningrad':'Калининград','Europe/Samara':'Самара','Asia/Yekaterinburg':'Екатеринбург','Asia/Omsk':'Омск','Asia/Novosibirsk':'Новосибирск','Asia/Krasnoyarsk':'Красноярск','Asia/Irkutsk':'Иркутск','Asia/Yakutsk':'Якутск','Asia/Vladivostok':'Владивосток','Asia/Magadan':'Магадан','Asia/Kamchatka':'Петропавловск-Камчатский','Etc/UTC':'Всемирное время'};
 export const timezoneLabel=(id:string)=>{const zone=new Intl.DateTimeFormat('ru',{timeZone:id,timeZoneName:'longOffset'}).formatToParts().find(p=>p.type==='timeZoneName')?.value.replace('GMT','UTC')??'';return (cities[id]??id.replaceAll('_',' '))+' · '+zone;};
 export function TimezonePicker({value,onChange,disabled}:{value:string;onChange:(v:string)=>void;disabled:boolean}){

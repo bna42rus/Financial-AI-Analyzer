@@ -9,6 +9,7 @@ import {Brand} from './Brand';
 import {SupportLink} from './SupportDialog';
 import {api,ApiError,readLink} from './server-client';
 import type {Session} from './server-client';
+import {deviceZone} from './InterfaceSettings';
 import {ServerAccount} from './ServerAccount';
 import {ServerRenewal} from './ServerRenewal';
 import {FirstAccessBilling,FirstPaidRenewal} from './AccessBilling';
@@ -42,7 +43,13 @@ export function ServerAccess(){
  const [tariffId,setTariffId]=useState(()=>new URLSearchParams(location.hash.split('?')[1]).get('tariff')??'');
  const selected=tariffs.find(t=>t.id===tariffId)??tariffs[0];
  const renewalTariff=route==='access'?new URLSearchParams(location.hash.split('?')[1]).get('tariff')??'':'';
- const refresh=useCallback(async()=>{try{setSession(await api<Session>('/session',undefined,AbortSignal.timeout(10000)));setSessionError('');}catch(e){if(hasCode(e,'AUTH_REQUIRED')){setSession(null);setSessionError('');}else{setSessionError('Не удалось проверить доступ. Проверьте соединение и повторите.');throw e;}}finally{setLoaded(true);}},[]);
+ const refresh=useCallback(async()=>{try{
+  const next=await api<Session>('/session',undefined,AbortSignal.timeout(10000)),zone=deviceZone();
+  if(next.scope==='active'&&(next.followsDevice||!next.timezone)&&next.timezone!==zone){
+   try{Object.assign(next,await api<Pick<Session,'timezone'|'followsDevice'>>('/access/profile/timezone',{timezone:zone,syncDevice:true},AbortSignal.timeout(6000)));}catch{/* Keep the last server calendar and retry on the next refresh. */}
+  }
+  setSession(next);setSessionError('');
+ }catch(e){if(hasCode(e,'AUTH_REQUIRED')){setSession(null);setSessionError('');}else{setSessionError('Не удалось проверить доступ. Проверьте соединение и повторите.');throw e;}}finally{setLoaded(true);}},[]);
  const reloadApplication=useCallback(async()=>{try{setRow((await api<{request:AccessRequest}>('/access/request')).request);setApplicationError('');}catch(e){if(hasCode(e,'APPLICATION_SESSION_REQUIRED')){setRow(null);setApplicationError('');}else{setApplicationError('Не удалось загрузить заявку. Повторите проверку.');throw e;}}finally{setApplicationLoaded(true);}},[]);
  useEffect(()=>{
   void refresh().catch(()=>{});void reloadApplication().catch(()=>{});

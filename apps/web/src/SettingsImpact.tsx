@@ -9,7 +9,30 @@ const array=(v:unknown):unknown[]=>Array.isArray(v)?v:[];
 const rows=(v:unknown)=>array(v).filter((r):r is Record<string,unknown>=>!!r&&typeof r==='object');
 export function SettingsImpact({details:d,finance:s,changes,subjectId}:{changes?:ImpactChange[];details:{kind:string}&Record<string,unknown>;finance?:FinanceState|null;subjectId?:string}){
  if(d.kind==='transfer_counterparty_operations')return <p>Перенести операции ({array(d.operationDependencies).length}) от «{String(d.sourceName)}» к «{String(d.destinationName)}»?</p>;
- if(d.kind==='delete_counterparty')return <section><p>Карточка будет удалена. Операции сохранятся.</p>{array(d.operationDependencies).length>0&&<p>Операций без этой привязки: {array(d.operationDependencies).length}.</p>}{array(d.rulesNeedSetup).length>0&&<p>Правил потребуется настроить заново: {array(d.rulesNeedSetup).length}.</p>}</section>;
+ if(d.kind==='merge_counterparties'){
+  const kept=(d.canonicalSettings as {name?:string}|undefined)?.name??'Выбранная карточка';
+  const donors=array(d.counterpartiesRedirected);
+  return <section aria-label="Последствия объединения контрагентов">
+   <p>Останется карточка «{kept}». Операции будут привязаны к ней.</p>
+   <dl className={style.delta}>
+    <div><dt>Карточек объединится</dt><dd>{donors.length}</dd></div>
+    <div><dt>Затронутые операции</dt><dd>{array(d.operationDependencies).length}</dd></div>
+    {array(d.rulesMoved).length>0&&<div><dt>Перенесётся правил</dt><dd>{array(d.rulesMoved).length}</dd></div>}
+   </dl>
+   <details><summary>Подробнее</summary>
+    <p>Источников переносится: {String(d.observationsMoved??0)}. Банковских псевдонимов: {String(d.aliasesMoved??0)}.</p>
+    <p>Банковские оригиналы, прошлые версии источников и финансовый смысл операций сохранятся.</p>
+    <p>Изменение появится в истории. Его можно отменить в течение 30 дней, пока нет зависимых новых решений.</p>
+   </details>
+  </section>;
+ }
+ if(d.kind==='delete_counterparty')return <section>
+  <p>Карточка будет удалена. Операции сохранятся.</p>
+  <dl className={style.delta}>
+   <div><dt>Операций без этой привязки</dt><dd>{array(d.operationDependencies).length}</dd></div>
+   {array(d.rulesNeedSetup).length>0&&<div><dt>Правил потребуется настроить заново</dt><dd>{array(d.rulesNeedSetup).length}</dd></div>}
+  </dl>
+ </section>;
  if(d.kind==='delete_rule')return <p>Правило перестанет применяться к новым загрузкам. Уже обработанные операции сохранят свои категории и другие значения.</p>;
  if(d.kind==='apply_rules'){
   const operations=array(d.changedOperationIds),conflicts=array(d.conflictingOperationIds);

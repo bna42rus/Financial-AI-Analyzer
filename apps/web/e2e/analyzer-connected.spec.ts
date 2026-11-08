@@ -15,7 +15,7 @@ import {calculateWidget,parseWidget} from '../../../packages/finance-core/src/ov
 let server:ViteDevServer,base:string;
 test.beforeAll(async()=>{server=await createServer({root:fileURLToPath(new URL('..',import.meta.url)),cacheDir:fileURLToPath(new URL('../node_modules/.vite-overview-'+process.pid,import.meta.url)),server:{host:'127.0.0.1',port:0},define:{'import.meta.env.VITE_API_ORIGIN':JSON.stringify('http://127.0.0.1:3000')}});await server.listen();base=server.resolvedUrls!.local[0]!;});
 test.afterAll(async()=>{await server?.close();});
-async function setup(page:Page,beforeOpen?:()=>Promise<void>,operatingBudget?:{limitAtoms:string;spentAtoms:string;heldAtoms:string;remainingAtoms:string;resetAt:string;warning:80|95|100|null}){const consoleKeys:string[]=[];page.on('console',m=>{if(m.text().includes('same key'))consoleKeys.push(m.text());});const detail=syntheticDetail(),category=crypto.randomUUID(),other=crypto.randomUUID(),op={...detail.projection,classification:detail.semantics,comment:''};op.date={precision:'day',date:'2026-09-03'};op.amountMinor='-10000';op.parts=op.parts.map(p=>({...p,amountMinor:'-10000',categoryId:category,role:'expense' as const,included:true}));op.classification.category.value=category;op.classification.merchant.value='Synthetic shop';op.reviewReasons=[];const second=structuredClone(op);second.id=crypto.randomUUID();second.amountMinor='-20000';second.parts[0]!.amountMinor='-20000';second.parts[0]!.categoryId=other;second.classification.category.value=other;second.classification.merchant.value='Synthetic shop plus';second.date={precision:'day',date:'2026-09-05'};
+async function setup(page:Page,beforeOpen?:()=>Promise<void>,customerBudget?:{limit:number;remaining:number;extra:number;resetAt:string}){const consoleKeys:string[]=[];page.on('console',m=>{if(m.text().includes('same key'))consoleKeys.push(m.text());});const detail=syntheticDetail(),category=crypto.randomUUID(),other=crypto.randomUUID(),op={...detail.projection,classification:detail.semantics,comment:''};op.date={precision:'day',date:'2026-09-03'};op.amountMinor='-10000';op.parts=op.parts.map(p=>({...p,amountMinor:'-10000',categoryId:category,role:'expense' as const,included:true}));op.classification.category.value=category;op.classification.merchant.value='Synthetic shop';op.reviewReasons=[];const second=structuredClone(op);second.id=crypto.randomUUID();second.amountMinor='-20000';second.parts[0]!.amountMinor='-20000';second.parts[0]!.categoryId=other;second.classification.category.value=other;second.classification.merchant.value='Synthetic shop plus';second.date={precision:'day',date:'2026-09-05'};
  const state:FinanceState={generation:detail.generation,revision:'1',accounts:[{id:detail.source.accountId,name:'Synthetic account',bankId:'tbank',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null}],mergedAccounts:[],categories:[{id:category,name:'Synthetic food',parentId:null,role:'expense',hidden:false},{id:other,name:'Synthetic other',parentId:null,role:'expense',hidden:false}],counterparties:[],rules:[],operations:[op,second],summary:aggregate([op,second])},views:any[]=[],calls:{path:string;body:Record<string,any>}[]=[],pending=new Map<string,Record<string,any>>();let blocked=false;const chats:Chat[]=[];let failNext=false,failActionNext=false;
  await page.route('http://127.0.0.1:3000/**',async route=>{const req=route.request(),path=new URL(req.url()).pathname,body=req.postDataJSON()??{},headers={'Access-Control-Allow-Origin':req.headers().origin??new URL(base).origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});calls.push({path,body});let result:unknown={},status=200;
  if(path==='/session')result={name:'Synthetic user',scope:blocked?'restricted':'active',capabilities:['finance'],indefinite:true,timezone:'Europe/Moscow'};
@@ -24,7 +24,7 @@ async function setup(page:Page,beforeOpen?:()=>Promise<void>,operatingBudget?:{l
  else if(path==='/finance/summary'||path==='/finance/state')result={...state,summary:aggregate(state.operations,body)};
  else if(path==='/finance/imports')result={batches:[],nextCursor:null};
  else if(path==='/finance/review-sessions')result={sessions:[]};
- else if(path==='/finance/analyzer-state')result={operatingBudget,chats:chats.map(c=>({...c,matches:!body.search||(c.title+' '+c.messages.map(m=>m.question).join(' ')).toLocaleLowerCase('ru').includes(body.search.toLocaleLowerCase('ru')),messages:c.id===(body.chatId??chats[0]?.id)?c.messages:[]})),quota:{available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null},providerAvailable:false,registryVersion};
+ else if(path==='/finance/analyzer-state')result={customerBudget,chats:chats.map(c=>({...c,matches:!body.search||(c.title+' '+c.messages.map(m=>m.question).join(' ')).toLocaleLowerCase('ru').includes(body.search.toLocaleLowerCase('ru')),messages:c.id===(body.chatId??chats[0]?.id)?c.messages:[]})),quota:{available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null},providerAvailable:false,registryVersion};
  else if(path==='/finance/analyzer-chat'){let c=chats.find(c=>c.id===body.id);if(body.create&&!c){c={id:body.id,title:'Новый диалог',pinned:false,createdAt:new Date().toISOString(),modifiedAt:new Date().toISOString(),messages:[]};chats.unshift(c);}if(body.delete)chats.splice(chats.findIndex(c=>c.id===body.id),1);else if(c){if(body.title)c.title=body.title;if(body.pinned!==undefined)c.pinned=body.pinned;}result={id:body.id};}
  else if(path==='/finance/analyzer-query'){const c=chats.find(c=>c.id===body.chatId)!;let m=c.messages.find(m=>m.id===body.id);if(!m){const prior=c.messages.find(m=>m.id===body.contextId),i=interpret(body.text,body.filter,prior?.answer.query,new Date('2026-10-11T12:00:00Z'));let answer:any={mode:i.relevance==='unrelated'?'redirect':i.relevance==='ambiguous'?'clarification':'unavailable',text:i.relevance==='unrelated'?'Я помогаю разбираться в финансах.':i.relevance==='ambiguous'?'Уточните показатель и период.':'Для такого вопроса нужна подключённая AI-модель.',registryVersion};if(i.query){const w=parseWidget({id:crypto.randomUUID(),name:'Расходы',metrics:[i.query.metric],grouping:i.query.grouping,comparison:{kind:i.query.comparison},filter:i.query.filter,chart:'table'});answer={...answer,mode:'deterministic',text:'Расчёт по вашим сохранённым операциям.',query:i.query,widget:w,result:calculateWidget(w,state.operations,state,{}),generation:state.generation,revision:state.revision,accountCount:1,periodFromQuestion:i.periodFromQuestion,followUp:i.followUp,computedAt:'2026-10-11T12:00:00Z'};c.title=body.text.slice(0,100);}m={id:body.id,question:body.text,answer,createdAt:new Date().toISOString(),actionId:null};c.messages.push(m);}result={id:m.id,answer:m.answer};if(failNext){failNext=false;return route.abort('failed');}}
  else if(path==='/finance/analyzer-propose'){const m=chats.flatMap(c=>c.messages).find(m=>m.id===body.tool.answerId)!;m.actionId=body.actionId;m.outcome={status:'previewed',tool:body.tool,confirmation:true};pending.set(body.actionId,body.tool.name==='finance_action'?body.tool.intent:{kind:'bulk_operations',operationIds:state.operations.map(o=>o.id),patch:body.tool.name==='set_inclusion'?{analyticsOverride:body.tool.value}:body.tool.patch});result={...syntheticPreview(body.actionId,detail),generation:state.generation,requiresConfirmation:true};}
@@ -88,15 +88,14 @@ test('device commands show a local proposal, apply and undo without an AI or fin
 });
 
 
-test('monthly budget shows the exact ruble remainder and warning independently of task quota',async({page})=>{
- await setup(page,undefined,{limitAtoms:'100000000000',spentAtoms:'81000000000',heldAtoms:'2328657920',remainingAtoms:'16671342080',resetAt:'2026-11-30T21:00:00Z',warning:80});
- await page.getByRole('button',{name:'Настройки Анализатора',exact:true}).click();
- const notice=page.getByRole('status').filter({hasText:'Тестовый бюджет ИИ'});
- await expect(notice).toContainText('16,67');
- await expect(notice).toContainText('из 100 ₽');
- await expect(notice).toContainText('80%');
- await expect(notice).toContainText('01.12.2026');
- await expect(page.getByText('Лимит ИИ не назначен. Точные расчёты его не расходуют.')).toBeVisible();
+test('monthly budget shows the purchased Analyzer units and the next reset',async({page})=>{
+ await setup(page,undefined,{limit:10000,remaining:8300,extra:2000,resetAt:'2026-11-30T21:00:00Z'});
+ await page.getByRole('button',{name:'Лимит Анализатора',exact:true}).click();
+ const limit=page.getByRole('dialog',{name:'Лимит Анализатора'});
+ await expect(limit).toContainText(/Осталось 8\s300 из 10\s000/);
+ await expect(limit).toContainText('1 декабря 2026');
+ await expect(limit).toContainText(/Дополнительно из пакетов: 2\s000/);
+ await expect(limit.getByRole('button',{name:'Докупить лимит'})).toBeVisible();
 });
 
 
@@ -118,4 +117,22 @@ test('pending question immediately shows the submitted text and waiting state, t
  await expect(log(page).locator('article[data-pending-question]')).toHaveCount(0);
  await expect(log(page).getByText('Мои расходы за сентябрь 2026',{exact:true})).toHaveCount(1);
  expect(h.calls.filter(c=>c.path==='/finance/analyzer-query')).toHaveLength(1);
+});
+
+test('Analyzer packages keep catalog prices and show payment only when configured',async({page})=>{
+ await setup(page,async()=>{
+  await page.route('http://127.0.0.1:3000/finance/ai-packages',async route=>{
+   if(route.request().method()==='OPTIONS')return route.fallback();
+   await route.fulfill({headers:{'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true'},json:{enabled:false,pending:[],packages:[
+    {units:1000,priceMinor:3900},{units:2000,priceMinor:6900},{units:5000,priceMinor:14900},{units:10000,priceMinor:26900},
+   ]}});
+  });
+ });
+ await page.getByRole('button',{name:'Лимит Анализатора',exact:true}).click();
+ await page.getByRole('button',{name:'Докупить лимит',exact:true}).click();
+ const dialog=page.getByRole('dialog',{name:'Пополнить лимит Анализатора'});
+ await expect(dialog.getByRole('radio')).toHaveCount(4);
+ await dialog.getByRole('radio',{name:/5\s000 единиц/}).check();
+ await expect(dialog.getByRole('button',{name:/Перейти к оплате · 149/})).toBeDisabled();
+ await expect(dialog.getByText('Оплата пока не подключена.',{exact:false})).toHaveCount(0);
 });

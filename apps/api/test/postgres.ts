@@ -61,6 +61,7 @@ export async function postgresFixture(options: { name?: 'finance_staging' } = {}
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0039_first_checkout_autorenewal.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0040_mail_request_cooldown.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0041_legacy_analyzer_allowance.sql',import.meta.url),'utf8'));
+  await owner.query(await readFile(new URL('../../../packages/database/migrations/0042_device_timezone.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

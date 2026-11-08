@@ -1,3 +1,4 @@
+import {FormSelect} from './SearchFilter';
 import {useEffect,useMemo,useState} from 'react';
 import type {Category,Link} from '../../../packages/finance-core/src/model';
 import {linkKinds} from '../../../packages/finance-core/src/model';
@@ -35,8 +36,12 @@ export function OperationParts({detail,purchase,categories,staged,onApply,onClos
    {!purchase&&<label>Тип части<select aria-label={`Тип части ${index+1}`} value={d.type} onChange={e=>change(index,{type:e.target.value as ComponentDraft['type']})}>{Object.entries(componentNames).map(([v,n])=><option key={v} value={v}>{n}</option>)}</select></label>}
    <OperationField label={`Сумма части ${index+1}, ₽`} error={checked?errors[index]:undefined}><input inputMode="decimal" value={d.amount} onChange={e=>change(index,{amount:e.target.value})}/></OperationField>
    {!purchase&&<label>Смысл части<select aria-label={`Смысл части ${index+1}`} value={d.role} onChange={e=>change(index,{role:e.target.value as ComponentDraft['role']})}>{(!detail.components.find(c=>c.id===d.id)?.role.userVerified)&&<option value="auto">По сохранённой логике</option>}{['expense','income','neutral','unresolved'].map(r=><option key={r} value={r}>{displayRole(r,'0')}</option>)}</select></label>}
-   <OperationField label={`Категория части ${index+1}`} error={checked?categoryErrors[index]:undefined}><select value={d.categoryId??''} onChange={e=>change(index,{categoryId:e.target.value||null,subcategoryId:null,categoryConfirmed:true,subcategoryConfirmed:true})}><option value="">Без категории</option>{categories.filter(c=>!c.parentId&&((!c.hidden&&compatible(d,c))||c.id===d.categoryId)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></OperationField>
-   <label>Подкатегория части {index+1}<select disabled={!d.categoryId} value={d.subcategoryId??''} onChange={e=>change(index,{subcategoryId:e.target.value||null,subcategoryConfirmed:true})}><option value="">Без подкатегории</option>{categories.filter(c=>d.categoryId&&c.parentId===d.categoryId&&((!c.hidden&&compatible(d,c))||c.id===d.subcategoryId)).map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
+   <OperationField label={`Категория части ${index+1}`} error={checked?categoryErrors[index]:undefined}><FormSelect label={`Категория части ${index+1}`} value={d.categoryId??''}
+    onValueChange={id=>change(index,{categoryId:id||null,subcategoryId:null,categoryConfirmed:true,subcategoryConfirmed:true})}
+    options={[['','Без категории'],...categories.filter(c=>!c.parentId&&((!c.hidden&&compatible(d,c))||c.id===d.categoryId)).map(c=>[c.id,c.name] as const)]}/></OperationField>
+   <label>Подкатегория части {index+1}<FormSelect label={`Подкатегория части ${index+1}`} value={d.subcategoryId??''} disabled={!d.categoryId}
+    onValueChange={id=>change(index,{subcategoryId:id||null,subcategoryConfirmed:true})}
+    options={[['','Без подкатегории'],...categories.filter(c=>d.categoryId&&c.parentId===d.categoryId&&((!c.hidden&&compatible(d,c))||c.id===d.subcategoryId)).map(c=>[c.id,c.name] as const)]}/></label>
    <div className={styles.actions}>
     {purchase&&<button className={common.button} onClick={()=>{try{change(index,{amount:purchaseRemainder(detail,drafts,d.id)});}catch(e){setError((e as Error).message);}}}>Заполнить остатком часть {index+1}</button>}
     <button className={common.button} disabled={drafts.length<=1} onClick={()=>{setError('');setDrafts(parts=>parts.filter(p=>p.id!==d.id));}}>Убрать часть {index+1}</button>

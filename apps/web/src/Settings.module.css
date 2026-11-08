@@ -185,6 +185,17 @@
 .similarReview { border-block:1px solid var(--color-border); padding:7px 0; }
 .similarReview li + li { border-top:1px solid var(--color-border); }
 .uploadFiles { border:1px solid var(--color-border); border-radius:8px; }
-.uploadFiles > summary { padding:6px 10px; min-height:34px; font-weight:550; }
+.uploadFiles > summary { padding:6px 10px 6px 12px; min-height:34px; font-weight:550; }
 .uploadFiles[open] > summary { border-bottom:1px solid var(--color-border); }
 .uploadFiles > div { padding:6px 10px; }
+.uploadFiles > div > details { padding-inline-start:12px; }
+
+.reviewForm label,.reviewForm p,.reviewForm summary,.reviewForm input:not([type=checkbox]),.reviewForm select,.reviewForm small { font-size:calc(14px * var(--text-scale,1)); }
+.similarToolbar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 0; border-bottom:1px solid var(--color-border); }
+.reviewList { overscroll-behavior:contain; }
+.listToolbar select { font-size:calc(14px * var(--text-scale,1)); padding-inline:10px 20px; }
+.topupPackages { border:0; padding:0; margin:0; min-width:0; }
+.topupPackages legend { margin-bottom:6px; }
+.topupPackage { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center; min-height:44px; cursor:pointer; }
+.topupPackage + .topupPackage { border-top:1px solid var(--color-border); }
+.topupPackage input { margin:0; accent-color:var(--color-primary); }

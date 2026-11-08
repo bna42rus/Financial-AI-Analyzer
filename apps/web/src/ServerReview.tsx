@@ -11,7 +11,7 @@ import styles from './Settings.module.css';
 
 type Queue={id:string;generation:string;revision:string;financeRevision:string;remaining:number;anchor?:string;operations:FinanceState['operations'];similar:string[]};
 export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,onAccessError,onBusy}:{state:FinanceState;refreshKey:number;command:WorkspaceCommand|null;disabled:boolean;timezone:string;onOpen:(id:string)=>void;onAccessError:(e:unknown)=>boolean;onBusy:(v:boolean)=>void}){
- const [queue,setQueue]=useState<Queue|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[show,setShow]=useState(false),[selected,setSelected]=useState<string[]>([]);
+ const [queue,setQueue]=useState<Queue|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[applySimilar,setApplySimilar]=useState(false),[selected,setSelected]=useState<string[]>([]);
  const turn=useRef(0),seenRefresh=useRef(refreshKey);
  async function load(params:Record<string,unknown>={}){
   const version=++turn.current;setBusy(true);setError('');
@@ -20,7 +20,7 @@ export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,
   finally{if(version===turn.current){setBusy(false);onBusy(false);}}
  }
  useEffect(()=>{if(disabled)return;const refresh=seenRefresh.current!==refreshKey;seenRefresh.current=refreshKey;void load(refresh?{refresh:true}:{});return()=>{++turn.current;onBusy(false);};},[state.generation,state.revision,refreshKey,disabled]);
- useEffect(()=>{setShow(false);setSelected([]);},[queue?.anchor]);
+ useEffect(()=>{setApplySimilar(false);setSelected([]);},[queue?.id,queue?.anchor,queue?.financeRevision]);
  const op=queue?.operations.find(o=>o.id===queue.anchor),similar=(queue?.similar??[]).filter(id=>id!==op?.id),items=new Map(queue?.operations.map(o=>[o.id,o])),locked=disabled||busy||queue?.financeRevision!==state.revision;
  const name=(item:FinanceState['operations'][number])=>item.displayName?.compositeLabel||item.classification.merchant.value||kindNames[item.classification.kind.value];
  const values=(item:FinanceState['operations'][number])=>displayBankDate(item.date,timezone)+' · '+formatMoney(item.amountMinor)+' · '+(state.accounts.find(a=>a.id===item.accountId)?.name??'Счёт');
@@ -31,8 +31,17 @@ export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,
   {queue?.remaining===0&&<p className={styles.muted}>Все операции проверены.</p>}
   {queue&&op&&<div className={styles.settingsStack}>
    <div className={styles.currentReview}><button className={common.linkButton} onClick={()=>onOpen(op.id)}>{name(op)}</button><p className={styles.muted}>{values(op)}</p><p>{op.reviewReasons.map(r=>reviewNames[r]??'Нужно проверить').join(' · ')}</p></div>
-   {similar.length>0&&<details className={styles.similarReview} open={show} onToggle={e=>setShow(e.currentTarget.open)}><summary>Похожие операции: {similar.length}</summary><label className={styles.reviewChoice}><input type="checkbox" checked={similar.every(id=>selected.includes(id))} disabled={locked} onChange={e=>setSelected(e.target.checked?similar:[])}/>Выбрать все похожие</label><ul className={styles.reviewList}>{similar.map(id=>{const item=items.get(id);return item&&<li key={id}><label className={styles.reviewChoice}><input type="checkbox" checked={selected.includes(id)} disabled={locked} onChange={e=>setSelected(ids=>e.target.checked?[...ids,id]:ids.filter(v=>v!==id))}/><span>{name(item)}<small>{values(item)}</small></span></label></li>;})}</ul></details>}
-   <QuickReviewFields key={queue.id+':'+op.id+':'+queue.financeRevision} op={op} state={state} similarIds={selected.filter(id=>similar.includes(id))} disabled={locked||!command} ruleHint={ruleHint} canSkip={queue.remaining>1} onOpen={()=>onOpen(op.id)} onSkip={()=>{onBusy(true);void load({skip:op.id,revision:queue.revision});}} onApply={intent=>void command?.begin({...intent,reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:op.id}},'Решение при проверке',!!intent.rememberRule,{generation:queue.generation,revision:queue.financeRevision})}/>
+   <QuickReviewFields key={queue.id+':'+op.id+':'+queue.financeRevision} op={op} state={state} similarIds={applySimilar?selected.filter(id=>similar.includes(id)):[]} requireSimilarSelection={applySimilar} similarControls={<>
+    <label className={styles.reviewChoice}><input type="checkbox" checked={applySimilar} disabled={locked||!similar.length} onChange={e=>setApplySimilar(e.target.checked)}/>Применить к похожим операциям ({similar.length})</label>
+    {applySimilar&&similar.length>0&&<section className={styles.similarReview} aria-label="Похожие операции">
+     <div className={styles.similarToolbar}>
+      <button type="button" className={common.button} disabled={locked||similar.every(id=>selected.includes(id))} onClick={()=>setSelected(similar)}>Выбрать все</button>
+      <button type="button" className={common.button} disabled={locked||!selected.length} onClick={()=>setSelected([])}>Снять выбор</button>
+      <span role="status">Выбрано: {selected.filter(id=>similar.includes(id)).length}/{similar.length}</span>
+     </div>
+     <ul className={styles.reviewList}>{similar.map(id=>{const item=items.get(id);return item&&<li key={id}><label className={styles.reviewChoice}><input type="checkbox" checked={selected.includes(id)} disabled={locked} onChange={e=>setSelected(ids=>e.target.checked?[...ids,id]:ids.filter(v=>v!==id))}/><span>{name(item)}<small>{values(item)}</small></span></label></li>;})}</ul>
+    </section>}
+   </>} disabled={locked||!command} ruleHint={ruleHint} canSkip={queue.remaining>1} onOpen={()=>onOpen(op.id)} onSkip={()=>{onBusy(true);void load({skip:op.id,revision:queue.revision});}} onApply={intent=>void command?.begin({...intent,reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:op.id}},'Решение при проверке',!!intent.rememberRule||intent.operationIds.length>1,{generation:queue.generation,revision:queue.financeRevision})}/>
   </div>}
  </section>;
 }

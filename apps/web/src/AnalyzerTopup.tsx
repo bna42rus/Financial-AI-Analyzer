@@ -1,31 +1,88 @@
-import {useEffect,useState} from 'react';
+import {useEffect,useRef,useState} from 'react';
 import {api} from './server-client';
 import {moneyLabel} from '../../../packages/access/src/model';
 import {OperationDialog} from './OperationDialog';
 import common from './App.module.css';
 import styles from './Settings.module.css';
+
 type Order={id:string;units:number;status:string;redirect:string|null};
 type Catalog={enabled:boolean;packages:{units:number;priceMinor:number}[];pending:Order[]};
+const number=(n:number)=>n.toLocaleString('ru-RU');
+const waiting=(order:Order|null)=>order?.status==='created'||order?.status==='pending';
+
 export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>void}){
- const [data,setData]=useState<Catalog|null>(null),[order,setOrder]=useState<Order|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const number=(n:number)=>n.toLocaleString('ru-RU');
- const load=()=>api<Catalog>('/finance/ai-packages',{},AbortSignal.timeout(8000)).then(d=>{setData(d);setError('');}).catch(e=>setError(e.message));
- useEffect(()=>{void load();},[]);
- async function proceed(id:string,units?:number){
-  if(busy)return;setBusy(true);setError('');
+ const [data,setData]=useState<Catalog|null>(null),[order,setOrder]=useState<Order|null>(null),[chosen,setChosen]=useState<number|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const attempt=useRef<{id:string;units:number}|null>(null),credit=useRef(onCredit);
+ credit.current=onCredit;
+ const selected=data?.packages.find(pack=>pack.units===chosen);
+
+ async function load(signal?:AbortSignal){
+  setError('');
   try{
-   if(units!==undefined){const pending=await api<Order>('/finance/ai-topup',{id,units});setOrder(pending);}
-   const updated=await api<Order>('/finance/ai-topup',{id});setOrder(updated);
-   if(updated.status==='paid')onCredit();
-  }catch(e){setError(e instanceof Error?e.message:'Не удалось проверить платёж.');void load();}
+   const catalog=await api<Catalog>('/finance/ai-packages',{},signal);
+   if(signal?.aborted)return;
+   setData(catalog);
+   setOrder(catalog.pending[0]??null);
+  }catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:'Не удалось загрузить пакеты.');}
+ }
+ useEffect(()=>{const abort=new AbortController();void load(abort.signal);return()=>abort.abort();},[]);
+ useEffect(()=>{
+  if(!data?.enabled||!waiting(order)||busy||!order)return;
+  const abort=new AbortController();
+  let running=false;
+  async function check(){
+   if(running||document.visibilityState==='hidden')return;
+   running=true;
+   try{
+    const next=await api<Order>('/finance/ai-topup',{id:order!.id},AbortSignal.any([abort.signal,AbortSignal.timeout(10000)]));
+    if(abort.signal.aborted)return;
+    setOrder(next);
+    setError('');
+    if(!waiting(next))attempt.current=null;
+    if(next.status==='paid')credit.current();
+   }catch(e){if(!abort.signal.aborted)setError(e instanceof Error?e.message:'Не удалось проверить платёж.');}
+   finally{running=false;}
+  }
+  void check();
+  const timer=window.setInterval(()=>void check(),15000);
+  window.addEventListener('focus',check);
+  return()=>{abort.abort();window.clearInterval(timer);window.removeEventListener('focus',check);};
+ },[data?.enabled,order?.id,order?.status,busy]);
+
+ async function start(){
+  if(busy||!selected||!data?.enabled||waiting(order))return;
+  setBusy(true);setError('');
+  if(attempt.current?.units!==selected.units)attempt.current={id:crypto.randomUUID(),units:selected.units};
+  try{
+   const pending=await api<Order>('/finance/ai-topup',attempt.current,AbortSignal.timeout(10000));
+   setOrder(pending);
+   const next=await api<Order>('/finance/ai-topup',{id:pending.id},AbortSignal.timeout(10000));
+   setOrder(next);
+   if(!waiting(next))attempt.current=null;
+   if(next.status==='paid')credit.current();
+   else if(next.redirect)window.location.assign(next.redirect);
+  }catch(e){setError(e instanceof Error?e.message:'Не удалось открыть оплату.');}
   finally{setBusy(false);}
  }
- return <OperationDialog compact title="Пополнить лимит Анализатора" onClose={()=>{if(!busy)onClose();}} footer={<button className={common.button} disabled={busy} onClick={onClose}>Закрыть</button>}>
+ return <OperationDialog compact title="Пополнить лимит Анализатора" onClose={()=>{if(!busy)onClose();}} footer={<>
+  <button className={common.button} disabled={busy} onClick={onClose}>Закрыть</button>
+  {waiting(order)?order?.redirect&&<a className={common.primaryButton} href={order.redirect}>Продолжить оплату</a>:
+   !!data?.packages.length&&<button className={common.primaryButton} disabled={busy||!data.enabled||!selected} onClick={()=>void start()}>{selected?'Перейти к оплате · '+moneyLabel(String(selected.priceMinor)):'Перейти к оплате'}</button>}
+ </>}>
   {error&&<p className={common.error} role="alert">{error}</p>}
-  {data&&!data.enabled&&<p className={styles.muted}>Оплата пока не подключена. Здесь можно посмотреть пакеты и цены.</p>}
-  {data?.enabled&&<p className={styles.muted}>Тестовый платёж. Реального списания не будет. Остаток пакета переносится на следующий месяц.</p>}
-  {order?.status==='paid'?<p role="status">Добавлено {number(order.units)} единиц.</p>:order?.status==='cancelled'?<p role="status">Платёж отменён.</p>:order&&<div className={styles.cardActions}>{order.redirect&&<a className={common.primaryButton} href={order.redirect} target="_blank" rel="noreferrer">Перейти в ЮKassa</a>}<button className={common.button} disabled={busy} onClick={()=>void proceed(order.id)}>Проверить оплату</button></div>}
-  {!data&&!error&&<p role="status">Загружаем пакеты…</p>}{!data&&error&&<button className={common.button} onClick={()=>void load()}>Повторить</button>}{data&&!data.packages.length&&<p>Нет доступных пакетов.</p>}
-  {data&&!order&&<div className={styles.settingsStack}>{data.packages.map(p=><div key={p.units} className={styles.settingsRow}><strong>{number(p.units)} единиц</strong>{data.enabled?<button className={common.button} disabled={busy} onClick={()=>void proceed(crypto.randomUUID(),p.units)}>{moneyLabel(String(p.priceMinor))}</button>:<span>{moneyLabel(String(p.priceMinor))}</span>}</div>)}{data.enabled&&data.pending.map(p=><div key={p.id} className={styles.settingsRow}><span>{number(p.units)} единиц · ожидает оплаты</span><button className={common.button} disabled={busy} onClick={()=>{setOrder(p);void proceed(p.id);}}>Открыть</button></div>)}</div>}
+  {!data&&!error&&<p role="status">Загружаем пакеты…</p>}
+  {!data&&error&&<button className={common.button} onClick={()=>void load()}>Повторить</button>}
+  {data&&!data.packages.length&&<p>Нет доступных пакетов.</p>}
+  {order?.status==='paid'&&<p role="status">Добавлено {number(order.units)} единиц.</p>}
+  {order?.status==='cancelled'&&<p role="status">Платёж отменён. Можно выбрать пакет заново.</p>}
+  {waiting(order)&&<p role="status">Ждём подтверждения оплаты за {number(order!.units)} единиц.</p>}
+  {!!data?.packages.length&&!waiting(order)&&<fieldset className={styles.topupPackages} disabled={busy}>
+   <legend>Выберите пакет</legend>
+   {data.packages.map(pack=><label key={pack.units} className={styles.topupPackage}>
+    <input type="radio" name="analyzer-topup" checked={chosen===pack.units} onChange={()=>setChosen(pack.units)}/>
+    <strong>{number(pack.units)} единиц</strong>
+    <span>{moneyLabel(String(pack.priceMinor))}</span>
+   </label>)}
+  </fieldset>}
  </OperationDialog>;
 }

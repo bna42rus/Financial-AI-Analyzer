@@ -41,7 +41,7 @@ export async function aiTopup(db:PoolClient,owner:{id:string;email:string},input
  if(payment.test!==true||payment.amount?.value!==value(order.price_minor)||payment.amount?.currency!=='RUB'||payment.metadata?.orderId!==id||order.provider_id&&payment.id!==order.provider_id)throw new HttpError(502,'PAYMENT_UNVERIFIED');
  let redirect:string|null=order.redirect_url;
  if(payment.confirmation?.confirmation_url){const url=new URL(payment.confirmation.confirmation_url);if(url.protocol!=='https:'||!['yookassa.ru','yoomoney.ru'].some(domain=>url.hostname===domain||url.hostname.endsWith('.'+domain))||url.username||url.password)throw new HttpError(502,'PAYMENT_UNVERIFIED');redirect=url.href;}
- const status=payment.status==='succeeded'&&payment.paid===true?'paid':payment.status==='cancelled'?'cancelled':'pending';
+ const status=payment.status==='succeeded'&&payment.paid===true?'paid':payment.status==='canceled'?'cancelled':'pending';
  if(status==='paid')await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",['customer-ai-budget:'+owner.id]);
  const saved=(await db.query<Order>("UPDATE commerce.ai_topup_order SET provider_id=$3,redirect_url=$4,status=$5,paid_at=CASE WHEN $5='paid' THEN clock_timestamp() ELSE NULL END WHERE user_id=$1 AND id=$2 RETURNING *",[owner.id,id,uuid(payment.id),status==='pending'?redirect:null,status])).rows[0]!;
  if(status==='paid')await outbox(db,'identity',seal,'analyzer_topup',{email:owner.email,units:order.units},{subjectId:owner.id,dedupeKey:'ai-topup:'+id});

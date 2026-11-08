@@ -3,3 +3,5 @@
 .field{flex-direction:column;align-items:stretch}.calendar{bottom:auto;height:36px}.error{font-size:12px;line-height:1.4;margin-top:5px;color:var(--color-danger,#b42339)}.field>input[aria-invalid=true]{border-color:var(--color-danger,#b42339)}
 
 .field{display:grid;grid-template-columns:minmax(0,1fr) 28px;grid-template-rows:auto auto}.field>input{grid-area:1/1/2/3}.field .calendar{position:relative;grid-area:1/2;align-self:stretch;justify-self:center;inset:auto;height:auto}.field .error{grid-column:1/-1}
+
+.field > input { padding-inline-start:10px; }

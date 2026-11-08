@@ -2,7 +2,7 @@ import {useMailCooldown} from './use-mail-cooldown';
 import type {MailSend} from './use-mail-cooldown';
 import {useState} from 'react';
 import {OperationDialog,OperationField} from './OperationDialog';
-import {TimezonePicker} from './InterfaceSettings';
+import {deviceZone,TimezonePicker} from './InterfaceSettings';
 import {api,ApiError} from './server-client';
 import type {Session} from './server-client';
 import common from './App.module.css';
@@ -10,7 +10,7 @@ import workspace from './Workspace.module.css';
 import access from './ServerAccess.module.css';
 export type AccountProfileField='name'|'email'|'timezone';
 export function AccountProfileEditor({field,session,onClose,onSaved}:{field:AccountProfileField;session:Session;onClose:()=>void;onSaved:()=>Promise<void>}){
- const [value,setValue]=useState(field==='name'?session.name:field==='timezone'?session.timezone??'device':''),[secret,setSecret]=useState(''),[code,setCode]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[where,setWhere]=useState(''),[isCooldown,setCooldown]=useState(false),[saved,setSaved]=useState(false);
+ const [value,setValue]=useState(field==='name'?session.name:field==='timezone'?(session.followsDevice||!session.timezone?'device':session.timezone):''),[secret,setSecret]=useState(''),[code,setCode]=useState(''),[confirm,setConfirm]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[where,setWhere]=useState(''),[isCooldown,setCooldown]=useState(false),[saved,setSaved]=useState(false);
  const mail=useMailCooldown();
  const title=field==='name'?'Изменить имя':field==='timezone'?'Часовой пояс':'Изменить почту';
  function issue(place:string,message:string){setWhere(place);setError(message);}
@@ -25,8 +25,7 @@ export function AccountProfileEditor({field,session,onClose,onSaved}:{field:Acco
    if(field==='email'&&!confirm){mail.remember(await api<MailSend>('/access/profile/email-request',{email:value.trim(),password:secret},AbortSignal.timeout(12000)));setConfirm(true);setSecret('');return;}
    if(field==='email')await api('/access/profile/email-confirm',{code:code.trim()},AbortSignal.timeout(12000));
    if(field==='name')await api('/access/profile/name',{name:value.trim()},AbortSignal.timeout(12000));
-   if(field==='timezone')await api('/access/profile/timezone',{timezone:value==='device'?Intl.DateTimeFormat().resolvedOptions().timeZone:value},AbortSignal.timeout(12000));
-   if(field==='timezone')try{if(value==='device')localStorage.setItem('cashneuro-timezone-device','yes');else localStorage.removeItem('cashneuro-timezone-device');}catch{/* Optional preference. */}
+   if(field==='timezone')await api('/access/profile/timezone',{timezone:value==='device'?deviceZone():value,followsDevice:value==='device'},AbortSignal.timeout(12000));
    setSaved(true);
    try{await onSaved();onClose();}catch{issue('form','Изменение сохранено. Не удалось обновить данные аккаунта.');}
   }catch(e){if(field==='email'&&!confirm)mail.remember(e);const tag=e instanceof ApiError?e.code:'';setCooldown(tag==='MAIL_COOLDOWN');if(tag==='INVALID_CREDENTIALS')issue('password','Пароль не подходит.');else if(tag==='INVALID_TOKEN')issue('code','Код не подходит или истёк.');else if(tag==='EMAIL_UNAVAILABLE')issue(confirm?'code':'value','Этот адрес недоступен.');else issue(confirm?'code':'form',e instanceof Error?e.message:'Не удалось сохранить изменения.');}
