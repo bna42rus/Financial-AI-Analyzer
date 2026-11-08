@@ -22,7 +22,7 @@ async function tariffs(db:PoolClient):Promise<Tariff[]> {return (await db.query(
 export async function ownRenewal(db:PoolClient,userId:string):Promise<OwnRenewal>{
  const cycle=await lockedCycle(db,userId),row=(await db.query(`SELECT data,state FROM commerce.renewal_request WHERE user_id=$1 ORDER BY (state='open') DESC,created_at DESC,id DESC LIMIT 1`,[userId])).rows[0];
  const plans=cycle.indefinite?[]:await tariffs(db),plannedEnds:Record<string,string>={};
- if(cycle.accessEnd&&!cycle.indefinite&&row?.state!=='open'){
+ if(cycle.accessEnd&&!cycle.indefinite){
   const now=await clock(db);
   for(const plan of plans)plannedEnds[plan.id]=(await extensionAt(db,cycle,plan.duration,now,'quote','quote')).extension.accessEnd;
  }

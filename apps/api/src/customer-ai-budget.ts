@@ -14,8 +14,10 @@ async function accessUsage(db:PoolClient,userId:string){
  return (await db.query(`WITH context AS MATERIALIZED (
   SELECT clock_timestamp() AS now,(SELECT anchor_at FROM commerce.access_cycle WHERE user_id=$1) AS anchor,
     (SELECT access_end FROM commerce.access_cycle WHERE user_id=$1) AS access_end
+ ), restoration AS (
+  SELECT window_start,period_start,restored_at FROM commerce.ai_allowance_restoration WHERE user_id=$1
  ), current_slot AS (
-  SELECT p.starts_at,p.ends_at,COALESCE(w.quota,$2::int) AS quota
+  SELECT p.starts_at,p.ends_at,CASE WHEN p.starts_at>=a.period_start THEN $2::int ELSE COALESCE(w.quota,$2::int) END AS quota
   FROM context c LEFT JOIN LATERAL (
     SELECT * FROM commerce.access_paid_window WHERE user_id=$1 AND starts_at<=c.now AND ends_at>c.now
     ORDER BY starts_at DESC LIMIT 1
@@ -23,9 +25,11 @@ async function accessUsage(db:PoolClient,userId:string){
   CROSS JOIN LATERAL commerce.billing_period(
    COALESCE(w.starts_at,CASE WHEN c.anchor<=c.now THEN c.anchor END,date_trunc('month',c.now AT TIME ZONE 'Europe/Moscow') AT TIME ZONE 'Europe/Moscow'),
    COALESCE(w.ends_at,CASE WHEN c.access_end>c.now THEN c.access_end END),COALESCE(w.kind,'calendar_months'),c.now) p
+  LEFT JOIN restoration a ON a.window_start=w.starts_at
  ), amounts AS (
-  SELECT p.starts_at,COALESCE(w.quota,$2::int) AS quota,
-   sum(CASE WHEN r.state IN ('settled','released') THEN r.settled_atoms ELSE r.reserved_atoms END) AS occupied
+  SELECT p.starts_at,CASE WHEN p.starts_at>=a.period_start THEN $2::int ELSE COALESCE(w.quota,$2::int) END AS quota,
+   sum(CASE WHEN p.starts_at=a.period_start AND r.created_at<a.restored_at THEN 0
+    WHEN r.state IN ('settled','released') THEN r.settled_atoms ELSE r.reserved_atoms END) AS occupied
   FROM commerce.ai_cost_reservation r CROSS JOIN context c LEFT JOIN LATERAL (
     SELECT * FROM commerce.access_paid_window WHERE user_id=$1 AND starts_at<=r.created_at AND ends_at>r.created_at
     ORDER BY starts_at DESC LIMIT 1
@@ -33,6 +37,7 @@ async function accessUsage(db:PoolClient,userId:string){
   CROSS JOIN LATERAL commerce.billing_period(
    COALESCE(w.starts_at,CASE WHEN c.anchor<=r.created_at THEN c.anchor END,date_trunc('month',r.created_at AT TIME ZONE 'Europe/Moscow') AT TIME ZONE 'Europe/Moscow'),
    w.ends_at,COALESCE(w.kind,'calendar_months'),r.created_at) p
+  LEFT JOIN restoration a ON a.window_start=w.starts_at
   WHERE r.user_id=$1 AND r.step<>'classification' GROUP BY 1,2
  ), paid AS (
   SELECT COALESCE(sum(units),0)::numeric*$3::numeric AS credits FROM commerce.ai_topup_order WHERE user_id=$1 AND status='paid'

@@ -1,7 +1,7 @@
 import {useEffect,useState} from 'react';
 import {timezoneLabel} from './InterfaceSettings';
 import {api} from './server-client';
-import {OnlineRenewal,useAccessBilling} from './AccessBilling';
+import {OnlineRenewal,RenewalEnd,useAccessBilling} from './AccessBilling';
 import {moneyLabel} from '../../../packages/access/src/model';
 import type {OwnRenewal} from '../../../packages/access/src/renewal';
 import styles from './ServerAccess.module.css';
@@ -37,8 +37,8 @@ function RenewalPreview({embedded,initialTariffId}:{embedded:boolean;initialTari
     <label>Период продления<select aria-label="Период продления" value={tariff.id} onChange={e=>setChosen(e.target.value)}>
      {data.tariffs.map(t=><option key={t.id} value={t.id}>{t.name} — {moneyLabel(t.priceMinor)}</option>)}
     </select></label>
-    {plannedEnd&&<p>После продления — до {date(plannedEnd)}.</p>}
-    <p>Лимит Анализатора на новый период — {tariff.aiQuota.toLocaleString('ru-RU')} единиц {tariff.duration.kind==='days'?'за период':'в месяц'}. Досрочное продление сохраняет текущий остаток.</p>
+    {plannedEnd&&<RenewalEnd date={plannedEnd} timezone={data.cycle.timezone}/>}
+    <p>Лимит Анализатора на новый период — {tariff.aiQuota.toLocaleString('ru-RU')} единиц {tariff.duration.kind==='days'?'за период':'в месяц'}.</p>
     <button type="button" className={styles.primary} disabled>Перейти к оплате · {moneyLabel(tariff.priceMinor)}</button>
    </>}
   </>}

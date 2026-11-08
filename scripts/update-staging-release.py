@@ -379,6 +379,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='commerce.access_checkout'::regclass AND contype='c' AND position('application_id' IN pg_get_constraintdef(oid))>0 AND position('enroll' IN pg_get_constraintdef(oid))>0)", '0039_first_checkout_autorenewal.sql'),
         ("SELECT to_regclass('mail.request_cooldown') IS NOT NULL", '0040_mail_request_cooldown.sql'),
         ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='assistant_profile' AND column_name='follows_device')", '0042_device_timezone.sql'),
+        ("SELECT to_regprocedure('commerce.restore_legacy_analyzer_allowance(text)') IS NOT NULL", '0043_analyzer_allowance_restoration.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')

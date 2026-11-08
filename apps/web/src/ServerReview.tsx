@@ -32,7 +32,7 @@ export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,
   {queue&&op&&<div className={styles.settingsStack}>
    <div className={styles.currentReview}><button className={common.linkButton} onClick={()=>onOpen(op.id)}>{name(op)}</button><p className={styles.muted}>{values(op)}</p><p>{op.reviewReasons.map(r=>reviewNames[r]??'Нужно проверить').join(' · ')}</p></div>
    <QuickReviewFields key={queue.id+':'+op.id+':'+queue.financeRevision} op={op} state={state} similarIds={applySimilar?selected.filter(id=>similar.includes(id)):[]} requireSimilarSelection={applySimilar} similarControls={<>
-    <label className={styles.reviewChoice}><input type="checkbox" checked={applySimilar} disabled={locked||!similar.length} onChange={e=>setApplySimilar(e.target.checked)}/>Применить к похожим операциям ({similar.length})</label>
+    <label><input type="checkbox" checked={applySimilar} disabled={locked||!similar.length} onChange={e=>setApplySimilar(e.target.checked)}/>Применить к похожим операциям ({similar.length})</label>
     {applySimilar&&similar.length>0&&<section className={styles.similarReview} aria-label="Похожие операции">
      <div className={styles.similarToolbar}>
       <button type="button" className={common.button} disabled={locked||similar.every(id=>selected.includes(id))} onClick={()=>setSelected(similar)}>Выбрать все</button>

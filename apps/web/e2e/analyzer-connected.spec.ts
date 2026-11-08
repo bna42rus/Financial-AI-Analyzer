@@ -132,6 +132,7 @@ test('Analyzer packages keep catalog prices and show payment only when configure
  await page.getByRole('button',{name:'Докупить лимит',exact:true}).click();
  const dialog=page.getByRole('dialog',{name:'Пополнить лимит Анализатора'});
  await expect(dialog.getByRole('radio')).toHaveCount(4);
+ await expect(dialog.getByText('Неиспользованные единицы из купленных пакетов переносятся на следующий месяц.')).toBeVisible();
  await dialog.getByRole('radio',{name:/5\s000 единиц/}).check();
  await expect(dialog.getByRole('button',{name:/Перейти к оплате · 149/})).toBeDisabled();
  await expect(dialog.getByText('Оплата пока не подключена.',{exact:false})).toHaveCount(0);

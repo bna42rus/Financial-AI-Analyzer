@@ -35,21 +35,25 @@ export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,s
   <OperationField label="Категория"><SearchFilter label="Выберите категорию" single fullWidth options={roots.map(c=>[c.id,c.name] as const)} value={cat?[cat]:[]} disabled={disabled} onChange={ids=>{setCat(ids[0]??'');setSub('');}}/></OperationField>
   {children.length>0&&<OperationField label="Подкатегория"><SearchFilter label="Подкатегория" single fullWidth options={[['','Без подкатегории'],...children.map(c=>[c.id,cat?c.name:(roots.find(r=>r.id===c.parentId)?.name??'')+' / '+c.name] as const)]} value={[sub]} disabled={disabled} onChange={ids=>{const id=ids[0]??'';setSub(id);const parent=children.find(c=>c.id===id)?.parentId;if(parent)setCat(parent);}}/></OperationField>}
  </>;
- const kindField=<OperationField label="Тип операции"><select value={kind} onChange={e=>setKind(e.target.value as Kind)}>{kinds.map(k=><option key={k} value={k}>{kindNames[k]}</option>)}</select></OperationField>;
- const roleField=<OperationField label="Финансовый смысл" error={roleError||(roleConflict?'Укажите смысл для выбранного типа.':undefined)}><select value={role} onChange={e=>{const next=e.target.value as Role;setRole(next);const allowed=(id:string)=>categories.some(c=>c.id===id&&(c.role===next||c.role==='both'));if(cat&&!allowed(cat)){setCat('');setSub('');}else if(sub&&!allowed(sub))setSub('');}}><option value="unresolved">Не определено</option>{roleError&&<option value={role} disabled>{roleNames[role]}</option>}{roles.map(r=><option key={r} value={r}>{roleNames[r]}</option>)}</select></OperationField>;
+ const kindField=<OperationField label="Тип операции"><SearchFilter label="Тип операции" single fullWidth disabled={disabled} value={[kind]} options={kinds.map(k=>[k,kindNames[k]??k] as const)} onChange={([id])=>{if(id)setKind(id as Kind);}}/></OperationField>;
+ const roleField=<OperationField label="Финансовый смысл" error={roleError||(roleConflict?'Укажите смысл для выбранного типа.':undefined)}><SearchFilter label="Финансовый смысл" single fullWidth disabled={disabled} value={[role]} options={[['unresolved','Не определено'],...(roleError?[[role,roleNames[role]??role] as const]:[]),...roles.map(r=>[r,roleNames[r]??r] as const)]} onChange={([id])=>{
+  if(!id)return;const next=id as Role;setRole(next);const allowed=(value:string)=>categories.some(c=>c.id===value&&(c.role===next||c.role==='both'));if(cat&&!allowed(cat)){setCat('');setSub('');}else if(sub&&!allowed(sub))setSub('');
+ }}/></OperationField>;
  return <form onSubmit={e=>{e.preventDefault();if(!ready)return;onApply({kind:'bulk_operations',operationIds:[op.id,...similarIds],patch,...(repeatable&&remember?{rememberRule:true}:{})});}}>
  <fieldset className={fields.form+' '+layout.reviewForm} disabled={disabled}>
   {needKind&&kindField}{(needRole||needKind)&&roleField}{showCategories&&categoryFields}
   {has('possible_duplicate','unlinked_refund','dependency_conflict','component_conflict','incomplete_credit_data','source_timezone_unknown','source_timezone_conflict','posted_timezone_unknown','posted_timezone_conflict')&&<button type="button" className={common.button} onClick={onOpen}>Открыть карточку для проверки</button>}
   <details><summary>Другие поля</summary><div className={fields.form}>{!needKind&&kindField}{!needRole&&!needKind&&roleField}{wantsCategory&&!showCategories&&categoryFields}
-   <OperationField label="Контрагент"><select value={party} onChange={e=>setParty(e.target.value)}><option value="">Без контрагента</option>{state.counterparties.filter(p=>p.state==='registered'||p.id===party).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></OperationField>
+   <OperationField label="Контрагент"><SearchFilter label="Контрагент" single fullWidth disabled={disabled} value={[party]} onChange={([id])=>setParty(id??'')} options={[['','Без контрагента'],...state.counterparties.filter(p=>p.state==='registered'||p.id===party).map(p=>[p.id,p.name] as const)]}/></OperationField>
    <OperationField label="Комментарий"><input value={comment} maxLength={1000} onChange={e=>setComment(e.target.value)}/></OperationField>
    {has('user_requested_review')&&<button type="button" className={common.button} onClick={()=>onApply({kind:'bulk_operations',operationIds:[op.id],patch:{reviewRequested:false}})}>Снять свою отметку проверки</button>}
   </div></details>
-  <div className={fields.verifyFields}>
-   {similarControls}
-   <label><input type="checkbox" checked={remember} disabled={!ruleHint} onChange={e=>setRemember(e.target.checked)}/>Запомнить для будущих операций</label>
-   {remember&&<p>{repeatable?ruleHint+'. Перед сохранением покажем правило.':'Выберите категорию, тип или финансовый смысл для правила.'}</p>}
+  <div className={layout.reviewOptions}>
+   <div className={layout.reviewOption}>
+    <label><input type="checkbox" checked={remember} disabled={!ruleHint} onChange={e=>setRemember(e.target.checked)}/>Запомнить для будущих операций</label>
+    {remember&&<p>{repeatable?ruleHint+'. Перед сохранением покажем правило.':'Выберите категорию, тип или финансовый смысл для правила.'}</p>}
+   </div>
+   <div className={layout.reviewOption}>{similarControls}</div>
   </div>
  </fieldset>
  <div className={layout.interfaceActions}><button type="button" className={common.button} disabled={disabled||!canSkip} onClick={onSkip}>Пропустить</button><button className={common.primaryButton} disabled={!ready}>Применить</button></div></form>;

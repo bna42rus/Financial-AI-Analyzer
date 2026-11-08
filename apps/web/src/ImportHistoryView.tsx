@@ -1,3 +1,4 @@
+import {ChevronRight} from 'lucide-react';
 import type {ImportHistory,ImportReport,RowCounts,TransactionCounts} from '../../../packages/imports/src/report';
 import {SearchFilter} from './SearchFilter';
 import {bankNames} from './finance-client';
@@ -26,7 +27,7 @@ export function ImportHistoryView({history,report,timezone,value,onChange,onSele
   <section className={layout.settingsBox} aria-label="Результат загрузки">{report?<>
    <h3>Загрузка от {date(report.createdAt)}</h3><p role="status" className={layout.statusPill}>{labels[report.status]}</p>
    <Counts rows={report.counts} operations={report.transactionCounts}/>
-   {!!report.files.length&&<details className={layout.uploadFiles}><summary>Файлы загрузки · {report.files.length}</summary><div className={layout.sublist}>{report.files.map((f,i)=><details key={f.fileId}><summary>{bankNames[f.bank]??f.bank} · Файл {i+1}{f.cancelledAt?' · Отменён':''}</summary>
+   {!!report.files.length&&<details className={layout.uploadFiles}><summary><ChevronRight size={14} aria-hidden="true"/>Файлы загрузки · {report.files.length}</summary><div className={layout.sublist}>{report.files.map((f,i)=><details key={f.fileId}><summary><ChevronRight size={14} aria-hidden="true"/>{bankNames[f.bank]??f.bank} · Файл {i+1}{f.cancelledAt?' · Отменён':''}</summary>
     <Counts rows={f.counts} operations={f.transactionCounts}/>
     {!!f.issues.length&&<details><summary>Ошибки строк · {f.issues.length}</summary><ul>{f.issues.map(issue=><li key={issue.ordinal}>Строка {issue.ordinal}: {reasons[issue.code]??'Не удалось проверить данные'}</li>)}</ul></details>}
     {f.blocked&&<p>Проверьте файл на устройстве и загрузите заново.</p>}

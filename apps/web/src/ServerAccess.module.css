@@ -79,3 +79,7 @@
 .previewBreakdown dd{margin:0;font-weight:600}
 @media(max-width:760px){.landing{grid-template-columns:minmax(0,1fr);margin-block:40px}.landingPreview{max-width:450px}}
 .warning { padding:10px 12px; border-radius:8px; background:var(--color-warning-surface); color:var(--color-warning); }
+
+.renewalEnd { display:grid; gap:3px; padding:10px 12px; border-radius:8px; background:var(--color-soft); }
+.renewalEnd span { color:var(--color-secondary-text); }
+.renewalEnd strong { font-size:calc(15px * var(--text-scale,1)); color:var(--color-text); }

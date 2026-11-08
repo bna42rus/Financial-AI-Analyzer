@@ -648,6 +648,7 @@ test('manual fixed end survives activation and calendar renewal retains its expl
  assert.equal((await a.b.get('/session')).json().accessEnd,end);
  const initial=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(Number(initial.end_offset_ms)>0);
  const next=await a.b.post('/access/renewal-create',{tariffId:tariff.id});assert.equal(next.statusCode,200);
+ assert.ok(next.json().plannedEnds[tariff.id],'Open legacy requests still have a date preview');
  const created=next.json().request;assert.equal((await a.b.post('/access/renewal-claim',{requestId:created.id,expectedRevision:created.revision,senderName:'Manual user',senderBank:'Bank'})).statusCode,200);
  const row=(await a.b.get('/access/renewal')).json().request,{inviteHours,...base}=reviewCommand(row);
  const p=await a.admin.b.post('/control/renewal-preview',base);assert.equal(p.statusCode,200);

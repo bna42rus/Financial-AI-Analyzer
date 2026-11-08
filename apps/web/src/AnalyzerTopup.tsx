@@ -84,5 +84,6 @@ export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>
     <span>{moneyLabel(String(pack.priceMinor))}</span>
    </label>)}
   </fieldset>}
+  {!!data?.packages.length&&<p className={styles.topupNote}>Неиспользованные единицы из купленных пакетов переносятся на следующий месяц.</p>}
  </OperationDialog>;
 }

@@ -73,3 +73,5 @@
 
 .widgetTotals,.widgetTotals .comparisonDate,.widgetTable th,.widgetTable td { font-size:calc(14px * var(--text-scale,1)); }
 .widgetTotals .comparisonDate { margin-top:0; }
+
+.widgetTotals[data-comparison] :is(span,small,strong) { font-size:inherit; }

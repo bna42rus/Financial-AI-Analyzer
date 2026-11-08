@@ -180,6 +180,7 @@
 .reviewPanel { display:grid; gap:12px; padding:12px 15px; border-top:1px solid var(--color-border); }
 .reviewPanel form,.reviewPanel fieldset { min-width:0; margin:0; }
 .currentReview { border-radius:8px; background:var(--color-soft); padding:10px 12px; display:grid; gap:3px; }
+.currentReview > :is(p,button) { margin:0; padding:0; }
 .currentReview button { justify-self:start; text-align:left; }
 .currentReview p:last-child { color:var(--color-secondary-text); }
 .similarReview { border-block:1px solid var(--color-border); padding:7px 0; }
@@ -199,3 +200,16 @@
 .topupPackage { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center; min-height:44px; cursor:pointer; }
 .topupPackage + .topupPackage { border-top:1px solid var(--color-border); }
 .topupPackage input { margin:0; accent-color:var(--color-primary); }
+
+.uploadFiles > summary,.uploadFiles .sublist > details > summary { display:flex; align-items:center; gap:6px; list-style:none; }
+.uploadFiles summary::-webkit-details-marker { display:none; }
+.uploadFiles summary > svg { flex:none; }
+.uploadFiles details[open] > summary > svg,.uploadFiles[open] > summary > svg { transform:rotate(90deg); }
+.reviewOptions { border:1px solid var(--color-border); border-radius:8px; padding:0 12px; }
+.reviewOption + .reviewOption { border-top:1px solid var(--color-border); }
+.reviewForm .reviewOption > label { display:flex; align-items:center; gap:8px; padding:8px 0; color:var(--color-text); }
+.reviewForm .reviewOption > p { margin:0 0 8px 24px; color:var(--color-secondary-text); }
+.reviewOptions .similarReview { margin-inline-start:24px; border-bottom:0; }
+
+
+.topupNote { color:var(--color-secondary-text); border-top:1px solid var(--color-border); padding-top:10px; }

@@ -1,6 +1,6 @@
 import {useEffect,useState} from 'react';
 import {Brand} from './Brand';
-import {CopySupportAddress,supportEmail as support} from './SupportDialog';
+import {supportEmail as support} from './SupportDialog';
 import {api,apiOrigin} from './server-client';
 import {legalDocuments,legalNotice} from '../../../packages/access/src/legal';
 import {moneyLabel} from '../../../packages/access/src/model';
@@ -58,7 +58,7 @@ export function LegalPage({path}:{path:string}){
  return <div className={styles.page}><header className={styles.header}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a></header>
  <main className={styles.main}><h1>{title}</h1>
  {entry?<><p className={styles.meta}>Редакция {entry[1].version}{!ready&&' · Версия для ознакомления'}</p><LegalText body={texts['../../../docs/legal/'+entry[0]+'.md']??''}/>{entry[0]!=='terms'&&<nav className={styles.documentLinks} aria-label="Связанные документы">{(entry[0]==='offer'||entry[0]==='payments')&&<a href="/autorenewal">Условия автопродления</a>}{entry[0]==='privacy'&&<a href="/data-consent">Открыть текст согласия</a>}<a href="/contacts">Контакты и реквизиты</a></nav>}</>:normalized==='/contacts'?<>
- <dl className={styles.details}><div><dt>Исполнитель и оператор</dt><dd>Битнер Никита Андреевич</dd></div><div><dt>ИНН</dt><dd>421408478543</dd></div><div><dt>Налоговый режим</dt><dd>Налог на профессиональный доход</dd></div>{support&&<div><dt>Поддержка, претензии и запросы о данных</dt><dd className={styles.contactEmail}><span>{support}</span><CopySupportAddress iconOnly/></dd></div>}{phone&&<div><dt>Телефон</dt><dd>{phone}</dd></div>}{address&&<div><dt>Почтовый адрес</dt><dd>{address}</dd></div>}</dl>{!support&&<p className={styles.meta}>Контакты поддержки будут опубликованы перед запуском оплаты.</p>}</>:<>
+ <dl className={styles.details}><div><dt>Исполнитель и оператор</dt><dd>Битнер Никита Андреевич</dd></div><div><dt>ИНН</dt><dd>421408478543</dd></div><div><dt>Налоговый режим</dt><dd>Налог на профессиональный доход</dd></div>{support&&<div><dt>Поддержка, претензии и запросы о данных</dt><dd>{support}</dd></div>}{phone&&<div><dt>Телефон</dt><dd>{phone}</dd></div>}{address&&<div><dt>Почтовый адрес</dt><dd>{address}</dd></div>}</dl>{!support&&<p className={styles.meta}>Контакты поддержки будут опубликованы перед запуском оплаты.</p>}</>:<>
  {failed?<p role="alert">Не удалось загрузить тарифы.</p>:tariffs?.length?<TariffCards tariffs={tariffs} showLink/>:tariffs||!apiOrigin?<p>Тарифы пока недоступны.</p>:<p role="status">Загружаем тарифы…</p>}
 </>}</main><LegalFooter/></div>;
 }

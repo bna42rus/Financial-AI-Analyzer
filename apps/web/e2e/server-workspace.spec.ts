@@ -55,7 +55,17 @@ test('live Review preserves a draft when selecting some similar operations',asyn
  await expect(review).toContainText('Осталось разобрать: 3');
  const future=review.getByRole('checkbox',{name:'Запомнить для будущих операций'});
  await expect(future).not.toBeChecked();
- await expect(review.getByRole('checkbox',{name:'Применить к похожим операциям (2)'})).not.toBeChecked();
+ const similarChoice=review.getByRole('checkbox',{name:'Применить к похожим операциям (2)'});
+ await expect(similarChoice).not.toBeChecked();
+ const [futureBox,similarBox]=await Promise.all([future.boundingBox(),similarChoice.boundingBox()]);
+ expect(futureBox?.x).toBe(similarBox?.x);
+ expect(futureBox!.y).toBeLessThan(similarBox!.y);
+ await review.getByText('Другие поля',{exact:true}).click();
+ for(const label of ['Тип операции','Финансовый смысл','Контрагент']){
+  await review.getByRole('button',{name:label,exact:true}).click();
+  await expect(page.getByRole('dialog',{name:label,exact:true}).getByRole('searchbox')).toBeVisible();
+  await page.keyboard.press('Escape');
+ }
  await review.getByRole('button',{name:'Категория',exact:true}).click();
  await page.getByRole('radio',{name:'Тестовая категория',exact:true}).click();
  await review.getByRole('checkbox',{name:'Применить к похожим операциям (2)'}).check();
@@ -523,7 +533,7 @@ test('public pricing opens the selected renewal and shares the support dialog',a
  await page.route('http://127.0.0.1:3000/access/**',async route=>{
   const req=route.request(),path=new URL(req.url()).pathname,headers={'Access-Control-Allow-Origin':new URL(base).origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
   if(req.method()==='OPTIONS')return route.fulfill({status:204,headers});
-  const baseState={cycle,tariffs,request:null,plannedEnds:{long:'2027-03-05T12:00:00Z'}};
+  const baseState={cycle,tariffs,request:{renewalState:'open',status:'awaiting_payment'},plannedEnds:{first:'2027-01-05T12:00:00Z',long:'2027-03-05T12:00:00Z'}};
   if(path.endsWith('/tariffs'))return route.fulfill({headers,json:{tariffs}});
   if(path.endsWith('/billing'))return route.fulfill({headers,json:{enabled:false,tariffs,renewal:null,order:null}});
   if(path.endsWith('/renewal'))return route.fulfill({headers,json:baseState});
@@ -536,7 +546,12 @@ test('public pricing opens the selected renewal and shares the support dialog',a
  await page.getByRole('article').filter({hasText:'3 месяца'}).getByRole('link',{name:'Выбрать тариф',exact:true}).click();
  const renewal=page.getByRole('dialog',{name:'Продление доступа',exact:true});
  await expect(renewal.getByRole('combobox',{name:'Период продления',exact:true})).toHaveValue('long');
- await expect(renewal).toContainText('После продления — до');
+ await expect(renewal.getByText('Доступ после продления')).toBeVisible();
+ await expect(renewal).toContainText('5 мар.');
+ await expect(renewal).not.toContainText('сохраняет текущий остаток');
+ await renewal.getByRole('combobox',{name:'Период продления'}).selectOption('first');
+ await expect(renewal).toContainText('5 янв.');
+ await renewal.getByRole('combobox',{name:'Период продления'}).selectOption('long');
  await expect(page.getByRole('heading',{name:'Аккаунт',exact:true})).toHaveCount(0);
  await expect(renewal.getByRole('button',{name:/Перейти к оплате · 1.?049/})).toBeDisabled();
  await expect(renewal.getByLabel('Имя отправителя')).toHaveCount(0);
@@ -545,9 +560,11 @@ test('public pricing opens the selected renewal and shares the support dialog',a
  await page.getByRole('button',{name:'Поддержка',exact:true}).click();
  const support=page.getByRole('dialog',{name:'Поддержка CashNeuro'});
  await expect(support.getByText('Напишите нам — поможем разобраться.')).toBeVisible();
- await support.getByRole('button',{name:'Написать письмо'}).click();
- for(const name of ['Gmail','Яндекс Почта','Mail','Почтовое приложение'])await expect(support.getByRole('link',{name,exact:true})).toBeVisible();
- await expect(support.getByRole('link',{name:'Почтовое приложение'})).toHaveAttribute('href','mailto:support@cashneuro.ru');
+ await expect(support.getByRole('button',{name:'Написать письмо'})).toHaveCount(0);
+ await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+ await support.getByRole('button',{name:'Скопировать адрес'}).click();
+ await expect(support.getByRole('status')).toHaveText('Адрес скопирован.');
+ expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe('support@cashneuro.ru');
 });
 
 test('credit accounting confirmation explains both models even when totals stay equal',async({page})=>{
@@ -608,8 +625,7 @@ test('operation actions fit without horizontal scrolling',async({page})=>{
  for(const button of buttons)await expect(button).toBeInViewport();
 });
 
-test('public footer and contacts show a plain support address with copy control',async({page})=>{
- await page.context().grantPermissions(['clipboard-read','clipboard-write']);
+test('public footer aligns the desktop columns and contacts show a plain address',async({page})=>{
  await page.goto(base+'contacts');
  const footer=page.getByRole('contentinfo');
  await expect(footer.getByText('Поможем разобраться')).toBeVisible();
@@ -617,9 +633,12 @@ test('public footer and contacts show a plain support address with copy control'
  const main=page.getByRole('main');
  await expect(main.getByText('support@cashneuro.ru',{exact:true})).toBeVisible();
  await expect(main.getByRole('link',{name:'support@cashneuro.ru'})).toHaveCount(0);
- await main.getByRole('button',{name:'Скопировать адрес'}).click();
- await expect(main.getByRole('status')).toHaveText('Адрес скопирован.');
- expect(await page.evaluate(()=>navigator.clipboard.readText())).toBe('support@cashneuro.ru');
+ await expect(main.getByRole('button',{name:'Скопировать адрес'})).toHaveCount(0);
+ if(page.viewportSize()!.width>600){
+  const rows=await Promise.all([footer.getByText('support@cashneuro.ru',{exact:true}),footer.getByRole('link',{name:'Контакты',exact:true}),footer.getByRole('link',{name:'Конфиденциальность',exact:true})].map(node=>node.boundingBox()));
+  const bottoms=rows.map(box=>box!.y+box!.height);
+  expect(Math.max(...bottoms)-Math.min(...bottoms)).toBeLessThanOrEqual(1);
+ }
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBe(true);
 });
 

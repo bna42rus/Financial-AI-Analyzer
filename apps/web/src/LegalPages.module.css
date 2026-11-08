@@ -24,20 +24,19 @@
 .footer { position:relative; isolation:isolate; width:min(100% - 36px,1154px); box-sizing:border-box; padding:22px 20px 16px; }
 .footer::before { content:""; position:absolute; inset:0; z-index:-1; background:color-mix(in srgb,var(--color-soft) 45%,var(--color-surface)); box-shadow:0 0 0 100vmax color-mix(in srgb,var(--color-soft) 45%,var(--color-surface)); clip-path:inset(0 -100vmax); }
 .page .footer { width:100%; }
-.footerTop { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); align-items:start; gap:16px 24px; }
+.footerTop { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); align-items:end; gap:16px 24px; }
 .footerSupport { display:grid; gap:8px; justify-items:start; }
 .footerSupport p { margin:0 0 2px; color:var(--color-secondary-text); }
 .footerSupport strong { color:var(--color-primary); overflow-wrap:anywhere; }
-.footer nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px 24px; }
+.footer nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; gap:12px 24px; }
 .footerGroup { display:grid; gap:6px; list-style:none; margin:0; padding:0; }
 .footerGroup a:hover { color:var(--color-primary); text-decoration:underline; }
 .documentLinks { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
 .documentLinks a,.tariffAction { display:inline-flex; align-items:center; gap:8px; min-height:34px; padding:4px 10px; border:1px solid var(--color-border); border-radius:8px; font-weight:550; }
 .documentLinks a:hover,.tariffAction:hover { background:var(--color-soft); color:var(--color-primary); }
-.contactEmail { display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
-.contactEmail button { flex:none; border:1px solid var(--color-border); }
 @media (max-width:600px) {
- .footerTop { grid-template-columns:minmax(0,1fr); }
+ .footerTop { grid-template-columns:minmax(0,1fr); align-items:start; }
+ .footer nav { align-items:start; }
  .footer { padding-inline:0; }
 }
 .requisites { color:var(--color-secondary-text); border-top:1px solid var(--color-border); padding-top:10px; margin-top:6px; }

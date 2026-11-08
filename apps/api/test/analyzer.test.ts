@@ -87,5 +87,11 @@ test('legacy monthly allowance is corrected without erasing spend, pending reser
  assert.equal(state.statusCode,200,state.body);
  const budget=state.json().customerBudget;
  assert.equal(budget.limit,10000);assert.equal(budget.remaining,5305);assert.equal(budget.extra,2000);
+ const lookup="SELECT commerce.restore_legacy_analyzer_allowance(encode(sha256(convert_to(email,'UTF8')),'hex')) AS result FROM identity.auth_user WHERE id='first'";
+ assert.equal((await pg.owner.query(lookup)).rows[0].result.status,'RESTORED');
+ const restored=(await request('/finance/analyzer-state',{})).json().customerBudget;
+ assert.equal(restored.limit,10000);assert.equal(restored.remaining,10000);assert.equal(restored.extra,2000);
+ assert.equal((await pg.owner.query(lookup)).rows[0].result.status,'ALREADY_RESTORED');
+ await assert.rejects(pg.finance.query("SELECT commerce.restore_legacy_analyzer_allowance(repeat('0',64))"),{code:'42501'});
  assert.equal((await pg.owner.query('SELECT * FROM commerce.ai_cost_reservation WHERE request_id=$1',[requestId])).rowCount,3);
 });
