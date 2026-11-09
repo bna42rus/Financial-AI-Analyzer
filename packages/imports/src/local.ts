@@ -1,3 +1,5 @@
+import {counterpartyEvidenceKinds,counterpartyNameHint,fullCounterpartyIdentifier,ownTransferEvidence} from './counterparty-evidence.ts';
+import type {CounterpartyEvidenceKind} from './counterparty-evidence.ts';
 import {bankDescription,merchantBankDescription,financialTransferText} from './bank-description.ts';
 import {localBankAdapter} from './bank-table.ts';
 import {extractSafeSource,parseSafeSource,hasBankDescription,merchantSourceSanitizer,sourceSanitizer,localSourceSanitizer,sourceProfiles,normalizeSourceDescription} from './safe-source.ts';
@@ -74,7 +76,22 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
      const descriptionHmac=description===null?null:await sign(encoder.encode(JSON.stringify(['source-description/1',file.bank,row.account.kind,account.hmac,description])));
      let source=row.safeSource??null;
      if(hasBankDescription(sanitizer)){const enriched=extractSafeSource(row.localDescription,amountMinor,sanitizer as typeof sourceProfiles[number]);if(enriched){enriched.details=(sanitizer===merchantSourceSanitizer?merchantBankDescription:bankDescription)(row.localDescription,row.localMerchant,row.localBankCategory,row.localMcc);if(enriched.event==='other'&&enriched.details.mcc&&BigInt(amountMinor)<0n&&!(sanitizer===merchantSourceSanitizer?financialTransferText(enriched.details.description)||/комисси|fee/iu.test(enriched.details.description):/перевод|transfer|\bSBP\b|СБП|комисси|fee/iu.test(enriched.details.description))){enriched.event='purchase';enriched.details.merchantText ||= enriched.details.description.slice(0,160);}}source=enriched;}
-     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(sanitizer!=='text-free/1'?{safeSource:parseSafeSource(source,amountMinor,sanitizer)}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
+     const safeSource=sanitizer==='text-free/1'?null:parseSafeSource(source,amountMinor,sanitizer);
+     let counterpartyEvidence:PreparedRow['counterpartyEvidence'];
+     const descriptionForEvidence=typeof row.localDescription==='string'?row.localDescription:'';
+     if(adapter===localBankAdapter&&sanitizer===merchantSourceSanitizer&&typeof row.parser==='string'&&row.parser.endsWith('-table/1')&&direction!=='unknown'&&!!safeSource&&['transfer_in','transfer_out'].includes(safeSource.event)&&financialTransferText(descriptionForEvidence)&&!ownTransferEvidence(descriptionForEvidence)&&Array.isArray(row.localCounterpartyEvidence)){
+      const values=row.localCounterpartyEvidence.flatMap(entry=>{
+       if(!entry||!counterpartyEvidenceKinds.includes(entry.kind))return [];
+       const kind=entry.kind as CounterpartyEvidenceKind,value=fullCounterpartyIdentifier(kind,entry.value);
+       return value?[{kind,value}]:[];
+      });
+      const match=values[0],name=counterpartyNameHint(row.localCounterpartyName);
+      if(match&&!values.some(v=>v.kind===match.kind&&v.value!==match.value)){
+       const hmac=await sign(encoder.encode(JSON.stringify(['counterparty-identity/1',file.bank,match.kind,match.value])));
+       counterpartyEvidence={kind:match.kind,hmac,...(name?{name}:{})};
+      }
+     }
+     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(counterpartyEvidence?{counterpartyEvidence}:{}),...(sanitizer!=='text-free/1'?{safeSource}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
     }catch(error){if(!(error instanceof RowFailure))throw error;result.issues.push({ordinal,code:error.code});}
    }
    prepared.push(result);

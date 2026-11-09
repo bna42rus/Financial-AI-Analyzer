@@ -1,3 +1,4 @@
+import {parseCounterpartyRuleConditions,parseProposalOperations,saveCounterpartyOptions} from './counterparty-proposals.ts';
 import {parseCategoryBinding,applyCategoryBinding} from './category-bindings.ts';
 import type {CategoryBindingIntent} from './category-bindings.ts';
 import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
@@ -26,7 +27,7 @@ import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
 import * as tables from '../../../packages/database/src/finance.ts';
-import {allowedOperationRoles,object,choice,uuid,dateFact,correction,effective,facet,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
+import {allowedOperationRoles,object,choice,uuid,dateFact,correction,effective,facet,normalizeEmptyCategoryConfidence,kinds,linkKinds} from '../../../packages/finance-core/src/model.ts';
 import type {Graph,BankFact,Kind,Component,Link,Semantics,Operation} from '../../../packages/finance-core/src/model.ts';
 import {parsePersistedMinor} from '../../../packages/finance-core/src/money.ts';
 import {allocationOrder,allocationParents} from '../../../packages/finance-core/src/allocation-graph.ts';
@@ -88,10 +89,19 @@ export async function loadFinance(db:PoolClient,userId:string){
  const transactionById=new Map(t.map(r=>[r.id,r]));
  const bindings=(await db.query('SELECT target_key,category_id,subcategory_id FROM finance.category_binding WHERE user_id=$1 ORDER BY target_key',[userId])).rows;
  const categoryBindings=Object.fromEntries(bindings.map(b=>[b.target_key,{categoryId:b.category_id,subcategoryId:b.subcategory_id}]));
+ const bankParties=new Map<string,Set<string>>();
+ const partyEvidence=(await db.query<{transaction_id:string;counterparty_id:string}>(
+  `SELECT DISTINCT finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id,b.counterparty_id
+   FROM finance.observation_counterparty b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id)
+   WHERE b.user_id=$1 AND b.alias_id IS NOT NULL AND o.versions->>'counterpartyEvidence'='counterparty-identity/1'`,[userId])).rows;
+ for(const entry of partyEvidence){
+  const ids=bankParties.get(entry.transaction_id)??new Set<string>();
+  ids.add(entry.counterparty_id);bankParties.set(entry.transaction_id,ids);
+ }
  const graph:Graph={categoryBindings,accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
   const source=observations.get(r.sourceObservationId!);if(!source)throw new TypeError('SOURCE_MISSING');
   const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
-  const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,corrections:r.corrections,semantics:{...r.semantics,merchant:{...r.semantics.merchant,value:cleanBankText(r.semantics.merchant.value,160)}},comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
+  const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,bankCounterpartyId:bankParties.get(r.id)?.size===1?bankParties.get(r.id)?.values().next().value:undefined,corrections:r.corrections,semantics:normalizeEmptyCategoryConfidence({...r.semantics,merchant:{...r.semantics.merchant,value:cleanBankText(r.semantics.merchant.value,160)}}),comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
  }),components:p.filter(r=>r.active&&!!transactionById.get(r.transactionId)&&!transactionById.get(r.transactionId)!.mergedIntoId).map(({userId,active,...r})=>({...r,amountMinor:r.amountMinor.toString()})),links:l.map(({userId,revision,...r})=>({...r,amountMinor:r.amountMinor.toString()})),loanMode:state.loan_mode};
  return {graph,state,sourceMap,categoryOperations:t.map(r=>({id:r.id,role:r.semantics.role.value,categoryId:r.semantics.category.value,subcategoryId:r.semantics.subcategory.value,merchant:cleanBankText(r.semantics.merchant.value,160),retired:!!r.mergedIntoId})),categoryComponents:p.map(c=>({id:c.id,transactionId:c.transactionId,role:c.role.value,categoryId:c.category.value,subcategoryId:c.subcategory.value,retired:!c.active||!!transactionById.get(c.transactionId)?.mergedIntoId})),aliases:(await db.query('SELECT id,account_id AS "accountId",alias_type AS type FROM finance.account_alias WHERE user_id=$1 ORDER BY id',[userId])).rows as {id:string;accountId:string;type:string}[],parties:(await orm.select().from(tables.counterparties).where(eq(tables.counterparties.userId,userId)).orderBy(tables.counterparties.id)).map(({userId,revision,...r})=>({...r,revision:revision.toString()})),rules:(await db.query('SELECT id,name,enabled,priority,conditions,assignments,revision,dependency_status AS "dependencyStatus" FROM finance.rule WHERE user_id=$1 ORDER BY id',[userId])).rows as (Rule&{revision:string;dependencyStatus:string})[]};
 }
@@ -100,10 +110,21 @@ export async function financeView(db:PoolClient,userId:string,filter:Filter={},c
  const operationsById=new Map(graph.operations.map(o=>[o.id,o]));
  const counterpartySources=(await db.query('SELECT b.observation_id AS "observationId",finance.canonical_operation(o.user_id,o.transaction_id) AS "transactionId",b.counterparty_id AS "counterpartyId",b.alias_id AS "aliasId" FROM finance.observation_counterparty b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id',[userId])).rows;
  const counterpartyAliases=(await db.query('SELECT id,counterparty_id AS "counterpartyId",alias_type AS type FROM finance.counterparty_alias WHERE user_id=$1 ORDER BY id',[userId])).rows;
+ const partyIdentityIds=new Set(counterpartyAliases.map(row=>row.counterpartyId)),proposalIds=new Map<string,string[]>();
+ for(const op of graph.operations)for(const id of new Set([op.bankCounterpartyId,op.semantics.counterparty.value]))if(id){
+  const ids=proposalIds.get(id)??[];ids.push(op.id);proposalIds.set(id,ids);
+ }
  const tombstones=(await db.query('SELECT id,merged_into_id AS "canonicalId" FROM finance.transaction WHERE user_id=$1 AND merged_into_id IS NOT NULL ORDER BY id',[userId])).rows;
  const summary=aggregate(projection.operations,filter);
- const duplicateCandidates=(await db.query("SELECT id,left_id AS \"leftId\",right_id AS \"rightId\" FROM finance.duplicate_candidate WHERE user_id=$1 AND status='candidate' ORDER BY id",[userId])).rows;
- return {categoryBindings:graph.categoryBindings,operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,displayName:operationDisplayName(o,{counterparties:parties}),classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:Object.hasOwn(o.corrections,'postedDate')?o.corrections.postedDate!:o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
+ const duplicateCandidates=(await db.query<{id:string;leftId:string;rightId:string}>("SELECT id,left_id AS \"leftId\",right_id AS \"rightId\" FROM finance.duplicate_candidate WHERE user_id=$1 AND status='candidate' ORDER BY id",[userId])).rows;
+ // Ambiguous repeat imports remain separate operations. They do not establish
+ // a second independent transfer until the user confirms they are different.
+ const ambiguousRepeats=new Set<string>();
+ for(const pair of duplicateCandidates){
+  const first=operationsById.get(pair.leftId)?.bankCounterpartyId;
+  if(first&&first===operationsById.get(pair.rightId)?.bankCounterpartyId)ambiguousRepeats.add(pair.rightId);
+ }
+ return {categoryBindings:graph.categoryBindings,operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId&&(p.state!=='discovered'||!partyIdentityIds.has(p.id)||(proposalIds.get(p.id)?.filter(id=>!ambiguousRepeats.has(id)).length??0)>=2)).map(p=>({...p,hasBankIdentity:partyIdentityIds.has(p.id),...(p.state==='registered'?{}:{proposalCandidates:(proposalIds.get(p.id)??[]).slice(0,1000)})})),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,displayName:operationDisplayName(o,{counterparties:parties}),classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:Object.hasOwn(o.corrections,'postedDate')?o.corrections.postedDate!:o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
 }
 export function parseFilter(value:unknown):Filter{
  const r=object(value,['from','through','accountIds','categoryIds','includeExcluded','compact']),f:Filter={};
@@ -118,7 +139,7 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {graph,state,parties}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
  const resolved=reconcile(graph),related=(l:{sourceId:string;targetId:string})=>l.sourceId===op.id||l.targetId===op.id;
  const links=graph.links.filter(related),linkIds=new Set(links.map(l=>l.id));
- const {bankRefHmac,...source}=op.source;return {...op,source,displayName:operationDisplayName(op,{counterparties:parties}),generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
+ const {bankRefHmac,...source}=op.source,{bankCounterpartyId,...publicOp}=op;return {...publicOp,source,displayName:operationDisplayName(op,{counterparties:parties}),generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
 type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
@@ -181,14 +202,14 @@ export function parseIntent(value:unknown):Intent {
  }else if(kind==='category'){
   const p=object(r.patch,['name','role','parentId','hidden']),out:Record<string,unknown>={};if('name'in p)out.name=safeText(p.name,160);if('role'in p)out.role=choice(p.role,['expense','income','both']);if('parentId'in p)out.parentId=ref(p.parentId);if('hidden'in p)out.hidden=bool(p.hidden);intent.patch=out;intent.create=r.create===undefined?false:bool(r.create);
  }else if(kind==='counterparty'){
-  const p=object(r.patch,['name','state','isSelf']),out:Record<string,unknown>={};if('name'in p)out.name=safeText(p.name,160);if('state'in p)out.state=choice(p.state,['registered','ignored']);if('isSelf'in p)out.isSelf=bool(p.isSelf);intent.patch=out;intent.create=r.create===undefined?false:bool(r.create);
+  const p=object(r.patch,['name','state','isSelf','proposalOperationIds','rememberForFuture','ruleConditions','autoRuleId']),out:Record<string,unknown>={};if('name'in p)out.name=safeText(p.name,160);if('state'in p)out.state=choice(p.state,['registered','ignored']);if('isSelf'in p)out.isSelf=bool(p.isSelf);if('proposalOperationIds'in p)out.proposalOperationIds=parseProposalOperations(p.proposalOperationIds);if('rememberForFuture'in p)out.rememberForFuture=bool(p.rememberForFuture);if('ruleConditions'in p)out.ruleConditions=parseCounterpartyRuleConditions(p.ruleConditions,intent.id);if('autoRuleId'in p)out.autoRuleId=uuid(p.autoRuleId);if(('autoRuleId'in p||'ruleConditions'in p)&&out.rememberForFuture!==true)throw new TypeError('INVALID_COUNTERPARTY_CONDITION');intent.patch=out;intent.create=r.create===undefined?false:bool(r.create);
  }else if(kind==='rule'){intent.patch=validateRule(r.patch) as unknown as Record<string,unknown>;intent.create=r.create===undefined?false:bool(r.create);
  }else if(kind==='analytics')intent.value=choice(r.value,['cashflow','economic']);else intent.value=uuid(r.value);
  if(intent.patch&&Object.keys(intent.patch).length===0)throw new TypeError('EMPTY_PATCH');
  if(intent.patch&&'name'in intent.patch&&!intent.patch.name)throw new TypeError('EMPTY_NAME');
  if(['category','counterparty','rule'].includes(kind)&&!intent.create&&r.id===undefined)throw new TypeError('MISSING_ID');return intent;
 }
-const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self'],rule:['name','enabled','priority','conditions','assignments','dependency_status'],link:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by']}as const;
+const columns={transaction:['corrections','semantics','comment','analytics_override','decomposition','review_reasons'],account:['display_name','account_type','analytics_enabled','default_visible','loan_mode','merged_into_id'],category:['name','role','parent_id','hidden'],counterparty:['name','state','is_self','proposal_operation_ids','auto_rule_id'],rule:['name','enabled','priority','conditions','assignments','dependency_status'],link:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by']}as const;
 type Undo={table:keyof typeof columns|'components'|'workspace';id:string;before:Record<string,unknown>|Record<string,unknown>[]|null}|StructuralUndo|EntityUndo|BatchUndo|HistoryUndo;
 const jsonColumns=new Set(['corrections','semantics','review_reasons','conditions','assignments','role','category','subcategory']);
 async function update(db:PoolClient,userId:string,table:keyof typeof columns,id:string,values:Record<string,unknown>){
@@ -239,13 +260,13 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  if(intent.kind==='save_overview_view'||intent.kind==='delete_overview_view'||intent.kind==='reorder_overview_views')return applyOverviewIntent(db,userId,intent);
  if(intent.kind==='save_budget'||intent.kind==='set_budget_limit'||intent.kind==='delete_budget')return applyBudgetIntent(db,userId,intent);
  if(intent.kind==='save_operations_view'||intent.kind==='delete_operations_view'||intent.kind==='reorder_operations_views')return applyViewIntent(db,userId,intent);
- if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));}
+ if(intent.kind==='delete_rule'||intent.kind==='apply_rules'){const {graph,rules}=await loadFinance(db,userId);return applyRuleIntent(db,userId,intent,graph,rules);}
  if(intent.kind==='create_rule_with_history'){
   await applyBase(db,userId,{kind:'rule',id:intent.id,patch:intent.patch as unknown as Record<string,unknown>,create:true},currentRevision);
   const {graph,rules}=await loadFinance(db,userId),rule={...intent.patch,id:intent.id};
   const accounts=new Map(graph.accounts.map(account=>[account.id,account]));
   const operationIds=graph.operations.filter(op=>{const account=accounts.get(effective(op).accountId);return !!account&&ruleMatches(op,account,rule);}).map(op=>op.id).sort();
-  const result=await applyRuleIntent(db,userId,{kind:'apply_rules',id:intent.id,ruleId:intent.id,operationIds},graph,rules,(role,c,s)=>categoryCompatible(graph,role,c,s));
+  const result=await applyRuleIntent(db,userId,{kind:'apply_rules',id:intent.id,ruleId:intent.id,operationIds},graph,rules);
   return {...result,details:{...result.details,kind:intent.kind}};
  }
  if(intent.kind==='operation_card'){
@@ -369,13 +390,16 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
   for(const [input,key]of Object.entries({name:'name',role:'role',parentId:'parent_id',hidden:'hidden'}))if(input in p)values[key]=p[input];
   if(intent.create){if(!p.name||!p.role)throw new TypeError('MISSING_CATEGORY');await db.query('INSERT INTO finance.category(user_id,id,name,role,parent_id,hidden) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,p.name,p.role,p.parentId??null,p.hidden??false]);}
  }
- if(table==='counterparty'){const existing=await partyRows(db,userId);if(!intent.create)activeParty(existing,id);if(typeof p.name==='string'&&existing.some(other=>other.id!==id&&!other.merged_into_id&&counterpartyNameKey(other.name)===counterpartyNameKey(p.name as string)))throw new HttpError(409,'COUNTERPARTY_NAME_EXISTS');for(const [input,key]of Object.entries({name:'name',state:'state',isSelf:'is_self'}))if(input in p)values[key]=p[input];if(intent.create){if(!p.name)throw new TypeError('MISSING_NAME');await db.query('INSERT INTO finance.counterparty(user_id,id,name,state,is_self) VALUES($1,$2,$3,$4,$5)',[userId,id,p.name,p.state??'registered',p.isSelf??false]);}}
+ if(table==='counterparty'){const existing=await partyRows(db,userId);if(!intent.create)activeParty(existing,id);if((intent.create||p.state==='registered'||before?.state==='registered'&&typeof p.name==='string')&&existing.some(other=>other.id!==id&&other.state==='registered'&&!other.merged_into_id&&counterpartyNameKey(other.name)===counterpartyNameKey(String(p.name??before?.name))))throw new HttpError(409,'COUNTERPARTY_NAME_EXISTS');for(const [input,key]of Object.entries({name:'name',state:'state',isSelf:'is_self'}))if(input in p)values[key]=p[input];if(intent.create){if(!p.name)throw new TypeError('MISSING_NAME');await db.query('INSERT INTO finance.counterparty(user_id,id,name,state,is_self) VALUES($1,$2,$3,$4,$5)',[userId,id,p.name,p.state??'registered',p.isSelf??false]);}Object.assign(values,await saveCounterpartyOptions(db,userId,id,p,before,graph));}
  if(table==='rule'){
-  const rule=p as unknown as Omit<Rule,'id'>;ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);
+  const rule=p as unknown as Omit<Rule,'id'>,linked=parties.find(party=>party.autoRuleId===id&&!party.mergedIntoId);
+  if(linked&&rule.assignments.counterpartyId!==linked.id)throw new HttpError(409,'COUNTERPARTY_RULE_TARGET');
+  if(rule.conditions.counterpartyBankIdentity&&(!rule.assignments.counterpartyId||!parties.some(party=>party.id===rule.assignments.counterpartyId&&party.state==='registered'&&!party.mergedIntoId)))throw new HttpError(409,'RULE_NEEDS_SETUP');
+  ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);
   categoryCompatible(graph,rule.assignments.role??'unresolved',rule.assignments.categoryId??null,rule.assignments.subcategoryId??null);Object.assign(values,p,{dependency_status:'ready'});
   if(intent.create)await db.query('INSERT INTO finance.rule(user_id,id,name,enabled,priority,conditions,assignments) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,p.name,p.enabled,p.priority,JSON.stringify(p.conditions),JSON.stringify(p.assignments)]);
  }
- if(!intent.create)await update(db,userId,table,id,values);
+ if(Object.keys(values).length&&(!intent.create||table==='counterparty'&&values.auto_rule_id))await update(db,userId,table,id,values);
  return {table,id,before:before?Object.fromEntries(columns[table].map(k=>[k,before[k]])):null};
 }
 async function restore(db:PoolClient,userId:string,undo:Undo){
@@ -466,7 +490,7 @@ export async function acceptObservation(db:PoolClient,userId:string,epoch:Import
  if(transactionId!==null){
   const previous=await row(db,userId,'transaction',id);semantics=refreshBankSemantics(previous.semantics,fact);
  }else{
-  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyFinancialRecognition(applyRules(op,account,rules),graph.categories);
+  const op:Operation={id,source:fact,accountAssignmentId:account.id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:[]},classified=applyFinancialRecognition(applyRules(op,account,rules,undefined,graph.categories),graph.categories);
   semantics=classified.semantics;await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,id,observationId,JSON.stringify(semantics),classified.analyticsOverride,JSON.stringify(classified.reviewReasons)]);
  }
  await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,merchant_text,description,bank_category,bank_ref_hmac,versions,source_kind,operation_amount_minor,operation_currency) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)',[userId,observationId,id,fact.accountId,JSON.stringify(fact.operationDate),fact.postedDate===null?null:JSON.stringify(fact.postedDate),fact.amountMinor,fact.currency,fact.merchantText,fact.description,fact.bankCategory,fact.bankRefHmac,JSON.stringify(fact.versions),kind,fact.operationAmountMinor,fact.operationCurrency]);

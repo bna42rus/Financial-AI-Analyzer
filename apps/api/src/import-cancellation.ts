@@ -1,3 +1,4 @@
+import {removeProposalOperationIds} from './counterparty-proposals.ts';
 import {initialBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
@@ -39,6 +40,7 @@ export async function cancelImport(db:PoolClient,userId:string,intent:CancelImpo
  const history=(await db.query("SELECT count(*)::int AS n FROM finance.action WHERE user_id=$1 AND id<>$2 AND NOT(status='committed' AND COALESCE(intent->'canonical'->>'receipt','false')='true')",[userId,actionId])).rows[0].n;
  await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,deletedLinks]);
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,unique]);
+ await removeProposalOperationIds(db,userId,unique);
  for(const o of remaining)await db.query('UPDATE finance.transaction SET source_observation_id=$3,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,o.transaction_id,o.id]);
  // Archived IDs remain usable references, but cannot retain the cancelled source.
  await db.query(`UPDATE finance.transaction t SET source_observation_id=(SELECT o.id FROM finance.source_observation o WHERE (o.user_id,o.transaction_id)=(t.user_id,t.id) AND NOT(o.id=ANY($2::uuid[])) ORDER BY o.observed_at DESC,o.id DESC LIMIT 1),revision=revision+1 WHERE t.user_id=$1 AND t.merged_into_id IS NOT NULL AND t.source_observation_id=ANY($2::uuid[])`,[userId,observationIds]);
@@ -49,15 +51,17 @@ export async function cancelImport(db:PoolClient,userId:string,intent:CancelImpo
  await db.query('UPDATE finance.ingestion_file SET file_hmac=NULL,cancelled_at=clock_timestamp() WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,fileIds]);
  // Inactive IDs also must not retain bank classification copied by an earlier
  // merge from a now-cancelled source. Keep explicit manual decisions only.
- const archived=(await db.query(`SELECT t.id,t.semantics,o.source_kind,o.merchant_text,o.amount_minor,o.description,o.versions,b.counterparty_id FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.observation_counterparty b ON (b.user_id,b.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.merged_into_id=ANY($2::uuid[])`,[userId,[...shared]])).rows;
+ const archived=(await db.query(`SELECT t.id,t.semantics,o.source_kind,o.merchant_text,o.amount_minor,o.description,o.versions,CASE WHEN o.versions->>'counterpartyEvidence' IS DISTINCT FROM 'counterparty-identity/1' THEN b.counterparty_id END AS counterparty_id FROM finance.transaction t JOIN finance.source_observation o ON (o.user_id,o.id)=(t.user_id,t.source_observation_id) LEFT JOIN finance.observation_counterparty b ON (b.user_id,b.observation_id)=(o.user_id,o.id) WHERE t.user_id=$1 AND t.merged_into_id=ANY($2::uuid[])`,[userId,[...shared]])).rows;
  for(const row of archived){const fresh=initialBankSemantics({sourceKind:row.source_kind,merchantText:row.merchant_text,amountMinor:row.amount_minor.toString(),description:row.description,versions:row.versions});if(row.counterparty_id)fresh.counterparty=facet(row.counterparty_id,'bank');for(const key of Object.keys(fresh) as (keyof Semantics)[])if(row.semantics[key].userVerified||row.semantics[key].source==='user')(fresh as unknown as Record<string,unknown>)[key]=row.semantics[key];await db.query('UPDATE finance.transaction SET semantics=$3,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,row.id,JSON.stringify(fresh)]);}
  const restored=await loadFinance(db,userId),restorations=[];
  for(const op of restored.graph.operations.filter(o=>shared.has(o.id))){
   const old=before.graph.operations.find(o=>o.id===op.id)!,fresh=initialBankSemantics(op.source);
-  const party=(await db.query('SELECT counterparty_id FROM finance.observation_counterparty WHERE user_id=$1 AND observation_id=$2',[userId,remaining.find(o=>o.transaction_id===op.id)!.id])).rows[0];
+  const party=(await db.query(`SELECT b.counterparty_id FROM finance.observation_counterparty b
+   JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id)
+   WHERE b.user_id=$1 AND b.observation_id=$2 AND o.versions->>'counterpartyEvidence' IS DISTINCT FROM 'counterparty-identity/1'`,[userId,remaining.find(o=>o.transaction_id===op.id)!.id])).rows[0];
   if(party)fresh.counterparty=facet(party.counterparty_id,'bank');
   for(const key of Object.keys(fresh) as (keyof Semantics)[])if(op.semantics[key].userVerified||op.semantics[key].source==='user')(fresh as unknown as Record<string,unknown>)[key]=op.semantics[key];
-  const classified=applyFinancialRecognition(applyRules({...op,semantics:fresh},canonicalAccount(restored.graph,op.accountAssignmentId??op.source.accountId),restored.rules),restored.graph.categories);
+  const classified=applyFinancialRecognition(applyRules({...op,semantics:fresh},canonicalAccount(restored.graph,op.accountAssignmentId??op.source.accountId),restored.rules,undefined,restored.graph.categories),restored.graph.categories);
   await db.query('UPDATE finance.transaction SET semantics=$3,analytics_override=$4,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,op.id,JSON.stringify(classified.semantics),classified.analyticsOverride]);
   restorations.push({operationId:op.id,before:bankValues(old.source),after:bankValues(op.source)});
  }

@@ -33,7 +33,7 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  else if(path==='/finance/operation')result={...detail,revision:state.revision};
  else if(path==='/finance/history-query')result={actions:[],nextBeforeRevision:null};
  else if(path==='/finance/preview'){previews.set(String(body.actionId),body.intent);result=syntheticPreview(String(body.actionId),detail);}
- else if(path==='/finance/commit'){commitAttempts++;if(lostCommit&&commitAttempts===1){await route.abort('connectionreset');return;}const intent=previews.get(String(body.actionId));if(intent?.kind==='account'){const patch=intent.patch as Record<string,unknown>;Object.assign(state.accounts[0]!,patch);}else if(intent?.kind==='account_settings'){for(const change of intent.accounts as {id:string;patch:Record<string,unknown>}[]){const account=state.accounts.find(a=>a.id===change.id);if(account)Object.assign(account,change.patch);}}state.revision='2';result={status:'committed',actionId:body.actionId,generation:state.generation,revision:state.revision};}
+ else if(path==='/finance/commit'){commitAttempts++;if(lostCommit&&commitAttempts===1){await route.abort('connectionreset');return;}const intent=previews.get(String(body.actionId));if(intent?.kind==='account'){const patch=intent.patch as Record<string,unknown>;Object.assign(state.accounts[0]!,patch);}else if(intent?.kind==='account_settings'){for(const change of intent.accounts as {id:string;patch:Record<string,unknown>}[]){const account=state.accounts.find(a=>a.id===change.id);if(account)Object.assign(account,change.patch);}}if(intent?.kind==='counterparty'){const party=state.counterparties.find(p=>p.id===intent.id);if(party)Object.assign(party,intent.patch);}state.revision=(BigInt(state.revision)+1n).toString();result={status:'committed',actionId:body.actionId,generation:state.generation,revision:state.revision};}
  await route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(result)});
  });
  await page.goto(base);await expect(page.getByRole('navigation',{name:'Разделы сайта',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();if(duringInitialLoad){await expect.poll(()=>summaryWaiting).toBe(true);try{await duringInitialLoad();}finally{releaseSummary();}}await expect(page.getByRole('status').filter({hasText:'Загружаем финансовые'})).toHaveCount(0,{timeout:duringInitialLoad?2000:5000});
@@ -505,6 +505,37 @@ test('deletion detail expands the sealed selection beyond the compact workspace'
  expect(h.calls.filter(c=>c.path==='/finance/commit')).toHaveLength(0);
 });
 
+test('counterparty proposal shows operation selection inside Edit and saves it without registering',async({page})=>{
+ const h=await setup(page),first=h.state.operations[0]!,second={...structuredClone(first),id:crypto.randomUUID()},other={...structuredClone(first),id:crypto.randomUUID()};
+ h.state.operations.push(second,other);
+ const id=crypto.randomUUID(),party={id,name:'Предложенный получатель',state:'discovered' as const,hasBankIdentity:true,proposalCandidates:[first.id,second.id]};
+ h.state.counterparties.push(party);
+ await page.getByRole('button',{name:'Обновить данные',exact:true}).click();
+ await section(page,'Контрагенты');
+ await page.getByRole('tab',{name:'Предложения',exact:true}).click();
+ const row=page.getByRole('article').filter({hasText:party.name});
+ await expect(row.getByRole('button',{name:'Посмотреть операции'})).toHaveCount(0);
+ await row.getByRole('button',{name:'Изменить',exact:true}).click();
+ const editor=page.getByRole('dialog',{name:'Изменить контрагента',exact:true});
+ await editor.getByRole('textbox',{name:'Имя контрагента'}).fill('Арендодатель');
+ await editor.getByRole('button',{name:'Посмотреть операции',exact:true}).click();
+ const picker=page.getByRole('dialog',{name:'Операции · '+party.name,exact:true});
+ await expect(picker.getByRole('checkbox')).toHaveCount(2);
+ await picker.getByRole('checkbox').first().uncheck();
+ await picker.getByRole('button',{name:'Сохранить выбор · 1',exact:true}).click();
+ await expect(picker).toHaveCount(0);
+ await expect(editor.getByRole('textbox',{name:'Имя контрагента'})).toHaveValue('Арендодатель');
+ await expect(editor.getByRole('button',{name:'Сохранить',exact:true})).toBeEnabled();
+ expect(h.calls.filter(c=>c.path==='/finance/preview').at(-1)?.body.intent).toMatchObject({kind:'counterparty',id,patch:{proposalOperationIds:[expect.any(String)]}});
+ expect(party.state).toBe('discovered');
+ await editor.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect(page.getByText('Арендодатель',{exact:true})).toBeVisible();
+ await page.getByRole('article').filter({hasText:'Арендодатель'}).getByRole('button',{name:'Добавить',exact:true}).click();
+ const add=page.getByRole('dialog',{name:'Добавить контрагента',exact:true});
+ await expect(add).toContainText('Операций будет привязано: 1.');
+ await expect(add.getByRole('button',{name:'Открыть правило',exact:true})).toHaveCount(0);
+});
+
 test('counterparty split shows one dialog and one search frame; operation checkbox stays left',async({page})=>{
  const h=await setup(page),source=h.state.counterparties[0]!,target={id:crypto.randomUUID(),name:'Другой получатель',state:'registered' as const};
  h.state.counterparties.push(target);
@@ -659,7 +690,7 @@ async function expectDesktopFooterColumns(footer:Locator,left:number,right:numbe
  expect(legal!.right).toBeCloseTo(right,0);
 }
 
-test('workspace footer follows the main gutters and category names share their size',async({page})=>{
+test('workspace footer follows the main gutters and subcategory names are smaller',async({page})=>{
  const h=await setup(page);
  const parent=crypto.randomUUID(),child=crypto.randomUUID();
  h.state.categories=[{id:parent,name:'Банковские услуги',parentId:null,role:'expense',hidden:false},{id:child,name:'Комиссии',parentId:parent,role:'expense',hidden:false}];
@@ -668,7 +699,7 @@ test('workspace footer follows the main gutters and category names share their s
  await page.getByRole('button',{name:/^Банковские услуги/}).click();
  const root=page.getByText('Банковские услуги',{exact:true}),leaf=page.getByText('Комиссии',{exact:true});
  const font=await root.evaluate(node=>getComputedStyle(node).fontSize);
- await expect(leaf).toHaveCSS('font-size',font);
+ await expect(leaf).toHaveCSS('font-size',(parseFloat(font)-1)+'px');
  await expect(root).toHaveCSS('font-weight','600');
  await expect(leaf).toHaveCSS('font-weight','400');
  const footer=page.getByRole('contentinfo');

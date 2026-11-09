@@ -21,7 +21,7 @@ export function parseOperationPatch(value:unknown){
 }
 export function selectionIds(value:unknown){if(!Array.isArray(value)||!value.length||value.length>1000)throw new TypeError('INVALID_SELECTION');const ids=value.map(uuid);if(new Set(ids).size!==ids.length)throw new TypeError('DUPLICATE_SELECTION');return ids;}
 export function parseBulkIntent(value:unknown):BulkIntent {
- const r=object(value,['kind','operationIds','patch','verify','reviewScope','rememberRule']),patch=r.patch===undefined?{}:parseOperationPatch(object(r.patch,['kind','role','categoryId','subcategoryId','counterpartyId','comment','analyticsOverride','reviewRequested']));
+ const r=object(value,['kind','operationIds','patch','verify','reviewScope','rememberRule']),patch=r.patch===undefined?{}:parseOperationPatch(object(r.patch,['kind','role','categoryId','subcategoryId','counterpartyId','comment','analyticsOverride','reviewRequested',...(r.reviewScope?['merchant']:[])]));
  const verify=r.verify===undefined?[]:Array.isArray(r.verify)&&r.verify.length<=4?r.verify.map(v=>choice(v,verificationFacets)):(()=>{throw new TypeError('INVALID_VERIFICATION');})();
  if(new Set(verify).size!==verify.length||!verify.length&&!Object.keys(patch).length||verify.length&&Object.keys(patch).length)throw new TypeError('INVALID_BULK_ACTION');
  if('subcategoryId'in patch&&!('categoryId'in patch))throw new TypeError('CATEGORY_REQUIRED');
@@ -42,7 +42,7 @@ export function bulkPatches(intent:BulkIntent,graph:Graph){
    }
    if('categoryId'in patch&&op.semantics.subcategory.userVerified)delete patch.categoryId;
    if(!('categoryId'in patch)&&'subcategoryId'in patch&&op.semantics.category.value!==intent.patch.categoryId)delete patch.subcategoryId;
-   delete patch.comment;delete patch.reviewRequested;
+   delete patch.merchant;delete patch.comment;delete patch.reviewRequested;
    if(('kind'in patch||'role'in patch)&&!allowedOperationRoles((patch.kind??op.semantics.kind.value) as Kind,effective(op).amountMinor).includes((patch.role??op.semantics.role.value) as Role)){delete patch.kind;delete patch.role;}
    const role=patch.role??op.semantics.role.value;
    const category=graph.categories.find(c=>c.id===('categoryId'in patch?patch.categoryId:op.semantics.category.value));

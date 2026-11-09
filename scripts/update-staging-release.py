@@ -380,6 +380,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regclass('mail.request_cooldown') IS NOT NULL", '0040_mail_request_cooldown.sql'),
         ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='assistant_profile' AND column_name='follows_device')", '0042_device_timezone.sql'),
         ("SELECT to_regprocedure('commerce.restore_legacy_analyzer_allowance(text)') IS NOT NULL", '0043_analyzer_allowance_restoration.sql'),
+        ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='counterparty' AND column_name='auto_rule_id')", '0044_counterparty_proposals.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')

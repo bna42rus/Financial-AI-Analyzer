@@ -14,7 +14,7 @@ export function classificationTargets(graph:Graph,rules:Rule[]){return graph.ope
  return !!a&&!op.decomposition&&!graph.components.some(p=>p.transactionId===op.id)&&['expense','income'].includes(op.semantics.role.value)&&!c.userVerified&&!s.userVerified&&!protectedSources.has(c.source)&&!protectedSources.has(s.source)&&!rules.some(r=>r.enabled&&('categoryId'in r.assignments||'subcategoryId'in r.assignments)&&ruleMatches(op,a,r));
 });}
 export function knownMerchantChanges(graph:Graph,rules:Rule[]){return graph.operations.filter(op=>['bank-source/4','bank-source/5'].includes(op.source.versions.sourceSanitizer??'')&&!graph.components.some(c=>c.transactionId===op.id)).map(op=>{
- const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId)),ruled=account?applyRules(op,account,rules):op;
+ const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId)),ruled=account?applyRules(op,account,rules,undefined,graph.categories):op;
  for(const key of ['kind','role','merchant','category','subcategory','counterparty'] as const)if(['kind','role','counterparty'].includes(key)||op.semantics[key].source==='user'||op.semantics[key].userVerified)(ruled.semantics as Record<string,unknown>)[key]=op.semantics[key];
  return {op,next:applyMerchantRecognition(ruled,graph.categories,graph.categoryBindings)};
 }).filter(({op,next})=>!isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons));}

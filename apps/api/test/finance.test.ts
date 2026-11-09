@@ -273,7 +273,7 @@ test('component removal and updates cannot cross tenants or silently disregard e
 });
 
 test('future rule edits leave history unchanged; explicit fixed historical application is read-only until commit and grouped Undo restores facets',async()=>{
- const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId,w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,id=randomUUID();
+ const a=(await append('-1000')).transactionId,b=(await append('-2000','transfer_out')).transactionId,w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,id=randomUUID();
  const patch={name:'Synthetic future rule',enabled:true,priority:10,conditions:{merchantContains:'Synthetic',direction:'out'},assignments:{role:'expense',categoryId:food}};
  await command({kind:'rule',id,patch,create:true});assert.equal((await view()).operations.find((o:{id:string})=>o.id===a).classification.category.value,null);
  await command({kind:'operation',id:b,patch:{role:'neutral'}});const before=(await pg.owner.query("SELECT id,semantics,analytics_override,review_reasons FROM finance.transaction WHERE user_id='first' ORDER BY id")).rows,facts=(await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,s=await view(),actionId=randomUUID();
@@ -323,7 +323,7 @@ test('historical rule selection is tenant scoped, rejects disabled, duplicate, e
 
 test('historical rules use the full active priority set, preserve conflicts and cannot commit after new imports or suspension',async()=>{
  const a=(await append('-1000')).transactionId,one=randomUUID(),two=randomUUID(),base={name:'Synthetic priority',enabled:true,priority:10,conditions:{merchantContains:'Synthetic'},assignments:{role:'neutral',analyticsOverride:'include'}};
- await command({kind:'rule',id:one,patch:base,create:true});await command({kind:'rule',id:two,patch:{...base,name:'Synthetic conflict',assignments:{role:'expense',analyticsOverride:'exclude'}},create:true});let w=await view(),id=randomUUID(),p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'apply_rules',ruleId:one,operationIds:[a]}});assert.equal(p.statusCode,200,p.body);assert.deepEqual(p.json().impact.details.conflictingOperationIds,[a]);assert.equal(p.json().impact.details.ruleIds.length,2);await append('-2000');assert.equal((await request('/finance/commit',{actionId:id})).json().code,'FINANCE_CHANGED');
+ await command({kind:'rule',id:one,patch:base,create:true});await command({kind:'rule',id:two,patch:{...base,name:'Synthetic conflict',assignments:{role:'expense',analyticsOverride:'exclude'}},create:true});let w=await view(),id=randomUUID(),p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'apply_rules',ruleId:one,operationIds:[a]}});assert.equal(p.statusCode,200,p.body);assert.deepEqual(p.json().impact.details.conflictingOperationIds,[a]);assert.deepEqual(p.json().impact.details.ruleIds,[one]);await append('-2000');assert.equal((await request('/finance/commit',{actionId:id})).json().code,'FINANCE_CHANGED');
  w=await view();id=randomUUID();p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'apply_rules',ruleId:one,operationIds:[a]}});assert.equal(p.statusCode,200,p.body);await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId:id})).statusCode,403);assert.equal((await pg.owner.query("SELECT semantics->'role'->>'value' AS role FROM finance.transaction WHERE user_id='first' AND id=$1",[a])).rows[0].role,'expense');
 });
 
@@ -388,4 +388,23 @@ test('live review skips persist and refresh restores the first unresolved operat
  const skip=await request('/finance/review-queue',{generation:first.generation,revision:first.revision,skip:first.anchor});assert.equal(skip.statusCode,200,skip.body);
  const second=(await request('/finance/review-queue',{})).json();assert.notEqual(second.anchor,first.anchor);assert.equal(second.id,first.id);
  const reset=await request('/finance/review-queue',{refresh:true});assert.equal(reset.json().anchor,first.anchor);
+});
+
+test('a saved counterparty without a bank identifier can create, edit and reuse one explicit future rule',async()=>{
+ const id=randomUUID(),ruleId=randomUUID(),name='Арендодатель';
+ await command({kind:'counterparty',id,create:true,patch:{name,state:'registered'}});
+ const {generation,revision}=await view();
+ const attempt=await request('/finance/preview',{actionId:randomUUID(),generation,revision,intent:{kind:'counterparty',id,patch:{rememberForFuture:true,autoRuleId:ruleId}}});
+ assert.equal(attempt.json().code,'COUNTERPARTY_RULE_CONDITIONS_REQUIRED');
+ await command({kind:'counterparty',id,patch:{rememberForFuture:true,autoRuleId:ruleId,ruleConditions:{direction:'out',descriptionContains:'Sanitized'}}});
+ let state=await view();assert.equal(state.counterparties[0].autoRuleId,ruleId);assert.equal(state.rules[0].enabled,true);
+ const {name:ruleName,conditions,assignments,priority}=state.rules[0];
+ await command({kind:'rule',id:ruleId,patch:{name:ruleName,enabled:true,priority,conditions:{...conditions,descriptionContains:'Sanitized example'},assignments}});
+ await command({kind:'counterparty',id,patch:{rememberForFuture:false}});
+ const inactive=(await append('-1000','transfer_out')).transactionId;
+ assert.equal((await view()).operations.find((o:any)=>o.id===inactive).classification.counterparty.value,null);
+ await command({kind:'counterparty',id,patch:{rememberForFuture:true}});
+ const active=(await append('-2000','transfer_out')).transactionId;
+ state=await view();assert.equal(state.rules.length,1);assert.equal(state.rules[0].conditions.descriptionContains,'Sanitized example');
+ assert.equal(state.operations.find((o:any)=>o.id===active).classification.counterparty.ruleId,ruleId);
 });

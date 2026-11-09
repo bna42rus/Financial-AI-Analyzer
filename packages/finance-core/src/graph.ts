@@ -51,7 +51,7 @@ export function reconcile(graph:Graph):{operations:Projection[];links:LinkOutcom
    base=[{id:op.id+':root',operation:op,componentId:null,amount,role,category:op.semantics.category,subcategory:op.semantics.subcategory}];
   }
   for(const n of base){
-   if(!n.category.userVerified&&n.category.confidence<90){addReason(op.id,'low_category_confidence');if(n.category.confidence<70){n.category={...n.category,value:null};n.subcategory={...n.subcategory,value:null};}}
+   if((n.category.value!==null||n.role.value==='expense'||n.role.value==='income')&&!n.category.userVerified&&n.category.confidence<90){addReason(op.id,'low_category_confidence');if(n.category.confidence<70){n.category={...n.category,value:null};n.subcategory={...n.subcategory,value:null};}}
    if(!compatible(n.role.value,n.category.value,n.subcategory.value)){
     addReason(op.id,'category_conflict');
     if(!compatible(n.role.value,n.category.value,null)){n.category={...n.category,value:null};n.subcategory={...n.subcategory,value:null};}

@@ -1,3 +1,4 @@
+import {counterpartyEvidenceKinds} from './counterparty-evidence.ts';
 import {BankPdfError,pdfMoney} from './bank-pdf.ts';
 import {dateFact} from '../../finance-core/src/model.ts';
 import {extractSafeSource,localSourceSanitizer} from './safe-source.ts';
@@ -71,6 +72,12 @@ export function parseBankTable(fileId:string,bytes:Uint8Array,table:string[][]):
   row.currency=['RUB','RUR','643','₽','руб.'].includes(r[currency]!.trim())?'RUB':r[currency];
   // A per-row account must agree with explicit file metadata when both are present.
   if(accountMeta.length&&accountColumn>=0&&norm(r[accountColumn]??'')!==norm(accountMeta[0]!))row.account.value=undefined;
+  const side=row.direction==='debit'?'получателя':row.direction==='credit'?'отправителя':null;
+  if(side){
+   const fields={bank_account:['номер счета '+side,'счет '+side],card:['номер карты '+side],phone:['телефон '+side,'номер телефона '+side]};
+   row.localCounterpartyEvidence=counterpartyEvidenceKinds.map(kind=>({kind,value:r[idx(fields[kind])]})).filter(entry=>entry.value?.trim());
+   row.localCounterpartyName=r[idx(['имя '+side,'фио '+side])];
+  }
   row.localMcc=r[idx(['mcc','код mcc'])];row.localBankCategory=r[idx(['категория','категория банка'])];row.localMerchant=r[idx(['магазин','название магазина','торговая точка'])];row.localDescription=r[description];row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,localSourceSanitizer);return row;
  });
  return {fileId,bank,bytes,rows};

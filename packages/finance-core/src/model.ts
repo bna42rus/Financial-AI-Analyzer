@@ -11,7 +11,7 @@ export type Category={id:string;name:string;parentId:string|null;role:'expense'|
 export type Semantics={kind:Facet<Kind>;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>;merchant:Facet<string>;counterparty:Facet<string|null>};
 export type BankFact={accountId:string;operationDate:BankDate;postedDate:BankDate|null;amountMinor:string;currency:'RUB';sourceKind?:Kind;operationAmountMinor?:string|null;operationCurrency?:string|null;merchantText:string;description:string;bankCategory:string;sourceMcc?:string|null;bankRefHmac:string|null;versions:Record<string,string>};
 export type Corrections={accountId?:string;operationDate?:BankDate;postedDate?:BankDate|null;amountMinor?:string};
-export type Operation={id:string;source:BankFact;accountAssignmentId?:string;corrections:Corrections;semantics:Semantics;comment:string;analyticsOverride:'default'|'include'|'exclude';decomposition:boolean;reviewReasons:string[]};
+export type Operation={id:string;source:BankFact;accountAssignmentId?:string;bankCounterpartyId?:string;corrections:Corrections;semantics:Semantics;comment:string;analyticsOverride:'default'|'include'|'exclude';decomposition:boolean;reviewReasons:string[]};
 export type Component={id:string;transactionId:string;type:'principal'|'interest'|'fee'|'insurance'|'other';amountMinor:string;role:Facet<Role>;category:Facet<string|null>;subcategory:Facet<string|null>};
 export const linkKinds=['own_transfer','credit_card_repayment','refund','reversal','expense_reimbursement','debt_repayment'] as const;
 export type Link={id:string;sourceId:string;targetId:string;sourceComponentId:string|null;targetComponentId:string|null;sourceAllocationId?:string|null;targetAllocationId?:string|null;kind:typeof linkKinds[number];amountMinor:string;status:'candidate'|'confirmed'|'rejected';confidence:number;createdBy:Source};
@@ -32,7 +32,11 @@ export function allowedOperationRoles(kind:Kind,amountMinor?:string):readonly Ro
  if(kind==='interest'&&amountMinor&&defaultRole(kind,amountMinor)!=='unresolved')return [defaultRole(kind,amountMinor),'unresolved'];
  return ['expense','income','neutral','unresolved'];
 }
-export function initialSemantics(kind:Kind,merchant='',amountMinor?:string):Semantics {return {kind:facet(kind,'bank'),role:facet(defaultRole(kind,amountMinor)),category:facet(null),subcategory:facet(null),merchant:facet(merchant,'bank'),counterparty:facet(null)};}
+export function initialSemantics(kind:Kind,merchant='',amountMinor?:string):Semantics {return {kind:facet(kind,'bank'),role:facet(defaultRole(kind,amountMinor)),category:facet(null,'deterministic_system_rule',false,0),subcategory:facet(null,'deterministic_system_rule',false,0),merchant:facet(merchant,'bank'),counterparty:facet(null)};}
+export function normalizeEmptyCategoryConfidence(semantics:Semantics):Semantics {
+ const normalize=(field:Facet<string|null>)=>field.value===null&&!field.userVerified&&['deterministic_system_rule','global_rule','ai','bank'].includes(field.source)?{...field,confidence:0}:field;
+ return {...semantics,category:normalize(semantics.category),subcategory:normalize(semantics.subcategory)};
+}
 export function object(value:unknown,keys:string[]):Record<string,unknown>{
  if(!value||typeof value!=='object'||Array.isArray(value)||Object.keys(value).some(k=>!keys.includes(k)))throw new TypeError('INVALID_FIELDS');return value as Record<string,unknown>;
 }

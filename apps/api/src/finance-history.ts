@@ -12,7 +12,7 @@ const definitions={
  operation:{table:'transaction',id:'id',keys:['corrections','semantics','comment','analytics_override','decomposition','review_reasons','source_observation_id','merged_into_id'],readonly:[]},
  account:{table:'account',id:'id',keys:['bank_id','system_name','display_name','account_type','currency','analytics_enabled','default_visible','loan_mode','merged_into_id'],readonly:['bank_id','system_name','currency']},
  category:{table:'category',id:'id',keys:['name','parent_id','role','hidden'],readonly:[]},
- counterparty:{table:'counterparty',id:'id',keys:['name','state','is_self','merged_into_id'],readonly:[]},
+ counterparty:{table:'counterparty',id:'id',keys:['name','state','is_self','merged_into_id','proposal_operation_ids','auto_rule_id'],readonly:[]},
  rule:{table:'rule',id:'id',keys:['name','enabled','priority','conditions','assignments','dependency_status'],readonly:[]},
  link:{table:'link',id:'id',keys:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by'],readonly:[]},
  component:{table:'component',id:'id',keys:['transaction_id','type','amount_minor','role','category','subcategory','active'],readonly:[]},
@@ -39,7 +39,7 @@ export async function captureHistory(db:PoolClient,userId:string):Promise<Snapsh
  for(const kind of Object.keys(definitions)as ObjectKind[]){const d=definitions[kind];let rows:Record<string,unknown>[];
   if(kind==='account_source'||kind==='counterparty_source')rows=(await db.query(`SELECT b.*,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.${d.table} b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
   else rows=(await db.query(`SELECT ${d.id},${kind==='analytics'?'config_revision AS revision':'revision'},${d.keys.join(',')} FROM finance.${d.table} WHERE user_id=$1 ORDER BY ${d.id}`,[userId])).rows;
-  for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.filter(k=>!['source_allocation_id','target_allocation_id'].includes(k)||row[k]!==null).map(k=>[k,row[k]]))}});}
+  for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.filter(k=>!['source_allocation_id','target_allocation_id','proposal_operation_ids','auto_rule_id'].includes(k)||row[k]!==null).map(k=>[k,row[k]]))}});}
  }
  return result;
 }

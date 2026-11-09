@@ -20,7 +20,7 @@ function parse(input:unknown):ResetIntent {
 function dependencies(r:{conditions:Record<string,unknown>;assignments:Record<string,unknown>},intent:ResetIntent,removeAccounts:readonly string[]){
  const conditions={...r.conditions},assignments={...r.assignments};let changed=false;
  if(typeof conditions.accountId==='string'&&removeAccounts.includes(conditions.accountId)){delete conditions.accountId;changed=true;}
- if(!intent.keepCounterparties&&'counterpartyId' in conditions){delete conditions.counterpartyId;changed=true;}
+ if(!intent.keepCounterparties)for(const key of ['counterpartyId','counterpartyBankIdentity'])if(key in conditions){delete conditions[key];changed=true;}
  for(const k of [...(!intent.keepCounterparties?['counterpartyId']:[]),...(!intent.keepCategories?['categoryId','subcategoryId']:[])])if(assignments[k]!==undefined&&assignments[k]!==null){delete assignments[k];changed=true;}
  return {conditions,assignments,changed};
 }
@@ -85,6 +85,7 @@ export async function commitReset(db:PoolClient,userId:string,id:string,action:R
   await db.query('DELETE FROM finance.account WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,removeAccounts]);
  }
  if(!intent.keepCounterparties){await db.query('DELETE FROM finance.counterparty_alias WHERE user_id=$1',[userId]);await db.query('DELETE FROM finance.counterparty WHERE user_id=$1',[userId]);}
+ if(intent.keepCounterparties)await db.query('UPDATE finance.counterparty SET proposal_operation_ids=NULL WHERE user_id=$1 AND proposal_operation_ids IS NOT NULL',[userId]);
  if(intent.keepRules){
   const rules=(await db.query('SELECT id,conditions,assignments FROM finance.rule WHERE user_id=$1',[userId])).rows;
   for(const r of rules){const d=dependencies(r,intent,removeAccounts);if(d.changed)await db.query("UPDATE finance.rule SET conditions=$3,assignments=$4,enabled=false,dependency_status='needs_setup' WHERE user_id=$1 AND id=$2",[userId,r.id,JSON.stringify(d.conditions),JSON.stringify(d.assignments)]);}

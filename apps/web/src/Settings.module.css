@@ -214,3 +214,6 @@
 
 
 .topupNote { color:var(--color-secondary-text); border-top:1px solid var(--color-border); padding-top:10px; }
+
+.reviewOtherFields { margin-top:6px; }
+.reviewOtherFields > summary + div { margin-top:4px; }

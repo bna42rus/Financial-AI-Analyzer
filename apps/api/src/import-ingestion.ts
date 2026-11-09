@@ -1,3 +1,4 @@
+import {recognizeImportedCounterparty} from './counterparty-proposals.ts';
 import {sameCalendar} from '../../../packages/finance-core/src/bank-calendar.ts';
 import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
 import {applyMerchantRecognition,recognizeMerchant} from '../../../packages/finance-core/src/merchant-recognition.ts';
@@ -139,30 +140,33 @@ export async function processImport(db:PoolClient,userId:string,batchId:string){
   const inheritedDescription=prior&&!row.safeSource?.details&&prior.source_kind===source.sourceKind&&hasBankDescription(prior.versions.sourceSanitizer);
   const sourceProfile=inheritedDescription?prior.versions.sourceSanitizer:row.safeSource?batch.versions.sanitizer:prior?.versions.sourceSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer;
   const textEvidence=row.safeSource?.details&&'textEvidence' in row.safeSource.details?row.safeSource.details.textEvidence:inheritedDescription?prior.versions.sourceTextEvidence:undefined;
+  const bankParty=row.counterpartyEvidence&&['transfer_in','transfer_out'].includes(ownSource.sourceKind)
+   ?await recognizeImportedCounterparty(db,userId,row.counterpartyEvidence):null;
   const fact:BankFact={accountId,operationDate:row.operationDate,postedDate:row.postedDate,amountMinor:row.amountMinor,currency:row.currency,...source,bankCategory:source.bankCategory??prior?.bank_category??'',bankRefHmac:row.bankRefHmac,versions:{
    sourceStorage:'direct-evidence/1',dedupe:Object.hasOwn(row,'descriptionHmac')?'strict-bank-description/2':'strict-bank-source/1',parser,normalizer:batch.versions.normalizer,sanitizer:batch.versions.sanitizer,pipeline:batch.versions.pipeline,hmac:batch.versions.hmac,
    classification:row.safeSource?(['bank-source/3','bank-source/4','bank-source/5'].includes(batch.versions.sanitizer)?'bank-signals/2':'bank-signals/1'):prior?.versions.classification??'unclassified/1',
-   sourceSanitizer:sourceProfile,...(textEvidence?{sourceTextEvidence:textEvidence}:{}),
+   sourceSanitizer:sourceProfile,...(textEvidence?{sourceTextEvidence:textEvidence}:{}),...(bankParty?{counterpartyEvidence:'counterparty-identity/1'}:{}),
    merchantSanitizer:row.safeSource?.merchant||row.safeSource?.details?.merchantText?batch.versions.sanitizer:prior?.versions.merchantSanitizer??prior?.versions.sanitizer??batch.versions.sanitizer,
   }};
   if(!prior){
    if(graph.operations.length>=10000)throw new HttpError(409,'FINANCE_SIZE_LIMIT');
    const semantics=initialBankSemantics(fact,fact.versions.sourceSanitizer==='bank-source/4'&&fact.merchantText?recognizeMerchant(fact.merchantText,fact.description).name:fact.merchantText);
-   const op=applyMerchantRecognition(applyFinancialRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules),graph.categories),graph.categories,graph.categoryBindings);
+   const op=applyMerchantRecognition(applyFinancialRecognition(applyRules({id:transactionId,source:fact,accountAssignmentId:accountId,bankCounterpartyId:bankParty?.counterparty_id,corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:row.amountMinor==='0'?['zero_amount']:[]},canonicalAccount(graph,accountId),loaded.rules,undefined,graph.categories),graph.categories),graph.categories,graph.categoryBindings);
    graph.operations.push(op);
    await db.query('INSERT INTO finance.transaction(user_id,id,source_observation_id,semantics,analytics_override,review_reasons) VALUES($1,$2,$3,$4,$5,$6)',[userId,transactionId,observationId,JSON.stringify(op.semantics),op.analyticsOverride,JSON.stringify(op.reviewReasons)]);
   }
   await db.query('INSERT INTO finance.source_observation(user_id,id,transaction_id,account_id,operation_date,posted_date,amount_minor,currency,source_kind,merchant_text,description,bank_category,bank_ref_hmac,versions,import_row_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)',[userId,observationId,transactionId,accountId,JSON.stringify(row.operationDate),row.postedDate===null?null:JSON.stringify(row.postedDate),row.amountMinor,row.currency,ownSource.sourceKind,ownSource.merchantText,ownSource.description,ownSource.bankCategory??'',row.bankRefHmac,JSON.stringify(fact.versions),entry.id]);
   await db.query('INSERT INTO finance.observation_account(user_id,observation_id,account_id) VALUES($1,$2,$3)',[userId,observationId,accountId]);
+  if(bankParty)await db.query('INSERT INTO finance.observation_counterparty(user_id,observation_id,counterparty_id,alias_id) VALUES($1,$2,$3,$4)',[userId,observationId,bankParty.counterparty_id,bankParty.id]);
   // Empty fields in this profile are absent evidence, never instructions to erase classification/text.
-  if(prior&&!unchanged){
-   const current=graph.operations.find(o=>o.id===transactionId)!,op=structuredClone(current);op.source=fact;
+  if(prior&&(!unchanged||bankParty&&graph.operations.find(o=>o.id===transactionId)?.bankCounterpartyId!==bankParty.counterparty_id)){
+   const current=graph.operations.find(o=>o.id===transactionId)!,op=structuredClone(current);op.source=fact;op.bankCounterpartyId=bankParty&&(!current.bankCounterpartyId||current.bankCounterpartyId===bankParty.counterparty_id)?bankParty.counterparty_id:bankParty?undefined:current.bankCounterpartyId;
    if(row.safeSource){
     op.semantics=refreshBankSemantics(op.semantics,fact);
    }
-   const classified=applyMerchantRecognition(applyFinancialRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules),graph.categories),graph.categories,graph.categoryBindings);
+   const classified=applyMerchantRecognition(applyFinancialRecognition(applyRules(op,canonicalAccount(graph,op.accountAssignmentId??accountId),loaded.rules,undefined,graph.categories),graph.categories),graph.categories,graph.categoryBindings);
    graph.operations[graph.operations.indexOf(current)]=classified;
-   await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride]);
+   await db.query('UPDATE finance.transaction SET source_observation_id=$3,semantics=$4,analytics_override=$5,review_reasons=$6,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,transactionId,observationId,JSON.stringify(classified.semantics),classified.analyticsOverride,JSON.stringify(classified.reviewReasons)]);
   }
   // An added source after an explicit merge is a new dependency for its Undo.
   if(prior&&unchanged)await db.query('UPDATE finance.transaction t SET revision=revision+1 WHERE t.user_id=$1 AND t.id=$2 AND EXISTS(SELECT 1 FROM finance.transaction a WHERE a.user_id=t.user_id AND a.merged_into_id=t.id)',[userId,transactionId]);

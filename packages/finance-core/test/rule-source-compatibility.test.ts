@@ -34,3 +34,37 @@ test('compatibility uses bank amount, not effective correction, and does not rei
  const next=op('Покупка PYATEROCHKA MOSCOW RUS',merchantSourceSanitizer);next.corrections.amountMinor='100';
  assert.equal(ruleMatches(next,account,rule({merchantContains:'Пятёрочка'})),true);assert.equal(ruleMatches(next,account,rule({descriptionContains:'PYATEROCHKA'})),true);assert.equal(ruleMatches(next,account,rule({descriptionContains:'Пятёрочка'})),false);
 });
+test('SAMOKAT matches the bank merchant in either alphabet and never replaces a manually named shop',()=>{
+ const operation=op('Покупка SAMOKAT SANKT-PETERBU RUS',merchantSourceSanitizer);
+ for(const value of ['SAMOKAT','Самокат'])assert.equal(ruleMatches(operation,account,rule({merchantContains:value})),true);
+ assert.equal(ruleMatches(operation,account,rule({descriptionContains:'SAMOKAT'})),true);
+ operation.semantics.merchant=facet('Мой магазин','user',true);
+ assert.equal(ruleMatches(operation,account,rule({merchantContains:'SAMOKAT'})),false);
+ assert.equal(ruleMatches(operation,account,rule({descriptionContains:'SAMOKAT'})),true);
+});
+test('the same rule checks all conditions and historical scope applies only its winning assignments',()=>{
+ const operation=op('Покупка SAMOKAT SANKT-PETERBU RUS',merchantSourceSanitizer);
+ operation.bankCounterpartyId='receiver';operation.semantics.counterparty=facet('previous');
+ const conditions:Rule['conditions']={merchantEquals:'Самокат',merchantContains:'SAMOKAT',descriptionContains:'SANKT',accountId:account.id,bankId:account.bankId,counterpartyId:'previous',counterpartyBankIdentity:true,kind:'purchase',direction:'out',amountFromMinor:'-10000',amountThroughMinor:'-10000',currency:'RUB'};
+ const selected:Rule={...rule(conditions),assignments:{categoryId:'new-root',counterpartyId:'receiver',analyticsOverride:'exclude'}};
+ assert.equal(ruleMatches(operation,account,selected),true);
+ for(const different of [{merchantEquals:'Озон'},{merchantContains:'Озон'},{descriptionContains:'Different'},{accountId:'other'},{bankId:'tbank'},{counterpartyId:'other'},{kind:'other'},{direction:'in'},{amountFromMinor:'-9999'},{amountThroughMinor:'-10001'}] as const){
+  assert.equal(ruleMatches(operation,account,{...selected,conditions:{...conditions,...different}}),false);
+ }
+ assert.equal(ruleMatches({...operation,bankCounterpartyId:'other'},account,selected),false);
+ const other:Rule={...rule({direction:'out'}),id:'other',priority:100,assignments:{categoryId:'other-root',role:'neutral',merchant:'Другой магазин'}};
+ const categories=[{id:'new-root',name:'Новая',parentId:null,role:'expense',hidden:false},{id:'other-root',name:'Старая',parentId:null,role:'expense',hidden:false},{id:'old-child',name:'Старая подкатегория',parentId:'other-root',role:'expense',hidden:false}] as const;
+ operation.semantics.category=facet('other-root');operation.semantics.subcategory=facet('old-child');
+ const scoped=applyRules(operation,account,[selected,other],selected.id,categories);
+ assert.equal(scoped.semantics.category.value,'new-root');assert.equal(scoped.semantics.subcategory.value,null);
+ assert.equal(scoped.semantics.role.value,'expense');assert.deepEqual(scoped.semantics.merchant,operation.semantics.merchant);
+ assert.equal(scoped.semantics.counterparty.value,'receiver');assert.equal(scoped.analyticsOverride,'exclude');
+ assert.equal(applyRules(operation,account,[selected,other],undefined,categories).semantics.merchant.value,'Другой магазин');
+ const higher:Rule={...selected,id:'higher',priority:2,assignments:{categoryId:'other-root',counterpartyId:'receiver'}};
+ assert.equal(applyRules(operation,account,[selected,higher],selected.id,categories).semantics.category.value,'other-root');
+ assert.equal(applyRules(operation,account,[selected,{...higher,enabled:false}],selected.id,categories).semantics.category.value,'new-root');
+ assert.ok(applyRules(operation,account,[selected,{...higher,priority:1}],selected.id,categories).reviewReasons.includes('conflicting_rules'));
+ operation.semantics.subcategory=facet('old-child','user',true);
+ const protectedResult=applyRules(operation,account,[selected,other],selected.id,categories);
+ assert.equal(protectedResult.semantics.category.value,'other-root');assert.equal(protectedResult.semantics.subcategory.value,'old-child');
+});

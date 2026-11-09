@@ -592,3 +592,48 @@ test('/5 full catalog recognizes additional agreed profiles locally and preserve
  const state=(await request('/finance/state')).json();assert.equal(state.operations.length,examples.length);for(const [merchant,leaf]of examples){const operation=state.operations.find((o:any)=>o.description==='Покупка '+merchant);assert.ok(operation,merchant);const original=await detail(operation.id);assert.equal(original.source.merchantText,merchant);assert.equal(original.source.amountMinor,'-12345');assert.equal(original.source.description,'Покупка '+merchant);assert.equal(operation.classification.category.source,'global_rule');assert.equal(state.categories.find((c:any)=>c.id===operation.classification.subcategory.value)?.name,leaf,merchant);}
  const observations=(await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' ORDER BY id")).rows;const repeat=await interestBatch('Synthetic complete catalog profiles',rows);await accept(repeat);assert.equal((await drain(repeat.batchId)).counts.created,0);assert.deepEqual((await pg.owner.query("SELECT * FROM finance.source_observation WHERE user_id='first' AND id=ANY($1::uuid[]) ORDER BY id",[observations.map(o=>o.id)])).rows,observations);assert.equal((await request('/finance/state')).json().operations.length,examples.length);
 });
+
+test('transfer proposals require distinct operations and future assignment follows one visible rule',async()=>{
+ const number='70000000000000000009';
+ const header=['Банк;Т-Банк','Номер счета;'+account,'Дата операции;Сумма операции;Валюта;Описание;Номер счёта получателя;Имя получателя'];
+ async function loadTable(lines:string[]){
+  const csv=[...header,...lines].join('\n'),local=await createLocalPreparation(await context(),undefined,localBankAdapter,'bank-source/5');
+  let prepared:PreparedBatch;
+  try{prepared=await local.prepare(randomUUID(),[parseBankTable(randomUUID(),new TextEncoder().encode(csv),csvTable(csv))]);}finally{local.dispose();}
+  assert.equal(JSON.stringify(prepared).includes(number),false);
+  await accept(prepared);await drain(prepared.batchId);
+  return prepared;
+ }
+ const state=async()=>(await request('/finance/state')).json();
+ const transfer=(day:number)=>'2026-09-'+String(day).padStart(2,'0')+';-10.00;RUB;Исходящий перевод;'+number+';Алексей И.';
+ await loadTable([transfer(1),'2026-09-02;-15.00;RUB;Покупка SAMOKAT;'+number+';Алексей И.']);
+ assert.equal((await state()).counterparties.length,0);
+ await loadTable([transfer(1)]);
+ assert.equal((await state()).counterparties.length,0);
+ const second=await loadTable([transfer(3)]);
+ const proposal=(await state()).counterparties[0];
+ assert.equal(proposal.name,'Алексей И.');assert.equal(proposal.state,'discovered');assert.equal(proposal.proposalCandidates.length,3);
+ const firstId=proposal.proposalCandidates[0],otherId=proposal.proposalCandidates[1];
+ assert.equal(JSON.stringify(await state()).includes(second.files[0]!.rows[0]!.counterpartyEvidence!.hmac),false);
+ await command({kind:'counterparty',id:proposal.id,patch:{state:'ignored'}});
+ await command({kind:'counterparty',id:proposal.id,patch:{name:'Арендодатель',proposalOperationIds:[firstId]}});
+ let view=await state();assert.equal(view.counterparties[0].state,'ignored');assert.deepEqual(view.counterparties[0].proposalOperationIds,[firstId]);
+ assert.equal((await detail(firstId)).semantics.counterparty.value,null);
+ const ruleId=randomUUID();
+ await command({kind:'counterparty',id:proposal.id,patch:{state:'registered',rememberForFuture:true,autoRuleId:ruleId}});
+ view=await state();assert.equal(view.counterparties[0].autoRuleId,ruleId);assert.equal(view.rules[0].name,'Контрагент · Арендодатель');
+ assert.deepEqual(view.rules[0].conditions,{counterpartyBankIdentity:true});
+ assert.equal((await detail(firstId)).semantics.counterparty.value,proposal.id);assert.equal((await detail(otherId)).semantics.counterparty.value,null);
+ await loadTable([transfer(4)]);
+ assert.equal((await state()).operations.find((o:any)=>o.date.date==='2026-09-04').classification.counterparty.ruleId,ruleId);
+ const r=(await state()).rules[0];
+ await command({kind:'rule',id:r.id,patch:{name:r.name,enabled:false,priority:r.priority,conditions:r.conditions,assignments:r.assignments}});
+ await loadTable([transfer(5)]);
+ assert.equal((await state()).operations.find((o:any)=>o.date.date==='2026-09-05').classification.counterparty.value,null);
+ await command({kind:'counterparty',id:proposal.id,patch:{rememberForFuture:true}});
+ await loadTable([transfer(6)]);
+ view=await state();assert.equal(view.rules.length,1);assert.equal(view.rules[0].enabled,true);
+ assert.equal(view.operations.find((o:any)=>o.date.date==='2026-09-06').classification.counterparty.ruleId,ruleId);
+ await command({kind:'delete_rule',id:ruleId});
+ assert.equal((await state()).counterparties[0].autoRuleId,null);
+});

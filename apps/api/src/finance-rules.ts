@@ -1,7 +1,7 @@
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,uuid,effective} from '../../../packages/finance-core/src/model.ts';
-import type {Graph,Operation,Account} from '../../../packages/finance-core/src/model.ts';
+import type {Graph,Operation,Account,Category} from '../../../packages/finance-core/src/model.ts';
 import {applyRules,ruleMatches} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {HttpError} from './types.ts';
@@ -16,9 +16,8 @@ export function parseRuleIntent(value:unknown):RuleIntent {
  const operationIds=r.operationIds.map(uuid);if(new Set(operationIds).size!==operationIds.length)throw new TypeError('DUPLICATE_SELECTION');
  return {kind:r.kind,id:randomUUID(),ruleId:uuid(r.ruleId),operationIds};
 }
-function historicalRuleChange(op:Operation,account:Account,active:Rule[]){
- const reconsidered={...op,reviewReasons:op.reviewReasons.filter(r=>r!=='conflicting_rules')};
- const next=applyRules(reconsidered,account,active);
+function historicalRuleChange(op:Operation,account:Account,active:Rule[],selectedRuleId:string,categories:Category[]){
+ const next=applyRules(op,account,active,selectedRuleId,categories);
  const snapshot=(value:Operation)=>[Object.values(value.semantics).map(f=>f.value),value.analyticsOverride,[...value.reviewReasons].sort()];
  return {next,changed:stableJSON(snapshot(op))!==stableJSON(snapshot(next))};
 }
@@ -28,11 +27,11 @@ export function historicalRuleCandidates(input:unknown,graph:Graph,rules:(Rule&{
  const ids:string[]=[];const rows:{id:string;date:ReturnType<typeof effective>['operationDate'];amountMinor:string;name:string}[]=[];
  if(rule.enabled&&rule.dependencyStatus==='ready')for(const op of graph.operations){
   const account=accounts.get(effective(op).accountId);
-  if(account&&ruleMatches(op,account,rule)&&historicalRuleChange(op,account,active).changed){ids.push(op.id);const bank=effective(op);if(rows.length<1000)rows.push({id:op.id,date:bank.operationDate,amountMinor:bank.amountMinor,name:op.semantics.merchant.value||bank.description||'Операция'});}
+  if(account&&ruleMatches(op,account,rule)&&historicalRuleChange(op,account,active,rule.id,graph.categories).changed){ids.push(op.id);const bank=effective(op);if(rows.length<1000)rows.push({id:op.id,date:bank.operationDate,amountMinor:bank.amountMinor,name:op.semantics.merchant.value||bank.description||'Операция'});}
  }
  return {operationIds:ids.slice(0,1000),total:ids.length,rows};
 }
-export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleIntent,graph:Graph,rules:(Rule&{dependencyStatus:string})[],compatible:(role:string,category:string|null,sub:string|null)=>void):Promise<BatchUndo> {
+export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleIntent,graph:Graph,rules:(Rule&{dependencyStatus:string})[]):Promise<BatchUndo> {
  const rule=rules.find(r=>r.id===(intent.kind==='delete_rule'?intent.id:intent.ruleId));if(!rule)throw new HttpError(404,'NOT_FOUND');
  if(intent.kind==='delete_rule'){
   const operationDependencies=graph.operations.filter(o=>Object.values(o.semantics).some(f=>f.ruleId===rule.id)).map(o=>o.id);
@@ -46,7 +45,7 @@ export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleInt
   const op=operations.get(id);if(!op)throw new HttpError(404,'NOT_FOUND');
   const account=accounts.get(effective(op).accountId)!;
   if(!ruleMatches(op,account,rule))throw new HttpError(409,'RULE_SCOPE_CHANGED');
-  const {next,changed}=historicalRuleChange(op,account,active);compatible(next.semantics.role.value,next.semantics.category.value,next.semantics.subcategory.value);
+  const {next,changed}=historicalRuleChange(op,account,active,rule.id,graph.categories);
   if(Object.values(op.semantics).some(f=>f.userVerified)||op.analyticsOverride!=='default')protectedOperationIds.push(id);
   if(next.reviewReasons.includes('conflicting_rules'))conflictingOperationIds.push(id);
   if(changed){
@@ -55,5 +54,5 @@ export async function applyRuleIntent(db:PoolClient,userId:string,intent:RuleInt
  }
  // Validation of the entire fixed set finishes before the first write.
  for(const c of changes)await db.query('UPDATE finance.transaction SET semantics=$3,analytics_override=$4,review_reasons=$5,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,c.id,JSON.stringify(c.semantics),c.analyticsOverride,JSON.stringify(c.reviewReasons)]);
- return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,ruleName:rule.name,ruleIds:active.map(r=>r.id),operationIds:intent.operationIds,selectedCount:intent.operationIds.length,changedOperationIds,protectedOperationIds,conflictingOperationIds,atomic:true,financialOperationsDeleted:0}};
+ return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,ruleName:rule.name,ruleIds:[rule.id],operationIds:intent.operationIds,selectedCount:intent.operationIds.length,changedOperationIds,protectedOperationIds,conflictingOperationIds,atomic:true,financialOperationsDeleted:0}};
 }
