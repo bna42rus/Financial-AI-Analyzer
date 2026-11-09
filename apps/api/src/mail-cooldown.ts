@@ -3,7 +3,7 @@ import {HttpError} from './types.ts';
 
 const hour=3600;
 const limit=6;
-type Purpose='application'|'password-reset'|'registration'|'email-change'|'invitation-resend'|'delivery-retry';
+type Purpose='application'|'password-reset'|'registration'|'email-change'|'account-deletion'|'invitation-resend'|'delivery-retry';
 type Window={key:string;sends:number;retry_at:Date;expires_at:Date};
 export class MailCooldownError extends HttpError {
  constructor(readonly retryAfterSeconds:number){super(429,'MAIL_COOLDOWN');}

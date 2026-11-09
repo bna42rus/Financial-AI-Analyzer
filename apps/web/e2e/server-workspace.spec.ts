@@ -832,3 +832,28 @@ test('device timezone stays selected and shows the actual zone in the account',a
  dialog=page.getByRole('dialog',{name:'Часовой пояс'});
  await expect(dialog.getByRole('button',{name:'Часовой пояс',exact:true})).toHaveText('Как на устройстве');
 });
+
+test('public demo uses connected screens and leaves the signed-in API and browser preferences untouched',async({page})=>{
+ await page.clock.setFixedTime(new Date('2026-11-09T12:00:00Z'));
+ const calls:string[]=[];
+ page.on('request',request=>{if(new URL(request.url()).port==='3000')calls.push(request.url());});
+ await page.goto(base+'demo');
+ await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();
+ await expect(page.getByText('Демонстрационный режим · тестовые данные')).toBeVisible();
+ const nav=page.getByRole('navigation',{name:'Разделы сайта'});
+ await nav.getByRole('link',{name:'Операции',exact:true}).click();
+ const list=page.getByRole('list',{name:'Сохранённые операции'});
+ await list.getByRole('button').first().click();
+ await expect(page.getByRole('dialog',{name:'Операция',exact:true})).toBeVisible();
+ await page.keyboard.press('Escape');
+ await nav.getByRole('link',{name:'Анализатор',exact:true}).click();
+ await page.getByRole('button',{name:'Сколько я потратил за выбранный период?'}).click();
+ await expect(page.getByText(/Расходы за вычетом возвратов за выбранный период/)).toBeVisible();
+ await nav.getByRole('link',{name:'Настройки',exact:true}).click();
+ await page.getByRole('button',{name:/^Бюджеты/}).click();
+ await expect(page.getByRole('heading',{name:'Продукты на месяц'})).toBeVisible();
+ await page.getByRole('button',{name:'Загрузить файлы',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Демонстрационный режим'})).toContainText('573');
+ expect(calls).toEqual([]);
+ expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);
+});

@@ -1,3 +1,5 @@
+import {accountDeletion,deletionQueue,deletionPreview,finishAccountDeletion} from './account-deletion.ts';
+import {adminHistory} from './admin-history.ts';
 import {MailCooldownError} from './mail-cooldown.ts';
 import {historicalRuleCandidates} from './finance-rules.ts';
 import {assistantWorkflowVersion} from './assistant-workflow.ts';
@@ -99,11 +101,12 @@ export async function createServer(config: Config) {
     // Per-route limits and authentication budgets stay unchanged and durable; server authority still gates all data.
     const financial=config.profile==='finance'&&(financeReads.has(route)||financeWrites.has(route)),scope=financial?'finance:':'';
     const ipScope=financial?(financeReads.has(route)?'finance:read:':'finance:write:'):'';
-    const budgets: [string, number, number][] = [[ipScope+'ip:' + request.ip, financial?(financeReads.has(route)?240:120):30, 60]];
+    const adminRead=config.profile==='control'&&route==='/control/history';
+    const budgets: [string, number, number][] = [[ipScope+'ip:' + request.ip, financial?(financeReads.has(route)?240:120):adminRead?90:30, 60]];
     const invitationSecret = (request.body as Record<string, unknown> | undefined)?.invitationToken;
     if(typeof invitationSecret==='string') budgets.push(['invitation:'+route+':'+invitationSecret,5,300]);
     if (address) budgets.push(['account:' + route + ':' + address, route.endsWith('reset-request') ? 3 : 5, 300]);
-    else budgets.push([scope+'action:' + route + ':' + request.ip, financial?(financeReads.has(route)?120:60):10, 60]);
+    else budgets.push([scope+'action:' + route + ':' + request.ip, financial?(financeReads.has(route)?120:60):adminRead?60:10, 60]);
     for (const [key, max, seconds] of budgets) {
       const entry = (await config.pool.query(`INSERT INTO ${schema}.rate_limit(key,hits,expires_at) VALUES($1,1,now()+$2*interval '1 second')
         ON CONFLICT(key) DO UPDATE SET hits=CASE WHEN ${schema}.rate_limit.expires_at<=now() THEN 1 ELSE ${schema}.rate_limit.hits+1 END,
@@ -127,14 +130,15 @@ export async function createServer(config: Config) {
       await rate(request);
       const resetPasswordProof=config.profile==='finance'&&path==='/finance/commit'&&typeof request.body==='object'&&request.body!==null&&'password'in request.body;
       const profileEmailProof=config.profile==='finance'&&path.startsWith('/account/email-')&&request.method==='POST';
-      if (config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)||resetPasswordProof||profileEmailProof) {
+      const deletionProof=request.method==='POST'&&((config.profile==='finance'&&['/account/deletion-start','/account/deletion-confirm'].includes(path))||(config.profile==='control'&&path==='/control/account-deletion-approve'));
+      if (deletionProof || config.profile==='control' && ['/auth/two-factor/enable','/auth/two-factor/verify-totp'].includes(path)||resetPasswordProof||profileEmailProof) {
         // Read the candidate before acquiring the mutation lock, release its connection,
         // then persist the limit. Re-check all authority inside the locked transaction below.
         // A second pool checkout while holding that lock can deadlock a saturated pool.
         const candidate=await config.pool.connect();let userId:string|undefined;
         try { userId=(await current(makeAuth(config,candidate,seal),request))?.user.id; }
         finally { candidate.release(); }
-        if(userId)await subjectRate(userId,resetPasswordProof?'financial-reset':profileEmailProof?path:'enrollment');
+        if(userId)await subjectRate(userId,resetPasswordProof?'financial-reset':profileEmailProof||deletionProof?path:'enrollment');
       }
       db = await config.pool.connect(); await db.query('BEGIN');
       // Serialize authentication mutations across instances. This foundation favors correctness over login throughput.
@@ -188,6 +192,25 @@ export async function createServer(config: Config) {
         result = await resetPassword(db, config, request, seal);
       } else if (path === '/control/recovery' && config.profile === 'control' && request.method === 'POST') {
         const recovered = await recoverAdmin(auth, db, config, request, seal); result = recovered.result; cookies = [recovered.cookie];
+      } else if(config.profile==='finance'&&((path==='/account/deletion'&&request.method==='GET')||
+        (['/account/deletion-start','/account/deletion-confirm','/account/deletion-cancel'].includes(path)&&request.method==='POST'))){
+        const s=await current(auth,request);if(!s?.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
+        await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
+        const step=path.endsWith('-start')?'start':path.endsWith('-confirm')?'confirm':path.endsWith('-cancel')?'cancel':'status';
+        result=await accountDeletion(db,s.user,step,step==='status'?{}:fields(request,step==='start'?['password','confirm']:step==='confirm'?['code']:[]),seal);
+      } else if(config.profile==='control'&&path==='/control/account-deletions'&&request.method==='GET'){
+        await requireAdmin(auth,db,request);result=await deletionQueue(db);
+      } else if(config.profile==='control'&&path==='/control/account-deletion-preview'&&request.method==='POST'){
+        await requireAdmin(auth,db,request);result=await deletionPreview(db,fields(request,['id']));
+      } else if(config.profile==='control'&&path==='/control/account-deletion-approve'&&request.method==='POST'){
+        const s=await requireAdmin(auth,db,request),body=fields(request,['id','email','code']);
+        const code=string(body.code,6);
+        if(!/^\d{6}$/.test(code))throw new HttpError(400,'INVALID_INPUT');
+        const headers=fromNodeHeaders(request.headers);
+        headers.set('cookie',(headers.get('cookie')??'').split(';').filter(part=>!part.includes('trust_device')).join(';'));
+        const response=await auth.handler(new Request(new URL('/auth/two-factor/verify-totp',config.baseURL),{method:'POST',headers,body:JSON.stringify({code})}));
+        if(!response.ok)throw new HttpError(response.status===429?429:401,'DELETION_ADMIN_CODE_INVALID');
+        result=await finishAccountDeletion(db,s.user.id,body,seal);
       } else if(config.profile==='finance'&&['/account/name','/account/timezone','/account/email-request','/account/email-confirm'].includes(path)&&request.method==='POST'){
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
@@ -231,7 +254,10 @@ export async function createServer(config: Config) {
         result={orders:(await db.query('SELECT * FROM commerce.control_checkout_queue()')).rows};
       } else if(config.profile==='control'&&path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)){
         const s=await requireAdmin(auth,db,request);
-        if(request.method==='POST'){result=await updateCommerceCatalog(db,request.body);await event(db,'control',s.user.id,'commerce_catalog_updated');}
+        if(request.method==='POST'){result=await updateCommerceCatalog(db,request.body);
+          const command=request.body as Record<string,unknown>;
+          await db.query('INSERT INTO commerce.action(id,actor_id,payload) VALUES($1,$2,$3)',[crypto.randomUUID(),s.user.id,{kind:'commerce_catalog_updated',target:command.id??command.units??null}]);
+          await event(db,'control',s.user.id,'commerce_catalog_updated');}
         else result=await commerceCatalog(db);
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
         await requireAdmin(auth,db,request);result=await mailQueue(db);
@@ -313,6 +339,8 @@ export async function createServer(config: Config) {
         else if(path==='/finance/imports')result=await importIngestion!.importHistory(db,s.user.id,request.method==='GET'?{}:request.body);
         else if(path==='/finance/edit')result=await finance.editFinance(db,s.user.id,request.body);
         else result=await finance.queryHistory(db,s.user.id,(await finance.prepareFinance(db,s.user.id)).generation,path==='/finance/history'?{}:request.body);
+      } else if(config.profile==='control'&&path==='/control/history'&&request.method==='POST'){
+        await requireAdmin(auth,db,request);result=await adminHistory(db,request);
       } else if (path === '/control/requests' && config.profile === 'control' && request.method === 'GET') {
         await requireAdmin(auth, db, request);
         result = await commerce!.queue(db);

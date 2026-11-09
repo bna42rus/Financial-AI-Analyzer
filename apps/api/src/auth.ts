@@ -18,7 +18,7 @@ export function makeAuth(config: Config, db: PoolClient, seal: Sealer) {
     database: drizzleAdapter(drizzle(db), { provider: 'pg', schema: authSchema(schema, seal.seal, seal.open), transaction: false }),
     trustedOrigins: [config.origin], logger: { disabled: true },
     emailAndPassword: { enabled: true, disableSignUp: true, requireEmailVerification: true, autoSignIn: false,
-      minPasswordLength: 12, maxPasswordLength: 128, revokeSessionsOnPasswordReset: true,
+      minPasswordLength: 8, maxPasswordLength: 128, revokeSessionsOnPasswordReset: true,
       password: { hash: hashPassword, verify: ({ password, hash }) => verifyPassword(password, hash) } },
     session: { expiresIn: config.profile === 'control' ? 3600 : 86400 * 7, disableSessionRefresh: true, freshAge: 300, cookieCache: { enabled: false } },
     advanced: {

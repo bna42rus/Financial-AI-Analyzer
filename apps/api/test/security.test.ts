@@ -22,7 +22,7 @@ before(async () => {
 });
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
-  await pg.owner.query(`TRUNCATE mail.delivery,mail.resend_audit,mail.request_cooldown,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
+  await pg.owner.query(`TRUNCATE identity.erasure_evidence,commerce.erased_account_payment,mail.delivery,mail.resend_audit,mail.request_cooldown,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
     identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
@@ -110,7 +110,7 @@ test('same generic login/reset responses for unknown and unverified email', asyn
   assert.equal((await pg.owner.query('SELECT * FROM identity.outbox')).rowCount,0);
 });
 test('request snapshot comes from database, no authority from client tariff/actor fields', async () => {
-  const b=userBrowser(); assert.equal((await b.post('/access/requests',{name:'Visitor',email:'v@example.test',tariffId:tariff.id,priceMinor:'1'})).statusCode,400);
+  const b=userBrowser(); assert.equal((await b.post('/access/requests',{name:'Visitor',email:'v@example.test',tariffId:tariff.id,priceMinor:'1'})).json().code,'TARIFF_CHANGED');
   const {row}=await application(); assert.equal(row.tariff.priceMinor,'119000');
   await pg.owner.query("UPDATE access.tariff SET snapshot=jsonb_set(snapshot,'{priceMinor}','999000')");
   assert.equal((await b.get('/access/request')).statusCode,401);
@@ -513,7 +513,7 @@ test('renewal requires verified identity, owns rows in API and RLS, and restores
  assert.equal((await pg.finance.query('SELECT * FROM commerce.access_cycle')).rowCount,0);
  assert.equal((await pg.finance.query('SELECT * FROM commerce.renewal_request')).rowCount,0);
  const db=await pg.finance.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[a.userId]);assert.equal((await db.query('SELECT * FROM commerce.renewal_request')).rowCount,1);await db.query('COMMIT');assert.equal((await db.query('SELECT * FROM commerce.renewal_request')).rowCount,0);}finally{db.release();}
- await assert.rejects(pg.finance.query("UPDATE commerce.access_cycle SET access_end=clock_timestamp()+interval '1 year'"),{code:'42501'});
+ await assert.rejects(pg.finance.query("UPDATE commerce.access_cycle SET quota_policy='{}'"),{code:'42501'});
  await assert.rejects(pg.control.query('SELECT * FROM identity.security_state'),{code:'42501'});
 });
 test('one unfinished renewal survives concurrent creation; only unclaimed revision can change or cancel',async()=>{
@@ -683,7 +683,7 @@ test('expired manual restoration uses commit time and explicit policy is require
  const before=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.equal(before.access_end.getTime()-before.anchor_at.getTime(),30*86400000);
  await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=clock_timestamp()-interval '40 days',access_end=clock_timestamp()-interval '1 day',end_offset_ms=999");
  const fresh=await manualCommand(b,{...body,actionId:crypto.randomUUID(),term:{kind:'days',count:7}});const at=Date.now();assert.equal((await b.post('/control/manual-access',fresh)).statusCode,200);
- const restored=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(restored.anchor_at.getTime()>=at-1);assert.equal(restored.end_offset_ms,'0');assert.equal(restored.extra_days,7);assert.equal(restored.quota_policy.limit,150);
+ const restored=(await pg.owner.query('SELECT * FROM commerce.access_cycle')).rows[0];assert.ok(restored.anchor_at.getTime()>=at-1);assert.equal(restored.end_offset_ms,'0');assert.equal(restored.extra_days,7);assert.equal(restored.quota_policy.limit,10000);
 });
 test('manual preview conflicts with revision, tariff policy changes and renewal confirmation; never double extends',async()=>{
  const a=await registeredUser(),row=await renewal(a),renew=await renewalCommand(a,row);
@@ -764,7 +764,7 @@ test('delivery metadata is TOTP-gated and never contains reset URLs, email proof
  assert.equal((await b.post('/control/manual-access',command)).statusCode,200);
  const row=(await pg.owner.query("SELECT id FROM access.outbox WHERE kind='invitation' ORDER BY created_at DESC LIMIT 1")).rows[0];
  await pg.owner.query("UPDATE access.outbox SET state='failed',last_error='TEMPORARY',attempts=5,retry_count=5 WHERE id=$1",[row.id]);
- const metadata=await b.get('/control/deliveries');assert.equal(metadata.statusCode,200);assert.ok(!metadata.body.includes('sealed_payload'));assert.ok(!metadata.body.includes('manual@example.test'));
+ const metadata=await b.get('/control/deliveries');assert.equal(metadata.statusCode,200);assert.ok(!metadata.body.includes('sealed_payload'));assert.equal(metadata.json().deliveries.find((item:{id:string})=>item.id===row.id).recipient,'manual@example.test');
  const action={actionId:crypto.randomUUID(),deliveryId:row.id,reason:'Retry after synthetic outage'};assert.equal((await b.post('/control/delivery-retry',action)).statusCode,200);assert.equal((await b.post('/control/delivery-retry',action)).json().status,'already_committed');
  assert.equal((await pg.owner.query('SELECT 1 FROM mail.resend_audit')).rowCount,1);assert.equal((await pg.owner.query('SELECT attempts FROM access.outbox WHERE id=$1',[row.id])).rows[0].attempts,5);
  assert.equal((await userBrowser().get('/control/deliveries')).statusCode,404);
@@ -785,4 +785,72 @@ test('active invitation resend is TOTP-gated, reuses link/expiry, rejects queued
  assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='invitation'")).rowCount,2);
  await deliverBatch(worker,sandboxTransport(worker));assert.equal((await pg.owner.query("SELECT 1 FROM mail.delivery WHERE kind='invitation' AND state='sent'")).rowCount,2);
  await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",[invite.id]);assert.equal((await b.post('/control/invitation-resend',{...action,actionId:crypto.randomUUID()})).statusCode,409);
+});
+
+test('verified erasure request can be withdrawn and approval atomically erases the right account',async()=>{
+ const user=await registeredUser(),{b:admin,uri}=user.admin;
+ await seedUser('identity','separate');
+ const address='visitor@example.test',path='/account/deletion';
+ await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=now()-interval '40 days',access_end=now()-interval '1 day' WHERE user_id=$1",[user.userId]);
+ assert.equal((await user.b.get('/session')).json().scope,'restricted');
+ assert.equal((await userBrowser().get(path)).statusCode,401);
+ assert.equal((await user.b.post(path+'-start',{password:'wrong password',confirm:true})).json().code,'INVALID_CREDENTIALS');
+ assert.equal((await user.b.post(path+'-start',{password:testPassword,confirm:true})).json().status,'awaiting_code');
+ assert.deepEqual((await admin.get('/control/account-deletions')).json().requests,[]);
+ const code=(await mail('identity','account_deletion_code')).code;
+ assert.equal((await user.b.post(path+'-confirm',{code:code==='000000'?'000001':'000000'})).json().code,'DELETION_CODE_INVALID');
+ assert.equal((await user.b.post(path+'-confirm',{code})).json().status,'pending');
+ const first=(await admin.get('/control/account-deletions')).json().requests[0];
+ assert.equal(first.email,address);
+ assert.deepEqual((await admin.post('/control/account-deletion-preview',{id:first.id})).json(),{operations:0,imports:0,dialogs:0});
+ assert.equal((await user.b.post(path+'-cancel',{})).json().status,'none');
+ assert.equal((await admin.post('/control/account-deletion-approve',{id:first.id,email:address,code:otp(uri)})).json().code,'DELETION_NOT_PENDING');
+ await pg.owner.query('TRUNCATE mail.request_cooldown');
+ assert.equal((await user.b.post(path+'-start',{password:testPassword,confirm:true})).json().status,'awaiting_code');
+ assert.equal((await user.b.post(path+'-confirm',{code:(await mail('identity','account_deletion_code')).code})).json().status,'pending');
+ const second=(await admin.get('/control/account-deletions')).json().requests[0];
+ assert.equal((await admin.post('/control/account-deletion-approve',{id:second.id,email:'separate@example.test',code:otp(uri)})).json().code,'DELETION_EMAIL_CHANGED');
+ assert.equal((await admin.post('/control/account-deletion-approve',{id:second.id,email:address,code:invalidOTP(uri)})).json().code,'DELETION_ADMIN_CODE_INVALID');
+ const checkout=crypto.randomUUID();
+ await pg.owner.query("INSERT INTO commerce.access_checkout(id,user_id,tariff,offer_version,mode,state) VALUES($1,$2,$3,'synthetic','once','pending')",[checkout,user.userId,tariff]);
+ assert.equal((await admin.post('/control/account-deletion-approve',{id:second.id,email:address,code:otp(uri)})).json().code,'DELETION_PAYMENT_PENDING');
+ await pg.owner.query("UPDATE commerce.access_checkout SET state='cancelled' WHERE id=$1",[checkout]);
+ const checked=await admin.post('/control/account-deletion-approve',{id:second.id,email:address,code:otp(uri)});
+ assert.equal(checked.statusCode,200,checked.body);
+ assert.equal((await user.b.get('/session')).statusCode,401);
+ assert.equal((await pg.owner.query('SELECT id FROM identity.auth_user')).rows[0].id,'separate');
+ for(const [table,column] of [['finance.workspace','user_id'],['identity.auth_account','user_id'],['identity.auth_session','user_id'],['commerce.access_cycle','user_id'],['commerce.purchase','user_id'],['commerce.account_directory','user_id']])
+  assert.equal((await pg.owner.query(`SELECT 1 FROM ${table} WHERE ${column}=$1`,[user.userId])).rowCount,0,table);
+ assert.equal((await pg.owner.query('SELECT 1 FROM mail.delivery WHERE recipient=$1',[address])).rowCount,0);
+ assert.equal((await pg.owner.query('SELECT 1 FROM identity.erasure_evidence WHERE id=$1',[second.id])).rowCount,1);
+ assert.equal((await pg.owner.query('SELECT 1 FROM commerce.erased_account_payment')).rowCount,1);
+ assert.equal((await mail('access','account_deletion_completed',cc)).email,address);
+ assert.equal((await admin.get('/control/account-deletions')).json().requests.length,0);
+ assert.equal((await admin.post('/control/history',{search:'account_deletion_completed'})).json().entries[0].id,second.id);
+ await assert.rejects(pg.control.query('SELECT * FROM identity.erasure_evidence'),{code:'42501'});
+});
+
+test('admin records manual extensions and a weekly Analyzer allowance for an indefinite account',async()=>{
+ await seedUser('identity','weekly');
+ const weekly={...tariff,id:'cashneuro-1w',name:'1 неделя',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500};
+ await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
+ const {b:admin}=await enrolledAdmin(),user=userBrowser();
+ const grant=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:'weekly',term:{kind:'days',count:7},reason:'Temporary access',quota:{source:'tariff',tariffId:weekly.id}});
+ const saved=await admin.post('/control/manual-access',grant);
+ assert.equal(saved.statusCode,200,saved.body);
+ const listing=await admin.post('/control/history',{search:'weekly@example.test'});
+ assert.equal(listing.statusCode,200,listing.body);
+ assert.equal(listing.json().entries[0].decision,'extend');
+ assert.equal(listing.json().entries[0].note,'Temporary access');
+ const indefinite=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'indefinite',userId:'weekly',term:{kind:'indefinite'},reason:'Recurring weekly quota'});
+ assert.equal((await admin.post('/control/manual-access',indefinite)).statusCode,200);
+ assert.equal((await user.post('/auth/sign-in/email',{email:'weekly@example.test',password:testPassword})).statusCode,200);
+ const state=await user.post('/finance/analyzer-state',{});
+ assert.equal(state.statusCode,200,state.body);
+ assert.equal(state.json().customerBudget.limit,2500);
+ const time=(await pg.owner.query("SELECT starts_at FROM commerce.manual_allowance WHERE user_id='weekly'")).rows[0].starts_at.getTime();
+ assert.equal(new Date(state.json().customerBudget.resetAt).getTime()-time,7*86400000);
+ const slot=(await pg.owner.query("SELECT * FROM commerce.analyzer_allowance_window('weekly',$1)",[new Date(time+8*86400000)])).rows[0];
+ assert.equal(slot.quota,2500);
+ assert.equal(slot.starts_at.getTime()-time,7*86400000);
 });

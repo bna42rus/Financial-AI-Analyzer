@@ -24,7 +24,7 @@ def send(config, smtp_factory=smtplib.SMTP_SSL):
     started_data = False
     try:
         message = EmailMessage(policy=SMTP)
-        message["From"] = Address(display_name="CashNeuro · Уведомления", addr_spec=config["sender"])
+        message["From"] = Address(display_name="CashNeuro", addr_spec=config["sender"])
         message["Reply-To"] = Address(display_name="Поддержка CashNeuro", addr_spec="support@cashneuro.ru")
         message["To"] = config["to"]
         message["Subject"] = config["subject"]

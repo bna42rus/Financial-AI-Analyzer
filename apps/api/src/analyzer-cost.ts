@@ -34,7 +34,7 @@ export async function reserveCost(db: PoolClient, identity: CostIdentity, policy
   if (aliases.length > 1) throw new CostError('AI_COST_RECONCILIATION_REQUIRED');
   const budgetPeriod: string = aliases[0]?.period ?? identity.periodStart;
   await db.query(`INSERT INTO commerce.ai_user_budget(user_id,anchor_at,period_start,limit_atoms) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [identity.userId, identity.anchorAt, budgetPeriod, baseMonthlyCost.toString()]);
-  await db.query(`SELECT * FROM commerce.ai_user_budget WHERE user_id=$1 AND anchor_at=$2 AND period_start=$3 FOR UPDATE`, [identity.userId, identity.anchorAt, budgetPeriod]);
+  const budget=(await db.query(`SELECT * FROM commerce.ai_user_budget WHERE user_id=$1 AND anchor_at=$2 AND period_start=$3 FOR UPDATE`, [identity.userId, identity.anchorAt, budgetPeriod])).rows[0];
   const old = (await db.query(`SELECT * FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2 AND step=$3`, [identity.userId, identity.requestId, identity.step])).rows[0];
   if (old) throw new CostError('AI_REQUEST_CHANGED');
   // Historical paid attempts cannot silently disappear when a ledger is added.
@@ -44,6 +44,8 @@ export async function reserveCost(db: PoolClient, identity: CostIdentity, policy
   const systemFunded = identity.step === 'classification';
   if(!systemFunded){
    await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",['customer-ai-budget:'+identity.userId]);
+   const {budget_minor:cap}=(await db.query("SELECT quota_policy->>'budgetMinor' AS budget_minor FROM commerce.access_cycle WHERE user_id=$1",[identity.userId])).rows[0]??{};
+   if(cap!==null&&cap!==undefined&&BigInt(budget.spent_atoms)+BigInt(budget.reserved_atoms)+amount>BigInt(cap)*10_000_000n)throw new CostError('AI_USER_COST_EXHAUSTED');
    await assertCustomerAiBudget(db,identity.userId,amount);
   }
   if (BigInt(project.spent_atoms) + BigInt(project.reserved_atoms) + amount > BigInt(project.limit_atoms)) throw new CostError('AI_PROJECT_COST_EXHAUSTED');

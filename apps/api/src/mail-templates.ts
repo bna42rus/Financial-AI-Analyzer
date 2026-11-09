@@ -49,6 +49,12 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
    subject='Подтвердите новую почту';body={paragraphs:['Введите код в окне CashNeuro, где запросили смену адреса.'],code:value(p,'code',100),note:'Код действует 15 минут.',unexpected:'Если вы не запрашивали смену почты, проигнорируйте письмо. Никому не сообщайте код.'};break;
   case 'profile_email_changed':
    subject='Почта для входа изменена';body={paragraphs:['Адрес для входа в CashNeuro изменён. Другие сеансы завершены.'],action:contact,unexpected:'Если вы не меняли почту, сразу сообщите в поддержку.'};break;
+  case 'account_deletion_code':
+   subject='Подтвердите заявку на удаление аккаунта';body={paragraphs:['Введите код в окне подачи заявки в CashNeuro.'],code:value(p,'code',6),note:'Код действует 15 минут.',unexpected:'Если вы не запрашивали удаление, проигнорируйте письмо. Никому не сообщайте код.'};break;
+  case 'account_deletion_received':
+   subject='Заявка на удаление аккаунта принята';body={paragraphs:['Заявка передана администратору. Её можно отозвать на странице аккаунта до начала удаления.'],action:profile,unexpected:'Если вы не подавали заявку, отзовите её и смените пароль.'};break;
+  case 'account_deletion_completed':
+   subject='Аккаунт CashNeuro удалён';body={paragraphs:['Заявка выполнена. Аккаунт и данные кабинета удалены, сеансы завершены. Записи, которые требуются для соблюдения закона, хранятся отдельно.'],facts:[['Номер заявки',value(p,'requestId',36)]],action:contact};break;
   case 'password_reset':
    subject='Восстановление пароля';body={paragraphs:['Задайте новый пароль для входа в CashNeuro. После смены пароля прежние сеансы завершатся.'],action:action('Задать новый пароль',link('reset')),note:'Ссылка одноразовая и действует 15 минут.',unexpected:'Если вы не запрашивали восстановление пароля, проигнорируйте письмо.'};break;
   case 'security_password_changed':
@@ -64,7 +70,7 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
   case 'access_activated':
    subject='Доступ активирован';body={paragraphs:['Регистрация завершена. Войдите с паролем, который выбрали при регистрации.'],facts:[['Начало доступа',at(p.activatedAt)],['Доступ',p.indefinite===true?'Бессрочный':'До '+at(p.accessEnd)]],action:signIn,unexpected:'Если вы не регистрировались, сообщите в поддержку.'};break;
   case 'manual_access_changed':
-   subject='Срок доступа изменён';body={paragraphs:[p.indefinite===true?'Доступ стал бессрочным.':'Срок доступа обновлён.'],facts:p.indefinite===true?undefined:[['Доступ до',at(p.accessEnd)]],action:profile,note:'Если аккаунт заблокирован, изменение срока не снимает блокировку.'};break;
+   subject='Срок доступа изменён';body={paragraphs:[p.indefinite===true?'Доступ стал бессрочным.':'Срок доступа обновлён.'],facts:[...(p.indefinite===true?[]:[['Доступ до',at(p.accessEnd)] as [string,string]]),...(Number.isSafeInteger(p.analyzerUnits)?[['Лимит Анализатора',String(p.analyzerUnits)+' единиц'+(Number.isSafeInteger(p.periodDays)?' каждые '+String(p.periodDays)+' дн.':' в месяц')] as [string,string]]:[])],action:profile,note:'Если аккаунт заблокирован, изменение срока не снимает блокировку.'};break;
   case 'payment_decision':case 'renewal_decision':{
    const renewal=kind==='renewal_decision', status=value(p,'status',50);
    const states:Record<string,[string,string]>={

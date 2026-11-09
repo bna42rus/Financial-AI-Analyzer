@@ -6,7 +6,7 @@ import type {Sealer} from './types.ts';
 import {actionId,remember} from './commerce.ts';
 const retryKinds=['invitation','payment_claim','renewal_claim','payment_decision','renewal_decision','manual_access_changed'];
 export async function mailQueue(db:PoolClient){
- const deliveries=(await db.query(`SELECT id,kind,state,attempts,created_at AS "createdAt",sent_at AS "sentAt",next_attempt_at AS "nextAttemptAt",last_error AS "lastError",acceptance,subject_id AS "subjectId",source_schema AS "sourceSchema" FROM mail.delivery ORDER BY created_at DESC,id LIMIT 100`)).rows;
+ const deliveries=(await db.query(`SELECT id,kind,state,attempts,created_at AS "createdAt",sent_at AS "sentAt",next_attempt_at AS "nextAttemptAt",last_error AS "lastError",acceptance,recipient,subject_id AS "subjectId",source_schema AS "sourceSchema" FROM mail.delivery ORDER BY created_at DESC,id LIMIT 100`)).rows;
  return {deliveries:deliveries.map(r=>({...r,canRetry:r.sourceSchema==='access'&&r.state==='failed'&&retryKinds.includes(r.kind)&&!['STALE','DELIVERY_UNKNOWN','INVALID_PAYLOAD'].includes(r.lastError)})),
   audit:(await db.query('SELECT action_id AS "actionId",delivery_id AS "deliveryId",reason,created_at AS "createdAt" FROM mail.resend_audit ORDER BY created_at DESC LIMIT 100')).rows};
 }

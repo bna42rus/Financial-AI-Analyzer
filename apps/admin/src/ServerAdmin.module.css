@@ -1,4 +1,8 @@
-.page{max-width:1340px}
+.page{min-width:0}
+.signedIn{--workspace-width:1280px;max-width:var(--workspace-width);padding-inline:var(--workspace-gutter,24px)}
+.entry{grid-template-columns:minmax(0,1fr) minmax(280px,.95fr)}
+.entry>section{margin:0;align-self:center}
+@media(max-width:760px){.entry{grid-template-columns:minmax(0,1fr)}.entry>section{width:100%;max-width:540px}}
 .header{padding-bottom:.8rem;margin-bottom:1rem}
 .identity{display:flex;align-items:center;gap:.9rem;font-weight:600}
 .identity>span:last-child{color:var(--color-secondary-text);font-size:.875rem}
@@ -6,11 +10,12 @@
 .nav button{border-color:transparent;padding:.55rem .75rem}
 .nav button[aria-pressed=true]{background:var(--color-soft)}
 @media(max-width:540px){.nav{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}}
-.environment{margin:0 0 12px;color:var(--color-warning-text);font-size:.875rem}
+
 .workspace{display:grid;grid-template-columns:218px minmax(0,1fr);align-items:start;gap:18px}
 .workspace .nav{position:sticky;top:12px;display:grid;gap:4px;padding:6px}
 .nav a{display:flex;align-items:center;gap:9px;padding:9px 10px;color:var(--color-text);text-decoration:none;border-radius:7px;font-size:.9rem}
-.nav a:hover,.nav a[aria-current=page]{background:var(--color-soft);color:var(--color-primary)}
+.nav a:hover{text-decoration:underline}.nav a[aria-current=page]{background:var(--color-soft);color:var(--color-primary)}
+.main>section,.main>div>section,.main>div>aside{border-radius:12px;padding:clamp(14px,2vw,22px)}
 .main{min-width:0}
 .sectionHead,.paymentHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .sectionHead{margin-bottom:12px}

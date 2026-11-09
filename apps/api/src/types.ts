@@ -1,3 +1,4 @@
+import {validNewPassword} from '../../../packages/access/src/password.ts';
 import type { PoolClient, Pool } from 'pg';
 import type { FastifyRequest } from 'fastify';
 import type { envelope } from './crypto.ts';
@@ -22,16 +23,16 @@ export function email(value: unknown): string {
   return v;
 }
 export function password(value: unknown): string {
-  const v = string(value, 128); if (v.length < 12) throw new HttpError(400, 'PASSWORD_TOO_SHORT'); return v;
+  if (!validNewPassword(value)) throw new HttpError(400, 'PASSWORD_POLICY'); return value;
 }
 export const realm = (profile: Profile) => profile === 'control' ? 'control' : 'identity';
 export async function clock(db: DB): Promise<string> { return (await db.query('SELECT clock_timestamp() AS now')).rows[0].now.toISOString(); }
 export type MailMeta={subjectId?:string;expiresAt?:string;dedupeKey?:string};
 export async function outbox(db: DB, schema: 'identity' | 'control' | 'access', seal: Sealer, kind: string, payload: Record<string, unknown>,meta:MailMeta={}) {
-  const source=schema==='control'||['invitation','payment_decision','renewal_decision','manual_access_changed'].includes(kind)?'control':'finance';
+  const source=schema==='control'||['invitation','payment_decision','renewal_decision','manual_access_changed','account_deletion_completed'].includes(kind)?'control':'finance';
   const id=crypto.randomUUID();
   // Untargeted DO NOTHING needs no SELECT on the encrypted access outbox.
-  await db.query(`INSERT INTO ${schema}.outbox(id,kind,sealed_payload,source_scope,subject_id,expires_at,dedupe_key) VALUES($7,$1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING`, [kind, seal.seal(JSON.stringify(payload)),source,meta.subjectId??null,meta.expiresAt??null,meta.dedupeKey??null,id]);
+  await db.query(`INSERT INTO ${schema}.outbox(id,kind,sealed_payload,source_scope,subject_id,expires_at,dedupe_key,recipient) VALUES($7,$1,$2,$3,$4,$5,$6,$8) ON CONFLICT DO NOTHING`, [kind, seal.seal(JSON.stringify(payload)),source,meta.subjectId??null,meta.expiresAt??null,meta.dedupeKey??null,id,['payment_claim','renewal_claim','account_deletion_completed'].includes(kind)?null:typeof payload.email==='string'?payload.email:null]);
   return id;
 }
 export async function event(db: DB, schema: 'identity' | 'control', userId: string, action: string) {

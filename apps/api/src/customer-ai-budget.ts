@@ -19,25 +19,23 @@ async function accessUsage(db:PoolClient,userId:string){
  ), current_slot AS (
   SELECT p.starts_at,p.ends_at,CASE WHEN p.starts_at>=a.period_start THEN $2::int ELSE COALESCE(w.quota,$2::int) END AS quota
   FROM context c LEFT JOIN LATERAL (
-    SELECT * FROM commerce.access_paid_window WHERE user_id=$1 AND starts_at<=c.now AND ends_at>c.now
-    ORDER BY starts_at DESC LIMIT 1
+    SELECT * FROM commerce.analyzer_allowance_window($1,c.now)
   ) w ON true
   CROSS JOIN LATERAL commerce.billing_period(
    COALESCE(w.starts_at,CASE WHEN c.anchor<=c.now THEN c.anchor END,date_trunc('month',c.now AT TIME ZONE 'Europe/Moscow') AT TIME ZONE 'Europe/Moscow'),
-   COALESCE(w.ends_at,CASE WHEN c.access_end>c.now THEN c.access_end END),COALESCE(w.kind,'calendar_months'),c.now) p
-  LEFT JOIN restoration a ON a.window_start=w.starts_at
+   least(w.ends_at,CASE WHEN c.access_end>c.now THEN c.access_end END),COALESCE(w.kind,'calendar_months'),c.now) p
+  LEFT JOIN restoration a ON a.window_start=w.starts_at AND NOT w.manual
  ), amounts AS (
   SELECT p.starts_at,CASE WHEN p.starts_at>=a.period_start THEN $2::int ELSE COALESCE(w.quota,$2::int) END AS quota,
    sum(CASE WHEN p.starts_at=a.period_start AND r.created_at<a.restored_at THEN 0
     WHEN r.state IN ('settled','released') THEN r.settled_atoms ELSE r.reserved_atoms END) AS occupied
   FROM commerce.ai_cost_reservation r CROSS JOIN context c LEFT JOIN LATERAL (
-    SELECT * FROM commerce.access_paid_window WHERE user_id=$1 AND starts_at<=r.created_at AND ends_at>r.created_at
-    ORDER BY starts_at DESC LIMIT 1
+    SELECT * FROM commerce.analyzer_allowance_window($1,r.created_at)
   ) w ON true
   CROSS JOIN LATERAL commerce.billing_period(
    COALESCE(w.starts_at,CASE WHEN c.anchor<=r.created_at THEN c.anchor END,date_trunc('month',r.created_at AT TIME ZONE 'Europe/Moscow') AT TIME ZONE 'Europe/Moscow'),
    w.ends_at,COALESCE(w.kind,'calendar_months'),r.created_at) p
-  LEFT JOIN restoration a ON a.window_start=w.starts_at
+  LEFT JOIN restoration a ON a.window_start=w.starts_at AND NOT w.manual
   WHERE r.user_id=$1 AND r.step<>'classification' GROUP BY 1,2
  ), paid AS (
   SELECT COALESCE(sum(units),0)::numeric*$3::numeric AS credits FROM commerce.ai_topup_order WHERE user_id=$1 AND status='paid'

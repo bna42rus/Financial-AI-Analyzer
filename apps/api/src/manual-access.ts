@@ -1,3 +1,4 @@
+import {paidAnalyzerUnits,unitsPerMonth} from './customer-ai-budget.ts';
 import {reserveMailRequest} from './mail-cooldown.ts';
 import type {PoolClient} from 'pg';
 import type {FastifyRequest} from 'fastify';
@@ -25,24 +26,28 @@ function limit(value:unknown){if(typeof value!=='number'||!Number.isSafeInteger(
 function same(a:unknown,b:unknown){return JSON.stringify(a)===JSON.stringify(b);}
 async function quota(db:PoolClient,value:unknown,fallback:QuotaPolicy|undefined):Promise<QuotaPolicy>{
  if(value===undefined){if(fallback)return fallback;throw new HttpError(400,'QUOTA_REQUIRED');}
- const q=object(value,['source','tariffId','limit']);
- if(q.source==='override'&&Object.keys(q).length===2)return {source:'override',limit:limit(q.limit)};
+ const q=object(value,['source','tariffId','limit','budgetMinor']);
+ if(q.source==='override'&&Object.keys(q).length===2){
+  if(typeof q.budgetMinor==='string'&&/^\d{1,7}$/.test(q.budgetMinor))return {source:'override',limit:unitsPerMonth,budgetMinor:BigInt(q.budgetMinor).toString()};
+  return {source:'override',limit:limit(q.limit)};
+ }
  if(q.source==='tariff'&&Object.keys(q).length===2){
   const id=string(q.tariffId,100),t=(await db.query("SELECT snapshot FROM access.tariff WHERE id=$1 AND snapshot->>'active'='true'",[id])).rows[0]?.snapshot;
   if(!t||typeof t.aiQuota!=='number'||!Number.isSafeInteger(t.aiQuota)||t.aiQuota<0||t.aiQuota>1000000000)throw new HttpError(409,'TARIFF_UNAVAILABLE');
-  return {source:'tariff',tariffId:id,limit:t.aiQuota};
+  return {source:'tariff',tariffId:id,limit:paidAnalyzerUnits(id,t.duration.kind,t.aiQuota),...(t.duration.kind==='days'&&t.duration.count<=366?{periodDays:t.duration.count}:{})};
  }
  throw new HttpError(400,'INVALID_INPUT');
 }
 export async function manualQueue(db:PoolClient):Promise<ManualQueue>{
  const users=(await db.query(`SELECT d.*,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
   FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id) ORDER BY d.registered_at DESC,d.user_id LIMIT 100`)).rows;
+ const limits=new Map((await db.query('SELECT * FROM commerce.control_analyzer_limits()')).rows.map(r=>[r.user_id,{units:r.units,spentAtoms:r.spent_atoms,budgetMinor:r.budget_minor}]));
  const invites=(await db.query(`SELECT i.id,i.manual_grant_id AS "grantId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",
   COALESCE((SELECT d.state FROM mail.delivery d WHERE d.subject_id=i.id AND d.kind='invitation' ORDER BY d.created_at DESC LIMIT 1),'queued') AS delivery,CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state,
   g.term,g.access_type AS "accessType",g.quota_policy AS quota,g.reason FROM commerce.invitation i JOIN commerce.manual_grant g ON g.id=i.manual_grant_id ORDER BY i.created_at DESC,i.id DESC LIMIT 100`)).rows;
- return {users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null})),invitations:invites,
+ return {users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null,analyzer:limits.get(u.user_id)})),invitations:invites,
   audit:(await db.query('SELECT data FROM commerce.manual_access_audit ORDER BY created_at DESC,action_id DESC LIMIT 100')).rows.map(r=>r.data),
-  tariffs:(await db.query('SELECT snapshot FROM access.tariff ORDER BY id')).rows.map(r=>r.snapshot).filter(t=>t.active===true&&Number.isSafeInteger(t.aiQuota)&&t.aiQuota>=0&&t.aiQuota<=1000000000).map(t=>({id:t.id,name:t.name,aiQuota:t.aiQuota}))};
+  tariffs:(await db.query('SELECT snapshot FROM access.tariff ORDER BY id')).rows.map(r=>r.snapshot).filter(t=>t.active===true&&Number.isSafeInteger(t.aiQuota)&&t.aiQuota>=0&&t.aiQuota<=1000000000).map(t=>({id:t.id,name:t.name,aiQuota:paidAnalyzerUnits(t.id,t.duration.kind,t.aiQuota),priceMinor:t.priceMinor,duration:t.duration}))};
 }
 async function availableEmail(db:PoolClient,address:string,now:string){
  if((await db.query('SELECT 1 FROM commerce.account_directory WHERE email=$1',[address])).rowCount)throw new HttpError(409,'EXISTING_ACCOUNT');
@@ -107,7 +112,8 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,revision,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET anchor_at=EXCLUDED.anchor_at,access_end=EXCLUDED.access_end,revision=EXCLUDED.revision,calendar_months=EXCLUDED.calendar_months,extra_days=EXCLUDED.extra_days,indefinite=EXCLUDED.indefinite,end_offset_ms=EXCLUDED.end_offset_ms,quota_policy=EXCLUDED.quota_policy`,
    [userId,next.anchorAt,next.accessEnd,next.timezone,next.revision,next.calendarMonths,next.extraDays,next.indefinite??false,next.endOffsetMs??0,q]);
-  await outbox(db,'access',seal,'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false},{subjectId:userId});
+  if(b.quota&&q.source==='tariff'&&!same(q,before?.quotaPolicy))await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[userId,now,q.limit,q.periodDays??null]);
+  await outbox(db,'access',seal,'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'&&q.budgetMinor!==undefined?{analyzerBudgetMinor:q.budgetMinor}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
  }
  const audit={actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
  await db.query('INSERT INTO commerce.manual_access_audit(action_id,user_id,data,created_at) VALUES($1,$2,$3,$4)',[id,userId??null,audit,now]);

@@ -31,3 +31,4 @@
 .reviewDisclosure[open] .reviewToggle svg { transform:rotate(180deg); }
 
 @media(max-width:360px){.header{grid-template-columns:minmax(0,1fr)}.headerActions{grid-column:1;grid-row:2}.header .navigation{grid-row:3}}
+.demoNotice{width:min(100% - 2 * var(--workspace-gutter,24px),var(--workspace-width,1440px));margin:12px auto 0;padding:8px 12px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;border-radius:8px;color:var(--color-text);background:var(--color-soft);font-size:.85rem}

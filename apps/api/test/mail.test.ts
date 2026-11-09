@@ -51,7 +51,7 @@ test('delivery reaches encrypted durable sandbox; sent is acceptance and metadat
  const id=await queue();assert.equal((await state(id)).state,'queued');await deliverBatch(fc,sandboxTransport(fc));
  const row=await state(id);assert.equal(row.state,'sent');assert.equal(row.acceptance,'sandbox');assert.equal(row.attempts,1);assert.ok(row.sent_at);
  const stored=(await pg.owner.query('SELECT sealed_message FROM mail.sandbox_inbox WHERE id=$1',[id])).rows[0].sealed_message;assert.ok(!stored.includes('user@example.test'));
- assert.match(JSON.parse(envelope(fc.wrappingKey).open(stored)).text,/Старые сессии/);assert.ok(!JSON.stringify(row).includes('user@example.test'));await deliverBatch(fc,sandboxTransport(fc));assert.equal((await state(id)).attempts,1);
+ assert.match(JSON.parse(envelope(fc.wrappingKey).open(stored)).text,/Прежние сеансы завершены/);assert.equal(row.recipient,'user@example.test');assert.ok(!Object.hasOwn(row,'sealed_payload'));await deliverBatch(fc,sandboxTransport(fc));assert.equal((await state(id)).attempts,1);
 });
 
 test('Staging API and Postbox queue use a KMS-unlocked key; acceptance, retries and uncertain outcome persist safely',async t=>{
