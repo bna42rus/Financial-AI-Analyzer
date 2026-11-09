@@ -33,7 +33,13 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  else if(path==='/finance/operation')result={...detail,revision:state.revision};
  else if(path==='/finance/history-query')result={actions:[],nextBeforeRevision:null};
  else if(path==='/finance/preview'){previews.set(String(body.actionId),body.intent);result=syntheticPreview(String(body.actionId),detail);}
- else if(path==='/finance/commit'){commitAttempts++;if(lostCommit&&commitAttempts===1){await route.abort('connectionreset');return;}const intent=previews.get(String(body.actionId));if(intent?.kind==='account'){const patch=intent.patch as Record<string,unknown>;Object.assign(state.accounts[0]!,patch);}else if(intent?.kind==='account_settings'){for(const change of intent.accounts as {id:string;patch:Record<string,unknown>}[]){const account=state.accounts.find(a=>a.id===change.id);if(account)Object.assign(account,change.patch);}}if(intent?.kind==='counterparty'){const party=state.counterparties.find(p=>p.id===intent.id);if(party)Object.assign(party,intent.patch);}state.revision=(BigInt(state.revision)+1n).toString();result={status:'committed',actionId:body.actionId,generation:state.generation,revision:state.revision};}
+ else if(path==='/finance/commit'){commitAttempts++;if(lostCommit&&commitAttempts===1){await route.abort('connectionreset');return;}const intent=previews.get(String(body.actionId));if(intent?.kind==='account'){const patch=intent.patch as Record<string,unknown>;Object.assign(state.accounts[0]!,patch);}else if(intent?.kind==='account_settings'){for(const change of intent.accounts as {id:string;patch:Record<string,unknown>}[]){const account=state.accounts.find(a=>a.id===change.id);if(account)Object.assign(account,change.patch);}}if(intent?.kind==='counterparty'){
+  const party=state.counterparties.find(p=>p.id===intent.id),patch=intent.patch as {autoRuleId?:string;rememberForFuture?:boolean};
+  if(party){
+   Object.assign(party,patch);
+   if(patch.autoRuleId)state.rules.push({id:patch.autoRuleId,name:'Контрагент · '+party.name,enabled:!!party.hasBankIdentity,priority:100,conditions:party.hasBankIdentity?{counterpartyBankIdentity:true}:{},assignments:{counterpartyId:party.id},dependencyStatus:party.hasBankIdentity?'ready':'needs_setup'});
+  }
+ }state.revision=(BigInt(state.revision)+1n).toString();result={status:'committed',actionId:body.actionId,generation:state.generation,revision:state.revision};}
  await route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(result)});
  });
  await page.goto(base);await expect(page.getByRole('navigation',{name:'Разделы сайта',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();if(duringInitialLoad){await expect.poll(()=>summaryWaiting).toBe(true);try{await duringInitialLoad();}finally{releaseSummary();}}await expect(page.getByRole('status').filter({hasText:'Загружаем финансовые'})).toHaveCount(0,{timeout:duringInitialLoad?2000:5000});
@@ -534,6 +540,32 @@ test('counterparty proposal shows operation selection inside Edit and saves it w
  const add=page.getByRole('dialog',{name:'Добавить контрагента',exact:true});
  await expect(add).toContainText('Операций будет привязано: 1.');
  await expect(add.getByRole('button',{name:'Открыть правило',exact:true})).toHaveCount(0);
+ await add.getByRole('checkbox',{name:'Запомнить для будущих операций'}).check();
+ await expect(add.getByLabel('Описание содержит')).toHaveCount(0);
+ await add.getByRole('button',{name:'Добавить',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ expect(h.calls.filter(c=>c.path==='/finance/preview').at(-1)?.body.intent).toMatchObject({kind:'counterparty',id,patch:{state:'registered',rememberForFuture:true,autoRuleId:expect.any(String)}});
+ expect(h.state.rules[0]?.enabled).toBe(true);
+});
+
+test('counterparty editor saves once and opens the linked rule for first setup',async({page})=>{
+ const h=await setup(page),party=h.state.counterparties[0]!;
+ await section(page,'Контрагенты');
+ const row=page.getByRole('article').filter({hasText:party.name});
+ await row.getByRole('button',{name:'Изменить',exact:true}).click();
+ const editor=page.getByRole('dialog',{name:'Изменить контрагента',exact:true});
+ await editor.getByRole('checkbox',{name:'Запомнить для будущих операций'}).check();
+ await expect(editor.getByLabel('Описание содержит')).toHaveCount(0);
+ await expect(editor.getByRole('button',{name:'Открыть правило',exact:true})).toHaveCount(0);
+ await editor.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ await row.getByRole('button',{name:'Изменить',exact:true}).click();
+ await editor.getByRole('button',{name:'Открыть правило',exact:true}).click();
+ const rule=page.getByRole('dialog',{name:'Изменение правила',exact:true});
+ await rule.getByLabel('Описание содержит').fill('Аренда');
+ await rule.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
+ expect(h.calls.filter(c=>c.path==='/finance/preview').at(-1)?.body.intent).toMatchObject({kind:'rule',patch:{enabled:true,conditions:{descriptionContains:'Аренда'},assignments:{counterpartyId:party.id}}});
 });
 
 test('counterparty split shows one dialog and one search frame; operation checkbox stays left',async({page})=>{

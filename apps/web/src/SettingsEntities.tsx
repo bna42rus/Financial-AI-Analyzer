@@ -1,5 +1,3 @@
-import {SelectField} from './SelectField';
-import {bankNames} from './finance-client';
 import {SearchFilter} from './SearchFilter';
 import type {StructureAction} from './SettingsStructure';
 import {useEffect,useId,useState} from 'react';
@@ -19,15 +17,13 @@ export function SettingsEntityDialog({editor,state,command,commandState,disabled
  const entity=category??party,editing=!!entity,forCategory=editor.kind==='category';
  const linkedRule=party?.autoRuleId?state.rules.find(r=>r.id===party.autoRuleId):undefined;
  const canRemember=editor.kind==='counterparty'&&!!party&&(party.state==='registered'||!!editor.add);
- const initial={name:entity?.name??'',role:category?.role??'expense',parentId:category?.parentId??'',hidden:category?.hidden??false,isSelf:party?.isSelf??false,remember:linkedRule?.enabled??false,ruleBank:'',ruleDirection:'',ruleDescription:''};
+ const initial={name:entity?.name??'',role:category?.role??'expense',parentId:category?.parentId??'',hidden:category?.hidden??false,isSelf:party?.isSelf??false,remember:linkedRule?.enabled??false};
  const [values,set]=useState(initial),[error,setError]=useState(''),[sent,setSent]=useState<string|null>(null);
  const form=useId(),[autoRuleId]=useState(()=>crypto.randomUUID()),[openedAt]=useState(()=>({generation:state.generation,revision:state.revision}));
  const epoch={...openedAt,revision:proposalSelectionRevision??openedAt.revision};
  const stale=epoch.generation!==state.generation||epoch.revision!==state.revision;
  const title=forCategory?(editing?'Изменить категорию':'Новая категория'):(editor.add?'Добавить контрагента':editing?'Изменить контрагента':'Новый контрагент');
  const changed=JSON.stringify(values)!==JSON.stringify(initial);
- const configureRule=canRemember&&values.remember&&!linkedRule&&!party?.hasBankIdentity;
- const ruleReady=!configureRule||!!values.ruleDirection&&!!values.ruleDescription.trim();
  const serverError=sent&&commandState.title===sent&&!commandState.preview?commandState.error:'';
  useEffect(()=>{if(sent&&stale&&commandState.phase==='idle'&&!commandState.error)close();},[sent,stale,commandState.phase,commandState.error]);
  function apply(){
@@ -42,17 +38,15 @@ export function SettingsEntityDialog({editor,state,command,commandState,disabled
   }else{
    if(!editing||editor.add)patch.state='registered';
    if(canRemember&&values.remember!==initial.remember){
-    if(!ruleReady){setError('Укажите направление и текст для правила.');return;}
     patch.rememberForFuture=values.remember;
     if(values.remember&&!linkedRule)patch.autoRuleId=autoRuleId;
-    if(configureRule)patch.ruleConditions={...(values.ruleBank?{bankId:values.ruleBank}:{}),direction:values.ruleDirection,descriptionContains:safeText(sanitizeText(values.ruleDescription),160)};
    }
    if(!editing||values.isSelf!==initial.isSelf)patch.isSelf=values.isSelf;
   }
   if(!Object.keys(patch).length){close();return;}
-  setSent(title);void command?.begin({kind:editor.kind,id:editor.id??crypto.randomUUID(),patch,create:!editing},title,editing&&('isSelf'in patch||'state'in patch||'rememberForFuture'in patch),epoch);
+  setSent(title);void command?.begin({kind:editor.kind,id:editor.id??crypto.randomUUID(),patch,create:!editing},title,false,epoch);
  }
- return <OperationDialog compact={!forCategory} title={title} onClose={()=>{if(!disabled)close();}} footer={<><button type="button" className={styles.textButton+' '+operationStyles.leftAction} disabled={disabled||!changed} onClick={()=>{set(initial);setError('');}}>Сбросить</button><button type="submit" form={form} className={common.primaryButton} disabled={disabled||stale||!ruleReady||editing&&!changed&&!editor.add}>{editor.add?'Добавить':editing?'Сохранить':'Создать'}</button></>}>
+ return <OperationDialog compact={!forCategory} title={title} onClose={()=>{if(!disabled)close();}} footer={<><button type="button" className={styles.textButton+' '+operationStyles.leftAction} disabled={disabled||!changed} onClick={()=>{set(initial);setError('');}}>Сбросить</button><button type="submit" form={form} className={common.primaryButton} disabled={disabled||stale||editing&&!changed&&!editor.add}>{editor.add?'Добавить':editing?'Сохранить':'Создать'}</button></>}>
   <form id={form} className={styles.settingsStack+' '+styles.entityForm} noValidate onSubmit={e=>{e.preventDefault();apply();}}>
    <OperationField label={forCategory?"Название":"Имя контрагента"} error={error||(!forCategory&&serverError.includes("таким именем")?serverError:undefined)}><input value={values.name} maxLength={160} disabled={disabled} onChange={e=>{set({...values,name:e.target.value});setError('');}}/></OperationField>
    {forCategory&&(!editing?<><OperationField label="Родительская категория"><SearchFilter label="Родительская категория" single fullWidth value={[values.parentId]} disabled={disabled} onChange={([parentId=''])=>{const root=state.categories.find(c=>c.id===parentId);set({...values,parentId,role:root?(root.role!=='both'?root.role:values.role==='both'?'expense':values.role):values.role});}}
@@ -63,11 +57,8 @@ export function SettingsEntityDialog({editor,state,command,commandState,disabled
    {canRemember&&<div className={styles.selfField}>
     <label className={styles.checkboxRow}><input type="checkbox" checked={values.remember} disabled={disabled||linkedRule?.dependencyStatus==='needs_setup'} onChange={e=>set({...values,remember:e.target.checked})}/>Запомнить для будущих операций</label>
     {linkedRule&&<button type="button" className={common.linkButton} disabled={disabled} onClick={()=>onRule(linkedRule.id)}>Открыть правило</button>}
-    {configureRule&&<fieldset className={operationStyles.ruleGroup}><legend>Условия для будущих операций</legend>
-     <OperationField label="Банк"><SelectField value={values.ruleBank} onChange={e=>set({...values,ruleBank:e.target.value})}><option value="">Любой банк</option>{Object.entries(bankNames).map(([id,label])=><option key={id} value={id}>{label}</option>)}</SelectField></OperationField>
-     <OperationField label="Направление"><SelectField value={values.ruleDirection} onChange={e=>set({...values,ruleDirection:e.target.value})}><option value="">Выберите направление</option><option value="in">Поступление</option><option value="out">Списание</option></SelectField></OperationField>
-     <OperationField label="Описание содержит"><input value={values.ruleDescription} maxLength={160} onChange={e=>set({...values,ruleDescription:e.target.value})}/></OperationField>
-    </fieldset>}
+    {linkedRule?.dependencyStatus==='needs_setup'&&<p className={styles.muted}>Добавьте условия в правиле, чтобы оно начало работать.</p>}
+    {values.remember&&!linkedRule&&!party?.hasBankIdentity&&<p className={styles.muted}>Условия можно задать после сохранения в разделе «Правила».</p>}
    </div>}
    {editor.add&&party&&<p>Операций будет привязано: {(party.proposalOperationIds??party.proposalCandidates?.slice(0,1000)??[]).filter(id=>party.proposalCandidates?.includes(id)).length}.</p>}
    {editing&&editor.id&&(forCategory?<div className={styles.categoryActions}>

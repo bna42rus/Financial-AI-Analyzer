@@ -22,7 +22,9 @@ export function validateRule(value:unknown):Omit<Rule,'id'> {
 }
 /** The same closed predicate is used for future imports and explicit historical selection. */
 export function ruleMatches(operation:Operation,account:Account,rule:Rule):boolean {
- const f=effective(operation),amount=BigInt(f.amountMinor),text=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU'),c=rule.conditions;
+ const c=rule.conditions;
+ if(!Object.keys(c).length)return false;
+ const f=effective(operation),amount=BigInt(f.amountMinor),text=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU');
  // Freeze the former matching input only for an intact, untouched /5 bank
  // initializer. Manual/private/global/AI names still match their actual value.
  const compat=operation.source.versions.sourceSanitizer==='bank-source/5'&&operation.source.versions.sourceTextEvidence==='intact'&&operation.semantics.merchant.source==='bank'&&!operation.semantics.merchant.userVerified&&operation.semantics.merchant.value===operation.source.merchantText;

@@ -24,6 +24,7 @@ function rulePatch(r:Rule):Omit<Rule,'id'>{return {name:r.name,enabled:r.enabled
 export function RuleEditor(props:EditorProps&{id:string|null;seed?:Rule;commandState?:CommandState;allowHistory?:boolean}){
  const draft=useSettingsDraft(props),s=draft.snapshot,persisted=s.rules.find(r=>r.id===props.id),existing=persisted??props.seed,linked=s.counterparties.find(p=>p.autoRuleId===persisted?.id&&!!p.autoRuleId);
  const [id]=useState(()=>existing?.id??crypto.randomUUID()),formId=useId();
+ const firstSetup=!!linked&&persisted?.dependencyStatus==='needs_setup'&&!Object.keys(persisted.conditions).length;
  const [initial]=useState(()=>({name:existing?.name??'',priority:String(existing?.priority??100),conditions:Object.fromEntries(Object.entries(existing?.conditions??{}).map(([k,v])=>[k,k.startsWith('amount')?minorToRubles(String(v)):String(v)])),assignments:Object.fromEntries(Object.entries(existing?.assignments??{}).map(([k,v])=>[k,v===null?'clear':String(v)])),history:false}));
  const [values,setValues]=useState(initial),[errors,setErrors]=useState<Record<string,string>>({}),[attempt,setAttempt]=useState<{title:string;receipt:string|null}|null>(null);
  const {name,priority,conditions,assignments,history}=values;
@@ -56,7 +57,7 @@ export function RuleEditor(props:EditorProps&{id:string|null;seed?:Rule;commandS
   if(typeof a.subcategoryId==='string'&&(!sub||sub.parentId!==cat?.id||!compatible(sub.role)))problems['a.subcategoryId']='Выберите подкатегорию выбранной категории.';
   setErrors(problems);if(Object.keys(problems).length)return;
   try{
-   const patch=validateRule({name:cleanName,enabled:persisted?.enabled??true,priority:Number(priority),conditions:c,assignments:a});
+   const patch=validateRule({name:cleanName,enabled:firstSetup||(persisted?.enabled??true),priority:Number(priority),conditions:c,assignments:a});
    const requestTitle=(persisted?'Изменить правило':history?'Создать и применить правило':'Создать правило')+' «'+patch.name+'»';
    setAttempt({title:requestTitle,receipt:props.commandState?.undoActionId??null});
    void props.command?.begin(history&&!persisted?{kind:'create_rule_with_history',id,patch}:{kind:'rule',id,patch,create:!persisted},requestTitle,history&&!persisted,s);
@@ -72,6 +73,7 @@ export function RuleEditor(props:EditorProps&{id:string|null;seed?:Rule;commandS
  return <OperationDialog title={title} onClose={()=>{if(!props.disabled)props.close();}} footer={<><button type="button" className={operationStyles.quietButton} disabled={draft.locked} onClick={()=>{setValues(initial);setErrors({});setAttempt(null);}}>Сбросить</button><button form={formId} type="submit" className={common.primaryButton+' '+operationStyles.rightAction} disabled={draft.locked}>{persisted?'Сохранить':history?'Создать и применить правило':'Создать правило'}</button></>}>
   {draft.stale&&<p role="alert" className={operationStyles.fieldError}>Данные изменились. Откройте редактор заново.</p>}
   {serverError&&<p role="alert" className={operationStyles.fieldError}>{serverError}</p>}
+  {firstSetup&&<p>Добавьте условия. Правило включится после сохранения.</p>}
   <form id={formId} onSubmit={e=>{e.preventDefault();submit();}}>
    <fieldset className={operationStyles.form} disabled={draft.locked}>
     <OperationField label="Название правила" error={errors.name}><input value={name} maxLength={160} onChange={e=>setValues(v=>({...v,name:e.target.value}))}/></OperationField>

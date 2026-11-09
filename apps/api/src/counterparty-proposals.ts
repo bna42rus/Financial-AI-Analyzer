@@ -75,10 +75,11 @@ export async function saveCounterpartyOptions(db:PoolClient,userId:string,id:str
   if(rule.enabled!==patch.rememberForFuture)await db.query('UPDATE finance.rule SET enabled=$3,revision=revision+1 WHERE user_id=$1 AND id=$2',[userId,before.auto_rule_id,patch.rememberForFuture]);
  }else if(patch.rememberForFuture){
   const aliases=await db.query('SELECT 1 FROM finance.counterparty_alias WHERE user_id=$1 AND counterparty_id=$2 LIMIT 1',[userId,id]);
-  const conditions=patch.ruleConditions??(aliases.rowCount?{counterpartyBankIdentity:true}:null);
-  if(!conditions||!patch.autoRuleId)throw new HttpError(409,'COUNTERPARTY_RULE_CONDITIONS_REQUIRED');
+  if(!patch.autoRuleId)throw new TypeError('INVALID_COUNTERPARTY_CONDITION');
+  const conditions=patch.ruleConditions??(aliases.rowCount?{counterpartyBankIdentity:true}:{});
+  const ready=Object.keys(conditions).length>0;
   const name=('Контрагент · '+(patch.name??before?.name??'')).slice(0,160);
-  await db.query('INSERT INTO finance.rule(user_id,id,name,enabled,priority,conditions,assignments) VALUES($1,$2,$3,true,100,$4,$5)',[userId,patch.autoRuleId,name,JSON.stringify(conditions),JSON.stringify({counterpartyId:id})]);
+  await db.query('INSERT INTO finance.rule(user_id,id,name,enabled,priority,conditions,assignments,dependency_status) VALUES($1,$2,$3,$4,100,$5,$6,$7)',[userId,patch.autoRuleId,name,ready,JSON.stringify(conditions),JSON.stringify({counterpartyId:id}),ready?'ready':'needs_setup']);
   changes.auto_rule_id=patch.autoRuleId;
  }
  return changes;

@@ -393,13 +393,14 @@ test('live review skips persist and refresh restores the first unresolved operat
 test('a saved counterparty without a bank identifier can create, edit and reuse one explicit future rule',async()=>{
  const id=randomUUID(),ruleId=randomUUID(),name='Арендодатель';
  await command({kind:'counterparty',id,create:true,patch:{name,state:'registered'}});
- const {generation,revision}=await view();
- const attempt=await request('/finance/preview',{actionId:randomUUID(),generation,revision,intent:{kind:'counterparty',id,patch:{rememberForFuture:true,autoRuleId:ruleId}}});
- assert.equal(attempt.json().code,'COUNTERPARTY_RULE_CONDITIONS_REQUIRED');
- await command({kind:'counterparty',id,patch:{rememberForFuture:true,autoRuleId:ruleId,ruleConditions:{direction:'out',descriptionContains:'Sanitized'}}});
- let state=await view();assert.equal(state.counterparties[0].autoRuleId,ruleId);assert.equal(state.rules[0].enabled,true);
- const {name:ruleName,conditions,assignments,priority}=state.rules[0];
- await command({kind:'rule',id:ruleId,patch:{name:ruleName,enabled:true,priority,conditions:{...conditions,descriptionContains:'Sanitized example'},assignments}});
+ await command({kind:'counterparty',id,patch:{rememberForFuture:true,autoRuleId:ruleId}});
+ let state=await view();assert.equal(state.counterparties[0].autoRuleId,ruleId);
+ assert.equal(state.rules[0].enabled,false);assert.equal(state.rules[0].dependencyStatus,'needs_setup');
+ assert.deepEqual(state.rules[0].conditions,{});
+ const beforeSetup=(await append('-500','transfer_out')).transactionId;
+ assert.equal((await view()).operations.find((o:any)=>o.id===beforeSetup).classification.counterparty.value,null);
+ const {name:ruleName,assignments,priority}=state.rules[0];
+ await command({kind:'rule',id:ruleId,patch:{name:ruleName,enabled:true,priority,conditions:{direction:'out',descriptionContains:'Sanitized example'},assignments}});
  await command({kind:'counterparty',id,patch:{rememberForFuture:false}});
  const inactive=(await append('-1000','transfer_out')).transactionId;
  assert.equal((await view()).operations.find((o:any)=>o.id===inactive).classification.counterparty.value,null);
