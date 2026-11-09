@@ -1,3 +1,4 @@
+import {SelectField} from '../../web/src/SelectField';
 import {useEffect,useState} from 'react';
 import {api} from '../../web/src/server-client';
 import {OperationDialog,OperationField} from '../../web/src/OperationDialog';
@@ -19,7 +20,7 @@ export function ServerCommerceCatalog(){
  {!draft&&error&&<p className={styles.error} role="alert">{error}</p>}
  {draft&&<OperationDialog narrow title={draft.id?'Настроить тариф':'Настроить пакет'} onClose={()=>{if(!busy)setDraft(null);}} footer={<><button className={common.button} disabled={busy} onClick={()=>setDraft(null)}>Отменить</button><button form="admin-commerce-editor" className={common.primaryButton} disabled={busy} type="submit">Сохранить</button></>}>
   <form id="admin-commerce-editor" className={styles.renewalBody} onSubmit={e=>{e.preventDefault();void save();}}><OperationField label="Цена, ₽" error={error||undefined}><input inputMode="decimal" value={draft.price} onChange={e=>{setError('');setDraft({...draft,price:e.target.value});}}/></OperationField>
-  {draft.id&&<><OperationField label="Единица срока"><select value={draft.durationKind} onChange={e=>setDraft({...draft,durationKind:e.target.value as Tariff['duration']['kind']})}><option value="days">Дни</option><option value="calendar_months">Месяцы</option></select></OperationField><OperationField label="Срок"><input type="number" min={1} max={draft.durationKind==='days'?31:24} required value={draft.count} onChange={e=>setDraft({...draft,count:Number(e.target.value)})}/></OperationField><OperationField label={draft.durationKind==='days'?'Лимит за период':'Лимит в месяц'}><input type="number" min={0} max={1000000} required value={draft.aiQuota} onChange={e=>setDraft({...draft,aiQuota:Number(e.target.value)})}/></OperationField></>}
+  {draft.id&&<><OperationField label="Единица срока"><SelectField value={draft.durationKind} onChange={e=>setDraft({...draft,durationKind:e.target.value as Tariff['duration']['kind']})}><option value="days">Дни</option><option value="calendar_months">Месяцы</option></SelectField></OperationField><OperationField label="Срок"><input type="number" min={1} max={draft.durationKind==='days'?31:24} required value={draft.count} onChange={e=>setDraft({...draft,count:Number(e.target.value)})}/></OperationField><OperationField label={draft.durationKind==='days'?'Лимит за период':'Лимит в месяц'}><input type="number" min={0} max={1000000} required value={draft.aiQuota} onChange={e=>setDraft({...draft,aiQuota:Number(e.target.value)})}/></OperationField></>}
   <label><input type="checkbox" checked={draft.enabled} onChange={e=>setDraft({...draft,enabled:e.target.checked})}/>Показывать пользователям</label></form>
  </OperationDialog>}</>;
 }

@@ -1,3 +1,4 @@
+import {SelectField} from './SelectField';
 import {useEffect,useState} from 'react';
 import {api} from './server-client';
 import {SupportLink} from './SupportDialog';
@@ -13,7 +14,7 @@ type Billing={enabled:boolean;test:boolean;accessEnd:string|null;tariffs:Tariff[
 type Quote={tariff:BillingPlan;startsAt:string;endsAt:string;cycleRevision:number;offerVersion:string;renewalVersion:string};
 type First={enabled:boolean;test:boolean;autoAvailable?:boolean;order:Order|null};
 const unfinished=(o:Order|null|undefined)=>!!o&&['created','pending','reconcile'].includes(o.state);
-const units=(t:BillingPlan)=>t.aiQuota.toLocaleString('ru-RU')+' единиц Анализатора '+(t.duration.kind==='days'?'за период':'в месяц');
+const units=(t:BillingPlan,renewal=false)=>t.aiQuota.toLocaleString('ru-RU')+' единиц Анализатора'+(t.duration.kind==='calendar_months'?' в месяц':renewal?'':' за период');
 function checkoutLabel(o:Order){return o.state==='paid'?'Оплата подтверждена.':o.state==='cancelled'?'Оплата не завершена. Доступ не активирован. Можно попробовать снова.':o.state==='reconcile'?'Проверяем платёж. Не оплачивайте повторно до ответа поддержки.':o.mode==='automatic'?'Проверяем автопродление.':'Ждём подтверждения оплаты.';}
 function PayLinks(){return <p className={styles.muted}><a href="/offer" target="_blank" rel="noreferrer">Публичная оферта</a> · <a href="/payments" target="_blank" rel="noreferrer">Оплата и возврат</a> · <a href="/privacy" target="_blank" rel="noreferrer">Конфиденциальность и данные</a></p>;}
 function resume(order:Order){if(order.redirect)window.location.assign(order.redirect);}
@@ -47,8 +48,8 @@ export function OnlineRenewal({state,refresh,onRefresh,initialTariffId=''}:{stat
  {unfinished(order)?<>{order?.plannedEnd&&<RenewalEnd date={order.plannedEnd}/>}{order?.redirect&&<button type="button" className={styles.primary} disabled={busy} onClick={()=>resume(order)}>Продолжить оплату</button>}{order?.mode==='enroll'&&!update&&<button type="button" className={styles.secondary} disabled={busy} onClick={()=>void act(async()=>{await api('/access/billing-disable',{});await refresh();setAuto(false);})}>Отказаться от будущих списаний</button>}</>:<form onSubmit={e=>{e.preventDefault();if(!quote||!selected||quote.tariff.id!==selected.id)return;void act(async()=>{
   const created=await api<Order>('/access/billing-create',{id:crypto.randomUUID(),tariffId:quote.tariff.id,priceMinor:quote.tariff.priceMinor,catalogVersion:quote.tariff.catalogVersion,cycleRevision:quote.cycleRevision,offerVersion:quote.offerVersion,...(auto?{renewalVersion:quote.renewalVersion}:{})});
   await refresh();const next=await api<Order>('/access/billing-sync',{id:created.id});await refresh();if(next.state==='paid')await onRefresh();else resume(next);
- });}}><label>Период продления<select aria-label="Период продления" value={selected?.id??''} onChange={e=>{setChosen(e.target.value);setQuote(null);setAuto(false);setError('');}}>{!selected&&<option value="">{state.tariffs.length?'Выберите тариф':'Нет доступных тарифов'}</option>}{state.tariffs?.map(t=><option key={t.id} value={t.id}>{t.name} — {moneyLabel(t.priceMinor)}</option>)}</select></label>
- {quote&&quote.tariff.id===selected?.id&&<><RenewalEnd date={quote.endsAt}/><p>Лимит на новый период — {units(quote.tariff)}.</p>
+ });}}><label>Период продления<SelectField aria-label="Период продления" value={selected?.id??''} onChange={e=>{setChosen(e.target.value);setQuote(null);setAuto(false);setError('');}}>{!selected&&<option value="">{state.tariffs.length?'Выберите тариф':'Нет доступных тарифов'}</option>}{state.tariffs?.map(t=><option key={t.id} value={t.id}>{t.name} — {moneyLabel(t.priceMinor)}</option>)}</SelectField></label>
+ {quote&&quote.tariff.id===selected?.id&&<><RenewalEnd date={quote.endsAt}/><p>Лимит на новый период — {units(quote.tariff,true)}.</p>
  <div className={styles.legalChoice}><input type="checkbox" id="checkout-auto-renewal" checked={auto} onChange={e=>setAuto(e.target.checked)}/><label htmlFor="checkout-auto-renewal">Включить автопродление: {moneyLabel(quote.tariff.priceMinor)} за «{quote.tariff.name}». Следующий платёж — {dateLabel(quote.endsAt)}. <a href="/autorenewal" target="_blank" rel="noreferrer">Условия автопродления</a></label></div>{!auto&&update?.state==='active'&&<p className={styles.muted}>Разовый платёж не отключает ранее настроенное автопродление.</p>}</>}
  <PayLinks/><button className={styles.primary} disabled={busy||!state.enabled||!quote||quote.tariff.id!==selected?.id}>{quote?'Перейти к оплате · '+moneyLabel(quote.tariff.priceMinor):'Перейти к оплате'}</button></form>}
  </section>;

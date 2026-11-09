@@ -5,14 +5,14 @@
 .search { display:flex; flex:1; min-width:0; align-items:center; gap:9px; border:1px solid var(--color-border); border-radius:8px; padding:0 12px; background:var(--color-surface); color:var(--color-secondary-text); height:42px; }
 .search input { border:0; background:transparent; color:var(--color-text); width:100%; min-width:0; padding:10px 0; }
 .sort,.extraFilters label { color:var(--color-secondary-text); font-size:calc(12px * var(--text-scale, 1)); }
-.sort select,.extraFilters select { display:block; margin-top:4px; padding:9px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); height:42px; max-width:100%; }
+.sort :global([data-select-trigger]),.extraFilters :global([data-select-trigger]) { display:block; margin-top:4px; padding:9px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); height:42px; max-width:100%; }
 .mobileFilter { display:none; }
 .quick { display:flex; gap:8px; overflow-x:auto; max-width:100%; padding:0 0 5px; margin-bottom:12px; }
 .quick button { display:flex; gap:8px; align-items:center; flex-shrink:0; padding:7px 11px; background:var(--color-surface); border:1px solid var(--color-border); border-radius:8px; color:var(--color-secondary-text); font-size:calc(13px * var(--text-scale, 1)); }
 .quick button[aria-pressed="true"] { background:var(--color-soft); color:var(--color-primary); border-color:var(--color-primary); }
 .quick span { font-size:calc(11px * var(--text-scale, 1)); opacity:.85; }
 .extraFilters { display:flex; gap:12px; margin-bottom:17px; }
-.extraFilters select { min-width:155px; width:100%; }
+.extraFilters :global([data-select-trigger]) { min-width:155px; width:100%; }
 .resultSummary { display:flex; align-items:center; flex-wrap:wrap; gap:8px 22px; margin:18px 0; color:var(--color-secondary-text); font-size:calc(13px * var(--text-scale, 1)); }
 .resultSummary strong { color:var(--color-text); margin-left:4px; font-weight:500; white-space:nowrap; }
 .selection { display:flex; align-items:center; flex-wrap:wrap; gap:12px; padding:12px 14px; border-radius:8px; background:var(--color-soft); color:var(--color-primary); margin-bottom:14px; }
@@ -69,14 +69,14 @@
   .selectAllMobile label { display:flex; align-items:center; gap:9px; color:var(--color-secondary-text); font-size:calc(13px * var(--text-scale, 1)); margin-bottom:4px; }
 }
 @media(max-width:600px) {
-  .toolbar { flex-wrap:wrap; gap:10px; } .search { flex:1; } .sort { width:100%; } .sort select { width:100%; } .mobileFilter { display:flex; } .desktopExtra { display:none; }
-  .extraFilters { display:grid; grid-template-columns:1fr; } .extraFilters select { min-width:0; } .quick button { min-height:40px; }
+  .toolbar { flex-wrap:wrap; gap:10px; } .search { flex:1; } .sort { width:100%; } .sort :global([data-select-trigger]) { width:100%; } .mobileFilter { display:flex; } .desktopExtra { display:none; }
+  .extraFilters { display:grid; grid-template-columns:1fr; } .extraFilters :global([data-select-trigger]) { min-width:0; } .quick button { min-height:40px; }
   .resultSummary { column-gap:18px; } .resultSummary>span:first-child { flex-basis:100%; }
   .operationItem { padding:14px; } .itemTop .merchant { font-size:calc(13px * var(--text-scale, 1)); } .itemTop>strong { font-size:calc(13px * var(--text-scale, 1)); }
   .drawer { width:100vw; padding:16px 18px max(22px,env(safe-area-inset-bottom)); } .drawerHead { margin-bottom:20px; } .drawerHead>span { display:none; } .back { display:flex; } .cardTitle { font-size:calc(23px * var(--text-scale, 1)); } .cardAmount { font-size:calc(31px * var(--text-scale, 1)); }
   .filterSheet { width:100%; max-height:100dvh; border-radius:0; height:100dvh; padding:20px 18px max(25px,env(safe-area-inset-bottom)); } .filterSheet>button { width:100%; }
 }
-@media(pointer:coarse) { .search,.sort select,.extraFilters select { min-height:44px; } .search input,.sort select,.extraFilters select { font-size:calc(16px * var(--text-scale, 1)); } .selection button,.merchant { min-height:36px; } }
+@media(pointer:coarse) { .search,.sort :global([data-select-trigger]),.extraFilters :global([data-select-trigger]) { min-height:44px; } .search input,.sort :global([data-select-trigger]),.extraFilters :global([data-select-trigger]) { font-size:calc(16px * var(--text-scale, 1)); } .selection button,.merchant { min-height:36px; } }
 
 :global([data-density="compact"]) .table th,:global([data-density="compact"]) .table td { padding:9px; }
 :global([data-density="compact"]) .operationItem { padding:10px 14px; }

@@ -1,3 +1,4 @@
+import {SelectField} from './SelectField';
 import {useEffect,useState} from 'react';
 import {timezoneLabel} from './InterfaceSettings';
 import {api} from './server-client';
@@ -34,11 +35,11 @@ function RenewalPreview({embedded,initialTariffId}:{embedded:boolean;initialTari
    <p>{data.cycle.indefinite?'Доступ бессрочный.':data.cycle.accessEnd?('Текущий срок — до '+date(data.cycle.accessEnd)+' ('+timezoneLabel(data.cycle.timezone)+').'):'Текущий срок не задан.'}</p>
    {data.request?.renewalState==='open'&&['under_review','needs_topup'].includes(data.request.status)&&<p role="status">Проверяем ранее начатый платёж.</p>}
    {!data.cycle.indefinite&&tariff&&<>
-    <label>Период продления<select aria-label="Период продления" value={tariff.id} onChange={e=>setChosen(e.target.value)}>
+    <label>Период продления<SelectField aria-label="Период продления" value={tariff.id} onChange={e=>setChosen(e.target.value)}>
      {data.tariffs.map(t=><option key={t.id} value={t.id}>{t.name} — {moneyLabel(t.priceMinor)}</option>)}
-    </select></label>
+    </SelectField></label>
     {plannedEnd&&<RenewalEnd date={plannedEnd} timezone={data.cycle.timezone}/>}
-    <p>Лимит Анализатора на новый период — {tariff.aiQuota.toLocaleString('ru-RU')} единиц {tariff.duration.kind==='days'?'за период':'в месяц'}.</p>
+    <p>Лимит Анализатора на новый период — {tariff.aiQuota.toLocaleString('ru-RU')} единиц{tariff.duration.kind==='calendar_months'?' в месяц':''}.</p>
     <button type="button" className={styles.primary} disabled>Перейти к оплате · {moneyLabel(tariff.priceMinor)}</button>
    </>}
   </>}

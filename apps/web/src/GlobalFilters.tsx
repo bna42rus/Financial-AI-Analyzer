@@ -1,3 +1,5 @@
+import {SelectField} from './SelectField';
+import {SearchFilter} from './SearchFilter';
 import {DateInput} from './DateInput';
 import type { DemoOperation, OverviewFilters } from './demo/overview';
 import styles from './App.module.css';
@@ -17,8 +19,8 @@ export function GlobalFilters({operations,filters,onChange}: Props) {
       <label>С даты<DateInput  aria-label="С даты" value={filters.start} aria-invalid={invalid} onValueChange={value=>value&&onChange({start:value})} /></label>
       <label>По дату<DateInput  aria-label="По дату" value={filters.end} aria-invalid={invalid} onValueChange={value=>value&&onChange({end:value})} /></label>
     </div>
-    <label>Банк<select aria-label="Банк" value={filters.bank} onChange={e=>onChange({bank:e.target.value,account:''})}><option value="">Все банки</option>{banks.map(bank=><option key={bank}>{bank}</option>)}</select></label>
-    <label>Счёт<select aria-label="Счёт" value={filters.account} onChange={e=>onChange({account:e.target.value})}><option value="">Все счета</option>{accounts.map(account=><option key={account}>{account}</option>)}</select></label>
-    <div className={styles.categoryField}><span className={styles.fieldLabel}>Категории</span><details className={styles.categoryPicker}><summary>{filters.categories.length?`Выбрано: ${filters.categories.length}`:'Все категории'}<span aria-hidden="true">⌄</span></summary><div className={styles.popover}>{categories.length?<><button onClick={()=>onChange({categories:[]})}>Все категории</button>{categories.map(category=><label key={category}><input type="checkbox" checked={filters.categories.includes(category)} onChange={e=>onChange({categories:e.target.checked?[...filters.categories,category]:filters.categories.filter(c=>c!==category)})} />{category}</label>)}</>:<p>Категории появятся после загрузки данных.</p>}</div></details></div>
+    <label>Банк<SelectField aria-label="Банк" value={filters.bank} onChange={e=>onChange({bank:e.target.value,account:''})}><option value="">Все банки</option>{banks.map(bank=><option key={bank}>{bank}</option>)}</SelectField></label>
+    <label>Счёт<SelectField aria-label="Счёт" value={filters.account} onChange={e=>onChange({account:e.target.value})}><option value="">Все счета</option>{accounts.map(account=><option key={account}>{account}</option>)}</SelectField></label>
+    <div className={styles.categoryField}><span className={styles.fieldLabel}>Категории</span><SearchFilter aria-label="Категории" label="Все категории" options={categories.map(category=>[category,category])} value={[...filters.categories]} onChange={ids=>onChange({categories:ids})} disabled={false} fullWidth/></div>
   </section>;
 }

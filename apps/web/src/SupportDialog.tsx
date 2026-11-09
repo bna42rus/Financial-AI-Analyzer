@@ -8,7 +8,7 @@ export const supportEmail=String(import.meta.env.VITE_PUBLIC_SUPPORT_EMAIL||'sup
 function CopySupportAddress(){
  const [status,setStatus]=useState('');
  async function copy(){
-  try{await navigator.clipboard.writeText(supportEmail);setStatus('Адрес скопирован.');}
+  try{await navigator.clipboard.writeText(supportEmail);setStatus('');}
   catch{setStatus('Не удалось скопировать адрес.');}
  }
  return <>

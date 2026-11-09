@@ -1,5 +1,6 @@
 import {Search,X} from 'lucide-react';
 import type {InputHTMLAttributes} from 'react';
+import {SelectField} from './SelectField';
 import {CategoryFilter} from './CategoryFilter';
 import styles from './Settings.module.css';
 
@@ -13,8 +14,7 @@ export function SearchFilter({label,options,value,onChange,disabled,single,fullW
 
 type SingleOptions=readonly (readonly [string,string])[];
 export function FormSelect({label,options,value,onValueChange,disabled,...accessibility}:{label:string;options:SingleOptions;value:string;onValueChange:(value:string)=>void;disabled?:boolean;'aria-label'?:string;'aria-invalid'?:boolean;'aria-describedby'?:string}){
- if(options.length>10)return <SearchFilter label={label} options={options} value={[value]} onChange={ids=>onValueChange(ids[0]??'')} disabled={!!disabled} single fullWidth {...accessibility}/>;
- return <select aria-label={label} {...accessibility} disabled={disabled} value={value} onChange={e=>onValueChange(e.target.value)}>
+ return <SelectField aria-label={label} {...accessibility} disabled={disabled} value={value} onChange={event=>onValueChange(event.target.value)}>
   {options.map(([id,name])=><option key={id} value={id}>{name}</option>)}
- </select>;
+ </SelectField>;
 }

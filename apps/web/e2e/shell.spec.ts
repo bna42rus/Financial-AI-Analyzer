@@ -1,3 +1,4 @@
+import {chooseOption} from './choice-picker';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -83,7 +84,7 @@ test('profile shows real connection states, changes the theme, keeps support pri
   await dialog.getByRole('button', { name: 'Очистить черновик', exact: true }).click();
   await expect(dialog.getByLabel('Сообщение', { exact: true })).toHaveValue('');
   await dialog.getByLabel('Сообщение', { exact: true }).fill('Только в памяти');
-  await dialog.getByLabel('Тема оформления').selectOption('dark'); await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
+  await chooseOption(dialog.getByLabel('Тема оформления'),'dark'); await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
   await page.keyboard.press('Escape'); await expect(page.getByRole('button', { name: 'Профиль', exact: true })).toBeFocused();
   await profile(page); await dialog.getByRole('button', { name: 'Поддержка', exact: true }).click();
   await expect(dialog.getByLabel('Сообщение', { exact: true })).toHaveValue('');
@@ -116,7 +117,7 @@ test('history links preserve financial filters, select the operation explicitly 
 
 test('closing the demo from profile clears the example but keeps appearance', async ({ page }) => {
   await page.goto('/'); await page.getByRole('button', { name: 'Посмотреть пример', exact: true }).click();
-  const dialog = await profile(page); await dialog.getByLabel('Тема оформления').selectOption('dark');
+  const dialog = await profile(page); await chooseOption(dialog.getByLabel('Тема оформления'),'dark');
   await dialog.getByRole('button', { name: 'Закрыть пример', exact: true }).click();
   await expect(dialog).toBeHidden(); await expect(page.getByTestId('expenses')).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Начните с первой выписки' })).toBeVisible();
@@ -126,7 +127,7 @@ test('closing the demo from profile clears the example but keeps appearance', as
 
 test('both dialogs fit narrow screens and large text, escape restores focus without runtime errors', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
-  await page.goto('/#settings/interface'); await page.getByLabel('Размер текста', { exact: true }).selectOption('large'); await page.getByLabel('Тема', { exact: true }).selectOption('dark');
+  await page.goto('/#settings/interface'); await chooseOption(page.getByLabel('Размер текста', { exact: true }),'large'); await chooseOption(page.getByLabel('Тема', { exact: true }),'dark');
   for (const width of [320, 390, 1024, 1440]) {
     await page.setViewportSize({ width, height: 850 });
     const uploadDialog = await upload(page);

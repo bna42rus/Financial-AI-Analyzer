@@ -1,3 +1,4 @@
+import {chooseOption} from './choice-picker';
 import { expect,test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 const expenses='Сколько я потратил за выбранный период?',attention='Какие операции требуют внимания?',largest='Покажи крупные расходы за сентябрь 2026';
@@ -24,7 +25,7 @@ test('independent chats, search, rename, pin and deletion leave operations intac
   await page.getByRole('link',{name:'Операции',exact:true}).click();await expect(page.getByTestId('operation-count')).toHaveText('Показано 18 из 18');
 });
 test('new replies follow changed filters while old totals keep their snapshot',async({page})=>{
-  await example(page);await page.getByRole('button',{name:expenses}).click();await page.getByRole('button',{name:'Фильтры Анализатора',exact:true}).click();await page.getByRole('dialog').getByRole('combobox',{name:'Банк',exact:true}).selectOption('Сбер');await page.getByRole('dialog').getByRole('button',{name:'Готово',exact:true}).click();await send(page,expenses);
+  await example(page);await page.getByRole('button',{name:expenses}).click();await page.getByRole('button',{name:'Фильтры Анализатора',exact:true}).click();await chooseOption(page.getByRole('dialog').getByRole('combobox',{name:'Банк',exact:true}),'Сбер');await page.getByRole('dialog').getByRole('button',{name:'Готово',exact:true}).click();await send(page,expenses);
   await expect(page.getByRole('log')).toContainText('58 869 ₽');await expect(page.getByRole('log')).toContainText('32 199 ₽');await send(page,'А по категориям?');await expect(page.getByRole('log')).toContainText('Итого с учётом возвратов: 32 199 ₽');
 });
 test('arbitrary input makes no AI request, mutation, browser persistence or URL disclosure',async({page})=>{

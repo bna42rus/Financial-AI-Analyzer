@@ -6,8 +6,8 @@ import type {FinanceState} from './finance-client';
 import {kindNames,roleNames,reviewNames,reviewStatusNames,rublesToMinor,minorToRubles} from './finance-client';
 import {metricNames} from '../../../packages/finance-core/src/overview';
 import {sourceNames} from './operations-client';
-import {OverviewPopover} from './OverviewDialogs';
-import {WidgetSelect} from './WidgetSelect';
+import {ChoicePicker,choiceStyles,foldChoice} from './ChoicePicker';
+import {SelectField} from './SelectField';
 import filterStyles from './CompactFilters.module.css';
 import styles from './OperationsTable.module.css';
 const kindOrder=['purchase','refund','expense_reimbursement','reversal','cashback','transfer_in','transfer_out','own_transfer','cash_deposit','cash_withdrawal','loan_disbursement','loan_payment','credit_card_repayment','interest','fee','insurance','other'];
@@ -32,12 +32,15 @@ export function advancedOperationFilters(f:OperationsFilter):OperationsFilter {
 }
 export function invalidAdvancedFilter(value:OperationsFilter){return ['description','merchant','comment'].some(k=>!!(k!=='merchant'||!value.merchantExact)&&!!searchExpressionError(value[k as 'description'|'merchant'|'comment']));}
 function Multiple({label,options,value,onChange,disabled}:{label:string;options:[string,string][];value:string[];onChange:(values:string[])=>void;disabled:boolean}){
- const [search,setSearch]=useState('');
- return <div className={styles.multiField}><span>{label}</span><OverviewPopover label={label} triggerText={value.length>1?'Выбрано несколько':value.length?options.find(([id])=>id===value[0])?.[1]??'Недоступное значение':'Любое значение'} triggerClassName={styles.filterPick} disabled={disabled} toolbar={<div className={filterStyles.searchRow}>
- <input type="search" aria-label={'Найти: '+label} placeholder="Найти" value={search} onChange={e=>setSearch(e.target.value)}/>
- <button type="button" className={filterStyles.clear} onClick={()=>{onChange([]);setSearch('');}}>Сбросить</button></div>}>
- {options.filter(([,name])=>name.toLocaleLowerCase('ru').includes(search.trim().toLocaleLowerCase('ru'))).map(([id,name])=><label key={id} className={filterStyles.choice+' '+styles.normalChoice}><input type="checkbox" checked={value.includes(id)} onChange={e=>onChange(e.target.checked?[...value,id]:value.filter(v=>v!==id))}/><span>{name}</span></label>)}
- </OverviewPopover></div>;
+ const selectedLabel=value.length>1?'Выбрано несколько':value.length?options.find(([id])=>id===value[0])?.[1]??'Недоступное значение':'Любое значение';
+ return <div className={styles.multiField}><span>{label}</span><ChoicePicker title={label} label={selectedLabel} aria-label={label} className={styles.filterPick} disabled={disabled} searchLabel={'Найти: '+label} closeLabel={'Закрыть: '+label} onReset={()=>onChange([])}>
+  {query=>{
+   const matches=options.filter(([,name])=>foldChoice(name).includes(query));
+   return matches.length?matches.map(([id,name])=><label key={id} className={choiceStyles.choice}>
+    <input type="checkbox" data-choice-option={id} checked={value.includes(id)} onChange={e=>onChange(e.target.checked?[...value,id]:value.filter(v=>v!==id))}/><span>{name}</span>
+   </label>):<p className={choiceStyles.empty}>Варианты не найдены</p>;
+  }}
+ </ChoicePicker></div>;
 }
 type NumericKey='amountFrom'|'amountThrough'|'confidenceFrom'|'confidenceThrough';
 export function OperationsFilters({state,value,contextFilter,onChange,disabled,onInvalid}:{state:FinanceState;value:OperationsFilter;contextFilter?:OperationsFilter;onChange:(v:OperationsFilter)=>void;disabled:boolean;onInvalid:(invalid:boolean)=>void}){
@@ -58,7 +61,7 @@ export function OperationsFilters({state,value,contextFilter,onChange,disabled,o
   setRaw(values);setErrors(problems);onInvalid(!!Object.keys(problems).length);
   if(commit&&!Object.keys(problems).length){onChange(next);setRaw({});}
  }
- const select=(key:keyof OperationsFilter,name:string,items:[string,string][])=> <label>{name}<WidgetSelect aria-label={name} value={String(value[key]??'')} onChange={e=>change(key,e.target.value)}><option value="">Любое значение</option>{items.map(([id,n])=><option key={id} value={id}>{n}</option>)}</WidgetSelect></label>;
+ const select=(key:keyof OperationsFilter,name:string,items:[string,string][])=> <label>{name}<SelectField aria-label={name} value={String(value[key]??'')} onChange={e=>change(key,e.target.value)}><option value="">Любое значение</option>{items.map(([id,n])=><option key={id} value={id}>{n}</option>)}</SelectField></label>;
  const summaries:{name:string;labels:string[]}[]=[];
  const context=contextFilter;
  if(value.refund!==undefined||value.transfer!==undefined)summaries.push({name:'Тип операции',labels:['Условия старого представления несовместимы. Выберите тип заново.']});
@@ -70,7 +73,7 @@ export function OperationsFilters({state,value,contextFilter,onChange,disabled,o
  if(context?.noSubcategory)summaries.push({name:'Подкатегория',labels:['Без подкатегории']});
  if(context?.noCounterparty)summaries.push({name:'Контрагент',labels:['Без контрагента']});
  const multi=(key:'reasons'|'statuses'|'kinds'|'roles'|'facets'|'sources'|'ruleIds'|'counterpartyIds',name:string,options:[string,string][])=>{const selected=value[key]??[];if(selected.length>1)summaries.push({name,labels:selected.map(id=>options.find(([v])=>v===id)?.[1]??'Недоступное значение')});return <Multiple label={name} options={options} value={selected} onChange={v=>change(key,v)} disabled={disabled}/>;};
- const flag=(key:'attention'|'uncategorized'|'refund'|'transfer'|'linked'|'possibleDuplicate',label:string)=> <label>{label}<WidgetSelect aria-label={label} disabled={disabled} value={String(value[key]??'')} onChange={e=>change(key,e.target.value===''?undefined:e.target.value==='true')}><option value="">Любое значение</option><option value="true">Да</option><option value="false">Нет</option></WidgetSelect></label>;
+ const flag=(key:'attention'|'uncategorized'|'refund'|'transfer'|'linked'|'possibleDuplicate',label:string)=> <label>{label}<SelectField aria-label={label} disabled={disabled} value={String(value[key]??'')} onChange={e=>change(key,e.target.value===''?undefined:e.target.value==='true')}><option value="">Любое значение</option><option value="true">Да</option><option value="false">Нет</option></SelectField></label>;
  const inputNumber=(key:NumericKey,label:string,accessibleName=label)=>{const v=value[key];return <label>{label}<input aria-label={accessibleName} aria-invalid={!!errors[key]||undefined} inputMode={key.startsWith('amount')?'decimal':'numeric'} value={raw[key]??(v===undefined?'':key.startsWith('amount')?minorToRubles(String(v)):String(v))} onChange={e=>number(key,e.target.value,false)} onBlur={e=>number(key,e.target.value,true)}/>{errors[key]&&<small role="alert">{errors[key]}</small>}</label>;};
  const field=(key:'description'|'merchant'|'comment',label:string)=>{const message=key==='merchant'&&value.merchantExact?undefined:searchExpressionError(value[key]);return <label>{label}<input maxLength={key==='comment'?1000:160} aria-invalid={!!message||undefined} value={value[key]??''} onChange={e=>change(key,e.target.value)}/>{message&&<small role="alert">{message}</small>}</label>;};
  const reasons=[...new Set([...Object.keys(reviewNames),...state.operations.flatMap(o=>o.reviewReasons)])];

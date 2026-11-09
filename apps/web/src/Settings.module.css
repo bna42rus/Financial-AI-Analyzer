@@ -48,7 +48,7 @@
 .count { display:grid; place-items:center; min-width:34px; min-height:34px; border-radius:8px; background:var(--color-background); font-size:calc(15px * var(--text-scale, 1)); }
 .appearance { display:grid; grid-template-columns:1fr 1fr; gap:23px 20px; }
 .appearance label { color:var(--color-text); font-size:calc(13px * var(--text-scale, 1)); }
-.appearance select { display:block; margin-top:7px; width:100%; height:44px; padding:9px; background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border); border-radius:8px; }
+.appearance :global([data-select-trigger]) { display:block; margin-top:7px; width:100%; height:44px; padding:9px; background:var(--color-surface); color:var(--color-text); border:1px solid var(--color-border); border-radius:8px; }
 .appearance small { display:block; color:var(--color-secondary-text); font-size:calc(12px * var(--text-scale, 1)); margin-top:7px; }
 .reset { margin-top:28px; padding:20px; background:var(--color-background); border-radius:9px; }
 .reset button { margin-top:14px; }
@@ -72,7 +72,7 @@
   .sectionHead { gap:10px; margin-bottom:22px; flex-wrap:wrap; align-items:flex-start; } .sectionHead>div:nth-child(2) { flex-basis:calc(100% - 54px); } .sectionHead h2 { font-size:calc(20px * var(--text-scale, 1)); } .readOnly { margin-left:54px; }
   .infoRow { display:block; } .infoRow dd { text-align:left; margin-top:6px; } .appearance { grid-template-columns:1fr; gap:20px; }
   .account { padding:14px; } .account button { margin-left:49px; } .reset,.danger { padding:16px; }
-  .sidebarNote { margin:17px 0; } .search input,.appearance select { font-size:calc(16px * var(--text-scale, 1)); }
+  .sidebarNote { margin:17px 0; } .search input,.appearance :global([data-select-trigger]) { font-size:calc(16px * var(--text-scale, 1)); }
 }
 
 .search:focus-within { border-color:var(--color-primary); box-shadow:0 0 0 1px var(--color-primary); }
@@ -89,7 +89,7 @@
 .accountFields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; border:0; margin:0; padding:0; min-width:0; }
 .fullRow { grid-column:1/-1; }
 .accountFields label,.settingsStack>label:not(.checkboxRow) { display:grid; gap:5px; font-size:.875rem; color:var(--color-secondary-text); }
-.accountFields input,.accountFields select,.settingsStack>label select { min-width:0; width:100%; padding:8px 10px; min-height:40px; border:1px solid var(--color-border); border-radius:8px; color:var(--color-text); background:var(--color-surface); font:inherit; }
+.accountFields input,.accountFields :global([data-select-trigger]),.settingsStack>label :global([data-select-trigger]) { min-width:0; width:100%; padding:8px 10px; min-height:40px; border:1px solid var(--color-border); border-radius:8px; color:var(--color-text); background:var(--color-surface); font:inherit; }
 .accountFields [aria-invalid="true"],.choiceGroup[aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
 .cardActions { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
 .saveBar { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-top:12px; border-top:1px solid var(--color-border); }
@@ -113,7 +113,7 @@
 .settingsBox>h3,.settingsBox section>h3 { font-size:1rem; margin:0; }
 .settingsBox>summary,.settingsBox details>summary { cursor:pointer; padding:3px 0; font-weight:550; }
 .settingsBox>label,.entityForm>label:not(.checkboxRow) { display:grid; gap:6px; color:var(--color-secondary-text); font-size:.875rem; }
-.settingsBox>label select,.entityForm>label input:not([type="checkbox"]),.entityForm>label select { min-width:0; width:100%; min-height:40px; padding:8px 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; }
+.settingsBox>label :global([data-select-trigger]),.entityForm>label input:not([type="checkbox"]),.entityForm>label :global([data-select-trigger]) { min-width:0; width:100%; min-height:40px; padding:8px 10px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-surface); color:var(--color-text); font:inherit; }
 .entityForm>label input[aria-invalid="true"] { border-color:var(--color-danger,#b4233b); }
 .settingsList { border:1px solid var(--color-border); border-radius:10px; padding:0 12px; }
 .settingsRow { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; padding:10px 0; overflow-wrap:anywhere; }
@@ -148,15 +148,15 @@
 .reviewChoice{display:flex;align-items:center;gap:.65rem;padding:.45rem .15rem}
 .reviewChoice small{display:block;color:var(--color-secondary-text)}
 .historyList{max-height:min(65dvh,48rem);overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
-.listToolbar select,.interfaceGrid select{min-width:0;max-width:100%;min-height:38px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);padding:7px 10px;font:inherit}
-.interfaceGrid select{width:100%}
+.listToolbar :global([data-select-trigger]),.interfaceGrid :global([data-select-trigger]){min-width:0;max-width:100%;min-height:38px;border:1px solid var(--color-border);border-radius:8px;background:var(--color-surface);color:var(--color-text);padding:7px 10px;font:inherit}
+.interfaceGrid :global([data-select-trigger]){width:100%}
 .settingsRow h3{font-size:1rem;margin:0}
 .trailingAction{margin-inline-start:auto}
 .searchField { height:var(--settings-control-height,42px); min-height:var(--settings-control-height,42px); background:var(--color-background); font-size:calc(13px * var(--text-scale,1)); }
 .searchField > input[type="search"] { appearance:none; height:100%; padding:0; min-height:0; border:0; box-shadow:none; background:transparent; font:inherit; }
 .searchField > input::placeholder { color:var(--color-secondary-text); opacity:1; }
 .searchField > input:focus-visible { outline:0; }
-.listToolbar > :is(button,select),.historyToolbar > button { height:var(--settings-control-height,42px); min-height:var(--settings-control-height,42px); }
+.listToolbar > :is(button,:global([data-select-trigger])),.historyToolbar > button { height:var(--settings-control-height,42px); min-height:var(--settings-control-height,42px); }
 .partyTabs { display:flex; gap:16px; border-bottom:1px solid var(--color-border); }
 .partyTabs button { min-height:38px; padding:4px 8px; border:0; border-bottom:2px solid transparent; background:none; color:var(--color-secondary-text); font-weight:600; }
 .partyTabs button[aria-selected="true"] { color:var(--color-primary); border-bottom-color:currentColor; }
@@ -186,22 +186,23 @@
 .similarReview { border-block:1px solid var(--color-border); padding:7px 0; }
 .similarReview li + li { border-top:1px solid var(--color-border); }
 .uploadFiles { border:1px solid var(--color-border); border-radius:8px; }
-.uploadFiles > summary { padding:6px 10px 6px 12px; min-height:34px; font-weight:550; }
+
 .uploadFiles[open] > summary { border-bottom:1px solid var(--color-border); }
 .uploadFiles > div { padding:6px 10px; }
-.uploadFiles > div > details { padding-inline-start:12px; }
+.uploadFiles .sublist > details { padding:0; }
+.uploadFiles .sublist > details > :not(summary) { margin-inline:12px; }
 
-.reviewForm label,.reviewForm p,.reviewForm summary,.reviewForm input:not([type=checkbox]),.reviewForm select,.reviewForm small { font-size:calc(14px * var(--text-scale,1)); }
+.reviewForm label,.reviewForm p,.reviewForm summary,.reviewForm input:not([type=checkbox]),.reviewForm :global([data-select-trigger]),.reviewForm small { font-size:calc(14px * var(--text-scale,1)); }
 .similarToolbar { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 0; border-bottom:1px solid var(--color-border); }
 .reviewList { overscroll-behavior:contain; }
-.listToolbar select { font-size:calc(14px * var(--text-scale,1)); padding-inline:10px 20px; }
+.listToolbar :global([data-select-trigger]) { font-size:calc(14px * var(--text-scale,1)); padding-inline:10px 20px; }
 .topupPackages { border:0; padding:0; margin:0; min-width:0; }
 .topupPackages legend { margin-bottom:6px; }
 .topupPackage { display:grid; grid-template-columns:auto minmax(0,1fr) auto; gap:10px; align-items:center; min-height:44px; cursor:pointer; }
 .topupPackage + .topupPackage { border-top:1px solid var(--color-border); }
 .topupPackage input { margin:0; accent-color:var(--color-primary); }
 
-.uploadFiles > summary,.uploadFiles .sublist > details > summary { display:flex; align-items:center; gap:6px; list-style:none; }
+.settingsBox .uploadFiles > summary,.settingsBox .uploadFiles .sublist > details > summary { display:flex; align-items:center; gap:6px; min-height:34px; padding:6px 12px; list-style:none; }
 .uploadFiles summary::-webkit-details-marker { display:none; }
 .uploadFiles summary > svg { flex:none; }
 .uploadFiles details[open] > summary > svg,.uploadFiles[open] > summary > svg { transform:rotate(90deg); }

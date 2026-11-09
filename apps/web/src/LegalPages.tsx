@@ -17,8 +17,8 @@ const groups=[
 const address=String(import.meta.env.VITE_PUBLIC_SELLER_ADDRESS??'').trim();
 const phone=String(import.meta.env.VITE_PUBLIC_SUPPORT_PHONE??'').trim();
 const ready=import.meta.env.VITE_PUBLIC_LEGAL_PUBLISHED==='1';
-export function LegalFooter(){
- return <footer className={styles.footer}>
+export function LegalFooter({workspace=false}:{workspace?:boolean}){
+ return <footer className={styles.footer+(workspace?' '+styles.workspaceFooter:'')}>
   <div className={styles.footerTop}>
    <div className={styles.footerSupport}>
     <a href="/" aria-label="CashNeuro — на главную"><Brand/></a>

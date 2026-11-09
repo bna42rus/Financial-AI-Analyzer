@@ -1,3 +1,4 @@
+import {chooseOption} from './choice-picker';
 import { expect,test } from '@playwright/test';
 
 async function openExample(page:import('@playwright/test').Page){await page.goto('/#operations');await page.getByRole('button',{name:'Посмотреть пример',exact:true}).click();await expect(page.getByTestId('operation-count')).toHaveText('Показано 18 из 18');}
@@ -19,7 +20,7 @@ test('global and advanced filters work on desktop and mobile sheet',async({page}
   await openExample(page);
   const mobile=testInfo.project.name==='mobile';if(mobile)await page.getByRole('button',{name:'Фильтры',exact:true}).click();
   const surface=mobile?page.getByRole('dialog'):page;
-  await surface.getByRole('combobox',{name:'Банк',exact:true}).selectOption('Сбер');await surface.getByRole('combobox',{name:'Финансовый смысл',exact:true}).selectOption('expense');
+  await chooseOption(surface.getByRole('combobox',{name:'Банк',exact:true}),'Сбер');await chooseOption(surface.getByRole('combobox',{name:'Финансовый смысл',exact:true}),'expense');
   await surface.getByLabel('С даты',{exact:true}).fill('2026-10-01');await expect(page.getByRole('alert')).toBeVisible();
   await surface.getByLabel('С даты',{exact:true}).fill('2026-09-01');
   if(mobile)await surface.getByRole('button',{name:'Показать операции',exact:true}).click();await expect(page.getByTestId('operation-count')).toHaveText('Показано 2 из 2');await expect(page.getByTestId('operation-expenses')).toHaveText('32 199 ₽');
@@ -41,7 +42,7 @@ test('overview drilldown keeps context and the card returns focus to the same op
 
 test('sort, range selection, card layout and reload do not leak or overflow',async({page})=>{
   const errors:string[]=[];page.on('pageerror',error=>errors.push(error.message));await openExample(page);
-  await page.getByRole('combobox',{name:'Сортировка',exact:true}).selectOption('date-asc');await page.getByRole('button',{name:'Александр · аренда',exact:true}).focus();await page.keyboard.press(' ');await page.keyboard.press('Shift+ArrowDown');await expect(page.getByRole('status')).toContainText('Выбрано: 2');
+  await chooseOption(page.getByRole('combobox',{name:'Сортировка',exact:true}),'date-asc');await page.getByRole('button',{name:'Александр · аренда',exact:true}).focus();await page.keyboard.press(' ');await page.keyboard.press('Shift+ArrowDown');await expect(page.getByRole('status')).toContainText('Выбрано: 2');
   await page.getByRole('button',{name:'Александр · аренда',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);await page.keyboard.press('Escape');
   expect(await page.evaluate(()=>({local:localStorage.length,session:sessionStorage.length}))).toEqual({local:0,session:0});expect(errors).toEqual([]);await page.reload();await expect(page.getByRole('heading',{name:'Здесь будут ваши операции'})).toBeVisible();
 });

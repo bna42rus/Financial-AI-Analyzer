@@ -1,3 +1,4 @@
+import {SelectField} from './SelectField';
 import {useState} from 'react';
 import type {Account} from '../../../packages/finance-core/src/model';
 import {minorToRubles,parseCorrectionDate,rublesToMinor} from './finance-client';
@@ -20,9 +21,9 @@ export function OperationCorrection({initial,detail,accounts,onApply,onClose}:{i
  return <OperationDialog title="Изменение банковских значений" onClose={onClose} compact footer={<><button className={styles.quietButton} onClick={restore}>Вернуть банковские значения</button><button className={styles.quietButton} onClick={()=>{setDraft(initial);setChecked(false);}}>Сбросить</button><button className={common.primaryButton+' '+styles.rightAction} onClick={apply}>Применить</button></>}>
   <fieldset className={styles.form}>
    <OperationField label="Сумма операции, ₽" error={checked?errors.amount:undefined}><input inputMode="decimal" value={draft.amount} onChange={e=>set({amount:e.target.value})}/></OperationField>
-   <label>Точность даты<select value={draft.precision} onChange={e=>set({precision:e.target.value as CorrectionDraft['precision'],date:e.target.value==='day'?draft.date.slice(0,10):''})}><option value="day">Дата без времени</option><option value="instant">Дата и время (UTC)</option></select></label>
+   <label>Точность даты<SelectField value={draft.precision} onChange={e=>set({precision:e.target.value as CorrectionDraft['precision'],date:e.target.value==='day'?draft.date.slice(0,10):''})}><option value="day">Дата без времени</option><option value="instant">Дата и время (UTC)</option></SelectField></label>
    <OperationField label={dateLabel} error={checked?errors.date:undefined}>{draft.precision==='day'?<DateInput aria-label={dateLabel} value={draft.date} showError={false} onValueChange={date=>set({date})}/>:<input aria-label={dateLabel} type="datetime-local" step="0.001" value={draft.date} onChange={e=>set({date:e.target.value})}/>}</OperationField>
-   <OperationField label="Счёт операции" error={checked?errors.accountId:undefined}><select value={draft.accountId} onChange={e=>set({accountId:e.target.value})}>{!accounts.some(a=>a.id===draft.accountId)&&<option value={draft.accountId}>Исходный счёт</option>}{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></OperationField>
+   <OperationField label="Счёт операции" error={checked?errors.accountId:undefined}><SelectField value={draft.accountId} onChange={e=>set({accountId:e.target.value})}>{!accounts.some(a=>a.id===draft.accountId)&&<option value={draft.accountId}>Исходный счёт</option>}{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</SelectField></OperationField>
   </fieldset>
  </OperationDialog>;
 }

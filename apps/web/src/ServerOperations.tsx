@@ -68,7 +68,7 @@ export function ServerOperations({state,filter={},navigationFilter,overviewConte
  useEffect(()=>{
   function selectPage(e:globalThis.KeyboardEvent){
    const target=e.target instanceof HTMLElement?e.target:null;
-   if(e.defaultPrevented||e.isComposing||target?.closest('input:not([type=checkbox]),textarea,select,[role=textbox]')||target?.isContentEditable||document.querySelector('[role=dialog][data-state=open]'))return;
+   if(e.defaultPrevented||e.isComposing||target?.closest('input:not([type=checkbox]),textarea,[data-select-trigger],[role=textbox]')||target?.isContentEditable||document.querySelector('[role=dialog][data-state=open]'))return;
    if(e.shiftKey&&e.key==='F10'){e.preventDefault();return;}
    if(!(e.ctrlKey||e.metaKey)||e.altKey||e.shiftKey||!(e.code==='KeyA'||e.key.toLowerCase()==='a'))return;
    e.preventDefault();if(!locked&&!editing&&shown.length){anchor.current=null;setSelected(shown.map(o=>o.id));}
