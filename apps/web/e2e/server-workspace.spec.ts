@@ -596,6 +596,45 @@ test('counterparty split shows one dialog and one search frame; operation checkb
  await expect(edit).toBeVisible();
 });
 
+test('public entry opens an isolated demo and aligns the two auth actions',async({page})=>{
+ const origin=new URL(base).origin;
+ await page.route('http://127.0.0.1:3000/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  return path==='/access/tariffs'?route.fulfill({headers,json:{tariffs:[]}}):route.fulfill({status:401,headers,json:{code:path==='/access/request'?'APPLICATION_SESSION_REQUIRED':'AUTH_REQUIRED'}});
+ });
+ await page.goto(base);
+ const landing=page.getByRole('main');
+ await expect(landing.getByText(/Анализатор с искусственным интеллектом/)).toBeVisible();
+ await expect(page.getByRole('navigation',{name:'Доступ'}).getByRole('link',{name:'Тарифы'})).toHaveCount(0);
+ await expect(landing.getByRole('link',{name:'Посмотреть тарифы'})).toBeVisible();
+ await page.getByRole('navigation',{name:'Доступ'}).getByRole('link',{name:'Войти',exact:true}).click();
+ const signIn=page.getByRole('button',{name:'Войти',exact:true}),forgot=page.getByRole('button',{name:'Забыли пароль?',exact:true});
+ await expect(signIn).toBeVisible();
+ expect((await signIn.boundingBox())?.y).toBe((await forgot.boundingBox())?.y);
+ await forgot.click();
+ const send=page.getByRole('button',{name:'Отправить письмо',exact:true}),back=page.getByRole('button',{name:'Войти с паролем',exact:true});
+ await expect(send).toBeVisible();
+ expect((await send.boundingBox())?.y).toBe((await back.boundingBox())?.y);
+ const apiRequests:string[]=[];
+ page.on('request',req=>{if(new URL(req.url()).port==='3000')apiRequests.push(req.url());});
+ await page.getByRole('link',{name:'Попробовать демо',exact:true}).click();
+ await expect(page).toHaveURL(/\/demo$/);
+ await expect(page.getByText('Демонстрационный режим · вымышленные данные')).toBeVisible();
+ await expect(page.getByTestId('expenses')).toHaveText('58 869 ₽');
+ await expect(page.getByRole('button',{name:'Загрузить файлы',exact:true})).toHaveCount(0);
+ await page.getByRole('link',{name:'Анализатор',exact:true}).click();
+ await page.getByRole('textbox',{name:'Ваш финансовый вопрос'}).fill('Сколько я заработал?');
+ await page.getByRole('button',{name:'Отправить вопрос',exact:true}).click();
+ await expect(page.getByRole('log')).toContainText('120 000 ₽');
+ await page.getByRole('button',{name:'Открыть в Операциях (1)',exact:true}).click();
+ await expect(page.getByTestId('operation-count')).toHaveText('Показано 1 из 1');
+ expect(apiRequests).toEqual([]);
+ await page.getByRole('link',{name:'Выйти из демо',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Понимайте, куда уходят деньги'})).toBeVisible();
+});
+
 test('public pricing opens the selected renewal and shares the support dialog',async({page})=>{
  await setup(page);
  const tariffs=[{id:'short',name:'2 недели',duration:{kind:'days',count:14},priceMinor:'21900',aiQuota:5000,active:true,publicVisible:true,availableForNew:true},{id:'first',name:'1 месяц',duration:{kind:'calendar_months',count:1},priceMinor:'39900',aiQuota:10000,active:true,publicVisible:true,availableForNew:true},{id:'long',name:'3 месяца',duration:{kind:'calendar_months',count:3},priceMinor:'104900',aiQuota:10000,active:true,publicVisible:true,availableForNew:true}];

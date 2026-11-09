@@ -26,6 +26,7 @@ export function readAppearance():Appearance{
  }catch{/* Appearance is optional; a blocked or corrupt store never blocks finance. */}
  return {...defaultAppearance};
 }
-export function applyAppearance(value:Appearance){const root=document.documentElement;root.dataset.theme=value.theme;root.dataset.density=value.density;root.dataset.textSize=value.textSize;root.dataset.motion=value.motion;
+export function applyAppearance(value:Appearance,persist=true){const root=document.documentElement;root.dataset.theme=value.theme;root.dataset.density=value.density;root.dataset.textSize=value.textSize;root.dataset.motion=value.motion;
+ if(!persist)return;
  try{if(Object.entries(defaultAppearance).every(([key,v])=>value[key as keyof Appearance]===v))localStorage.removeItem(appearanceKey);else localStorage.setItem(appearanceKey,JSON.stringify({theme:value.theme,density:value.density,textSize:value.textSize,motion:value.motion}));}catch{/* Safe visual preferences can remain in memory. */}
 }

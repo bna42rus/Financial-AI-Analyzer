@@ -46,6 +46,10 @@
 .entryNav{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .entryCard,.authWrap{width:100%;max-width:540px;margin:18px auto 32px}
 .authWrap .card{margin-bottom:12px}
+.authActions{display:flex;align-items:stretch;gap:8px}
+.authActions>button{min-width:0;text-align:center}
+.authActions:has(>button:nth-child(3)){flex-wrap:wrap}
+@media(max-width:480px){.authActions>button{padding-inline:10px}}
 .entryFootnote{text-align:center;color:var(--color-secondary-text)}
 .entryIcon{display:grid;place-items:center;width:44px;height:44px;margin-bottom:14px;border-radius:11px;color:var(--color-primary);background:var(--color-soft)}
 .entryCard h1{margin-bottom:10px}
@@ -61,6 +65,8 @@
 .landing p:not(.eyebrow){max-width:34em;font-size:1.15rem;line-height:1.5;color:var(--color-secondary-text)}
 .landing .eyebrow{color:var(--color-primary);font-weight:700}
 .landing .primary{gap:8px}
+.landing .tariffLink{align-self:center;color:var(--color-primary);font-weight:600;padding:8px 4px}
+@media(max-width:760px){.landing .tariffLink{flex-basis:100%}}
 .entryPage .error{background:var(--color-danger-surface,var(--color-surface));color:var(--color-danger);border:1px solid var(--color-danger)}
 @media(max-width:480px){.entryCard,.authWrap{margin-top:6px}.entryNav{gap:8px}.entryPage .header{margin-bottom:12px}.entryCard .actions>*{flex-basis:auto}}
 .landing{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(270px,.75fr);gap:clamp(24px,4vw,64px);align-items:center;max-width:none}

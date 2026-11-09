@@ -37,3 +37,14 @@ test('HTML contains a labelled action and escaped user text, with a plain-text U
  assert.match(m.html!,/&lt;img onerror=&quot;alert\(1\)&quot;&gt;/);
  assert.match(m.html!,/src="cid:cashneuro-mark"/);assert.match(m.text,/Открыть аккаунт: https:/);
 });
+
+test('messages triggered by someone entering an address explain what to do before showing the action',()=>{
+ const kinds=['existing_account','existing_invitation','application_verification','invitation','billing_invitation','registration_verification','profile_email_verification','password_reset','owner_email_verification'];
+ for(const kind of kinds){
+  const mail=renderMail(kind,{email:'u@example.test',token:'synthetic_token',proofToken:'synthetic_proof',code:'123456',expiresAt:'2030-01-01T00:00:00Z',profile:kind==='owner_email_verification'?'control':'finance'},origins,'2026-10-01T00:00:00Z');
+  assert.match(mail.text,/Если вы не .+проигнорируйте письмо/,kind);
+  assert.match(mail.html!,/background:#fff5df[^>]*>Если вы не .+проигнорируйте письмо/,kind);
+ }
+ const notice=renderMail('existing_account',{email:'u@example.test'},origins,'2026-10-01T00:00:00Z');
+ assert.ok(notice.text.indexOf('проигнорируйте письмо')<notice.text.indexOf('Войти в CashNeuro'));
+});

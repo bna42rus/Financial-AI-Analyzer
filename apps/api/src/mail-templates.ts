@@ -12,7 +12,7 @@ export function describeDevice(userAgent:string|undefined){
  const device=/iPhone|iPad/.test(s)?'iPhone / iPad':/Android/.test(s)?'Android':/Windows/.test(s)?'Windows':/Macintosh/.test(s)?'Mac':/Linux/.test(s)?'Linux':'Неизвестное устройство';
  return browser+' · '+device;
 }
-type MailBody={ paragraphs:string[]; action?:{label:string;href:string}; facts?:[string,string][]; code?:string; note?:string };
+type MailBody={ paragraphs:string[]; action?:{label:string;href:string}; facts?:[string,string][]; code?:string; note?:string; unexpected?:string };
 const support='support@cashneuro.ru';
 function escapeHtml(s:string){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]!));}
 function formatMail(subject:string,body:MailBody){
@@ -20,9 +20,10 @@ function formatMail(subject:string,body:MailBody){
  const facts=body.facts?.length?'<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 18px;background:#f4f3fe;border-radius:10px">'+body.facts.map(([k,v])=>'<tr><td style="padding:8px 12px;color:#53617e">'+h(k)+'</td><td align="right" style="padding:8px 12px;color:#19213b"><strong>'+h(v)+'</strong></td></tr>').join('')+'</table>':'';
  const code=body.code?'<p style="margin:0 0 18px;padding:12px 14px;background:#f1efff;color:#3a2ab4;border-radius:8px;font:700 21px/1.4 monospace;overflow-wrap:anywhere">'+h(body.code)+'</p>':'';
  const action=body.action?'<table role="presentation" cellspacing="0" cellpadding="0" style="margin:0 0 20px"><tr><td bgcolor="#4d3dd8" style="border-radius:8px"><a href="'+h(body.action.href)+'" style="display:inline-block;border:1px solid #4d3dd8;padding:11px 17px;color:#fff;text-decoration:none;font-weight:bold;border-radius:8px">'+h(body.action.label)+'</a></td></tr></table>':'';
+ const unexpected=body.unexpected?'<p style="margin:0 0 16px;padding:10px 12px;background:#fff5df;border-radius:8px;color:#65440d;font-size:14px">'+h(body.unexpected)+'</p>':'';
  const note=body.note?'<p style="margin:0;color:#53617e;font-size:13px">'+h(body.note)+'</p>':'';
- const text=[...body.paragraphs,...(body.facts?.length?[body.facts.map(([k,v])=>k+': '+v).join('\n')]:[]),body.code,body.action&&body.action.label+': '+body.action.href,body.note,'Команда CashNeuro · '+support].filter(Boolean).join('\n\n');
- const html='<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f3f4fa"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f3f4fa"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;font:15px/1.55 Arial,sans-serif;color:#19213b"><tr><td style="padding:0 0 14px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td><img src="cid:cashneuro-mark" width="36" height="36" alt="" style="display:block;border:0"></td><td style="padding-left:10px;font-size:22px;font-weight:bold">Cash<span style="color:#4d3dd8">Neuro</span></td></tr></table></td></tr><tr><td bgcolor="#ffffff" style="padding:24px;border:1px solid #dce0f0;border-radius:14px"><h1 style="margin:0 0 16px;font-size:22px;line-height:1.25">'+h(subject)+'</h1>'+body.paragraphs.map(paragraph).join('')+facts+code+action+note+'</td></tr><tr><td style="padding:14px 0;color:#53617e;font-size:13px">Команда CashNeuro · <a href="mailto:'+support+'" style="color:#4d3dd8">'+support+'</a></td></tr></table></td></tr></table></body></html>';
+ const text=[...body.paragraphs,body.unexpected,...(body.facts?.length?[body.facts.map(([k,v])=>k+': '+v).join('\n')]:[]),body.code,body.action&&body.action.label+': '+body.action.href,body.note,'Команда CashNeuro · '+support].filter(Boolean).join('\n\n');
+ const html='<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body style="margin:0;background:#f3f4fa"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" bgcolor="#f3f4fa"><tr><td align="center" style="padding:24px 12px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;font:15px/1.55 Arial,sans-serif;color:#19213b"><tr><td style="padding:0 0 14px"><table role="presentation" cellspacing="0" cellpadding="0"><tr><td><img src="cid:cashneuro-mark" width="36" height="36" alt="" style="display:block;border:0"></td><td style="padding-left:10px;font-size:22px;font-weight:bold">Cash<span style="color:#4d3dd8">Neuro</span></td></tr></table></td></tr><tr><td bgcolor="#ffffff" style="padding:24px;border:1px solid #dce0f0;border-radius:14px"><h1 style="margin:0 0 16px;font-size:22px;line-height:1.25">'+h(subject)+'</h1>'+body.paragraphs.map(paragraph).join('')+facts+unexpected+code+action+note+'</td></tr><tr><td style="padding:14px 0;color:#53617e;font-size:13px">Команда CashNeuro · <a href="mailto:'+support+'" style="color:#4d3dd8">'+support+'</a></td></tr></table></td></tr></table></body></html>';
  return {text,html};
 }
 export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrigins,createdAt:string):Message{
@@ -33,35 +34,35 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
  let to=account,subject:string,body:MailBody;
  switch(kind){
   case 'application_verification':
-   subject='Подтвердите почту';body={paragraphs:['Подтвердите адрес, чтобы продолжить оформление доступа к CashNeuro.'],action:action('Подтвердить почту',link('verify')),note:'Ссылка действует 30 минут. Если вы не подавали заявку, проигнорируйте письмо.'};break;
+   subject='Подтвердите почту';body={paragraphs:['Подтвердите адрес, чтобы продолжить оформление доступа к CashNeuro.'],action:action('Подтвердить почту',link('verify')),note:'Ссылка действует 30 минут.',unexpected:'Если вы не подавали заявку, проигнорируйте письмо.'};break;
   case 'owner_email_verification':
    if(p.profile!=='control')throw new Error('INVALID_PAYLOAD');
-   subject='Подтвердите создание администратора';body={paragraphs:['На сервере запущено создание первого администратора тестовой среды. Введите код в консоли при выполнении owner:complete.','После создания аккаунта настройте двухфакторную аутентификацию в админке.'],code:value(p,'code',100),note:'Код действует 15 минут. Никому его не передавайте.'};break;
+   subject='Подтвердите создание администратора';body={paragraphs:['На сервере запущено создание первого администратора тестовой среды. Введите код в консоли при выполнении owner:complete.','После создания аккаунта настройте двухфакторную аутентификацию в админке.'],code:value(p,'code',100),note:'Код действует 15 минут. Никому его не передавайте.',unexpected:'Если вы не запускали создание администратора, проигнорируйте письмо.'};break;
   case 'invitation':case 'billing_invitation':
-   subject='Приглашение в CashNeuro';body={paragraphs:[kind==='billing_invitation'?'Оплата подтверждена. Создайте аккаунт, чтобы начать оплаченный период.':'Для вас подготовлен доступ. Создайте аккаунт по приглашению.'],facts:[['Ссылка действует до',at(p.expiresAt)]],action:action('Создать аккаунт',link('invite')),note:'Если ссылка истечёт, обратитесь в поддержку. Повторно оплачивать доступ не нужно.'};break;
+   subject='Приглашение в CashNeuro';body={paragraphs:[kind==='billing_invitation'?'Оплата подтверждена. Создайте аккаунт, чтобы начать оплаченный период.':'Для вас подготовлен доступ. Создайте аккаунт по приглашению.'],facts:[['Ссылка действует до',at(p.expiresAt)]],action:action('Создать аккаунт',link('invite')),note:'Если ссылка истечёт, обратитесь в поддержку. Повторно оплачивать доступ не нужно.',unexpected:'Если вы не оформляли доступ и не ждали приглашение, проигнорируйте письмо.'};break;
   case 'registration_verification':
-   subject='Код для регистрации';body={paragraphs:['Введите этот код на странице регистрации CashNeuro.'],code:value(p,'proofToken',100),note:'Код действует 15 минут и подходит только к этому приглашению.'};break;
+   subject='Код для регистрации';body={paragraphs:['Введите этот код на странице регистрации CashNeuro.'],code:value(p,'proofToken',100),note:'Код действует 15 минут и подходит только к этому приглашению.',unexpected:'Если вы не запрашивали код регистрации, проигнорируйте письмо. Никому не сообщайте код.'};break;
   case 'analyzer_topup':
    if(![1000,2000,5000,10000].includes(Number(p.units)))throw new Error('INVALID_PAYLOAD');
    subject='Лимит Анализатора пополнен';body={paragraphs:['Пакет добавлен. Неиспользованные единицы сохраняются при переходе на следующий месяц.'],facts:[['Добавлено единиц',Number(p.units).toLocaleString('ru-RU')]],action:action('Открыть Анализатор',base+'/#analyzer')};break;
   case 'profile_email_verification':
-   subject='Подтвердите новую почту';body={paragraphs:['Введите код в окне CashNeuro, где запросили смену адреса.'],code:value(p,'code',100),note:'Код действует 15 минут. Если вы не меняли адрес, проигнорируйте письмо.'};break;
+   subject='Подтвердите новую почту';body={paragraphs:['Введите код в окне CashNeuro, где запросили смену адреса.'],code:value(p,'code',100),note:'Код действует 15 минут.',unexpected:'Если вы не запрашивали смену почты, проигнорируйте письмо. Никому не сообщайте код.'};break;
   case 'profile_email_changed':
-   subject='Почта для входа изменена';body={paragraphs:['Адрес для входа в CashNeuro изменён. Другие сеансы завершены.'],action:contact,note:'Если вы не меняли адрес, сообщите нам.'};break;
+   subject='Почта для входа изменена';body={paragraphs:['Адрес для входа в CashNeuro изменён. Другие сеансы завершены.'],action:contact,unexpected:'Если вы не меняли почту, сразу сообщите в поддержку.'};break;
   case 'password_reset':
-   subject='Восстановление пароля';body={paragraphs:['Задайте новый пароль для входа в CashNeuro. После смены пароля прежние сеансы завершатся.'],action:action('Задать новый пароль',link('reset')),note:'Ссылка одноразовая и действует 15 минут. Если вы не запрашивали восстановление, проигнорируйте письмо.'};break;
+   subject='Восстановление пароля';body={paragraphs:['Задайте новый пароль для входа в CashNeuro. После смены пароля прежние сеансы завершатся.'],action:action('Задать новый пароль',link('reset')),note:'Ссылка одноразовая и действует 15 минут.',unexpected:'Если вы не запрашивали восстановление пароля, проигнорируйте письмо.'};break;
   case 'security_password_changed':
-   subject='Пароль изменён';body={paragraphs:['Пароль аккаунта изменён. Прежние сеансы завершены.'],facts:[['Когда',at(createdAt)]],action:contact,note:'Если вы не меняли пароль, сообщите нам.'};break;
+   subject='Пароль изменён';body={paragraphs:['Пароль аккаунта изменён. Прежние сеансы завершены.'],facts:[['Когда',at(createdAt)]],action:contact,unexpected:'Если вы не меняли пароль, сразу сообщите в поддержку.'};break;
   case 'security_admin_recovery':
-   subject='Начато восстановление доступа администратора';body={paragraphs:['Прежние сеансы завершены, прежний ключ двухфакторной защиты отключён. Действия в админке будут доступны после настройки нового ключа.'],facts:[['Когда',at(createdAt)]],action:contact,note:'Если вы не запускали восстановление, сообщите нам.'};break;
+   subject='Начато восстановление доступа администратора';body={paragraphs:['Прежние сеансы завершены, прежний ключ двухфакторной защиты отключён. Действия в админке будут доступны после настройки нового ключа.'],facts:[['Когда',at(createdAt)]],action:contact,unexpected:'Если вы не запускали восстановление, сразу сообщите в поддержку.'};break;
   case 'security_login':
-   subject='Новый вход в аккаунт';body={paragraphs:['В CashNeuro вошли с нового сеанса.'],facts:[['Когда',at(p.at??createdAt)],['Устройство',typeof p.device==='string'?p.device:'Неизвестное устройство']],action:profile,note:'Если это были не вы, смените пароль и проверьте активные сеансы.'};break;
+   subject='Новый вход в аккаунт';body={paragraphs:['В CashNeuro вошли с нового сеанса.'],facts:[['Когда',at(p.at??createdAt)],['Устройство',typeof p.device==='string'?p.device:'Неизвестное устройство']],action:profile,unexpected:'Если это были не вы, смените пароль и проверьте активные сеансы.'};break;
   case 'existing_account':
-   subject='Ваш аккаунт уже существует';body={paragraphs:['Для этого адреса уже есть аккаунт. Войдите с паролем или восстановите его на странице входа.'],action:signIn};break;
+   subject='Ваш аккаунт уже существует';body={paragraphs:['Этот адрес указали при оформлении доступа к CashNeuro. На него уже зарегистрирован аккаунт.','Если запрос был вашим, войдите с паролем или восстановите его на странице входа.'],action:signIn,unexpected:'Если вы не оформляли доступ, проигнорируйте письмо.'};break;
   case 'existing_invitation':
-   subject='Для вас уже подготовлен доступ';body={paragraphs:['На эту почту уже выдано приглашение. Откройте ранее полученное письмо. Если ссылка недоступна, запросите новую в поддержке.'],action:contact};break;
+   subject='Для вас уже подготовлен доступ';body={paragraphs:['На эту почту уже выдано приглашение. Откройте ранее полученное письмо. Если ссылка недоступна, запросите новую в поддержке.'],action:contact,unexpected:'Если вы не оформляли доступ, проигнорируйте письмо.'};break;
   case 'access_activated':
-   subject='Доступ активирован';body={paragraphs:['Регистрация завершена. Войдите с паролем, который выбрали при регистрации.'],facts:[['Начало доступа',at(p.activatedAt)],['Доступ',p.indefinite===true?'Бессрочный':'До '+at(p.accessEnd)]],action:signIn};break;
+   subject='Доступ активирован';body={paragraphs:['Регистрация завершена. Войдите с паролем, который выбрали при регистрации.'],facts:[['Начало доступа',at(p.activatedAt)],['Доступ',p.indefinite===true?'Бессрочный':'До '+at(p.accessEnd)]],action:signIn,unexpected:'Если вы не регистрировались, сообщите в поддержку.'};break;
   case 'manual_access_changed':
    subject='Срок доступа изменён';body={paragraphs:[p.indefinite===true?'Доступ стал бессрочным.':'Срок доступа обновлён.'],facts:p.indefinite===true?undefined:[['Доступ до',at(p.accessEnd)]],action:profile,note:'Если аккаунт заблокирован, изменение срока не снимает блокировку.'};break;
   case 'payment_decision':case 'renewal_decision':{
@@ -73,7 +74,7 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
     rejected:['Оплату не подтвердили','Свяжитесь с поддержкой, чтобы уточнить причину и порядок возврата, если деньги были списаны.'],
    };
    if(!Object.hasOwn(states,status))throw new Error('INVALID_PAYLOAD');
-   const [heading,copy]=states[status]!;subject=heading;body={paragraphs:[copy],facts:[...(status==='needs_topup'&&p.remainingMinor?[['Осталось доплатить',money(p.remainingMinor)] as [string,string]]:[]),...(p.accessEnd?[['Доступ до',at(p.accessEnd)] as [string,string]]:[])],action:status==='rejected'?contact:renewal?profile:access};break;
+   const [heading,copy]=states[status]!;subject=heading;body={paragraphs:[copy],facts:[...(status==='needs_topup'&&p.remainingMinor?[['Осталось доплатить',money(p.remainingMinor)] as [string,string]]:[]),...(p.accessEnd?[['Доступ до',at(p.accessEnd)] as [string,string]]:[])],action:status==='rejected'?contact:renewal?profile:access,unexpected:renewal?undefined:'Если вы не оформляли доступ, сообщите в поддержку.'};break;
   }
   case 'payment_claim':case 'renewal_claim':{
    to=email(options.adminRecipient);subject=kind==='renewal_claim'?'Сверьте оплату продления':'Сверьте оплату первого доступа';
