@@ -3,7 +3,7 @@ import {calculateOverview,defaultOverview} from '../../../packages/finance-core/
 // Synthetic HTTP responses exercise the connected UI. Real PostgreSQL/HTTP authorization
 // and durable writes are covered separately by apps/api/test/browser.test.ts in CI.
 import {test,expect} from '@playwright/test';
-import type {Page} from '@playwright/test';
+import type {Locator,Page} from '@playwright/test';
 import {createServer} from 'vite';
 import type {ViteDevServer} from 'vite';
 import {fileURLToPath} from 'node:url';
@@ -648,6 +648,17 @@ test('operation actions fit without horizontal scrolling',async({page})=>{
  for(const button of buttons)await expect(button).toBeInViewport();
 });
 
+async function expectDesktopFooterColumns(footer:Locator,left:number,right:number){
+ const brand=await footer.getByRole('link',{name:'CashNeuro — на главную'}).boundingBox();
+ expect(brand?.x).toBeCloseTo(left,0);
+ const [middle,legal]=await footer.getByRole('list').evaluateAll(groups=>groups.map(group=>{
+  const links=Array.from(group.querySelectorAll('a'),link=>link.getBoundingClientRect());
+  return {left:Math.min(...links.map(link=>link.left)),right:Math.max(...links.map(link=>link.right))};
+ }));
+ expect((middle!.left+middle!.right)/2).toBeCloseTo((left+right)/2,0);
+ expect(legal!.right).toBeCloseTo(right,0);
+}
+
 test('workspace footer follows the main gutters and category names share their size',async({page})=>{
  const h=await setup(page);
  const parent=crypto.randomUUID(),child=crypto.randomUUID();
@@ -665,7 +676,9 @@ test('workspace footer follows the main gutters and category names share their s
   const rect=element.getBoundingClientRect(),css=getComputedStyle(element);
   return [rect.left+parseFloat(css.paddingLeft),rect.right-parseFloat(css.paddingRight)];
  });
- expect(await bounds(footer)).toEqual(await bounds(page.getByRole('main')));
+ const mainBounds=await bounds(page.getByRole('main'));
+ expect(await bounds(footer)).toEqual(mainBounds);
+ if(page.viewportSize()!.width>600)await expectDesktopFooterColumns(footer,mainBounds[0]!,mainBounds[1]!);
 });
 
 test('public footer aligns the desktop columns and contacts show a plain address',async({page})=>{
@@ -677,7 +690,11 @@ test('public footer aligns the desktop columns and contacts show a plain address
  await expect(main.getByText('support@cashneuro.ru',{exact:true})).toBeVisible();
  await expect(main.getByRole('link',{name:'support@cashneuro.ru'})).toHaveCount(0);
  await expect(main.getByRole('button',{name:'Скопировать адрес'})).toHaveCount(0);
+ const mainBox=(await main.boundingBox())!,footerBox=(await footer.boundingBox())!;
+ expect(footerBox.x).toBeCloseTo(mainBox.x,0);
+ expect(footerBox.width).toBeCloseTo(mainBox.width,0);
  if(page.viewportSize()!.width>600){
+  await expectDesktopFooterColumns(footer,mainBox.x,mainBox.x+mainBox.width);
   const rows=await Promise.all([footer.getByText('support@cashneuro.ru',{exact:true}),footer.getByRole('link',{name:'Контакты',exact:true}),footer.getByRole('link',{name:'Конфиденциальность',exact:true})].map(node=>node.boundingBox()));
   const bottoms=rows.map(box=>box!.y+box!.height);
   expect(Math.max(...bottoms)-Math.min(...bottoms)).toBeLessThanOrEqual(1);
