@@ -3,8 +3,8 @@ import {object,uuid} from '../../../packages/finance-core/src/model.ts';
 import {HttpError,outbox} from './types.ts';
 import type {Sealer} from './types.ts';
 
-type Payment={id:string;test:boolean;paid:boolean;status:string;amount:{currency:string;value:string};metadata:{orderId:string};confirmation?:{confirmation_url:string}};
-export type TestPayments={read(id:string):Promise<Payment>;create(input:{id:string;value:string;units:number}):Promise<Payment>};
+import type {AccessPayment as Payment,AccessPaymentProvider} from './access-payment-provider.ts';
+export type TestPayments={readRefund?:AccessPaymentProvider['readRefund'];read(id:string):Promise<Payment>;create(input:{id:string;value:string;units:number}):Promise<Payment>};
 export function testYooKassa(shopId:string,key:string,origin:string,call=fetch):TestPayments{
  if(!/^\d{3,16}$/.test(shopId)||!/^test_[A-Za-z0-9_-]{12,200}$/.test(key)||new URL(origin).origin!==origin||!origin.startsWith('https://'))throw new Error('YOOKASSA_TEST_CONFIGURATION_REQUIRED');
  const auth='Basic '+Buffer.from(shopId+':'+key).toString('base64');
@@ -38,7 +38,7 @@ export async function aiTopup(db:PoolClient,owner:{id:string;email:string},input
  if(r.units!==undefined||['paid','cancelled'].includes(order.status))return projection(order);
  if(!order.provider_id&&Date.now()-order.created_at.getTime()>23*3600_000)throw new HttpError(409,'PAYMENT_RETRY_REQUIRED');
  const payment=order.provider_id?await provider.read(order.provider_id):await provider.create({id,value:value(order.price_minor),units:order.units});
- if(payment.test!==true||payment.amount?.value!==value(order.price_minor)||payment.amount?.currency!=='RUB'||payment.metadata?.orderId!==id||order.provider_id&&payment.id!==order.provider_id)throw new HttpError(502,'PAYMENT_UNVERIFIED');
+ if(payment.test!==true||payment.amount?.value!==value(order.price_minor)||payment.amount?.currency!=='RUB'||payment.metadata?.orderId!==id||order.provider_id&&payment.id!==order.provider_id||!['pending','waiting_for_capture','succeeded','canceled'].includes(payment.status)||payment.status==='succeeded'&&payment.paid!==true)throw new HttpError(502,'PAYMENT_UNVERIFIED');
  let redirect:string|null=order.redirect_url;
  if(payment.confirmation?.confirmation_url){const url=new URL(payment.confirmation.confirmation_url);if(url.protocol!=='https:'||!['yookassa.ru','yoomoney.ru'].some(domain=>url.hostname===domain||url.hostname.endsWith('.'+domain))||url.username||url.password)throw new HttpError(502,'PAYMENT_UNVERIFIED');redirect=url.href;}
  const status=payment.status==='succeeded'&&payment.paid===true?'paid':payment.status==='canceled'?'cancelled':'pending';

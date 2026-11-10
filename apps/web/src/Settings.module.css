@@ -218,4 +218,6 @@
 .reviewOtherFields { margin-top:6px; }
 .reviewOtherFields > summary + div { margin-top:4px; }
 
-.reviewOtherFields .reviewInput{font:inherit}
+.reviewForm label input:not([type=checkbox]),.reviewForm label :global([data-select-trigger]){
+ min-height:44px;padding:8px 11px;font-size:calc(14px * var(--text-scale,1));line-height:1.5;
+}

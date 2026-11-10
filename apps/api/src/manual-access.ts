@@ -120,13 +120,18 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await db.query('INSERT INTO commerce.manual_grant(id,email,term,access_type,quota_policy,reason,creator,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[grantId,address,t,b.accessType,q,reason,actorId,now]);
   await newInvitation(db,grantId,address,lifetime!,seal,now);
  }else if(next){
+  const extendingAllowance=!b.quota&&before?.accessEnd&&next.accessEnd&&Date.parse(next.accessEnd)>Date.parse(before.accessEnd)&&(mode==='extend'||mode==='set_end');
+  if(extendingAllowance){
+   const saved=(await db.query('SELECT commerce.extend_customer_allowance($1,$2,$3) AS saved',[userId,now,next.accessEnd])).rows[0]?.saved;
+   if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
+  }
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,revision,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET anchor_at=EXCLUDED.anchor_at,access_end=EXCLUDED.access_end,revision=EXCLUDED.revision,calendar_months=EXCLUDED.calendar_months,extra_days=EXCLUDED.extra_days,indefinite=EXCLUDED.indefinite,end_offset_ms=EXCLUDED.end_offset_ms,quota_policy=EXCLUDED.quota_policy`,
    [userId,next.anchorAt,next.accessEnd,next.timezone,next.revision,next.calendarMonths,next.extraDays,next.indefinite??false,next.endOffsetMs??0,q]);
   if(b.quota&&q.source==='override'&&next.accessEnd&&Date.parse(next.accessEnd)>Date.parse(now)){
    const saved=(await db.query('SELECT commerce.set_customer_allowance($1,$2,$3,$4) AS saved',[userId,now,next.accessEnd,q.limit])).rows[0]?.saved;
    if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
-  }else if(mode!=='quota'){
+  }else if(mode!=='quota'&&!extendingAllowance){
    await db.query('SELECT commerce.move_customer_allowance_end($1,$2,$3)',[userId,now,b.quota?null:next.accessEnd]);
   }
   if(b.quota&&q.source==='override'&&next.indefinite)await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units) VALUES($1,$2,$3)',[userId,now,q.limit]);

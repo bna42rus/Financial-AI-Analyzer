@@ -952,3 +952,51 @@ test('payment reconciliation uses verified provider identity and full refund clo
  assert.equal((await admin.get('/control/workspace-requests')).json().requests[0].status,'closed');
  assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='billing_refund'")).rowCount,2);
 });
+
+test('YooKassa notifications verify provider facts and settle test payments once without a browser session',async()=>{
+ const requestId=crypto.randomUUID(),orderId=crypto.randomUUID(),paymentId=crypto.randomUUID();
+ const refundId=crypto.randomUUID(),topupId=crypto.randomUUID(),topupPayment=crypto.randomUUID(),cancelledId=crypto.randomUUID(),cancelledPayment=crypto.randomUUID(),now=new Date().toISOString();
+ const address='webhook-flow@example.test',url='/api/payments/yookassa/webhook';
+ const request={id:requestId,email:address,name:address,tariff,revision:0,createdAt:now,verifiedAt:now,expiresAt:new Date(Date.now()+86400000).toISOString(),status:'awaiting_payment'};
+ await pg.owner.query('INSERT INTO access.request(id,email,data) VALUES($1,$2,$3)',[requestId,address,request]);
+ await pg.owner.query("INSERT INTO commerce.access_checkout(id,application_id,tariff,offer_version,mode,state,provider_id) VALUES($1,$2,$3,'synthetic','once','pending',$4)",[orderId,requestId,tariff,paymentId]);
+ await seedUser('identity','webhook');
+ await pg.owner.query("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor,status,provider_id) VALUES('webhook',$1,2000,6900,'pending',$2)",[topupId,topupPayment]);
+ const forbidden=async()=>{throw Error('Webhook must never create a charge');};
+ let value='1.00',paymentStatus='pending',packStatus='pending',reads=0;
+ const s=await createServer({...fc,accessPayments:{test:true,create:forbidden,read:async id=>{
+  reads++;return {id,test:true,paid:paymentStatus==='succeeded',status:paymentStatus,amount:{currency:'RUB',value},metadata:{orderId}};
+ },readRefund:async id=>({id,payment_id:paymentId,status:'succeeded',created_at:now,amount:{currency:'RUB',value:'1190.00'}})},testPayments:{
+  create:forbidden,readRefund:async id=>({id,payment_id:topupPayment,status:'succeeded',created_at:now,amount:{currency:'RUB',value:'69.00'}}),
+  read:async id=>({id,test:true,paid:packStatus==='succeeded',status:id===cancelledPayment?'canceled':packStatus,amount:{currency:'RUB',value:'69.00'},metadata:{orderId:id===cancelledPayment?cancelledId:topupId}}),
+ }});
+ try{
+  const notify=(event:string,id:string,payment?:string)=>s.fastify.inject({url,method:'POST',payload:{type:'notification',event,object:{id,payment_id:payment,paid:true}}});
+  assert.equal((await notify('payment.succeeded',crypto.randomUUID())).statusCode,200);
+  assert.equal(reads,0);
+  assert.equal((await notify('payment.succeeded',paymentId)).statusCode,503);
+  paymentStatus='succeeded';
+  assert.equal((await notify('payment.succeeded',paymentId)).statusCode,502);
+  assert.equal((await pg.owner.query('SELECT state FROM commerce.access_checkout WHERE id=$1',[orderId])).rows[0].state,'pending');
+  value='1190.00';
+  for(const r of await Promise.all([notify('payment.succeeded',paymentId),notify('payment.succeeded',paymentId)]))assert.equal(r.statusCode,200,r.body);
+  assert.equal((await pg.owner.query('SELECT state FROM commerce.access_checkout WHERE id=$1',[orderId])).rows[0].state,'paid');
+  assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='billing_invitation'")).rowCount,1);
+  packStatus='succeeded';
+  for(const r of await Promise.all([notify('payment.succeeded',topupPayment),notify('payment.succeeded',topupPayment)]))assert.equal(r.statusCode,200,r.body);
+  assert.equal((await pg.owner.query('SELECT status FROM commerce.ai_topup_order WHERE id=$1',[topupId])).rows[0].status,'paid');
+  assert.equal((await pg.owner.query("SELECT 1 FROM identity.outbox WHERE kind='analyzer_topup'")).rowCount,1);
+  const topupRefund=crypto.randomUUID();
+  for(const r of await Promise.all([notify('refund.succeeded',topupRefund,topupPayment),notify('refund.succeeded',topupRefund,topupPayment)]))assert.equal(r.statusCode,200,r.body);
+  assert.equal((await pg.owner.query('SELECT amount_minor FROM commerce.checkout_refund WHERE id=$1',[topupRefund])).rows[0]?.amount_minor,6900);
+  await pg.owner.query("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor,status,provider_id) VALUES('webhook',$1,2000,6900,'pending',$2)",[cancelledId,cancelledPayment]);
+  assert.equal((await notify('payment.canceled',cancelledPayment)).statusCode,200);
+  assert.equal((await pg.owner.query('SELECT status FROM commerce.ai_topup_order WHERE id=$1',[cancelledId])).rows[0].status,'cancelled');
+  // A late event for an earlier order cannot alter its already recorded payment.
+  assert.equal((await notify('payment.canceled',topupPayment)).statusCode,200);
+  assert.equal((await pg.owner.query('SELECT status FROM commerce.ai_topup_order WHERE id=$1',[topupId])).rows[0].status,'paid');
+  for(const r of await Promise.all([notify('refund.succeeded',refundId,paymentId),notify('refund.succeeded',refundId,paymentId)]))assert.equal(r.statusCode,200,r.body);
+  assert.equal((await pg.owner.query('SELECT state FROM commerce.invitation')).rows[0].state,'cancelled');
+  assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='billing_refund'")).rowCount,1);
+ }finally{await s.close();}
+});

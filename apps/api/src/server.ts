@@ -73,6 +73,7 @@ export async function createServer(config: Config) {
   const importIngestion = config.profile === 'finance' ? await import('./import-ingestion.ts') : null;
   const accountProfile=config.profile==='finance'?await import('./account-profile.ts'):null;
   const checkout=config.profile==='finance'?await import('./yookassa-topups.ts'):null;
+  const webhook=config.profile==='finance'&&['test','staging'].includes(config.environment)&&(config.accessPayments||config.testPayments)?await import('./yookassa-webhook.ts'):null;
   const customerBudget=config.profile==='finance'?await import('./customer-ai-budget.ts'):null;
   const registration = config.profile === 'finance' ? await import('./registration.ts') : null;
   const renewalApplication = config.profile === 'finance' ? await import('./renewal-application.ts') : null;
@@ -393,7 +394,7 @@ export async function createServer(config: Config) {
       } else if (application && path === '/access/requests' && request.method === 'POST') {
         result = await application.createApplication(db, request, seal,config.launchLegal); status = 202;
       } else if (application && path === '/access/verify' && request.method === 'POST') {
-        const verified = await application.verifyApplication(db, request); result = { status: 'verified' }; cookies = [application.appCookie(config, verified.session)];
+        const verified = await application.verifyApplication(db, request); result = { status: 'verified',requestId:verified.row.id }; cookies = [application.appCookie(config, verified.session)];
       } else if (application && path === '/access/request' && request.method === 'GET') {
         if (request.url.includes('?')) throw new HttpError(400, 'INVALID_INPUT');
         result = { request: application.publicRequest(await application.ownedApplication(db, config, request)) };
@@ -413,6 +414,20 @@ export async function createServer(config: Config) {
       return reply.code(error instanceof HttpError ? error.status : 400).send({code,...(error instanceof MailCooldownError?{retryAfterSeconds:error.retryAfterSeconds}:{}),...(error instanceof LinkEditError?{linkIndex:error.linkIndex}:{}),...(recovery?{message:recovery}:{})});
     }
   };
+  if(webhook)fastify.post('/api/payments/yookassa/webhook',{bodyLimit:32*1024},async(request,reply)=>{
+    if(request.headers['content-type']?.split(';')[0]!=='application/json')return reply.code(415).send({code:'INVALID_NOTIFICATION'});
+    const db=await config.pool.connect();
+    try{
+      await db.query('BEGIN');
+      await db.query('SELECT pg_advisory_xact_lock(92042)');
+      await webhook.handleYooKassaNotification(db,request.body,config.accessPayments,config.testPayments,seal);
+      await db.query('COMMIT');
+      return reply.code(200).send({status:'ok'});
+    }catch(error){
+      await db.query('ROLLBACK');
+      return reply.code(error instanceof HttpError?error.status:503).send({code:'PAYMENT_NOTIFICATION_FAILED'});
+    }finally{db.release();}
+  });
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});
   if(finance)for(const url of ['/finance/preview','/finance/review-command'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:256*1024,handler:requestHandler});
   // Isolated normalized-contract budget; password/auth routes retain the 8 KiB default.

@@ -38,6 +38,10 @@ body > [data-cashneuro-dialog="overlay"]:has(~ [data-cashneuro-dialog="overlay"]
 body > [data-cashneuro-dialog="content"]:has(~ [data-cashneuro-dialog="content"]) { visibility:hidden; }
 
 html{scrollbar-gutter:stable}
-body[data-scroll-locked]{margin-right:0!important}
+/* Keep the same viewport gutter while Radix locks the page scroll. */
+@supports (scrollbar-gutter:stable){
+ html:has(body[data-scroll-locked]){overflow-y:hidden}
+ html body[data-scroll-locked]{margin-right:0!important;--removed-body-scroll-bar-size:0px}
+}
 :where(a[href]){color:var(--color-primary);text-decoration:none;text-underline-offset:.18em}
 :where(a[href]:hover,a[href]:focus-visible){text-decoration:underline}

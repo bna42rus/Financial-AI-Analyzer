@@ -358,11 +358,34 @@ test('refresh preserves an unsaved card name and requires a deliberate conflict 
 test('start screen and default period follow device preferences and profile timezone while explicit links win',async({page})=>{
  await setup(page);await page.clock.setFixedTime(new Date('2026-10-10T01:00:00Z'));await section(page,'Интерфейс');
  await chooseOption(page.getByLabel('Стартовый экран',{exact:true}),'operations');await chooseOption(page.getByLabel('Период по умолчанию',{exact:true}),'current_month');await page.getByRole('button',{name:'Применить',exact:true}).click();
- await page.goto(base);await page.getByRole('link',{name:'Открыть кабинет'}).click();await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
+ await page.goto(base);await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
  await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('01.10.2026');await expect(page.getByLabel('По дату',{exact:true})).toHaveValue('09.10.2026');
- await page.getByRole('link',{name:'CashNeuro — Финансовый анализатор',exact:true}).click();await expect(page.getByRole('link',{name:'Открыть кабинет'})).toBeVisible();await expect(page).toHaveURL(base);
+ await page.getByRole('link',{name:'CashNeuro — Финансовый анализатор',exact:true}).click();await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();await expect(page).toHaveURL(base);
  await page.goto(base+'#analyzer');await expect(page.getByRole('heading',{name:'Анализатор',exact:true})).toBeVisible();
  const stored=await page.evaluate(()=>localStorage.getItem('finance-navigation-v1'));expect(JSON.parse(stored!)).toEqual({startScreen:'operations',defaultPeriod:'current_month'});
+});
+
+test('root and logo show the current restricted access status',async({page})=>{
+ const origin=new URL(base).origin;
+ let blocked=true;
+ await page.route('http://127.0.0.1:3000/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Credentials':'true','Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(path==='/session')return route.fulfill({headers,json:{name:'Тестовый пользователь',scope:'restricted',blocked,accessEnd:'2026-10-01T00:00:00Z',capabilities:[]}});
+  return path==='/access/tariffs'?route.fulfill({headers,json:{tariffs:[]}}):route.fulfill({status:401,headers,json:{code:'APPLICATION_SESSION_REQUIRED'}});
+ });
+ for(const status of ['Доступ приостановлен','Срок доступа закончился']){
+  await page.goto(base+'?check='+Number(blocked)+'#account');
+  await expect(page.getByRole('heading',{name:status})).toBeVisible();
+  await page.getByRole('button',{name:'Открыть аккаунт'}).click();
+  await expect(page.getByRole('dialog',{name:'Аккаунт',exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Готово',exact:true}).click();
+  await page.getByRole('banner').getByRole('link',{name:'CashNeuro',exact:true}).click();
+  await expect(page.getByRole('heading',{name:status})).toBeVisible();
+  await expect(page).toHaveURL(base);
+  blocked=false;
+ }
 });
 
 test('compact global category picker searches children, keeps multiple choices narrow and shares exact scope with Operations',async({page},info)=>{
@@ -856,4 +879,43 @@ test('public demo uses connected screens and leaves the signed-in API and browse
  await expect(page.getByRole('dialog',{name:'Демонстрационный режим'})).toContainText('573');
  expect(calls).toEqual([]);
  expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);
+});
+
+test('the homepage and fresh access form ignore an existing application until mail confirmation',async({page})=>{
+ const origin=new URL(base).origin;
+ const tariff={id:'week',name:'1 неделя',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500};
+ const request={id:'verified-application',email:'existing@example.test',tariff,status:'awaiting_payment'};
+ const orderId=crypto.randomUUID();
+ let applicationReads=0;
+ await page.context().route('http://127.0.0.1:3000/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  const headers={'Access-Control-Allow-Origin':origin,'Access-Control-Allow-Credentials':'true',
+   'Access-Control-Allow-Headers':'content-type','Access-Control-Allow-Methods':'GET,POST,OPTIONS'};
+  if(route.request().method()==='OPTIONS')return route.fulfill({status:204,headers});
+  if(path==='/session')return route.fulfill({status:401,headers,json:{code:'AUTH_REQUIRED'}});
+  if(path==='/access/request')applicationReads++;
+  const json=path==='/access/tariffs'?{tariffs:[tariff]}:path==='/access/verify'?{requestId:request.id}:
+   path==='/access/request'?{request}:path==='/access/first-checkout'?{enabled:false,order:{id:orderId,state:'pending'}}:{};
+  return route.fulfill({headers,json});
+ });
+ await page.goto(base);
+ await expect(page.getByRole('heading',{name:/Поймите, куда уходят деньги/})).toBeVisible();
+ await page.getByRole('link',{name:'Получить доступ',exact:true}).click();
+ await expect(page.getByRole('heading',{name:'Получить доступ',exact:true})).toBeVisible();
+ await expect(page.getByLabel('Почта',{exact:true})).toBeEmpty();
+ expect(applicationReads).toBe(0);
+ await page.goto(base+'#verify?token=synthetic');
+ await page.getByRole('button',{name:'Подтвердить почту'}).click();
+ await expect(page.getByRole('heading',{name:'Оплатите доступ'})).toBeVisible();
+ await expect(page).toHaveURL(base+'#checkout');
+ await page.reload();
+ await expect(page.getByRole('heading',{name:'Оплатите доступ'})).toBeVisible();
+ await page.getByRole('banner').getByRole('link',{name:'CashNeuro'}).click();
+ await page.getByRole('link',{name:'Получить доступ',exact:true}).click();
+ await expect(page.getByLabel('Почта',{exact:true})).toBeEmpty();
+ const separate=await page.context().newPage();
+ await separate.goto(base+'#checkout');
+ await expect(separate.getByRole('heading',{name:'Получить доступ',exact:true})).toBeVisible();
+ await page.goto(base+'#checkout?payment='+orderId);
+ await expect(page.getByRole('heading',{name:'Оплатите доступ'})).toBeVisible();
 });

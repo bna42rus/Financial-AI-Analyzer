@@ -158,6 +158,20 @@ class UpdateTests(unittest.TestCase):
         with self.assertRaisesRegex(m.m.InstallationError,'AI_RESUME_DROPIN_CHANGED'):
             m.activate_ai(b'ExecStart=unexpected')
 
+    def test_payment_webhook_config_is_exact_scoped_and_idempotent(self):
+        existing = b'test.cashneuro.ru {\n    basic_auth {\n        owner synthetic\n    }\n}\n'
+        config = {'YOOKASSA_ACCESS_TEST_ENABLED': '1', 'PORT': '3000'}
+        candidate, enabled = m.configure_payment_webhook(existing, config)
+        self.assertTrue(enabled)
+        self.assertTrue(candidate.startswith(existing))
+        self.assertIn(b'test.cashneuro.ru/api/payments/yookassa/webhook {', candidate)
+        self.assertIn(b'@notification method POST', candidate)
+        self.assertIn(b'reverse_proxy @notification 127.0.0.1:3000', candidate)
+        self.assertEqual(m.configure_payment_webhook(candidate, config), (candidate, True))
+        disabled, enabled = m.configure_payment_webhook(candidate, {})
+        self.assertFalse(enabled)
+        self.assertEqual(disabled.strip(), existing.strip())
+
     def test_full_install_with_real_backup_and_switch_files_handles_all_ai_modes(self):
         # Run the actual installer orchestration. Only external processes/HTTP
         # and the receipt helper are substituted; snapshots, config/dropin

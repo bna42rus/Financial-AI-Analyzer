@@ -75,23 +75,27 @@ export async function runReconciliations(pool:Pool,provider:AccessPaymentProvide
  }
 }
 
-function refundValue(refund:ProviderRefund){
+export function refundValue(refund:ProviderRefund){
  if(!refund||typeof refund.id!=='string'||!uuidPattern.test(refund.id)||typeof refund.payment_id!=='string'||!uuidPattern.test(refund.payment_id)||
   !['pending','succeeded','canceled'].includes(refund.status)||refund.amount?.currency!=='RUB'||typeof refund.amount.value!=='string'||
   !/^\d{1,8}\.\d{2}$/.test(refund.amount.value)||typeof refund.created_at!=='string'||!Number.isFinite(Date.parse(refund.created_at)))return null;
  const minor=Number(refund.amount.value.replace('.',''));
  return minor>0&&minor<=1000000?minor:null;
 }
+export async function recordAccessRefund(db:PoolClient,refund:ProviderRefund,seal:Sealer){
+ const amount=refundValue(refund);
+ if(amount===null)return;
+ const row=(await db.query('SELECT * FROM commerce.record_checkout_refund($1,$2,$3,$4,$5)',[refund.id,refund.payment_id,amount,refund.status,refund.created_at])).rows[0];
+ if(row?.notify_email)await outbox(db,'access',seal,'billing_refund',{email:row.notify_email,amountMinor:String(amount),full:row.fully_refunded},{subjectId:row.checkout_id,dedupeKey:'billing-refund:'+refund.id});
+}
 export async function importRefunds(pool:Pool,provider:AccessPaymentProvider,seal:Sealer,since:string,cursor?:string){
  if(!provider.refunds)return undefined;
  const page=await provider.refunds(since,cursor);
  for(const refund of page.items){
-  const amount=refundValue(refund);if(amount===null)continue;
   const db=await pool.connect();
   try{
    await db.query('BEGIN');await db.query('SELECT pg_advisory_xact_lock(92042)');
-   const row=(await db.query('SELECT * FROM commerce.record_checkout_refund($1,$2,$3,$4,$5)',[refund.id,refund.payment_id,amount,refund.status,refund.created_at])).rows[0];
-   if(row?.notify_email)await outbox(db,'access',seal,'billing_refund',{email:row.notify_email,amountMinor:String(amount),full:row.fully_refunded},{subjectId:row.checkout_id,dedupeKey:'billing-refund:'+refund.id});
+   await recordAccessRefund(db,refund,seal);
    await db.query('COMMIT');
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
  }

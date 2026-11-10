@@ -23,10 +23,12 @@ const assistantProvider = await loadAssistantProvider(environment, profile, proc
 if(![undefined,'0','1'].includes(process.env.CLASSIFICATION_ENABLED))throw new Error('CLASSIFICATION_CONFIGURATION_DENIED');
 const classificationEnabled=process.env.CLASSIFICATION_ENABLED==='1';
 if(classificationEnabled&&!assistantProvider)throw new Error('CLASSIFICATION_PROVIDER_REQUIRED');
-const testPayments=environment==='staging'&&profile==='finance'&&process.env.YOOKASSA_TEST_ENABLED==='1'
- ?testYooKassa(process.env.YOOKASSA_TEST_SHOP_ID??'',process.env.YOOKASSA_TEST_SECRET??'',process.env.WEB_ORIGIN!):undefined;
-const accessPayments=environment==='staging'&&profile==='finance'&&process.env.YOOKASSA_ACCESS_TEST_ENABLED==='1'
- ?createAccessPaymentProvider({shopId:process.env.YOOKASSA_TEST_SHOP_ID??'',secret:process.env.YOOKASSA_TEST_SECRET??'',origin:process.env.WEB_ORIGIN!,test:true}):undefined;
+const accessEnabled=environment==='staging'&&profile==='finance'&&process.env.YOOKASSA_ACCESS_TEST_ENABLED==='1';
+const topupsEnabled=environment==='staging'&&profile==='finance'&&process.env.YOOKASSA_TEST_ENABLED==='1';
+const shopId=process.env.YOOKASSA_TEST_SHOP_ID??'',secret=process.env.YOOKASSA_TEST_SECRET??'';
+const paymentProvider=accessEnabled||topupsEnabled?createAccessPaymentProvider({shopId,secret,origin:process.env.WEB_ORIGIN!,test:true}):undefined;
+const accessPayments=accessEnabled?paymentProvider:undefined;
+const testPayments=topupsEnabled?{...testYooKassa(shopId,secret,process.env.WEB_ORIGIN!),readRefund:paymentProvider?.readRefund}:undefined;
 const server = await createServer({ profile, pool, baseURL: process.env.API_BASE_URL!, origin: process.env.WEB_ORIGIN!, authSecret: process.env.AUTH_SECRET!,
   wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider, classificationEnabled,testPayments,accessPayments,launchLegal:process.env.CASHNEURO_LEGAL_REQUIRED==='1' });
 await server.app.listen(Number(process.env.PORT ?? (profile === 'control' ? 3001 : 3000)), '127.0.0.1');

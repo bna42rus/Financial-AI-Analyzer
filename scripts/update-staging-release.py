@@ -78,6 +78,48 @@ def settings():
     return values
 
 
+WEBHOOK_PATH = '/api/payments/yookassa/webhook'
+WEBHOOK_URL = 'https://test.cashneuro.ru' + WEBHOOK_PATH
+WEBHOOK_START = b'# BEGIN CASHNEURO STAGING PAYMENT WEBHOOK'
+WEBHOOK_END = b'# END CASHNEURO STAGING PAYMENT WEBHOOK'
+
+
+def configure_payment_webhook(caddyfile, config):
+    # A site address with an exact path is routed ahead of the host-only SPA
+    # block. Its own POST handler never enters the SPA's Basic Auth or rewrites.
+    blocks = caddyfile.count(WEBHOOK_START), caddyfile.count(WEBHOOK_END)
+    if blocks == (1, 1) and caddyfile.index(WEBHOOK_START) < caddyfile.index(WEBHOOK_END):
+        start = caddyfile.index(WEBHOOK_START)
+        end = caddyfile.index(WEBHOOK_END) + len(WEBHOOK_END)
+        caddyfile = caddyfile[:start] + caddyfile[end:].lstrip(b'\r\n')
+    elif blocks != (0, 0):
+        raise m.InstallationError('PAYMENT_WEBHOOK_CONFIG_CHANGED')
+    if not any(config.get(flag) == '1' for flag in ('YOOKASSA_ACCESS_TEST_ENABLED', 'YOOKASSA_TEST_ENABLED')):
+        return caddyfile, False
+    port = config.get('PORT', '3000')
+    if not port.isascii() or not port.isdecimal() or not 1 <= int(port) <= 65535:
+        raise m.InstallationError('PAYMENT_WEBHOOK_PORT_INVALID')
+    block = f"""test.cashneuro.ru{WEBHOOK_PATH} {{
+    @notification method POST
+    route {{
+        reverse_proxy @notification 127.0.0.1:{port}
+        respond 405
+    }}
+}}""".encode()
+    return caddyfile.rstrip() + b'\n\n' + WEBHOOK_START + b'\n' + block + b'\n' + WEBHOOK_END + b'\n', True
+
+
+def check_payment_webhook():
+    payload = {'type': 'notification', 'event': 'payment.succeeded',
+               'object': {'id': '00000000-0000-0000-0000-000000000000'}}
+    # Check the public route locally with the real host and TLS certificate.
+    result = m.run(['curl', '--fail', '--silent', '--show-error', '--max-time', '5',
+                    '--noproxy', '*', '--resolve', 'test.cashneuro.ru:443:127.0.0.1',
+                    '-H', 'Content-Type: application/json', '--data-binary', json.dumps(payload), WEBHOOK_URL])
+    if json.loads(result) != {'status': 'ok'}:
+        raise m.InstallationError('PAYMENT_WEBHOOK_ROUTE_NOT_HEALTHY')
+
+
 def validate_origin(value):
     url = urlsplit(value)
     if url.scheme != 'https' or url.hostname != 'test.cashneuro.ru' or url.port or url.username or url.password or url.query or url.fragment or url.path not in ('', '/', '/api', '/api/'):
@@ -387,6 +429,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regclass('identity.account_deletion') IS NOT NULL", '0046_account_deletion.sql'),
         ("SELECT to_regclass('control.display_preferences') IS NOT NULL", '0047_admin_workspace.sql'),
         ("SELECT to_regclass('commerce.customer_allowance_override') IS NOT NULL", '0048_customer_allowance.sql'),
+        ("SELECT to_regprocedure('commerce.extend_customer_allowance(text,timestamptz,timestamptz)') IS NOT NULL", '0049_manual_allowance_extension.sql'),
+        ("SELECT to_regprocedure('commerce.yookassa_payment_target(uuid)') IS NOT NULL", '0050_yookassa_webhook.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
@@ -410,6 +454,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     next_caddy = original.replace(old_root.encode(), str(new_root).encode())
     if old_admin:
         next_caddy = next_caddy.replace(old_admin.encode(), str(release / 'apps/admin/dist').encode())
+    next_caddy, payment_webhook = configure_payment_webhook(next_caddy, config)
     m.private_write(candidate, next_caddy)
     m.run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
     rollback = 'sudo /usr/bin/python3 ' + shlex.quote(str(release / 'scripts/update-staging-release.py')) + ' --rollback ' + shlex.quote(str(backup))
@@ -462,6 +507,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         m.run(['systemctl', 'daemon-reload'])
         m.run(['systemctl', 'restart', m.UNIT])
         wait_release_health(release, keep_ai_paused)
+        if payment_webhook:
+            check_payment_webhook()
         if metadata['workerManaged']:
             m.run(['systemctl', 'enable', WORKER])
             m.run(['systemctl', 'restart', WORKER])
@@ -475,6 +522,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         m.atomic_replace(m.CADDY, candidate.read_bytes(), stat.S_IMODE(info.st_mode), info.st_uid, info.st_gid)
         m.run(['systemctl', 'reload', 'caddy'])
         wait_release_health(release, keep_ai_paused)
+        if payment_webhook:
+            check_payment_webhook()
         active_caddy = json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty']))
         actual = m.frontend_root(active_caddy)
         if actual != str(new_root) or full_staging and m.frontend_root(active_caddy, 'admin.test.cashneuro.ru') != str(release / 'apps/admin/dist'):
@@ -484,7 +533,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         restore(backup)
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
-    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_active_preserved' if preserve_active_ai else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_active_preserved' if preserve_active_ai else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), **({'paymentWebhook': WEBHOOK_URL} if payment_webhook else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
 
 
 def wait_release_health(release, keep_ai_paused):
