@@ -113,6 +113,6 @@
 @media(max-width:760px){.entryPage{--workspace-gutter:16px}}
 
 .accountWarning button{display:inline-flex;font:inherit}
-.accountDeletionChoice{display:flex;align-items:center;gap:10px;margin-block:8px}
-.accountDeletionChoice input[type=checkbox]{margin:0;flex:none}
+.accountDeletionChoice{display:flex;align-items:flex-start;gap:10px;margin-block:8px}
+.accountDeletionChoice input[type=checkbox]{margin:.22em 0 0;flex:none}
 .accountDeletionChoice label{margin:0;line-height:1.45}
