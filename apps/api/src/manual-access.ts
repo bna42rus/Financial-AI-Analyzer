@@ -120,7 +120,8 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await db.query('INSERT INTO commerce.manual_grant(id,email,term,access_type,quota_policy,reason,creator,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[grantId,address,t,b.accessType,q,reason,actorId,now]);
   await newInvitation(db,grantId,address,lifetime!,seal,now);
  }else if(next){
-  const extendingAllowance=!b.quota&&before?.accessEnd&&next.accessEnd&&Date.parse(next.accessEnd)>Date.parse(before.accessEnd)&&(mode==='extend'||mode==='set_end');
+  const extraMs=Date.parse(next.accessEnd??'')-Date.parse(before?.accessEnd??'');
+  const extendingAllowance=!b.quota&&previousMode==='continuous'&&(mode==='extend'||mode==='set_end')&&extraMs>0&&extraMs<=31*86400000;
   if(extendingAllowance){
    const saved=(await db.query('SELECT commerce.extend_customer_allowance($1,$2,$3) AS saved',[userId,now,next.accessEnd])).rows[0]?.saved;
    if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');

@@ -1,4 +1,4 @@
-import {assertCustomerAiBudget} from './customer-ai-budget.ts';
+import {assertCustomerAiBudget,unitsPerMonth} from './customer-ai-budget.ts';
 import type { PoolClient } from 'pg';
 import { object } from '../../../packages/finance-core/src/model.ts';
 import { baseMonthlyCost, rubAmount, tokenPrice, tokenCost, CostError } from '../../../packages/analyzer/src/cost.ts';
@@ -46,6 +46,11 @@ export async function reserveCost(db: PoolClient, identity: CostIdentity, policy
    await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",['customer-ai-budget:'+identity.userId]);
    const {budget_minor:cap}=(await db.query("SELECT quota_policy->>'budgetMinor' AS budget_minor FROM commerce.access_cycle WHERE user_id=$1",[identity.userId])).rows[0]??{};
    if(cap!==null&&cap!==undefined&&BigInt(budget.spent_atoms)+BigInt(budget.reserved_atoms)+amount>BigInt(cap)*10_000_000n)throw new CostError('AI_USER_COST_EXHAUSTED');
+   // Retain the internal monthly money ceiling for legacy usage. Purchased
+   // units can extend it, but cannot erase spending already billed this month.
+   const bought=(await db.query<{units:string}>("SELECT COALESCE(SUM(units),0)::text AS units FROM commerce.ai_topup_order WHERE user_id=$1 AND status='paid'",[identity.userId])).rows[0]!;
+   const paidCost=BigInt(bought.units)*(baseMonthlyCost/BigInt(unitsPerMonth));
+   if(BigInt(budget.spent_atoms)+BigInt(budget.reserved_atoms)+amount>BigInt(budget.limit_atoms)+paidCost)throw new CostError('AI_USER_COST_EXHAUSTED');
    await assertCustomerAiBudget(db,identity.userId,amount);
   }
   if (BigInt(project.spent_atoms) + BigInt(project.reserved_atoms) + amount > BigInt(project.limit_atoms)) throw new CostError('AI_PROJECT_COST_EXHAUSTED');

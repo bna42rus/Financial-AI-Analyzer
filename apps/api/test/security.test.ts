@@ -890,6 +890,21 @@ test('admin workspace keeps display preference, account suspension, and expiry i
 
 });
 
+test('a short manual access extension keeps the current monthly allowance through the new end',async()=>{
+ const a=await manualRegistered({kind:'calendar_months',count:1});
+ await pg.owner.query('DELETE FROM commerce.customer_allowance_override WHERE user_id=$1',[a.userId]);
+ const before=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;
+ assert.equal(before.manual,false);
+ const extend=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:5},reason:'Short extension'});
+ const result=await a.admin.b.post('/control/manual-access',extend);
+ assert.equal(result.statusCode,200,result.body);
+ const end=(await a.b.get('/session')).json().accessEnd;
+ const after=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;
+ assert.ok(Date.parse(end)>Date.parse(before.resetAt));
+ assert.equal(after.resetAt,end);
+ assert.equal(after.remaining,before.remaining);
+});
+
 test('catalog creation and pack unit edits preserve existing top-up snapshots and record only changes',async()=>{
  const a=await manualRegistered(),admin=a.admin.b;
  const plan=await admin.post('/control/commerce-catalog',{kind:'plan',durationKind:'calendar_months',count:2,aiQuota:5000,priceMinor:'75000',enabled:true});

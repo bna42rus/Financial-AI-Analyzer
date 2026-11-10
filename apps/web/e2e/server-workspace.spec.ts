@@ -919,3 +919,19 @@ test('the homepage and fresh access form ignore an existing application until ma
  await page.goto(base+'#checkout?payment='+orderId);
  await expect(page.getByRole('heading',{name:'Оплатите доступ'})).toBeVisible();
 });
+
+test('opening and closing a connected dialog never shifts the page shell',async({page})=>{
+ await setup(page);
+ const shell=page.locator('header').first();
+ const before=await shell.boundingBox();
+ expect(before).not.toBeNull();
+ await page.getByRole('button',{name:'Аккаунт',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Аккаунт',exact:true})).toBeVisible();
+ const during=await shell.boundingBox();
+ expect(during).not.toBeNull();
+ expect(Math.abs(during!.x-before!.x)).toBeLessThan(1);
+ await page.getByRole('dialog',{name:'Аккаунт',exact:true}).getByRole('button',{name:'Готово'}).click();
+ await expect(page.getByRole('dialog',{name:'Аккаунт',exact:true})).toHaveCount(0);
+ const after=await shell.boundingBox();
+ expect(Math.abs(after!.x-before!.x)).toBeLessThan(1);
+});

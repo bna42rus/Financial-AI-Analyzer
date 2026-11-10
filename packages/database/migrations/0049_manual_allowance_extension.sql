@@ -29,6 +29,7 @@ BEGIN
   WHERE a.user_id=ac.user_id AND a.data->'after'->>'revision'=ac.revision::text
    AND a.data->>'mode' IN ('extend','set_end')
    AND (a.data->'before'->>'accessEnd')::timestamptz<ac.access_end
+   AND ac.access_end<=(a.data->'before'->>'accessEnd')::timestamptz+interval '31 days'
  )
  LOOP
   PERFORM commerce.extend_customer_allowance(c.user_id,at_time,c.access_end);

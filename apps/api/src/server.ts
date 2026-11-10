@@ -416,17 +416,18 @@ export async function createServer(config: Config) {
   };
   if(webhook)fastify.post('/api/payments/yookassa/webhook',{bodyLimit:32*1024},async(request,reply)=>{
     if(request.headers['content-type']?.split(';')[0]!=='application/json')return reply.code(415).send({code:'INVALID_NOTIFICATION'});
-    const db=await config.pool.connect();
+    let db:PoolClient|undefined;
     try{
+      db=await config.pool.connect();
       await db.query('BEGIN');
       await db.query('SELECT pg_advisory_xact_lock(92042)');
       await webhook.handleYooKassaNotification(db,request.body,config.accessPayments,config.testPayments,seal);
       await db.query('COMMIT');
       return reply.code(200).send({status:'ok'});
     }catch(error){
-      await db.query('ROLLBACK');
+      await db?.query('ROLLBACK').catch(()=>{});
       return reply.code(error instanceof HttpError?error.status:503).send({code:'PAYMENT_NOTIFICATION_FAILED'});
-    }finally{db.release();}
+    }finally{db?.release();}
   });
   fastify.route({method:['GET','POST','OPTIONS'],url:'/*',handler:requestHandler});
   if(finance)for(const url of ['/finance/preview','/finance/review-command'])fastify.route({method:['GET','POST','OPTIONS'],url,bodyLimit:256*1024,handler:requestHandler});
