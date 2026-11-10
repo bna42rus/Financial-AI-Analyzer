@@ -31,7 +31,7 @@ test('owner proof mail names its exact privileged setup purpose and never preten
   const message = renderMail('owner_email_verification', { email: 'owner@example.test', profile: 'control', code },
     { financeOrigin: 'https://test.cashneuro.ru', controlOrigin: 'https://admin.test.cashneuro.ru', adminRecipient: 'owner@example.test' }, new Date().toISOString());
   assert.equal(message.to, 'owner@example.test');
-  assert.match(message.subject, /первого администратора Staging/);
+  assert.match(message.subject, /создание администратора/);
   assert.match(message.text, /owner:complete/); assert.match(message.text, /15 минут/);
   assert.match(message.text, /TOTP/); assert.match(message.text, /Пароль вы выбираете самостоятельно/);
   assert.ok(message.text.includes(code));
