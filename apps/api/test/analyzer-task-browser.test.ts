@@ -70,7 +70,7 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
   async function count(n: number) { await expect.poll(async () => (await messages()).length).toBe(n); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeDisabled(); }
   async function idle() { await expect(page.getByRole('button', { name: 'Фильтры', exact: true })).toBeEnabled(); }
   try {
-    await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Продолжить', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
+    await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Войти', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
     await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
     await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();
