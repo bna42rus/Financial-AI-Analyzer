@@ -5,8 +5,8 @@ import type { Transport } from './mail-worker.ts';
 import type { Message } from './mail-templates.ts';
 
 export type PostboxConfig = { sender: string; username: string; password: string;
-  environment: 'staging'; recipients: string[] };
-const address = (value: string) => /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}$/.test(value) && value.length <= 254;
+  environment: 'staging' };
+export const postboxAddress = (value: string) => /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?\.[A-Za-z]{2,63}$/.test(value) && value.length <= 254;
 const helper = fileURLToPath(new URL('./postbox-smtp.py', import.meta.url));
 
 /** A timeout/failed bridge may occur after SMTP acceptance; never blindly retry. */
@@ -35,13 +35,10 @@ export function smtpBridge(payload: Record<string, string>): Promise<{ acceptanc
 
 export function postboxTransport(config: PostboxConfig, bridge: typeof smtpBridge = smtpBridge): Transport {
   if (config.environment !== 'staging' || config.sender !== 'notifications@cashneuro.ru' ||
-    !config.username || config.username.length > 256 || !config.password || config.password.length > 4096 ||
-    !Array.isArray(config.recipients) || config.recipients.length < 1 || config.recipients.length > 5 ||
-    config.recipients.some(value => !address(value))) throw new Error('POSTBOX_CONFIGURATION_DENIED');
-  const recipients = new Set(config.recipients.map(value => value.toLowerCase()));
+    !config.username || config.username.length > 256 || !config.password || config.password.length > 4096) throw new Error('POSTBOX_CONFIGURATION_DENIED');
   return { idempotent: false, async deliver(id: string, message: Message) {
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(id) ||
-      !address(message.to) || !recipients.has(message.to.toLowerCase()) ||
+      !postboxAddress(message.to) ||
       typeof message.subject !== 'string' || /[\r\n]/.test(message.subject) || message.subject.length > 500 ||
       typeof message.text !== 'string' || Buffer.byteLength(message.text) > 65536 ||
       (message.html !== undefined && (typeof message.html !== 'string' || Buffer.byteLength(message.html) > 65536))) throw new DeliveryFailure('REJECTED');

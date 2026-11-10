@@ -23,6 +23,7 @@ export async function accountDeletion(db:PoolClient,owner:Owner,step:'status'|'s
  };
  if(step==='status')return publicStatus();
  if(step==='cancel'){
+  if(current?.status==='pending')await db.query('SELECT commerce.record_deletion_withdrawal($1)',[current.id]);
   await db.query('DELETE FROM identity.account_deletion WHERE user_id=$1',[owner.id]);
   return {status:'none'};
  }

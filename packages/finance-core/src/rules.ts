@@ -4,13 +4,13 @@ import {effective,facet,object,choice,uuid,kinds} from './model.ts';
 import type {Operation,Account,Category,Role,Kind} from './model.ts';
 import {parsePersistedMinor} from './money.ts';
 import {safeText} from '../../privacy/src/text.ts';
-export type Rule={id:string;name:string;enabled:boolean;priority:number;conditions:{merchantEquals?:string;merchantContains?:string;descriptionContains?:string;accountId?:string;bankId?:string;counterpartyId?:string;counterpartyBankIdentity?:true;direction?:'in'|'out';kind?:Kind;amountFromMinor?:string;amountThroughMinor?:string;currency?:'RUB'};assignments:{role?:Role;kind?:Kind;categoryId?:string|null;subcategoryId?:string|null;merchant?:string;counterpartyId?:string|null;analyticsOverride?:'default'|'include'|'exclude'}};
+export type Rule={id:string;name:string;enabled:boolean;priority:number;conditions:{merchantEquals?:string;merchantContains?:string;descriptionContains?:string;accountId?:string;bankId?:string;counterpartyId?:string;bankCounterpartyId?:string;counterpartyBankIdentity?:true;direction?:'in'|'out';kind?:Kind;amountFromMinor?:string;amountThroughMinor?:string;currency?:'RUB'};assignments:{role?:Role;kind?:Kind;categoryId?:string|null;subcategoryId?:string|null;merchant?:string;counterpartyId?:string|null;analyticsOverride?:'default'|'include'|'exclude'}};
 export function validateRule(value:unknown):Omit<Rule,'id'> {
- const r=object(value,['name','enabled','priority','conditions','assignments']),c=object(r.conditions,['merchantEquals','merchantContains','descriptionContains','accountId','bankId','counterpartyId','counterpartyBankIdentity','direction','kind','amountFromMinor','amountThroughMinor','currency']),a=object(r.assignments,['role','kind','categoryId','subcategoryId','merchant','counterpartyId','analyticsOverride']);
+ const r=object(value,['name','enabled','priority','conditions','assignments']),c=object(r.conditions,['merchantEquals','merchantContains','descriptionContains','accountId','bankId','counterpartyId','bankCounterpartyId','counterpartyBankIdentity','direction','kind','amountFromMinor','amountThroughMinor','currency']),a=object(r.assignments,['role','kind','categoryId','subcategoryId','merchant','counterpartyId','analyticsOverride']);
  if(Object.keys(c).length===0||Object.keys(a).length===0||typeof r.enabled!=='boolean'||typeof r.priority!=='number'||!Number.isInteger(r.priority)||Math.abs(r.priority)>10000)throw new TypeError('INVALID_RULE');
  const conditions:Rule['conditions']={},assignments:Rule['assignments']={};
  for(const k of ['merchantEquals','merchantContains','descriptionContains','bankId']as const)if(k in c){conditions[k]=safeText(c[k],160);if(!conditions[k])throw new TypeError('EMPTY_CONDITION');}
- for(const k of ['accountId','counterpartyId']as const)if(k in c)conditions[k]=uuid(c[k]);
+ for(const k of ['accountId','counterpartyId','bankCounterpartyId']as const)if(k in c)conditions[k]=uuid(c[k]);
  if('counterpartyBankIdentity'in c){if(c.counterpartyBankIdentity!==true||typeof a.counterpartyId!=='string')throw new TypeError('INVALID_COUNTERPARTY_CONDITION');conditions.counterpartyBankIdentity=true;}
  if('direction'in c)conditions.direction=choice(c.direction,['in','out']);if('kind'in c)conditions.kind=choice(c.kind,kinds);if('currency'in c)conditions.currency=choice(c.currency,['RUB']);
  for(const k of ['amountFromMinor','amountThroughMinor']as const)if(k in c){parsePersistedMinor(c[k]);conditions[k]=c[k] as string;}
@@ -19,6 +19,16 @@ export function validateRule(value:unknown):Omit<Rule,'id'> {
  for(const k of ['categoryId','subcategoryId','counterpartyId']as const)if(k in a)assignments[k]=a[k]===null?null:uuid(a[k]);
  if('merchant'in a)assignments.merchant=safeText(a.merchant,160);if('analyticsOverride'in a)assignments.analyticsOverride=choice(a.analyticsOverride,['default','include','exclude']);
  return {name:safeText(r.name,160),enabled:r.enabled,priority:r.priority,conditions,assignments};
+}
+/** Review decisions use the bank's stable, tenant-scoped identity for transfers. */
+export function reviewRuleConditions(operation:Operation):Rule['conditions']|undefined{
+ const fact=effective(operation),kind=operation.semantics.kind.value,amount=BigInt(fact.amountMinor);
+ if(amount===0n)return;
+ const direction=amount<0n?'out':'in';
+ const accountId=fact.accountId;
+ if((kind==='transfer_in'||kind==='transfer_out')&&operation.bankCounterpartyId)return {bankCounterpartyId:operation.bankCounterpartyId,accountId,direction,kind};
+ const merchant=operation.semantics.merchant.value.trim();
+ if(kind==='purchase'&&amount<0n&&merchant)return {merchantEquals:merchant,accountId,direction,kind};
 }
 /** The same closed predicate is used for future imports and explicit historical selection. */
 export function ruleMatches(operation:Operation,account:Account,rule:Rule):boolean {
@@ -40,7 +50,7 @@ export function ruleMatches(operation:Operation,account:Account,rule:Rule):boole
   return actual.matched&&expected.matched&&!actual.conflict&&!expected.conflict&&text(expected.name)===text(value)&&!!actual.brand&&actual.brand===expected.brand&&merchantKey(actual.name)===merchantKey(value);
  };
  const descriptionMatches=(value:string)=>text(f.description).includes(text(value))||['вендинг','vending'].includes(text(value))&&merchantKey(f.description).includes('vending');
- return (!c.merchantEquals||sameMerchant(c.merchantEquals))&&(!c.merchantContains||merchantContains(c.merchantContains)||text(c.merchantContains)==='таймвэб'&&recognizeMerchant(semanticMerchant).brand==='TimeWeb')&&(!c.descriptionContains||descriptionMatches(c.descriptionContains))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.counterpartyBankIdentity||!!operation.bankCounterpartyId&&operation.bankCounterpartyId===rule.assignments.counterpartyId)&&(!c.kind||c.kind===operation.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
+ return (!c.merchantEquals||sameMerchant(c.merchantEquals))&&(!c.merchantContains||merchantContains(c.merchantContains)||text(c.merchantContains)==='таймвэб'&&recognizeMerchant(semanticMerchant).brand==='TimeWeb')&&(!c.descriptionContains||descriptionMatches(c.descriptionContains))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.bankCounterpartyId||c.bankCounterpartyId===operation.bankCounterpartyId)&&(!c.counterpartyBankIdentity||!!operation.bankCounterpartyId&&operation.bankCounterpartyId===rule.assignments.counterpartyId)&&(!c.kind||c.kind===operation.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
 }
 /** Updating a rule never calls this on old operations; history needs a separate preview command. */
 export function applyRules(operation:Operation,account:Account,rules:Rule[],onlyRuleId?:string,categories?:readonly Category[]):Operation {

@@ -30,7 +30,7 @@ export async function resendInvitation(db:PoolClient,request:FastifyRequest,acto
  else await db.query('SELECT id FROM commerce.manual_grant WHERE id=$1 FOR UPDATE',[ref.manual_grant_id]);
  const invite=(await db.query(`SELECT i.email,i.sealed_token,i.expires_at FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE i.id=$1 AND i.state='active' AND i.expires_at>clock_timestamp() AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp())) FOR UPDATE OF i`,[invitationId])).rows[0];
  if(!invite)throw new HttpError(409,'INVITATION_UNAVAILABLE');
- if((await db.query("SELECT 1 FROM mail.delivery WHERE kind='invitation' AND subject_id=$1 AND state='queued'",[invitationId])).rowCount)throw new HttpError(409,'DELIVERY_UNAVAILABLE');
+ if((await db.query("SELECT 1 FROM mail.delivery WHERE kind IN ('invitation','billing_invitation') AND subject_id=$1 AND state='queued'",[invitationId])).rowCount)throw new HttpError(409,'DELIVERY_UNAVAILABLE');
  const retryAfterSeconds=await reserveMailRequest(db,seal,'control','invitation-resend',invite.email);
  const delivery=await outbox(db,'access',seal,'invitation',{email:invite.email,token:seal.open(invite.sealed_token),expiresAt:invite.expires_at.toISOString()},{subjectId:invitationId,expiresAt:invite.expires_at.toISOString()});
  await db.query('INSERT INTO mail.resend_audit(action_id,actor_id,delivery_id,reason) VALUES($1,$2,$3,$4)',[id,actorId,delivery,reason]);

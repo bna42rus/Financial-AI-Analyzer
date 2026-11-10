@@ -34,7 +34,7 @@ import {allocationOrder,allocationParents} from '../../../packages/finance-core/
 import {reconcile,aggregate} from '../../../packages/finance-core/src/graph.ts';
 import type {Filter} from '../../../packages/finance-core/src/graph.ts';
 import {starterCategories,isMarketplaceName} from '../../../packages/finance-core/src/starter.ts';
-import {applyRules,ruleMatches,validateRule} from '../../../packages/finance-core/src/rules.ts';
+import {reviewRuleConditions,applyRules,ruleMatches,validateRule} from '../../../packages/finance-core/src/rules.ts';
 import type {Rule} from '../../../packages/finance-core/src/rules.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
 import {HttpError,LinkEditError} from './types.ts';
@@ -124,7 +124,7 @@ export async function financeView(db:PoolClient,userId:string,filter:Filter={},c
   const first=operationsById.get(pair.leftId)?.bankCounterpartyId;
   if(first&&first===operationsById.get(pair.rightId)?.bankCounterpartyId)ambiguousRepeats.add(pair.rightId);
  }
- return {categoryBindings:graph.categoryBindings,operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId&&(p.state!=='discovered'||!partyIdentityIds.has(p.id)||(proposalIds.get(p.id)?.filter(id=>!ambiguousRepeats.has(id)).length??0)>=2)).map(p=>({...p,hasBankIdentity:partyIdentityIds.has(p.id),...(p.state==='registered'?{}:{proposalCandidates:(proposalIds.get(p.id)??[]).slice(0,1000)})})),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,displayName:operationDisplayName(o,{counterparties:parties}),classification:o.semantics,comment:o.comment,description:o.source.description,postedDate:Object.hasOwn(o.corrections,'postedDate')?o.corrections.postedDate!:o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
+ return {categoryBindings:graph.categoryBindings,operationAliases:tombstones,duplicateCandidates,generation:state.generation,revision:state.revision,loanMode:graph.loanMode,keyVersion:state.key_version,interfaceEpoch:state.interface_epoch,accounts:graph.accounts.filter(a=>!a.mergedIntoId),mergedAccounts:graph.accounts.filter(a=>a.mergedIntoId),accountSources:compact?[]:sourceMap,accountAliases:compact?[]:aliases,categories:graph.categories,counterparties:parties.filter(p=>!p.mergedIntoId&&(p.state!=='discovered'||!partyIdentityIds.has(p.id)||(proposalIds.get(p.id)?.filter(id=>!ambiguousRepeats.has(id)).length??0)>=2)).map(p=>({...p,hasBankIdentity:partyIdentityIds.has(p.id),...(p.state==='registered'?{}:{proposalCandidates:(proposalIds.get(p.id)??[]).slice(0,1000)})})),mergedCounterparties:parties.filter(p=>p.mergedIntoId),counterpartySources:compact?[]:counterpartySources,counterpartyAliases:compact?[]:counterpartyAliases,categoryOperations:compact?[]:categoryOperations,categoryComponents:compact?[]:categoryComponents,rules,operationCount:projection.operations.length,operations:(compact?projection.operations.slice(0,100):projection.operations).map(p=>{const o=operationsById.get(p.id)!;return {...p,displayName:operationDisplayName(o,{counterparties:parties}),classification:o.semantics,canRememberTransfer:!!reviewRuleConditions(o)?.bankCounterpartyId,comment:o.comment,description:o.source.description,postedDate:Object.hasOwn(o.corrections,'postedDate')?o.corrections.postedDate!:o.source.postedDate,bankCategory:o.source.bankCategory,reviewStatus:reviewStatus(p.reviewReasons,o.semantics)};}),links:projection.links,summary:compact?{...summary,operationIds:summary.operationIds.slice(0,100),attentionIds:summary.attentionIds.slice(0,100),operationCount:summary.operationIds.length,attentionCount:summary.attentionIds.length}:summary};
 }
 export function parseFilter(value:unknown):Filter{
  const r=object(value,['from','through','accountIds','categoryIds','includeExcluded','compact']),f:Filter={};
@@ -291,13 +291,15 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
   for(const item of patches){delete item.patch.analyticsOverride;if(Object.keys(item.patch).length)await applyBase(db,userId,{kind:'operation',id:item.id,patch:item.patch},currentRevision,loaded);}
   let ruleName:string|undefined;
   if(intent.rememberRule){
-   const anchor=loaded.graph.operations.find(o=>o.id===intent.reviewScope?.anchorId),merchant=anchor?.semantics.merchant.value.trim();
-   if(!review?.liveQueue||!anchor||!merchant||anchor.semantics.kind.value!=='purchase'||BigInt(effective(anchor).amountMinor)>=0n)throw new HttpError(409,'REVIEW_GROUP_CHANGED');
-   const conditions={merchantEquals:merchant,accountId:effective(anchor).accountId,direction:'out' as const,kind:'purchase' as const},assignments=intent.patch as Rule['assignments'];
+   const anchor=loaded.graph.operations.find(o=>o.id===intent.reviewScope?.anchorId);
+   const conditions=anchor&&reviewRuleConditions(anchor);
+   if(!review?.liveQueue||!anchor||!conditions)throw new HttpError(409,'REVIEW_GROUP_CHANGED');
+   const label=conditions.bankCounterpartyId?(loaded.parties.find(p=>p.id===conditions.bankCounterpartyId)?.name||anchor.semantics.merchant.value||'По банковскому совпадению'):conditions.merchantEquals!;
+   const assignments=intent.patch as Rule['assignments'];
    const matching=loaded.rules.filter(r=>r.enabled&&stableJSON(r.conditions)===stableJSON(conditions));
    if(matching.some(r=>Object.entries(assignments).some(([key,value])=>key in r.assignments&&stableJSON((r.assignments as Record<string,unknown>)[key])!==stableJSON(value))))throw new HttpError(409,'REVIEW_RULE_CONFLICT');
    if(!matching.some(r=>stableJSON(r.assignments)===stableJSON(assignments))){
-    ruleName=safeText('Правило: '+merchant,160);
+    ruleName=safeText((conditions.bankCounterpartyId?'Перевод · ':'Правило: ')+label,160);
     const patch={name:ruleName,enabled:true,priority:0,conditions,assignments};
     await applyBase(db,userId,{kind:'rule',id:intent.id,create:true,patch},currentRevision,loaded);
    }
@@ -395,6 +397,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
   const rule=p as unknown as Omit<Rule,'id'>,linked=parties.find(party=>party.autoRuleId===id&&!party.mergedIntoId);
   if(linked&&rule.assignments.counterpartyId!==linked.id)throw new HttpError(409,'COUNTERPARTY_RULE_TARGET');
   if(rule.conditions.counterpartyBankIdentity&&(!rule.assignments.counterpartyId||!parties.some(party=>party.id===rule.assignments.counterpartyId&&party.state==='registered'&&!party.mergedIntoId)))throw new HttpError(409,'RULE_NEEDS_SETUP');
+  if(rule.conditions.bankCounterpartyId&&!parties.some(party=>party.id===rule.conditions.bankCounterpartyId&&!party.mergedIntoId))throw new HttpError(409,'RULE_NEEDS_SETUP');
   ownRefs(graph,parties,rule.conditions as Record<string,unknown>);ownRefs(graph,parties,rule.assignments as Record<string,unknown>);
   categoryCompatible(graph,rule.assignments.role??'unresolved',rule.assignments.categoryId??null,rule.assignments.subcategoryId??null);Object.assign(values,p,{dependency_status:'ready'});
   if(intent.create)await db.query('INSERT INTO finance.rule(user_id,id,name,enabled,priority,conditions,assignments) VALUES($1,$2,$3,$4,$5,$6,$7)',[userId,id,p.name,p.enabled,p.priority,JSON.stringify(p.conditions),JSON.stringify(p.assignments)]);

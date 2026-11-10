@@ -8,6 +8,7 @@ full_staging=false
 shift 2
 while (($#)); do
   case "$1" in
+    --restore-default-tariffs) extra+=("$1"); shift ;;
     --full-staging) full_staging=true; extra+=("$1"); shift ;;
     --resume-ai) resume_ai=true; extra+=("$1"); shift ;;
     --monthly-ai-budget=100) extra+=("$1"); shift ;;

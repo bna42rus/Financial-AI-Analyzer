@@ -49,7 +49,7 @@ export function demoGraph(now=new Date()):Graph{
   if(!transfer&&!person&&!needsReview)semantics.category=facet(id(rent?20:salary?18:cashback?19:10+group));
   if(rent)semantics.counterparty=facet(demoParties.landlord,'user',true);
   const date=dayAt(today,Math.floor(i*152/573));
-  return {id:id(1000+i),...(person?{bankCounterpartyId:demoParties.proposal}:{}),source:{accountId:accounts[transfer?2:i%3===0?1:0]!.id,operationDate:{precision:'day',date},postedDate:null,amountMinor:String(amount),currency:'RUB',sourceKind:kind,merchantText:name,description:transfer?'Перевод между своими счетами':name,bankCategory:'',bankRefHmac:null,versions:{}},corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:needsReview?['user_requested_review']:[]};
+  return {id:id(1000+i),...(person?{bankCounterpartyId:demoParties.proposal}:{}),source:{accountId:accounts[transfer?2:i%3===0?1:0]!.id,operationDate:{precision:'day',date},postedDate:null,amountMinor:String(amount),currency:'RUB',sourceKind:kind,merchantText:name,description:transfer?'Перевод между своими счетами':name,bankCategory:'',bankRefHmac:null,versions:{}},corrections:{},semantics,comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:needsReview?['low_category_confidence']:[]};
  });
  return {accounts:structuredClone(accounts),categories:structuredClone(categories),operations,components:[],links:[],loanMode:'cashflow'};
 }

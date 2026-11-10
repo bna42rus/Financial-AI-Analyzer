@@ -18,7 +18,7 @@ export async function assertMailRole(config:WorkerConfig){
  if(config.postbox&&config.environment!=='staging')throw new Error('MAIL_CONFIGURATION_DENIED');
  try{
   for(const origin of [config.financeOrigin,config.controlOrigin]){const u=new URL(origin);if(u.origin!==origin||!['http:','https:'].includes(u.protocol))throw new Error();if(config.environment==='staging'&&(u.protocol!=='https:'||!(u.hostname==='test.cashneuro.ru'||u.hostname.endsWith('.test.cashneuro.ru'))))throw new Error();}
-  if(config.postbox){if(!config.postbox.recipients.some(r=>r.toLowerCase()===config.adminRecipient.toLowerCase()))throw new Error();}
+  if(config.postbox){const {postboxAddress}=await import('./postbox.ts');if(!postboxAddress(config.adminRecipient))throw new Error();}
   else if(!/^[^\s@]+@example\.test$/.test(config.adminRecipient))throw new Error();
  }catch{throw new Error('MAIL_CONFIGURATION_DENIED');}
  const role=(await config.pool.query('SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user')).rows[0];

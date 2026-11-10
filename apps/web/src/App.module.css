@@ -123,3 +123,5 @@
 a.button,a.primaryButton { text-decoration:none; }
 
 .categoryField > :global([data-select-trigger]) { margin-top:5px; height:41px; }
+
+:global(body:has([data-cashneuro-dialog='content'] [role='alert'])) :global([data-workspace-error]){display:none}

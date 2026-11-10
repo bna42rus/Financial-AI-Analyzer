@@ -1,30 +1,68 @@
-import {SearchField,foldSearch} from '../../web/src/SearchFilter';
+import {Plus} from 'lucide-react';
 import {SelectField} from '../../web/src/SelectField';
 import {useEffect,useState} from 'react';
-import {api} from '../../web/src/server-client';
+import {api,ApiError} from '../../web/src/server-client';
 import {OperationDialog,OperationField} from '../../web/src/OperationDialog';
-import {moneyFromRubles,rublesFromMinor,moneyLabel} from '../../../packages/access/src/model';
+import {catalogDurationLabel,moneyLabel} from '../../../packages/access/src/model';
 import type {Tariff} from '../../../packages/access/src/model';
 import common from '../../web/src/App.module.css';
 import styles from '../../web/src/ServerAccess.module.css';
-type Pack={units:number;priceMinor:number;enabled:boolean};
+import shell from './ServerAdmin.module.css';
+
+type Pack={id:string;units:number;priceMinor:number;enabled:boolean};
 type Catalog={plans:Tariff[];packs:Pack[]};
-type Edit={id?:string;units?:number;price:string;count?:number;durationKind?:Tariff['duration']['kind'];aiQuota?:number;expectedVersion?:number;enabled:boolean};
-export function ServerCommerceCatalog(){
- const [data,setData]=useState<Catalog|null>(null),[draft,setDraft]=useState<Edit|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[query,setQuery]=useState('');
- useEffect(()=>{void api<Catalog>('/control/commerce-catalog').then(setData).catch(e=>setError(e.message));},[]);
- async function save(){if(!draft||busy)return;setError('');let priceMinor:string;try{priceMinor=moneyFromRubles(draft.price);if(BigInt(priceMinor)<100n||BigInt(priceMinor)>1000000n)throw Error();}catch{setError('Введите цену от 1 до 10 000 ₽.');return;}
-  setBusy(true);try{setData(await api<Catalog>('/control/commerce-catalog',{...('id'in draft?{id:draft.id,count:draft.count,durationKind:draft.durationKind,aiQuota:draft.aiQuota,expectedVersion:draft.expectedVersion}:{units:draft.units}),priceMinor,enabled:draft.enabled}));setDraft(null);}catch(e){setError(e instanceof Error?e.message:'Не удалось сохранить тариф.');}finally{setBusy(false);}
+type Draft={kind:'plan'|'pack';original?:Tariff|Pack;price:string;count:string;durationKind:Tariff['duration']['kind'];quota:string;units:string;enabled:boolean};
+type Field='price'|'count'|'quota'|'units'|'form';
+const empty=(kind:Draft['kind']):Draft=>({kind,price:'',count:'',durationKind:'days',quota:'',units:'',enabled:true});
+const fieldByCode:Record<string,Field>={INVALID_TARIFF_PRICE:'price',INVALID_TARIFF_DURATION:'count',INVALID_TARIFF_LIMIT:'quota',INVALID_PACK_UNITS:'units',PACK_UNITS_EXIST:'units'};
+const number=(value:string,min:number,max:number)=>/^\d+$/.test(value)&&Number.isSafeInteger(Number(value))&&Number(value)>=min&&Number(value)<=max;
+const displayPrice=(minor:string|number)=>Number(minor)%100===0?String(Number(minor)/100):'';
+
+export function ServerCommerceCatalog({refresh=0}:{refresh?:number}){
+ const [data,setData]=useState<Catalog|null>(null),[draft,setDraft]=useState<Draft|null>(null),[error,setError]=useState(''),[errors,setErrors]=useState<Partial<Record<Field,string>>>({}),[busy,setBusy]=useState(false);
+ useEffect(()=>{const abort=new AbortController();setError('');void api<Catalog>('/control/commerce-catalog',undefined,abort.signal).then(setData).catch(e=>{if(!abort.signal.aborted)setError(e.message);});return()=>abort.abort();},[refresh]);
+ function edit(next:Draft){setErrors({});setDraft(next);}
+ function update(field:Field,value:string){if(!draft||field==='form'||!/^\d*$/.test(value))return;setErrors(previous=>({...previous,[field]:undefined,form:undefined}));setDraft({...draft,[field]:value.replace(/^0+(?=\d)/,'')});}
+ async function save(){
+  if(!draft||busy)return;
+  const nextErrors:typeof errors={};
+  if(!number(draft.price,1,10000))nextErrors.price='Введите целое число от 1 до 10 000 ₽.';
+  if(draft.kind==='plan'){
+   if(!number(draft.count,1,draft.durationKind==='days'?36500:120))nextErrors.count=draft.durationKind==='days'?'Введите от 1 до 36 500 дней.':'Введите от 1 до 120 месяцев.';
+   if(!number(draft.quota,0,1000000))nextErrors.quota='Введите целое число от 0 до 1 000 000.';
+  }else if(!number(draft.units,1,1000000))nextErrors.units='Введите целое число от 1 до 1 000 000.';
+  setErrors(nextErrors);if(Object.keys(nextErrors).length)return;
+  const old=draft.original;
+  const target=draft.kind==='plan'?{...(old&&'duration'in old?{id:old.id,expectedVersion:old.catalogVersion??0}:{}),count:Number(draft.count),durationKind:draft.durationKind,aiQuota:Number(draft.quota)}:
+   {...(old&&'units'in old?{packId:old.id,expectedUnits:old.units,expectedPriceMinor:old.priceMinor,expectedEnabled:old.enabled}:{}),units:Number(draft.units)};
+  setBusy(true);try{setData(await api<Catalog>('/control/commerce-catalog',{kind:draft.kind,...target,priceMinor:String(Number(draft.price)*100),enabled:draft.enabled}));setDraft(null);}
+  catch(e){setErrors({[e instanceof ApiError?fieldByCode[e.code]??'form':'form']:e instanceof Error?e.message:'Не удалось сохранить изменения.'});}
+  finally{setBusy(false);}
  }
- const matches=(value:string)=>foldSearch(value).includes(foldSearch(query.trim()));
- const plans=data?.plans.filter(t=>matches([t.name,moneyLabel(t.priceMinor),t.aiQuota,t.id].join(' ')));
- const packs=data?.packs.filter(p=>matches([p.units,p.units.toLocaleString('ru-RU'),moneyLabel(String(p.priceMinor))].join(' ')));
- return <><SearchField value={query} onValueChange={setQuery} placeholder="Название тарифа, цена или единицы" aria-label="Поиск тарифов и пакетов"/>{data&&(!plans?.length&&!packs?.length)&&<p>Тарифы и пакеты не найдены.</p>}<div className={styles.layout}><section className={styles.card}><h2>Доступ</h2><p>Изменения сразу видны в каталоге. Оплаченные периоды и сохранённые заказы не изменятся. Для автопродления на новых условиях потребуется подтверждение.</p>{plans?.map(t=><article className={styles.record} key={t.id}><strong>{t.name} · {moneyLabel(t.priceMinor)}</strong><p>{t.active?'Опубликован':'Скрыт'} · {t.aiQuota.toLocaleString('ru-RU')} единиц {t.duration.kind==='days'?'за период':'в месяц'}</p><button className={styles.secondary} onClick={()=>{setError('');setDraft({id:t.id,price:rublesFromMinor(t.priceMinor),count:t.duration.count,durationKind:t.duration.kind,aiQuota:t.aiQuota,expectedVersion:t.catalogVersion??0,enabled:t.active});}}>Изменить</button></article>)}</section>
- <section className={styles.card}><h2>Пакеты Анализатора</h2>{packs?.map(p=><article className={styles.record} key={p.units}><strong>{p.units.toLocaleString('ru-RU')} единиц · {moneyLabel(String(p.priceMinor))}</strong><p>{p.enabled?'Доступен пользователям':'Скрыт'}</p><button className={styles.secondary} onClick={()=>{setError('');setDraft({units:p.units,price:rublesFromMinor(String(p.priceMinor)),enabled:p.enabled});}}>Изменить</button></article>)}</section></div>
- {!draft&&error&&<p className={styles.error} role="alert">{error}</p>}
- {draft&&<OperationDialog narrow title={draft.id?'Настроить тариф':'Настроить пакет'} onClose={()=>{if(!busy)setDraft(null);}} footer={<><button className={common.button} disabled={busy} onClick={()=>setDraft(null)}>Отменить</button><button form="admin-commerce-editor" className={common.primaryButton} disabled={busy} type="submit">Сохранить</button></>}>
-  <form id="admin-commerce-editor" className={styles.renewalBody} onSubmit={e=>{e.preventDefault();void save();}}><OperationField label="Цена, ₽" error={error||undefined}><input inputMode="decimal" value={draft.price} onChange={e=>{setError('');setDraft({...draft,price:e.target.value});}}/></OperationField>
-  {draft.id&&<><OperationField label="Единица срока"><SelectField value={draft.durationKind} onChange={e=>setDraft({...draft,durationKind:e.target.value as Tariff['duration']['kind']})}><option value="days">Дни</option><option value="calendar_months">Месяцы</option></SelectField></OperationField><OperationField label="Срок"><input type="number" min={1} max={draft.durationKind==='days'?31:24} required value={draft.count} onChange={e=>setDraft({...draft,count:Number(e.target.value)})}/></OperationField><OperationField label={draft.durationKind==='days'?'Лимит за период':'Лимит в месяц'}><input type="number" min={0} max={1000000} required value={draft.aiQuota} onChange={e=>setDraft({...draft,aiQuota:Number(e.target.value)})}/></OperationField></>}
-  <label><input type="checkbox" checked={draft.enabled} onChange={e=>setDraft({...draft,enabled:e.target.checked})}/>Показывать пользователям</label></form>
- </OperationDialog>}</>;
+ return <>
+ {error&&<p className={styles.error} role="alert">{error}</p>}
+ {!data&&!error&&<p role="status">Загружаем тарифы…</p>}
+ <div className={styles.layout}>
+  <section className={styles.card}><div className={shell.listHead}><h2>Доступ</h2><button className={styles.primary} onClick={()=>edit(empty('plan'))}><Plus size={16}/>Добавить тариф</button></div>
+  <p>Каталог применяется к новым заказам. Для автопродления на новых условиях потребуется подтверждение.</p>
+  {data?.plans.map(t=><article className={shell.catalogRow} key={t.id}><div><div className={shell.listHead}><strong>{catalogDurationLabel(t.duration)} · {moneyLabel(t.priceMinor)}</strong><span className={shell.badge}>{t.active?'Опубликован':'Скрыт'}</span></div><small>{t.aiQuota.toLocaleString('ru-RU')} единиц {t.duration.kind==='days'?'за период':'в месяц'}</small></div>
+   <button className={styles.secondary} onClick={()=>edit({...empty('plan'),original:t,price:displayPrice(t.priceMinor),count:String(t.duration.count),durationKind:t.duration.kind,quota:String(t.aiQuota),enabled:t.active})}>Изменить</button></article>)}</section>
+  <section className={styles.card}><div className={shell.listHead}><h2>Пакеты Анализатора</h2><button className={styles.primary} onClick={()=>edit(empty('pack'))}><Plus size={16}/>Добавить пакет</button></div>
+  {data?.packs.map(p=><article className={shell.catalogRow} key={p.id}><div><strong>{p.units.toLocaleString('ru-RU')} единиц · {moneyLabel(String(p.priceMinor))}</strong><p><span className={shell.badge}>{p.enabled?'Доступен':'Скрыт'}</span></p></div>
+   <button className={styles.secondary} onClick={()=>edit({...empty('pack'),original:p,price:displayPrice(p.priceMinor),units:String(p.units),enabled:p.enabled})}>Изменить</button></article>)}</section>
+ </div>
+ {draft&&<OperationDialog narrow title={draft.kind==='plan'?(draft.original?'Настроить тариф':'Добавить тариф'):(draft.original?'Настроить пакет':'Добавить пакет')} onClose={()=>{if(!busy)setDraft(null);}} footer={<>
+  <button className={common.button} disabled={busy} onClick={()=>setDraft(null)}>Отмена</button><button form="admin-commerce-editor" className={common.primaryButton} disabled={busy} type="submit">Сохранить</button></>}>
+  <form id="admin-commerce-editor" className={styles.renewalBody} onSubmit={e=>{e.preventDefault();void save();}}>
+   <OperationField label="Цена, ₽" error={errors.price}><input inputMode="numeric" value={draft.price} onChange={e=>update('price',e.target.value)}/></OperationField>
+   {draft.kind==='plan'?<>
+    <OperationField label="Единица срока"><SelectField value={draft.durationKind} onChange={e=>setDraft({...draft,durationKind:e.target.value as Tariff['duration']['kind']})}><option value="days">Дни</option><option value="calendar_months">Месяцы</option></SelectField></OperationField>
+    <OperationField label="Срок" error={errors.count}><input inputMode="numeric" value={draft.count} onChange={e=>update('count',e.target.value)}/></OperationField>
+    <OperationField label={draft.durationKind==='days'?'Лимит за период':'Лимит в месяц'} error={errors.quota}><input inputMode="numeric" value={draft.quota} onChange={e=>update('quota',e.target.value)}/></OperationField>
+   </>:<OperationField label="Количество единиц" error={errors.units}><input inputMode="numeric" value={draft.units} onChange={e=>update('units',e.target.value)}/></OperationField>}
+   <label className={shell.check}><input type="checkbox" checked={draft.enabled} onChange={e=>setDraft({...draft,enabled:e.target.checked})}/>Показывать пользователям</label>
+   {errors.form&&<p className={styles.error} role="alert">{errors.form}</p>}
+  </form>
+ </OperationDialog>}
+ </>;
 }

@@ -1,30 +1,57 @@
 import type {PoolClient} from 'pg';
 import {object} from '../../../packages/finance-core/src/model.ts';
+import {catalogDurationLabel} from '../../../packages/access/src/model.ts';
+import type {Tariff} from '../../../packages/access/src/model.ts';
 import {HttpError} from './types.ts';
 
-const planIds=['cashneuro-1w','cashneuro-2w','cashneuro-1m','cashneuro-3m','cashneuro-6m'];
+type Pack={id:string;units:number;priceMinor:number;enabled:boolean};
+export type CatalogChange={label:string;before:unknown;after:unknown};
 export const catalogOrder="CASE WHEN snapshot->'duration'->>'kind'='days' THEN (snapshot->'duration'->>'count')::int ELSE (snapshot->'duration'->>'count')::int*31 END,id";
 export async function commerceCatalog(db:PoolClient){return {
- plans:(await db.query(`SELECT snapshot FROM access.tariff WHERE id=ANY($1::text[]) ORDER BY ${catalogOrder}`,[planIds])).rows.map(r=>r.snapshot),
- packs:(await db.query('SELECT units,price_minor AS "priceMinor",enabled FROM commerce.ai_pack ORDER BY units')).rows,
+ plans:(await db.query<{snapshot:Tariff}>(`SELECT snapshot FROM access.tariff WHERE id LIKE 'cashneuro-%' ORDER BY ${catalogOrder}`)).rows.map(r=>r.snapshot),
+ packs:(await db.query<Pack>('SELECT catalog_id AS id,units,price_minor AS "priceMinor",enabled FROM commerce.ai_pack ORDER BY units')).rows,
 };}
+const validInt=(value:unknown,min:number,max:number):value is number=>typeof value==='number'&&Number.isSafeInteger(value)&&value>=min&&value<=max;
+const differences=(fields:CatalogChange[])=>fields.filter(field=>field.before!==field.after);
+
 export async function updateCommerceCatalog(db:PoolClient,input:unknown){
- const r=object(input,['id','units','priceMinor','months','durationKind','count','aiQuota','enabled','expectedVersion']),price=Number(r.priceMinor);
- if(typeof r.priceMinor!=='string'||!/^[1-9]\d{2,6}$/.test(r.priceMinor)||price<100||price>1000000||typeof r.enabled!=='boolean')throw new HttpError(400,'INVALID_INPUT');
- if(r.id!==undefined){
-  await db.query('SELECT pg_advisory_xact_lock(92044)');
-  const kind=r.durationKind??'calendar_months',count=Number(r.count??r.months),quota=r.aiQuota;
-  if(!planIds.includes(String(r.id))||r.units!==undefined||!['days','calendar_months'].includes(String(kind))||typeof (r.count??r.months)!=='number'||!Number.isSafeInteger(count)||count<1||count>(kind==='days'?31:24)||quota!==undefined&&(!Number.isSafeInteger(quota)||Number(quota)<0||Number(quota)>1000000)||r.expectedVersion!==undefined&&(!Number.isSafeInteger(r.expectedVersion)||Number(r.expectedVersion)<0))throw new HttpError(400,'INVALID_INPUT');
-  const name=kind==='days'?(count===7?'1 неделя':count===14?'2 недели':count+' дн.'):(count===1?'1 месяц':count===3?'3 месяца':count===6?'6 месяцев':count+' мес.');
-  const update=await db.query(`UPDATE access.tariff SET snapshot=snapshot||jsonb_build_object(
-   'priceMinor',$2::text,'duration',jsonb_build_object('kind',$3::text,'count',$4::integer),
-   'active',$5::boolean,'publicVisible',$5::boolean,'name',$6::text,'aiQuota',COALESCE($7::integer,(snapshot->>'aiQuota')::int),
-   'catalogVersion',COALESCE((snapshot->>'catalogVersion')::int,0)+1)
-   WHERE id=$1 AND ($8::int IS NULL OR COALESCE((snapshot->>'catalogVersion')::int,0)=$8)`,[r.id,r.priceMinor,kind,count,r.enabled,name,quota??null,r.expectedVersion??null]);
-  if(!update.rowCount)throw new HttpError(409,'TARIFF_CHANGED');
- }else{
-  if(![1000,2000,5000,10000].includes(Number(r.units))||typeof r.units!=='number'||r.months!==undefined||r.count!==undefined||r.durationKind!==undefined||r.aiQuota!==undefined||r.expectedVersion!==undefined)throw new HttpError(400,'INVALID_INPUT');
-  await db.query('UPDATE commerce.ai_pack SET price_minor=$2,enabled=$3 WHERE units=$1',[r.units,price,r.enabled]);
+ const r=object(input,['kind','id','packId','units','priceMinor','months','durationKind','count','aiQuota','enabled','expectedVersion','expectedUnits','expectedPriceMinor','expectedEnabled']);
+ if(typeof r.priceMinor!=='string'||!/^[1-9]\d{2,6}$/.test(r.priceMinor)||!validInt(Number(r.priceMinor),100,1000000)||Number(r.priceMinor)%100!==0||typeof r.enabled!=='boolean')throw new HttpError(400,'INVALID_TARIFF_PRICE');
+ await db.query('SELECT pg_advisory_xact_lock(92044)');
+ if(r.kind==='plan'||r.id!==undefined){
+  if(r.id!==undefined&&(typeof r.id!=='string'||!/^cashneuro-[a-z0-9-]{1,85}$/.test(r.id)))throw new HttpError(400,'INVALID_INPUT');
+  const id=r.id??'cashneuro-'+crypto.randomUUID();
+  const previous=(await db.query<{snapshot:Tariff}>('SELECT snapshot FROM access.tariff WHERE id=$1 FOR UPDATE',[id])).rows[0]?.snapshot;
+  if(r.id&&!previous||previous&&r.expectedVersion!==undefined&&r.expectedVersion!==(previous.catalogVersion??0))throw new HttpError(409,'TARIFF_CHANGED');
+  const kind=r.durationKind??'calendar_months',count=r.count??r.months,aiQuota=r.aiQuota??previous?.aiQuota;
+  if(kind!=='days'&&kind!=='calendar_months'||!validInt(count,1,kind==='days'?36500:120))throw new HttpError(400,'INVALID_TARIFF_DURATION');
+  if(!validInt(aiQuota,0,1000000))throw new HttpError(400,'INVALID_TARIFF_LIMIT');
+  const duration={kind,count} as Tariff['duration'];
+  const next:Tariff={id,name:catalogDurationLabel(duration),duration,priceMinor:r.priceMinor,aiQuota,active:r.enabled,publicVisible:r.enabled,
+   availableForNew:previous?.availableForNew??true,availableForRenewal:previous?.availableForRenewal??true,catalogVersion:(previous?.catalogVersion??0)+1};
+  const changes=differences([
+   {label:'Срок',before:previous?catalogDurationLabel(previous.duration):null,after:next.name},
+   {label:'Цена, ₽',before:previous?Number(previous.priceMinor)/100:null,after:Number(next.priceMinor)/100},
+   {label:'Лимит Анализатора',before:previous?.aiQuota??null,after:next.aiQuota},
+   {label:'Показывать пользователям',before:previous?.active??null,after:next.active}
+  ]);
+  if(changes.length)await db.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET snapshot=EXCLUDED.snapshot',[id,next]);
+  return {catalog:await commerceCatalog(db),audit:changes.length?{kind:previous?'tariff':'tariff_created',target:next.name,changes}:null};
  }
- return commerceCatalog(db);
+ if(r.kind!==undefined&&r.kind!=='pack'||!validInt(r.units,1,1000000)||r.packId!==undefined&&typeof r.packId!=='string')throw new HttpError(400,'INVALID_PACK_UNITS');
+ const previous=(await db.query<Pack>(`SELECT catalog_id AS id,units,price_minor AS "priceMinor",enabled FROM commerce.ai_pack
+  WHERE ($1::text IS NOT NULL AND catalog_id=$1) OR ($2::boolean AND units=$3) FOR UPDATE`,[r.packId??null,r.kind===undefined&&r.packId===undefined,r.units])).rows[0];
+ if(r.packId&&!previous||previous&&((r.expectedUnits!==undefined&&previous.units!==r.expectedUnits)||(r.expectedPriceMinor!==undefined&&previous.priceMinor!==r.expectedPriceMinor)||(r.expectedEnabled!==undefined&&previous.enabled!==r.expectedEnabled)))throw new HttpError(409,'TARIFF_CHANGED');
+ const other=(await db.query('SELECT 1 FROM commerce.ai_pack WHERE units=$1 AND catalog_id IS DISTINCT FROM $2',[r.units,previous?.id??null])).rowCount;
+ if(other)throw new HttpError(409,'PACK_UNITS_EXIST');
+ const changes=differences([
+  {label:'Количество единиц',before:previous?.units??null,after:r.units},
+  {label:'Цена, ₽',before:previous?previous.priceMinor/100:null,after:Number(r.priceMinor)/100},
+  {label:'Показывать пользователям',before:previous?.enabled??null,after:r.enabled}
+ ]);
+ if(changes.length){
+  if(previous)await db.query('UPDATE commerce.ai_pack SET units=$2,price_minor=$3,enabled=$4 WHERE catalog_id=$1',[previous.id,r.units,Number(r.priceMinor),r.enabled]);
+  else await db.query('INSERT INTO commerce.ai_pack(units,price_minor,enabled) VALUES($1,$2,$3)',[r.units,Number(r.priceMinor),r.enabled]);
+ }
+ return {catalog:await commerceCatalog(db),audit:changes.length?{kind:previous?'pack':'pack_created',target:r.units+' единиц',changes}:null};
 }

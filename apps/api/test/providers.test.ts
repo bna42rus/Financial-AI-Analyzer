@@ -105,16 +105,16 @@ const config = { sender:'notifications@cashneuro.ru', username:'synthetic-api-id
 const message = { to:'inbox@example.org',subject:'Проверка',text:'Синтетическое письмо' };
 const id = '01234567-1234-1234-1234-123456789abc';
 
-test('Postbox enforces test inboxes and blocks header injection before invoking SMTP', async () => {
+test('Postbox accepts valid staging recipients and blocks header injection before invoking SMTP', async () => {
   let calls=0;
   const transport=postboxTransport(config,async payload => { calls++; assert.equal(payload.username,config.username);
-    assert.equal(payload.to,message.to); assert.equal(payload.id,id); return {acceptance:'postbox'}; });
+    assert.match(payload.to??'',/@example\.org$/); assert.equal(payload.id,id); return {acceptance:'postbox'}; });
   assert.equal(transport.idempotent,false); assert.deepEqual(await transport.deliver(id,message),{acceptance:'postbox'});
-  for(const invalid of [{...message,to:'customer@example.org'},{...message,subject:'a\r\nBcc: victim@example.org'},
+  await transport.deliver(id,{...message,to:'customer@example.org'});
+  for(const invalid of [{...message,subject:'a\r\nBcc: victim@example.org'},
     {...message,to:'inbox@example.org\nX'},{...message,text:'x'.repeat(65537)}])
     await assert.rejects(transport.deliver(id,invalid),{message:'REJECTED'});
-  assert.equal(calls,1);
-  assert.throws(()=>postboxTransport({...config,recipients:[]}),/POSTBOX_CONFIGURATION_DENIED/);
+  assert.equal(calls,2);
   assert.throws(()=>postboxTransport({...config,environment:'production'} as never),/POSTBOX_CONFIGURATION_DENIED/);
 });
 

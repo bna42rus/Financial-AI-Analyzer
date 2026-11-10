@@ -120,6 +120,7 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
  const base=continuity?new Date(Date.parse(cycle.accessEnd!)-1).toISOString():settled;
  const result=await extensionAt(db,cycle,o.tariff.duration,base,o.id,o.id),e=result.extension;
  await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,user.id,e.mode==='continuous']);
+ await db.query('UPDATE commerce.access_checkout SET previous_end=$2,access_end=$3 WHERE id=$1',[o.id,cycle.accessEnd,e.accessEnd]);
  await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[user.id,start,e.accessEnd,o.tariff.duration.kind,paidAnalyzerUnits(o.tariff.id,o.tariff.duration.kind,o.tariff.aiQuota)]);
  const old=await savedRenewal(db,user.id);
  if(o.mode==='enroll'&&savedMethod){
@@ -141,21 +142,21 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
 async function finishFirst(db:PoolClient,o:Order,row:AccessRequest,seal:Sealer){
  const code=token(),invitationId='invitation:'+o.id;
  const r=(await db.query('SELECT commerce.finish_first_checkout($1,$2,$3,$4) AS done',[o.id,invitationId,digest(code),seal.seal(code)])).rows[0];
- if(!r?.done){await db.query("UPDATE commerce.access_checkout SET state='reconcile',payment_method_id=NULL WHERE id=$1",[o.id]);return;}
+ if(!r?.done){await db.query("UPDATE commerce.access_checkout SET state='reconcile',reconcile_reason='first_access_not_issued',payment_method_id=NULL WHERE id=$1",[o.id]);return;}
  const expiresAt=new Date(Date.parse(await clock(db))+72*3600000).toISOString();
  await outbox(db,'access',seal,'billing_invitation',{email:row.email,token:code,expiresAt},{subjectId:invitationId,expiresAt,dedupeKey:'billing-invite:'+o.id});
 }
-export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|AccessRequest,provider:AccessPaymentProvider|undefined,seal:Sealer){
+export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|AccessRequest,provider:AccessPaymentProvider|undefined,seal:Sealer,resolveReconciliation=false){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
  const first='tariff' in owner;
  if(first)await db.query("SELECT set_config('app.checkout_application',$1,true)",[owner.id]);else await lockedCycle(db,owner.id);
  const o=await paymentOrder(db,uuid(id));
  if(!o||(first?o.application_id!==owner.id:o.user_id!==owner.id))throw new HttpError(404,'NOT_FOUND');
- if(terminal(o))return projection(o);
+ if(terminal(o)&&!(resolveReconciliation&&o.state==='reconcile'&&o.provider_id))return projection(o);
  const now=Date.parse(await clock(db));
  if(!o.provider_id){
   if(!first&&(await db.query('SELECT status FROM identity.security_state WHERE user_id=$1',[owner.id])).rows[0]?.status!=='active')throw new HttpError(403,'SUSPENDED');
-  if(now-o.created_at.getTime()>23*3600000){await db.query("UPDATE commerce.access_checkout SET state='reconcile' WHERE id=$1",[o.id]);return projection({...o,state:'reconcile'});}
+  if(now-o.created_at.getTime()>23*3600000){await db.query("UPDATE commerce.access_checkout SET state='reconcile',reconcile_reason='provider_reference_missing' WHERE id=$1",[o.id]);return projection({...o,state:'reconcile'});}
   if(first&&(!owner.verifiedAt||owner.status!=='awaiting_payment'||o.created_at.getTime()>=Date.parse(owner.expiresAt)))throw new HttpError(409,'PAYMENT_RETRY_REQUIRED');
   if(o.mode==='automatic'){
    const cycle=await lockedCycle(db,owner.id);
@@ -163,17 +164,25 @@ export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|A
    const r=await savedRenewal(db,owner.id);
    const current=(await catalog(db)).find(t=>t.id===o.tariff.id);
    const consent=!!r&&r.state==='active'&&r.method_id===o.payment_method_id&&cycle.revision===o.cycle_revision&&cycle.accessEnd===r.next_at.toISOString()&&exactConsent(r,current)&&sameBillingPlan(r.tariff,o.tariff);
-   if(!consent){await db.query("UPDATE commerce.access_checkout SET state='reconcile' WHERE id=$1",[o.id]);return projection({...o,state:'reconcile'});}
+   if(!consent){await db.query("UPDATE commerce.access_checkout SET state='reconcile',reconcile_reason='autorenewal_consent_changed' WHERE id=$1",[o.id]);return projection({...o,state:'reconcile'});}
   }
  }
  const payment=o.provider_id?await provider.read(o.provider_id):await provider.create({id:o.id,value:rubleValue(o.tariff.priceMinor),title:o.tariff.name,first,...(o.mode==='enroll'&&o.renewal_version?{save:true}:o.mode==='automatic'?{method:o.payment_method_id?seal.open(o.payment_method_id):undefined}:{})});
  const redirect=verifiedPayment(payment,{id:o.id,providerId:o.provider_id,value:rubleValue(o.tariff.priceMinor),test:provider.test});
  const savedMethod=payment.payment_method?.saved&&typeof payment.payment_method.id==='string'&&payment.payment_method.id.length<=160?seal.seal(payment.payment_method.id):null;
  const state=payment.status==='succeeded'?'paid':payment.status==='canceled'?'cancelled':'pending';
- await db.query("UPDATE commerce.access_checkout SET provider_id=$2,redirect_url=$3,state=$4,paid_at=CASE WHEN $4='paid' THEN clock_timestamp() ELSE NULL END,payment_method_id=$5 WHERE id=$1",[o.id,payment.id,state==='pending'?redirect:null,state,first&&state==='paid'&&o.mode==='enroll'&&o.renewal_version?savedMethod:null]);
+ if(resolveReconciliation&&state==='pending')return projection(o);
+ const timestamp=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():null;
+ const reason=payment.cancellation_details?.reason;
+ await db.query(`UPDATE commerce.access_checkout SET provider_id=$2,redirect_url=$3,state=$4,paid_at=CASE WHEN $4='paid' THEN clock_timestamp() ELSE NULL END,
+  payment_method_id=$5,provider_paid_at=$6,provider_expires_at=$7,cancellation_reason=$8,reconcile_reason=NULL WHERE id=$1`,
+ [o.id,payment.id,state==='pending'?redirect:null,state,first&&state==='paid'&&o.mode==='enroll'&&o.renewal_version?savedMethod:null,
+  timestamp(payment.captured_at),state==='pending'?timestamp(payment.confirmation?.expires_at):null,
+  state==='cancelled'&&typeof reason==='string'&&/^[a-z_]{1,60}$/.test(reason)?reason:null]);
  if(state==='paid'){
   if(first)await finishFirst(db,o,owner,seal);
   else await finalizeAccount(db,o,owner,savedMethod,seal);
+  await db.query('SELECT commerce.record_checkout_completion($1)',[o.id]);
  }else if(state==='cancelled'&&o.mode==='automatic'){
   const r=await savedRenewal(db,owner.id);if(r?.state==='active')await stopRenewal(db,r,'failed');
  }
@@ -187,6 +196,7 @@ export async function disableAutoRenewal(db:PoolClient,userId:string){
  return {status:'disabled'};
 }
 export async function runAutoRenewals(pool:Pool,provider:AccessPaymentProvider,seal:Sealer){
+ await pool.query('SELECT commerce.flag_stale_checkouts()');
  const first=(await pool.query<{id:string;application_id:string}>('SELECT * FROM commerce.billing_first_due()')).rows;
  for(const item of first){
   const db=await pool.connect();try{

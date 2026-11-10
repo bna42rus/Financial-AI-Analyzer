@@ -7,6 +7,7 @@ import { loadAssistantProvider } from './analyzer-assistant-config.ts';
 import { testYooKassa } from './yookassa-topups.ts';
 import {createAccessPaymentProvider} from './access-payment-provider.ts';
 import {runAutoRenewals} from './access-checkout.ts';
+import {importRefunds,runReconciliations} from './checkout-operations.ts';
 import {envelope} from './crypto.ts';
 import { loadYandexAnalyzer } from './yandex-config.ts';
 const profile = process.env.API_PROFILE as Profile;
@@ -33,5 +34,18 @@ const classification=classificationEnabled?await import('./classification-store.
 let stopping=false;
 const classificationLoop=classificationEnabled?(async()=>{while(!stopping){try{await classification!.runClassificationStage(pool,assistantProvider!);}catch{/* No financial or provider text in logs. */}if(!stopping)await setTimeout(1000);}})():Promise.resolve();
 const paymentSeal=accessPayments?envelope(key.bytes):undefined;
-const billingLoop=accessPayments&&paymentSeal?(async()=>{while(!stopping){try{await runAutoRenewals(pool,accessPayments,paymentSeal);}catch{/* Reconcile via durable checkout state, never log payment credentials. */}if(!stopping)await setTimeout(5000);}})():Promise.resolve();
+const billingLoop=accessPayments&&paymentSeal?(async()=>{
+ let nextRefunds=0,cursor:string|undefined;
+ let since=new Date(Date.now()-90*86400000).toISOString(),started=Date.now();
+ while(!stopping){
+  try{await runAutoRenewals(pool,accessPayments,paymentSeal);await runReconciliations(pool,accessPayments,paymentSeal);}catch{/* Retry durable orders on the next pass. */}
+  if(Date.now()>=nextRefunds){
+   try{
+    cursor=await importRefunds(pool,accessPayments,paymentSeal,since,cursor);
+    if(!cursor){since=new Date(started-30*86400000).toISOString();started=Date.now();nextRefunds=started+60000;}
+   }catch{cursor=undefined;nextRefunds=Date.now()+60000;}
+  }
+  if(!stopping)await setTimeout(5000);
+ }
+})():Promise.resolve();
 for (const signal of ['SIGINT','SIGTERM']) process.once(signal, async () => { try { stopping=true; await server.close(); await Promise.all([classificationLoop,billingLoop]); await pool.end(); await yandexAnalyzer?.pool.end(); } finally { key.destroy(); } });

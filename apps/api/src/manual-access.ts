@@ -38,15 +38,22 @@ async function quota(db:PoolClient,value:unknown,fallback:QuotaPolicy|undefined)
  }
  throw new HttpError(400,'INVALID_INPUT');
 }
-export async function manualQueue(db:PoolClient):Promise<ManualQueue>{
+export async function manualQueue(db:PoolClient,options?:{search:string;filter:string;page:number;target:string}):Promise<ManualQueue>{
+ const size=options?30:100;
  const users=(await db.query(`SELECT d.*,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
-  FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id) ORDER BY d.registered_at DESC,d.user_id LIMIT 100`)).rows;
- const limits=new Map((await db.query('SELECT * FROM commerce.control_analyzer_limits()')).rows.map(r=>[r.user_id,{units:r.units,spentAtoms:r.spent_atoms,budgetMinor:r.budget_minor}]));
- const invites=(await db.query(`SELECT i.id,i.manual_grant_id AS "grantId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",
+  FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id)
+  WHERE ($1='' OR strpos(lower(d.email||' '||d.name),lower($1))>0) AND
+   ($2='' OR $2='blocked' AND d.status='suspended' OR $2='unlimited' AND c.indefinite OR
+    $2='active' AND c.access_end>clock_timestamp() OR $2='expired' AND c.access_end<=clock_timestamp())
+  ORDER BY (d.user_id=$3) DESC,d.registered_at DESC,d.user_id LIMIT $4 OFFSET $5`,
+  [options?.search??'',options?.filter??'',options?.target??'',size+1,(options?.page??0)*size])).rows;
+ const hasMore=users.length>size;users.splice(size);
+ const limits=new Map((await db.query('SELECT * FROM commerce.control_analyzer_limits()')).rows.map(r=>[r.user_id,{units:r.units,spentAtoms:r.spent_atoms,budgetMinor:r.budget_minor,resetAt:r.reset_at?.toISOString()??null}]));
+ const invites=options?[]:(await db.query(`SELECT i.id,i.manual_grant_id AS "grantId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",
   COALESCE((SELECT d.state FROM mail.delivery d WHERE d.subject_id=i.id AND d.kind='invitation' ORDER BY d.created_at DESC LIMIT 1),'queued') AS delivery,CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state,
   g.term,g.access_type AS "accessType",g.quota_policy AS quota,g.reason FROM commerce.invitation i JOIN commerce.manual_grant g ON g.id=i.manual_grant_id ORDER BY i.created_at DESC,i.id DESC LIMIT 100`)).rows;
- return {users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null,analyzer:limits.get(u.user_id)})),invitations:invites,
-  audit:(await db.query('SELECT data FROM commerce.manual_access_audit ORDER BY created_at DESC,action_id DESC LIMIT 100')).rows.map(r=>r.data),
+ return {hasMore,users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null,analyzer:limits.get(u.user_id)})),invitations:invites,
+  audit:options?[]:(await db.query('SELECT data FROM commerce.manual_access_audit ORDER BY created_at DESC,action_id DESC LIMIT 100')).rows.map(r=>r.data),
   tariffs:(await db.query('SELECT snapshot FROM access.tariff ORDER BY id')).rows.map(r=>r.snapshot).filter(t=>t.active===true&&Number.isSafeInteger(t.aiQuota)&&t.aiQuota>=0&&t.aiQuota<=1000000000).map(t=>({id:t.id,name:t.name,aiQuota:paidAnalyzerUnits(t.id,t.duration.kind,t.aiQuota),priceMinor:t.priceMinor,duration:t.duration}))};
 }
 async function availableEmail(db:PoolClient,address:string,now:string){
@@ -64,9 +71,9 @@ async function newInvitation(db:PoolClient,grantId:string,address:string,lifetim
 export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean){
  const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota']);
  const id=actionId(b.actionId),reason=string(b.reason,1000).trim(),mode=string(b.mode,20);
- if(!['invite','extend','set_end','indefinite','end_now'].includes(mode))throw new HttpError(400,'INVALID_INPUT');
+ if(!['invite','extend','set_end','indefinite','end_now','quota'].includes(mode))throw new HttpError(400,'INVALID_INPUT');
  if(!preview&&(!Number.isInteger(b.expectedRevision)||typeof b.expectedMode!=='string'||!b.expectedQuota))throw new HttpError(400,'INVALID_INPUT');
- const t=mode==='end_now'?undefined:term(b.term);
+ const t=mode==='end_now'||mode==='quota'?undefined:term(b.term);
  if((mode==='extend'&&t?.kind!=='days'&&t?.kind!=='calendar_months')||(mode==='set_end'&&t?.kind!=='fixed')||(mode==='indefinite'&&t?.kind!=='indefinite')||(mode==='end_now'&&b.term!==undefined))throw new HttpError(400,'INVALID_INPUT');
  if(mode==='invite'?(b.userId!==undefined||!['Paid','Test','Free','Other'].includes(String(b.accessType))):(b.email!==undefined||b.accessType!==undefined||b.inviteHours!==undefined))throw new HttpError(400,'INVALID_INPUT');
  const address=mode==='invite'?email(b.email):undefined,userId=mode==='invite'?undefined:string(b.userId,100),lifetime=mode==='invite'?hours(b.inviteHours):undefined;
@@ -92,6 +99,7 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    const result=await extensionAt(db,base,t as {kind:'days'|'calendar_months';count:number},now,'manual:'+id,id);
    next={...next,anchorAt:result.extension.anchorAt,accessEnd:result.extension.accessEnd,calendarMonths:result.calendarMonths,extraDays:result.extraDays,indefinite:false,endOffsetMs:previousMode==='continuous'?(base.endOffsetMs??0):0};
   }else if(mode==='indefinite')next={...next,accessEnd:null,indefinite:true};
+  else if(mode==='quota'){if(!before||!b.quota)throw new HttpError(409,'QUOTA_REQUIRED');}
   else{
    if(mode==='end_now'&&!before)throw new HttpError(409,'CYCLE_UNAVAILABLE');
    const end=mode==='end_now'?now:(t as {kind:'fixed';end:string}).end;
@@ -99,7 +107,8 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    next={...next,accessEnd:end,indefinite:false,endOffsetMs:Date.parse(end)-Date.parse(grid)};
   }
  }
- const result:ManualPreview={mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
+ const paidUntil=mode==='quota'&&account&&q.source==='tariff'?(await db.query("SELECT commerce.control_paid_allowance_end($1) AS finish",[userId])).rows[0]?.finish:null;
+ const result:ManualPreview={...(paidUntil?{effectiveAt:paidUntil.toISOString()}:{}),mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
  if(preview)return result;
  if(address){
   // Only an actually ended fixed grant can release this reservation. Link expiry alone never does.
@@ -113,9 +122,9 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET anchor_at=EXCLUDED.anchor_at,access_end=EXCLUDED.access_end,revision=EXCLUDED.revision,calendar_months=EXCLUDED.calendar_months,extra_days=EXCLUDED.extra_days,indefinite=EXCLUDED.indefinite,end_offset_ms=EXCLUDED.end_offset_ms,quota_policy=EXCLUDED.quota_policy`,
    [userId,next.anchorAt,next.accessEnd,next.timezone,next.revision,next.calendarMonths,next.extraDays,next.indefinite??false,next.endOffsetMs??0,q]);
   if(b.quota&&q.source==='tariff'&&!same(q,before?.quotaPolicy))await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[userId,now,q.limit,q.periodDays??null]);
-  await outbox(db,'access',seal,'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'&&q.budgetMinor!==undefined?{analyzerBudgetMinor:q.budgetMinor}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
+  await outbox(db,'access',seal,mode==='quota'?'manual_quota_changed':'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'&&q.budgetMinor!==undefined?{analyzerBudgetMinor:q.budgetMinor}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
  }
- const audit={actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
+ const audit={changes:mode==='quota'?[{label:'Политика лимита Анализатора',before:before?.quotaPolicy??null,after:q}]:[],actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
  await db.query('INSERT INTO commerce.manual_access_audit(action_id,user_id,data,created_at) VALUES($1,$2,$3,$4)',[id,userId??null,audit,now]);
  return {status:'committed',...await manualQueue(db)};
 }

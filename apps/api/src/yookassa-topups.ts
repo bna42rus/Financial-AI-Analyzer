@@ -19,19 +19,19 @@ type Order={id:string;units:number;price_minor:number;status:string;provider_id:
 const value=(minor:number)=>Math.floor(minor/100)+'.'+String(minor%100).padStart(2,'0');
 const projection=(order:Order)=>({id:order.id,units:order.units,status:order.status,redirect:order.redirect_url});
 export async function aiPackCatalog(db:PoolClient,userId:string,provider?:TestPayments){return {
- enabled:!!provider,packages:(await db.query('SELECT units,price_minor AS "priceMinor" FROM commerce.ai_pack WHERE enabled ORDER BY units')).rows,
+ enabled:!!provider,packages:(await db.query('SELECT catalog_id AS id,units,price_minor AS "priceMinor" FROM commerce.ai_pack WHERE enabled ORDER BY units')).rows,
  pending:(await db.query<Order>("SELECT * FROM commerce.ai_topup_order WHERE user_id=$1 AND status IN ('created','pending') ORDER BY created_at DESC LIMIT 10",[userId])).rows.map(projection),
 };}
 export async function aiTopup(db:PoolClient,owner:{id:string;email:string},input:unknown,provider:TestPayments|undefined,seal:Sealer){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
- const r=object(input,['id','units']),id=uuid(r.id),read=async()=>(await db.query<Order>('SELECT * FROM commerce.ai_topup_order WHERE user_id=$1 AND id=$2 FOR UPDATE',[owner.id,id])).rows[0];
+ const r=object(input,['id','units','packId','priceMinor']),id=uuid(r.id),read=async()=>(await db.query<Order>('SELECT * FROM commerce.ai_topup_order WHERE user_id=$1 AND id=$2 FOR UPDATE',[owner.id,id])).rows[0];
  let order=await read();
  if(r.units!==undefined){
-  if(typeof r.units!=='number'||![1000,2000,5000,10000].includes(r.units))throw new HttpError(400,'INVALID_INPUT');
-  if(order&&order.units!==r.units)throw new HttpError(409,'ACTION_REUSED');
+  if(typeof r.units!=='number'||!Number.isSafeInteger(r.units)||r.units<1||r.units>1000000||r.packId!==undefined&&typeof r.packId!=='string'||r.priceMinor!==undefined&&(!Number.isSafeInteger(r.priceMinor)||Number(r.priceMinor)<100))throw new HttpError(400,'INVALID_INPUT');
+  if(order&&(order.units!==r.units||r.priceMinor!==undefined&&order.price_minor!==r.priceMinor))throw new HttpError(409,'ACTION_REUSED');
   if(!order){
-   const inserted=await db.query<Order>("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor) SELECT $1,$2,units,price_minor FROM commerce.ai_pack WHERE units=$3 AND enabled RETURNING *",[owner.id,id,r.units]);order=inserted.rows[0];
-   if(!order)throw new HttpError(404,'NOT_FOUND');
+   const inserted=await db.query<Order>("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor) SELECT $1,$2,units,price_minor FROM commerce.ai_pack WHERE units=$3 AND enabled AND ($4::text IS NULL OR catalog_id=$4) AND ($5::int IS NULL OR price_minor=$5) RETURNING *",[owner.id,id,r.units,r.packId??null,r.priceMinor??null]);order=inserted.rows[0];
+   if(!order)throw new HttpError(409,'TARIFF_CHANGED');
   }
  }
  if(!order)throw new HttpError(404,'NOT_FOUND');

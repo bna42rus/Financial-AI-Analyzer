@@ -29,7 +29,7 @@ export const realm = (profile: Profile) => profile === 'control' ? 'control' : '
 export async function clock(db: DB): Promise<string> { return (await db.query('SELECT clock_timestamp() AS now')).rows[0].now.toISOString(); }
 export type MailMeta={subjectId?:string;expiresAt?:string;dedupeKey?:string};
 export async function outbox(db: DB, schema: 'identity' | 'control' | 'access', seal: Sealer, kind: string, payload: Record<string, unknown>,meta:MailMeta={}) {
-  const source=schema==='control'||['invitation','payment_decision','renewal_decision','manual_access_changed','account_deletion_completed'].includes(kind)?'control':'finance';
+  const source=schema==='control'||['invitation','payment_decision','renewal_decision','manual_access_changed','manual_quota_changed','account_access_status','account_deletion_completed'].includes(kind)?'control':'finance';
   const id=crypto.randomUUID();
   // Untargeted DO NOTHING needs no SELECT on the encrypted access outbox.
   await db.query(`INSERT INTO ${schema}.outbox(id,kind,sealed_payload,source_scope,subject_id,expires_at,dedupe_key,recipient) VALUES($7,$1,$2,$3,$4,$5,$6,$8) ON CONFLICT DO NOTHING`, [kind, seal.seal(JSON.stringify(payload)),source,meta.subjectId??null,meta.expiresAt??null,meta.dedupeKey??null,id,['payment_claim','renewal_claim','account_deletion_completed'].includes(kind)?null:typeof payload.email==='string'?payload.email:null]);

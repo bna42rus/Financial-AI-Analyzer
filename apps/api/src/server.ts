@@ -1,3 +1,5 @@
+import {requestReconciliation} from './checkout-operations.ts';
+import {adminInvitations,adminPreferences,adminRequests,changeUserAccessStatus} from './admin-workspace.ts';
 import {accountDeletion,deletionQueue,deletionPreview,finishAccountDeletion} from './account-deletion.ts';
 import {adminHistory} from './admin-history.ts';
 import {MailCooldownError} from './mail-cooldown.ts';
@@ -239,7 +241,7 @@ export async function createServer(config: Config) {
       } else if (path === '/session' && request.method === 'GET') {
         if (config.profile === 'control') {
           const s = await requireAdmin(auth, db, request, ['enrollment', 'recovery', 'admin']);
-          result = { name: s.user.name, scope: s.proof.level, capabilities: s.proof.level === 'admin' ? ['review_requests','manual_access'] : ['enroll_totp'] };
+          result = { name: s.user.name,email:s.user.email, scope: s.proof.level, capabilities: s.proof.level === 'admin' ? ['review_requests','manual_access'] : ['enroll_totp'] };
         } else {
           const s = await current(auth, request); if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
           await db.query("SELECT set_config('app.user_id',$1,true)",[s.user.id]);
@@ -249,15 +251,32 @@ export async function createServer(config: Config) {
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
           result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,...await financialProfile!.financialTimezonePreference(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
+      } else if(config.profile==='control'&&path==='/control/admin-preferences'&&['GET','POST'].includes(request.method)){
+        const s=await requireAdmin(auth,db,request);
+        result=await adminPreferences(db,s.user.id,request.method==='POST'?fields(request,['timezone']):undefined);
+      } else if(config.profile==='control'&&path==='/control/user-status'&&request.method==='POST'){
+        const s=await requireAdmin(auth,db,request);
+        result=await changeUserAccessStatus(db,s.user.id,fields(request,['actionId','userId','status','note','endSessions']),seal);
+      } else if(config.profile==='control'&&path==='/control/workspace-requests'&&request.method==='GET'){
+        await requireAdmin(auth,db,request);result=await adminRequests(db,new URL(request.url,config.baseURL).searchParams.get('id')?.slice(0,100));
+      } else if(config.profile==='control'&&path==='/control/workspace-invitations'&&request.method==='GET'){
+        await requireAdmin(auth,db,request);result=await adminInvitations(db,new URL(request.url,config.baseURL).searchParams.get('id')?.slice(0,100));
+      } else if(config.profile==='control'&&path==='/control/checkout-reconciliation'&&request.method==='POST'){
+        const s=await requireAdmin(auth,db,request);
+        result=await requestReconciliation(db,s.user.id,fields(request,['actionId','checkoutId','providerId','step']));
       } else if(config.profile==='control'&&path==='/control/access-checkouts'&&request.method==='GET'){
         await requireAdmin(auth,db,request);
-        result={orders:(await db.query('SELECT * FROM commerce.control_checkout_queue()')).rows};
+        const target=new URL(request.url,config.baseURL).searchParams.get('id');
+        result={orders:(await db.query('SELECT * FROM commerce.control_checkout_queue($1)',[target&&/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(target)?target:null])).rows};
       } else if(config.profile==='control'&&path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)){
         const s=await requireAdmin(auth,db,request);
-        if(request.method==='POST'){result=await updateCommerceCatalog(db,request.body);
-          const command=request.body as Record<string,unknown>;
-          await db.query('INSERT INTO commerce.action(id,actor_id,payload) VALUES($1,$2,$3)',[crypto.randomUUID(),s.user.id,{kind:'commerce_catalog_updated',target:command.id??command.units??null}]);
-          await event(db,'control',s.user.id,'commerce_catalog_updated');}
+        if(request.method==='POST'){
+          const updated=await updateCommerceCatalog(db,request.body);result=updated.catalog;
+          if(updated.audit){
+            await db.query('INSERT INTO commerce.action(id,actor_id,payload) VALUES($1,$2,$3)',[crypto.randomUUID(),s.user.id,updated.audit]);
+            await event(db,'control',s.user.id,'commerce_catalog_updated');
+          }
+        }
         else result=await commerceCatalog(db);
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
         await requireAdmin(auth,db,request);result=await mailQueue(db);
@@ -266,7 +285,11 @@ export async function createServer(config: Config) {
       } else if (config.profile==='control'&&path==='/control/invitation-resend'&&request.method==='POST'){
         const s=await requireAdmin(auth,db,request);result=await resendInvitation(db,request,s.user.id,seal);
       } else if (manual && path==='/control/accesses' && request.method==='GET') {
-        await requireAdmin(auth,db,request);result=await manual.manualQueue(db);
+        await requireAdmin(auth,db,request);
+        const query=new URL(request.url,config.baseURL).searchParams;
+        const search=query.get('search')??'',filter=query.get('filter')??'',page=Number(query.get('page')??0),target=query.get('target')??'';
+        if(search.length>254||target.length>100||!['','blocked','active','expired','unlimited'].includes(filter)||!Number.isSafeInteger(page)||page<0||page>100000)throw new HttpError(400,'INVALID_INPUT');
+        result=await manual.manualQueue(db,query.size?{search,filter,page,target}:undefined);
       } else if (manual && ['/control/manual-preview','/control/manual-access'].includes(path) && request.method==='POST') {
         const s=await requireAdmin(auth,db,request);result=await manual.manualAccess(db,request,s.user.id,seal,path==='/control/manual-preview');
       } else if (manual && path==='/control/manual-invitation-action' && request.method==='POST') {

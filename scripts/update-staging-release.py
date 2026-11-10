@@ -263,7 +263,9 @@ def activate_ai(dropin):
     return value.replace(b'ASSISTANT_ENABLED=0', b'ASSISTANT_ENABLED=1').rstrip() + b'\nEnvironment=ASSISTANT_ENABLED=1\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
 
 
-def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False, full_staging=False):
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False, full_staging=False, restore_default_tariffs=False):
+    if restore_default_tariffs and not full_staging:
+        raise m.InstallationError('TARIFF_RESTORE_REQUIRES_FULL_STAGING')
     if preserve_active_ai and (keep_ai_paused or resume_ai or enable_classification or evidence or tested_sha or monthly_budget is not None):
         raise m.InstallationError('ACTIVE_MONTHLY_AI_ARGUMENTS_CONFLICT')
     if monthly_budget is not None and (monthly_budget != '100' or not resume_ai):
@@ -375,7 +377,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         sql('BEGIN;\n' + (source / 'packages/database/migrations/0036_access_checkout.sql').read_text() + '\nCOMMIT;')
     for probe, filename in (
         ("SELECT to_regprocedure('finance.record_budget_settings()') IS NOT NULL", '0037_budget_settings_history.sql'),
-        ("SELECT to_regprocedure('commerce.control_checkout_queue()') IS NOT NULL", '0038_admin_checkout_projection.sql'),
+        ("SELECT coalesce(to_regprocedure('commerce.control_checkout_queue()'),to_regprocedure('commerce.control_checkout_queue(uuid)')) IS NOT NULL", '0038_admin_checkout_projection.sql'),
         ("SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='commerce.access_checkout'::regclass AND contype='c' AND position('application_id' IN pg_get_constraintdef(oid))>0 AND position('enroll' IN pg_get_constraintdef(oid))>0)", '0039_first_checkout_autorenewal.sql'),
         ("SELECT to_regclass('mail.request_cooldown') IS NOT NULL", '0040_mail_request_cooldown.sql'),
         ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='assistant_profile' AND column_name='follows_device')", '0042_device_timezone.sql'),
@@ -383,6 +385,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='counterparty' AND column_name='auto_rule_id')", '0044_counterparty_proposals.sql'),
         ("SELECT to_regclass('commerce.manual_allowance') IS NOT NULL", '0045_admin_operations.sql'),
         ("SELECT to_regclass('identity.account_deletion') IS NOT NULL", '0046_account_deletion.sql'),
+        ("SELECT to_regclass('control.display_preferences') IS NOT NULL", '0047_admin_workspace.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
@@ -390,6 +393,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     # it is safe and also catches old snapshots written after a runtime rollback.
     allowance = (source / 'packages/database/migrations/0041_legacy_analyzer_allowance.sql').read_text()
     sql('BEGIN;\n' + allowance + '\nCOMMIT;')
+    if restore_default_tariffs:
+        sql('BEGIN;\n' + (source / 'infra/staging/restore-default-tariffs.sql').read_text() + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
@@ -498,6 +503,7 @@ def main():
     parser.add_argument('--inspect-api-origin', action='store_true')
     parser.add_argument('--inspect-control-origin', action='store_true')
     parser.add_argument('--full-staging', action='store_true')
+    parser.add_argument('--restore-default-tariffs', action='store_true')
     parser.add_argument('--source')
     parser.add_argument('--sha')
     parser.add_argument('--rollback')
@@ -520,7 +526,7 @@ def main():
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai, args.full_staging)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai, args.full_staging, args.restore_default_tariffs)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

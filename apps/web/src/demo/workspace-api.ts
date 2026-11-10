@@ -2,7 +2,7 @@ import {aggregate,reconcile} from '../../../../packages/finance-core/src/graph';
 import {facet,effective} from '../../../../packages/finance-core/src/model';
 import type {Graph,Operation,Semantics,Category,Account,Link} from '../../../../packages/finance-core/src/model';
 import {operationDisplayName} from '../../../../packages/finance-core/src/operation-name';
-import {applyRules,ruleMatches,validateRule} from '../../../../packages/finance-core/src/rules';
+import {applyRules,reviewRuleConditions,ruleMatches,validateRule} from '../../../../packages/finance-core/src/rules';
 import type {Rule} from '../../../../packages/finance-core/src/rules';
 import {parseOperationsQuery,queryOperations} from '../../../../packages/finance-core/src/operations';
 import type {OperationsFilter} from '../../../../packages/finance-core/src/operations';
@@ -42,7 +42,7 @@ function snapshot(data=sample,filter:OperationsFilter={}):FinanceState{
  const {graph,parties,rules}=data,projection=reconcile(graph);
  return {generation,revision,accounts:graph.accounts,mergedAccounts:[],categories:graph.categories,counterparties:parties,rules,
   loanMode:graph.loanMode,operationCount:graph.operations.length,summary:aggregate(projection.operations,filter),
-  operations:projection.operations.map((row,i)=>{const op=graph.operations[i]!;return {...row,displayName:operationDisplayName(op,{counterparties:parties}),classification:op.semantics,comment:op.comment,description:op.source.description,postedDate:op.source.postedDate,bankCategory:op.source.bankCategory};})};
+  operations:projection.operations.map((row,i)=>{const op=graph.operations[i]!;return {...row,displayName:operationDisplayName(op,{counterparties:parties}),classification:op.semantics,canRememberTransfer:!!reviewRuleConditions(op)?.bankCounterpartyId,comment:op.comment,description:op.source.description,postedDate:op.source.postedDate,bankCategory:op.source.bankCategory};})};
 }
 function changeOperation(op:Operation,patch:OperationPatch,verify:unknown){
  const keys={kind:'kind',role:'role',categoryId:'category',subcategoryId:'subcategory',merchant:'merchant',counterpartyId:'counterparty'} as const;
@@ -84,14 +84,32 @@ function makePreview(body:Record<string,unknown>){
  const intent=body.intent as Intent,id=String(intent.id??crypto.randomUUID());
  let data=structuredClone(sample),undoneId:string|undefined;
  const {graph}=data;
+ const accountChanges:NonNullable<FinancePreview['impact']['changes']>=[];
  const patch=(intent.patch??{}) as Record<string,unknown>;
  const ids=Array.isArray(intent.operationIds)?intent.operationIds.map(String):[id];
  let details:FinancePreview['impact']['details'];
  switch(intent.kind){
-  case 'operation':case 'bulk_operations':
+  case 'operation':case 'bulk_operations':{
+   const scope=intent.reviewScope as {anchorId?:string}|undefined;
+   const anchor=scope?.anchorId?find(graph.operations,scope.anchorId):undefined;
+   const conditions=anchor&&intent.rememberRule?reviewRuleConditions(anchor):undefined;
+   let ruleName:string|undefined;
+   if(intent.rememberRule&&(!anchor||!conditions))fail('REVIEW_GROUP_CHANGED','Для операции больше нельзя создать это правило.');
+   if(anchor&&conditions){
+    const assignments=patch as Rule['assignments'];
+    const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
+    const matches=data.rules.filter(rule=>rule.enabled&&same(rule.conditions,conditions));
+    if(matches.some(rule=>Object.entries(assignments).some(([key,value])=>key in rule.assignments&&!same(rule.assignments[key as keyof Rule['assignments']],value))))fail('REVIEW_RULE_CONFLICT','Для этих операций уже действует правило с другими условиями назначения.');
+    if(!matches.some(rule=>same(rule.assignments,assignments))){
+     ruleName=conditions.bankCounterpartyId?'Перевод · '+(data.parties.find(p=>p.id===conditions.bankCounterpartyId)?.name??anchor.semantics.merchant.value):'Правило: '+conditions.merchantEquals;
+     const rule=validateRule({name:ruleName,enabled:true,priority:0,conditions,assignments});
+     data.rules.push({...rule,id,dependencyStatus:'ready'});
+    }
+   }
    for(const id of ids)changeOperation(find(graph.operations,id),patch as OperationPatch,intent.verify);
-   if(intent.kind==='bulk_operations')details={kind:intent.kind,operationIds:ids,selectedCount:ids.length,patch,verify:intent.verify??[],atomic:true,remainingReviewIds:[],warnings:[]};
+   if(intent.kind==='bulk_operations')details={kind:intent.kind,operationIds:ids,selectedCount:ids.length,patch,verify:intent.verify??[],atomic:true,remainingReviewIds:[],warnings:[],...(ruleName?{ruleName}:{})};
    break;
+  }
   case 'components':updateParts(graph,id,intent.parts as PartWrite[]);break;
   case 'link':updateLink(graph,id,intent.link as LinkIntent['link']);break;
   case 'operation_card':{
@@ -115,7 +133,16 @@ function makePreview(body:Record<string,unknown>){
    break;
   }
   case 'account':Object.assign(find(graph.accounts,id),patch);break;
-  case 'account_settings':for(const item of intent.accounts as {id:string;patch:Partial<Account>}[])Object.assign(find(graph.accounts,item.id),item.patch);break;
+  case 'account_settings':{
+   const values=(a:Account)=>({display_name:a.name,account_type:a.type,analytics_enabled:a.analyticsEnabled,loan_mode:a.loanMode});
+   for(const item of intent.accounts as {id:string;patch:Partial<Account>}[]){
+    const account=find(graph.accounts,item.id),before=values(account);
+    Object.assign(account,item.patch);
+    const after=values(account);
+    if(JSON.stringify(before)!==JSON.stringify(after))accountChanges.push({kind:'account',id:account.id,before:{values:before},after:{values:after}});
+   }
+   details={kind:intent.kind};break;
+  }
   case 'analytics':graph.loanMode=intent.value==='economic'?'economic':'cashflow';break;
   case 'category':replace(graph.categories,{...(intent.create?{parentId:null,hidden:false,role:'expense'}:find(graph.categories,id)),...patch,id} as Category);break;
   case 'counterparty':{
@@ -182,7 +209,7 @@ function makePreview(body:Record<string,unknown>){
  const before=snapshot(),after=snapshot(data),relations=reconcile(data.graph),priorLinks=new Map(reconcile(sample.graph).links.map(l=>[l.id,l.reason]));
  const original=new Map(sample.graph.operations.map(op=>[op.id,op]));
  const changes=data.graph.operations.filter(op=>JSON.stringify(original.get(op.id))!==JSON.stringify(op)).map(op=>({kind:'operation',id:op.id,before:{values:{semantics:original.get(op.id)?.semantics,comment:original.get(op.id)?.comment}},after:{values:{semantics:op.semantics,comment:op.comment}}}));
- const preview:FinancePreview={status:'previewed',actionId,intent:{id,kind:intent.kind},impact:{before:before.summary,after:after.summary,affectedOperationIds:changes.map(c=>c.id),changes,dependencyConflicts:relations.links.filter(l=>l.reason!==null&&priorLinks.get(l.id)!==l.reason),...(details?{details}:{})}};
+ const preview:FinancePreview={status:'previewed',actionId,intent:{id,kind:intent.kind},impact:{before:before.summary,after:after.summary,affectedOperationIds:changes.map(c=>c.id),changes:[...changes,...accountChanges],dependencyConflicts:relations.links.filter(l=>l.reason!==null&&priorLinks.get(l.id)!==l.reason),...(details?{details}:{})}};
  previews.set(actionId,{revision,after:data,preview,intent,undoneId});
  return preview;
 }

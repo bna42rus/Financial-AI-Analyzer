@@ -31,7 +31,16 @@ export function moneyFromRubles(value: string): string {
 }
 export function rublesFromMinor(value: string): string { const n = parsePersistedMinor(value); if (n < 0n) fail('Сумма не может быть отрицательной'); return `${n / 100n},${(n % 100n).toString().padStart(2, '0')}`; }
 export function moneyLabel(value: string): string { const n = parsePersistedMinor(value), a = n < 0n ? -n : n; return `${n < 0n ? '−' : ''}${new Intl.NumberFormat('ru-RU').format(a / 100n)}${a % 100n ? ',' + (a % 100n).toString().padStart(2, '0') : ''} ₽`; }
-export function durationLabel(value: Duration): string { return value.kind === 'calendar_months' ? value.count === 1 ? '1 календарный месяц' : value.count === 3 ? '3 календарных месяца' : `${value.count} календарных месяцев` : `${value.count} дней`; }
+function durationNoun(count:number,forms:Record<string,string>){return forms[new Intl.PluralRules('ru-RU').select(count)]??forms.many;}
+export function durationLabel(value:Duration):string {
+ return value.count+' '+(value.kind==='calendar_months'?durationNoun(value.count,{one:'календарный месяц',few:'календарных месяца',many:'календарных месяцев'}):durationNoun(value.count,{one:'день',few:'дня',many:'дней'}));
+}
+export function catalogDurationLabel(value:Duration):string {
+ if(value.kind==='calendar_months')return value.count+' '+durationNoun(value.count,{one:'месяц',few:'месяца',many:'месяцев'});
+ if(value.count===7)return '1 неделя';
+ if(value.count===14)return '2 недели';
+ return durationLabel(value);
+}
 export function dateLabel(value: string | null): string { return value ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '—'; }
 export function requestStatus(request: AccessRequest, now: string): RequestStatus | 'expired' { return request.kind !== 'renewal' && ['awaiting_email', 'awaiting_payment'].includes(request.status) && time(now) >= time(request.expiresAt) ? 'expired' : request.status; }
 export function invitationStatus(invite: Invitation, now: string): Invitation['state'] { return invite.state === 'active' && time(now) >= time(invite.expiresAt) ? 'expired' : invite.state; }

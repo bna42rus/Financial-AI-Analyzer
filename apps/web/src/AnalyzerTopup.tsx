@@ -6,15 +6,15 @@ import common from './App.module.css';
 import styles from './Settings.module.css';
 
 type Order={id:string;units:number;status:string;redirect:string|null};
-type Catalog={enabled:boolean;packages:{units:number;priceMinor:number}[];pending:Order[]};
+type Catalog={enabled:boolean;packages:{id:string;units:number;priceMinor:number}[];pending:Order[]};
 const number=(n:number)=>n.toLocaleString('ru-RU');
 const waiting=(order:Order|null)=>order?.status==='created'||order?.status==='pending';
 
 export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>void}){
- const [data,setData]=useState<Catalog|null>(null),[order,setOrder]=useState<Order|null>(null),[chosen,setChosen]=useState<number|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- const attempt=useRef<{id:string;units:number}|null>(null),credit=useRef(onCredit);
+ const [data,setData]=useState<Catalog|null>(null),[order,setOrder]=useState<Order|null>(null),[chosen,setChosen]=useState<string|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ const attempt=useRef<{id:string;units:number;packId:string;priceMinor:number}|null>(null),credit=useRef(onCredit);
  credit.current=onCredit;
- const selected=data?.packages.find(pack=>pack.units===chosen);
+ const selected=data?.packages.find(pack=>pack.id===chosen);
 
  async function load(signal?:AbortSignal){
   setError('');
@@ -52,7 +52,7 @@ export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>
  async function start(){
   if(busy||!selected||!data?.enabled||waiting(order))return;
   setBusy(true);setError('');
-  if(attempt.current?.units!==selected.units)attempt.current={id:crypto.randomUUID(),units:selected.units};
+  if(attempt.current?.packId!==selected.id||attempt.current.units!==selected.units||attempt.current.priceMinor!==selected.priceMinor)attempt.current={id:crypto.randomUUID(),units:selected.units,packId:selected.id,priceMinor:selected.priceMinor};
   try{
    const pending=await api<Order>('/finance/ai-topup',attempt.current,AbortSignal.timeout(10000));
    setOrder(pending);
@@ -78,8 +78,8 @@ export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>
   {waiting(order)&&<p role="status">Ждём подтверждения оплаты за {number(order!.units)} единиц.</p>}
   {!!data?.packages.length&&!waiting(order)&&<fieldset className={styles.topupPackages} disabled={busy}>
    <legend>Выберите пакет</legend>
-   {data.packages.map(pack=><label key={pack.units} className={styles.topupPackage}>
-    <input type="radio" name="analyzer-topup" checked={chosen===pack.units} onChange={()=>setChosen(pack.units)}/>
+   {data.packages.map(pack=><label key={pack.id} className={styles.topupPackage}>
+    <input type="radio" name="analyzer-topup" checked={chosen===pack.id} onChange={()=>setChosen(pack.id)}/>
     <strong>{number(pack.units)} единиц</strong>
     <span>{moneyLabel(String(pack.priceMinor))}</span>
    </label>)}

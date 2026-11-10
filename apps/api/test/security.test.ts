@@ -854,3 +854,81 @@ test('admin records manual extensions and a weekly Analyzer allowance for an ind
  assert.equal(slot.quota,2500);
  assert.equal(slot.starts_at.getTime()-time,7*86400000);
 });
+
+test('admin workspace keeps display preference, account suspension, and expiry independent',async()=>{
+ const a=await manualRegistered(),admin=a.admin.b;
+ assert.equal((await admin.get('/control/admin-preferences')).json().timezone,'device');
+ assert.equal((await admin.post('/control/admin-preferences',{timezone:'Europe/Riga'})).json().timezone,'Europe/Riga');
+ assert.equal((await admin.post('/control/admin-preferences',{timezone:'not-a-timezone'})).json().code,'INVALID_ADMIN_TIMEZONE');
+ const before=(await a.b.get('/session')).json().accessEnd;
+ const blocked={actionId:crypto.randomUUID(),userId:a.userId,status:'suspended',note:'Synthetic security review',endSessions:false};
+ assert.equal((await admin.post('/control/user-status',blocked)).statusCode,200);
+ assert.equal((await admin.post('/control/user-status',blocked)).statusCode,200);
+ const restricted=(await a.b.get('/session')).json();
+ assert.equal(restricted.blocked,true);assert.equal(restricted.scope,'restricted');assert.equal(restricted.accessEnd,before);
+ const users=await admin.get('/control/accesses?search=MANUAL%40example.test&filter=blocked&page=0');
+ assert.equal(users.statusCode,200,users.body);assert.equal(users.json().users[0].userId,a.userId);
+ const audit=(await admin.post('/control/history',{search:'manual@example.test'})).json().entries.find((e:{kind:string})=>e.kind==='user_access_status');
+ assert.equal(audit.changes[0].after,'Доступ приостановлен');
+ assert.equal((await admin.post('/control/user-status',{...blocked,actionId:crypto.randomUUID(),status:'active'})).statusCode,200);
+ assert.equal((await a.b.get('/session')).json().scope,'active');
+ const command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,quota:{source:'override',budgetMinor:'12500'},reason:'Adjust independent cost budget'});
+ assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);
+ assert.equal((await a.b.get('/session')).json().accessEnd,before);
+});
+
+test('catalog creation and pack unit edits preserve existing top-up snapshots and record only changes',async()=>{
+ const a=await manualRegistered(),admin=a.admin.b;
+ const plan=await admin.post('/control/commerce-catalog',{kind:'plan',durationKind:'calendar_months',count:2,aiQuota:5000,priceMinor:'75000',enabled:true});
+ assert.equal(plan.statusCode,200,plan.body);const created=plan.json().plans[0];
+ assert.equal(created.name,'2 месяца');
+ const edited=await admin.post('/control/commerce-catalog',{kind:'plan',id:created.id,expectedVersion:created.catalogVersion,durationKind:'calendar_months',count:2,aiQuota:5000,priceMinor:'80000',enabled:true});
+ assert.equal(edited.statusCode,200,edited.body);
+ const change=(await admin.post('/control/history',{search:'2 месяца'})).json().entries.find((e:{kind:string})=>e.kind==='tariff');
+ assert.deepEqual(change.changes,[{label:'Цена, ₽',before:750,after:800}]);
+ const added=await admin.post('/control/commerce-catalog',{kind:'pack',units:1500,priceMinor:'5900',enabled:true});
+ assert.equal(added.statusCode,200,added.body);const pack=added.json().packs.find((p:{units:number})=>p.units===1500);
+ const order=crypto.randomUUID();
+ await pg.owner.query("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor) VALUES($1,$2,1500,5900)",[a.userId,order]);
+ const modified=await admin.post('/control/commerce-catalog',{kind:'pack',packId:pack.id,units:1750,priceMinor:'6900',enabled:true,expectedUnits:1500,expectedPriceMinor:5900,expectedEnabled:true});
+ assert.equal(modified.statusCode,200,modified.body);
+ assert.equal(modified.json().packs.find((p:{id:string})=>p.id===pack.id).units,1750);
+ assert.deepEqual((await pg.owner.query('SELECT units,price_minor FROM commerce.ai_topup_order WHERE id=$1',[order])).rows[0],{units:1500,price_minor:5900});
+});
+
+test('payment reconciliation uses verified provider identity and full refund closes a first-access invitation',async()=>{
+ const {b:admin}=await enrolledAdmin();
+ const requestId=crypto.randomUUID(),orderId=crypto.randomUUID(),providerId=crypto.randomUUID(),now=new Date().toISOString();
+ const address='refund-flow@example.test';
+ const request={id:requestId,email:address,name:address,tariff,revision:0,createdAt:now,verifiedAt:now,expiresAt:new Date(Date.now()+86400000).toISOString(),status:'awaiting_payment',claimedAt:null,senderName:'',senderBank:'',decisionNote:''};
+ await pg.owner.query('INSERT INTO access.request(id,email,data) VALUES($1,$2,$3)',[requestId,address,request]);
+ await pg.owner.query("INSERT INTO commerce.access_checkout(id,application_id,tariff,offer_version,mode,state) VALUES($1,$2,$3,'synthetic','once','reconcile')",[orderId,requestId,tariff]);
+ const {importRefunds,runReconciliations}=await import('../src/checkout-operations.ts');
+ const refundId=crypto.randomUUID(),finalRefundId=crypto.randomUUID();
+ const payment={id:providerId,test:true,paid:true,status:'succeeded',amount:{currency:'RUB',value:'1190.00'},metadata:{orderId}};
+ const provider={test:true,read:async()=>payment,create:async()=>{throw Error('Reconciliation must never create a charge');},
+  refunds:async()=>({items:[
+   {id:refundId,payment_id:providerId,status:'succeeded',created_at:now,amount:{currency:'RUB',value:'190.00'}},
+   {id:finalRefundId,payment_id:providerId,status:'succeeded',created_at:now,amount:{currency:'RUB',value:'1000.00'}}
+  ]})};
+ const seal=envelope(fc.wrappingKey);
+ const check=await admin.post('/control/checkout-reconciliation',{actionId:crypto.randomUUID(),checkoutId:orderId,providerId,step:'check'});
+ assert.equal(check.statusCode,200,check.body);
+ await runReconciliations(pg.finance,provider,seal);
+ let order=(await admin.get('/control/access-checkouts?id='+orderId)).json().orders[0];
+ assert.equal(order.reconciliation.state,'verified');
+ assert.equal((await pg.owner.query('SELECT * FROM commerce.invitation')).rowCount,0);
+ const apply=await admin.post('/control/checkout-reconciliation',{actionId:crypto.randomUUID(),checkoutId:orderId,step:'apply'});
+ assert.equal(apply.statusCode,200,apply.body);await runReconciliations(pg.finance,provider,seal);
+ order=(await admin.get('/control/access-checkouts?id='+orderId)).json().orders[0];
+ assert.equal(order.status,'paid');assert.equal(order.reconciliation.state,'resolved');assert.equal(order.email,address);
+ let invites=(await admin.get('/control/workspace-invitations')).json().invitations;
+ assert.equal(invites[0].state,'active');assert.equal(invites[0].delivery,'queued');
+ await importRefunds(pg.finance,provider,seal,now);await importRefunds(pg.finance,provider,seal,now);
+ order=(await admin.get('/control/access-checkouts?id='+orderId)).json().orders[0];
+ assert.equal(order.refunds.length,2);
+ invites=(await admin.get('/control/workspace-invitations')).json().invitations;
+ assert.equal(invites[0].state,'cancelled');
+ assert.equal((await admin.get('/control/workspace-requests')).json().requests[0].status,'closed');
+ assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='billing_refund'")).rowCount,2);
+});

@@ -25,7 +25,7 @@ async function applicationResumable(db:PoolClient,row:AccessRequest,now:string){
  return Boolean((await db.query("SELECT 1 FROM commerce.access_checkout WHERE application_id=$1 AND state IN ('created','pending','reconcile') LIMIT 1",[row.id])).rowCount);
 }
 export async function createApplication(db: PoolClient, request: FastifyRequest, seal: Sealer,legalRequired=false) {
-  const input = fields(request, ['name', 'email', 'tariffId','consentVersion','priceMinor','catalogVersion']), address = email(input.email), name = string(input.name, 100).trim(), tariffId = string(input.tariffId, 100);
+  const input = fields(request, ['name', 'email', 'tariffId','consentVersion','priceMinor','catalogVersion']), address = email(input.email), name = input.name === undefined ? address : string(input.name, 100).trim() || address, tariffId = string(input.tariffId, 100);
   checkLegalVersion(input.consentVersion,legalDocuments.consent.version,legalRequired);
   const now = await clock(db);
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['access-email:'+address]);
@@ -41,7 +41,7 @@ export async function createApplication(db: PoolClient, request: FastifyRequest,
   let row:AccessRequest|undefined;
   for(const candidate of previous)if(await applicationResumable(db,candidate,now)){row=candidate;break;}
   if (!row) {
-    row = createAccessRequest(emptyAccessStore(), { id: crypto.randomUUID(), name, email: address, tariff }, now).requests[0]!;
+    row = createAccessRequest(emptyAccessStore(), { id: crypto.randomUUID(), name: name === address ? address.slice(0, 100) : name, email: address, tariff }, now).requests[0]!;
     await db.query('INSERT INTO access.request(id,email,data) VALUES($1,$2,$3)', [row.id, address, row]);
   }
   if (input.consentVersion) await db.query('INSERT INTO access.legal_consent(request_id,version) VALUES($1,$2) ON CONFLICT DO NOTHING',[row.id,input.consentVersion]);
@@ -84,4 +84,4 @@ export async function applicationClaim(db: PoolClient, config: Config, request: 
 }
 
 /** Public application projection does not expose internal admin reasons/notes. */
-export function publicRequest(row:AccessRequest):AccessRequest {return {...row,decisionNote:row.status==='rejected'?'Заявка отклонена. Обратитесь к владельцу проекта для уточнения.':''};}
+export function publicRequest(row:AccessRequest):AccessRequest {return {...row,decisionNote:'refundStatus'in row&&row.refundStatus==='refunded'?'Оплата возвращена. Приглашение закрыто.':row.status==='rejected'?'Заявка отклонена. Обратитесь к владельцу проекта для уточнения.':''};}

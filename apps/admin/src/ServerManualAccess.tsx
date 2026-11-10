@@ -1,48 +1,169 @@
-import {SelectField} from '../../web/src/SelectField';
 import {useEffect,useState} from 'react';
-import {ResendInvitation} from './ResendInvitation';
-import {api} from '../../web/src/server-client';
-import {SearchField,foldSearch} from '../../web/src/SearchFilter';
-import {dateLabel,moneyLabel,moneyFromRubles,rublesFromMinor} from '../../../packages/access/src/model';
-import type {ManualCommand,ManualPreview,ManualQueue,ManualUser,ManualInvite,ManualTerm} from '../../../packages/access/src/manual';
+import {CalendarDays,Sparkles} from 'lucide-react';
+import {SearchField} from '../../web/src/SearchFilter';
+import {SelectField} from '../../web/src/SelectField';
+import {OperationDialog,OperationField} from '../../web/src/OperationDialog';
+import {api,ApiError} from '../../web/src/server-client';
+import {catalogDurationLabel,moneyLabel} from '../../../packages/access/src/model';
 import {termLabel} from '../../../packages/access/src/manual';
+import type {ManualCommand,ManualPreview,ManualQueue,ManualUser,ManualTerm,QuotaPolicy} from '../../../packages/access/src/manual';
+import {adminLink,localAdminDate,parseAdminDate,useAdminData,useAdminTime} from './admin-view';
+import common from '../../web/src/App.module.css';
 import styles from '../../web/src/ServerAccess.module.css';
+import shell from './ServerAdmin.module.css';
+
 const count=(n:number)=>n.toLocaleString('ru-RU');
-function quotaLabel(quota:ManualPreview['quota']){
- if(quota.source==='override'&&quota.budgetMinor!==undefined)return moneyLabel(quota.budgetMinor)+' в месяц на обращения к модели';
- return count(quota.limit)+' ед. '+(quota.source==='tariff'&&quota.periodDays?'на '+quota.periodDays+' дн.':'в месяц');
+const status=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочный':u.cycle?.accessEnd&&Date.parse(u.cycle.accessEnd)>Date.now()?'Действует':u.cycle?.accessEnd?'Истёк':'Доступ не выдан';
+function quotaLabel(q:QuotaPolicy){
+ if(q.source==='override'&&q.budgetMinor!==undefined)return moneyLabel(q.budgetMinor)+' в месяц на модель';
+ return count(q.limit)+' единиц '+(q.source==='tariff'&&q.periodDays?'каждые '+q.periodDays+' дней':'в месяц');
 }
-function spendLabel(atoms:string){const n=BigInt(atoms),fraction=(n%1000000000n).toString().padStart(9,'0').replace(/0+$/,'');return (n/1000000000n).toLocaleString('ru-RU')+(fraction?','+fraction:'')+' ₽';}
-const modeLabel:Record<string,string>={invite:'Выдать приглашение',extend:'Добавить период',set_end:'Изменить дату окончания',indefinite:'Сделать бессрочным',end_now:'Завершить доступ сейчас',invitation_cancel:'Отменить приглашение',invitation_reissue:'Заменить приглашение'};
-export function ServerManualAccess(){
- const [data,setData]=useState<ManualQueue|null>(null),[selected,setSelected]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[query,setQuery]=useState('');
- useEffect(()=>{let live=true;api<ManualQueue>('/control/accesses').then(r=>{if(live)setData(r);}).catch(e=>{if(live)setError(e.message);});return()=>{live=false;};},[]);
+function spend(atoms:string){
+ const n=BigInt(atoms),f=(n%1000000000n).toString().padStart(9,'0').replace(/0+$/,'');
+ return (n/1000000000n).toLocaleString('ru-RU')+(f?','+f:'')+' ₽';
+}
+type Panel='invite'|'access'|'quota'|'status';
+export function ServerManualAccess({refresh,target}:{refresh:number;target?:string}){
+ const [query,setQuery]=useState(''),[search,setSearch]=useState(''),[filter,setFilter]=useState(''),[page,setPage]=useState(0),[selected,setSelected]=useState(target??''),[panel,setPanel]=useState<Panel|null>(null),[notice,setNotice]=useState('');
+ const params=new URLSearchParams({search,filter,page:String(page),target:target??''});
+ const {data,error,loading,reload}=useAdminData<ManualQueue>('/control/accesses?'+params,refresh);
+ const time=useAdminTime();
+ useEffect(()=>{const timer=setTimeout(()=>{setSearch(query.trim());setPage(0);},250);return()=>clearTimeout(timer);},[query]);
+ useEffect(()=>{if(target){setSelected(target);setQuery('');setFilter('');setPage(0);}},[target]);
  const user=data?.users.find(u=>u.userId===selected);
- const matches=(value:string)=>foldSearch(value).includes(foldSearch(query.trim()));
- return <><div className={styles.actions}><button className={styles.primary} disabled={busy} onClick={()=>setSelected('')}>Новый доступ по email</button><button className={styles.secondary} disabled={busy} onClick={async()=>{setBusy(true);setError('');try{setData(await api<ManualQueue>('/control/accesses'));}catch(e){setError(e instanceof Error?e.message:'Не удалось обновить.');}finally{setBusy(false);}}}>Обновить доступы</button></div>{error&&<p role="alert" className={styles.error}>{error}</p>}{data&&<><div className={styles.layout}><section className={styles.card}><h2>Пользователи</h2><SearchField value={query} onValueChange={setQuery} placeholder="Имя или почта" aria-label="Поиск пользователей и приглашений"/>{!data.users.length&&<p>Зарегистрированных пользователей пока нет.</p>}<div className={styles.list}>{data.users.filter(u=>matches(u.name+' '+u.email)).map(u=><button key={u.userId} className={styles.secondary} aria-pressed={selected===u.userId} onClick={()=>setSelected(u.userId)}><strong>{u.name}</strong><p>{u.email}</p><small>{u.status==='suspended'?'Аккаунт заблокирован · ':''}{u.cycle?.indefinite?'Бессрочно':u.cycle?.accessEnd?`До ${dateLabel(u.cycle.accessEnd)}`:'Доступ не выдан'}</small></button>)}</div></section><AccessForm key={(user?.userId??'new')+':'+(user?.cycle?.revision??-1)} user={user} data={data} onChanged={setData}/></div><section className={styles.card}><h2>Ручные приглашения</h2>{!data.invitations.length&&<p>Приглашений пока нет.</p>}{data.invitations.filter(i=>matches(i.email)).map(i=><ManualInvitation key={i.id+':'+i.state} invite={i} onChanged={setData}/>)}</section><section className={styles.card}><h2>История ручного доступа</h2>{!data.audit.length&&<p>Действий пока нет.</p>}{data.audit.filter(a=>matches(a.email)).map(a=><article key={a.actionId} className={styles.record}><strong>{modeLabel[a.mode]??a.mode} · {a.email}</strong><p>{dateLabel(a.at)} · администратор {a.actorId}</p><p>{a.before?.indefinite?'Бессрочно':dateLabel(a.before?.accessEnd??null)} → {a.after?.indefinite?'Бессрочно':dateLabel(a.after?.accessEnd??null)}</p><p>Заметка · {a.reason}</p><p>Лимит Анализатора · {quotaLabel(a.quota)}.</p></article>)}</section></>}</>;
+ const formatTerm=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочно':u.cycle?.accessEnd?'До '+time.format(u.cycle.accessEnd):'Срок не задан';
+ function done(message:string){setPanel(null);setNotice(message);reload();}
+ return <>
+  <div className={shell.listHead}><button className={styles.primary} onClick={()=>{setNotice('');setPanel('invite');}}>Выдать доступ по email</button></div>
+  {notice&&<p className={styles.success} role="status">{notice}</p>}
+  <div className={styles.layout}>
+   <section className={styles.card}><h2>Пользователи</h2><div className={shell.filters}>
+    <SearchField value={query} onValueChange={setQuery} placeholder="Имя или почта" aria-label="Поиск пользователей"/>
+    <SelectField value={filter} aria-label="Статус доступа" onChange={e=>{setFilter(e.target.value);setPage(0);}}><option value="">Все статусы</option><option value="active">Действует</option><option value="expired">Истёк</option><option value="unlimited">Бессрочный</option><option value="blocked">Заблокирован</option></SelectField>
+   </div>
+   {error&&<p className={styles.error} role="alert">{error}</p>}{loading&&!data&&<p role="status">Загружаем пользователей…</p>}
+   {data?.users.length===0&&!loading&&<p>Пользователи не найдены.</p>}
+   <div className={styles.list}>{data?.users.map(row=><button key={row.userId} className={styles.secondary} aria-pressed={selected===row.userId} onClick={()=>setSelected(row.userId)}>
+    <div className={shell.paymentHead}><strong>{row.name||row.email}</strong><span className={row.status==='suspended'?shell.attention:shell.badge}>{row.status==='suspended'?'Заблокирован':status(row)}</span></div>
+    <p>{row.email}</p><small>{formatTerm(row)}</small>
+   </button>)}</div>
+   {(page>0||data?.hasMore)&&<div className={styles.actions}><button className={styles.secondary} disabled={page===0||loading} onClick={()=>setPage(n=>n-1)}>Назад</button><button className={styles.secondary} disabled={!data?.hasMore||loading} onClick={()=>setPage(n=>n+1)}>Дальше</button></div>}
+   </section>
+   {user?<section className={styles.card}>
+    <div className={shell.paymentHead}><h2>{user.name||user.email}</h2><span className={shell.badge}>{status(user)}</span></div><p>{user.email}</p>
+    {user.status==='suspended'&&<span className={shell.attention}>Заблокирован</span>}
+    <div className={shell.records}>
+     <article><h3><CalendarDays size={17}/> Доступ</h3><dl className={shell.detailList}><div><dt>Срок</dt><dd>{formatTerm(user)}</dd></div><div><dt>Зарегистрирован</dt><dd>{time.format(user.registeredAt)}</dd></div></dl>
+      <div className={styles.actions}><button className={styles.secondary} onClick={()=>setPanel('access')}>Изменить доступ</button><button className={styles.secondary} onClick={()=>setPanel('status')}>{user.status==='suspended'?'Снять блокировку':'Приостановить доступ'}</button></div></article>
+     <article><h3><Sparkles size={17}/> Лимит Анализатора</h3><dl className={shell.detailList}>
+      <div><dt>Действующий лимит</dt><dd>{user.analyzer?count(user.analyzer.units)+' единиц':'—'}</dd></div>
+      {user.cycle?.quotaPolicy?.source==='tariff'&&user.cycle.quotaPolicy.periodDays&&<div><dt>Политика лимита</dt><dd>{quotaLabel(user.cycle.quotaPolicy)}</dd></div>}
+      <div><dt>Следующее обновление</dt><dd>{time.format(user.analyzer?.resetAt)}</dd></div>
+      <div><dt>Расход на модель за месяц</dt><dd>{user.analyzer?spend(user.analyzer.spentAtoms):'—'}</dd></div>
+      {user.analyzer?.budgetMinor!=null&&<div><dt>Бюджет на модель</dt><dd>{moneyLabel(user.analyzer.budgetMinor)} в месяц</dd></div>}
+     </dl><button className={styles.secondary} disabled={!user.cycle} onClick={()=>setPanel('quota')}>Настроить лимит</button></article>
+    </div>
+    <div className={styles.actions}><a href={adminLink('requests',{search:user.email})}>Заявки</a><a href={adminLink('payments',{search:user.email})}>Платежи</a><a href={adminLink('history',{search:user.email})}>История изменений</a></div>
+   </section>:<aside className={styles.card}><p>Выберите пользователя, чтобы посмотреть его доступ и лимит Анализатора.</p></aside>}
+  </div>
+  {panel==='status'&&user&&<StatusEditor user={user} onClose={()=>setPanel(null)} onDone={done}/>}
+  {data&&(panel==='invite'||user&&(panel==='access'||panel==='quota'))&&<AccessEditor panel={panel} user={user} data={data} onClose={()=>setPanel(null)} onDone={done}/>}
+ </>;
 }
-function AccessForm({user,data,onChanged}:{user?:ManualUser;data:ManualQueue;onChanged:(d:ManualQueue)=>void}){
- const [mode,setMode]=useState<ManualCommand['mode']>(user?'extend':'invite'),[kind,setKind]=useState<ManualTerm['kind']>('days'),[policy,setPolicy]=useState(user?.cycle?.quotaPolicy?'keep':'override'),[tariffId,setTariffId]=useState(data.tariffs[0]?.id??''),[preview,setPreview]=useState<{command:ManualCommand;result:ManualPreview}|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[saved,setSaved]=useState(false);
- return <section className={styles.card}><h2>{user?`Доступ: ${user.email}`:'Выдать доступ по email'}</h2><p>Заметка видна только в админке. Об изменении доступа пользователь получит письмо.</p>{user?.analyzer&&<dl><div><dt>Действующий лимит Анализатора</dt><dd>{count(user.analyzer.units)} ед.</dd></div><div><dt>Потрачено на модель в текущем месяце</dt><dd>{spendLabel(user.analyzer.spentAtoms)}</dd></div>{user.analyzer.budgetMinor!==null&&<div><dt>Лимит расходов на модель</dt><dd>{moneyLabel(user.analyzer.budgetMinor)}</dd></div>}</dl>}{user?.status==='suspended'&&<p>Аккаунт заблокирован. Блокировка сохранится.</p>}{saved&&<p role="status" className={styles.success}>Ручной доступ сохранён.</p>}{preview?<div className={styles.preview}><h3>Последствия ручного доступа</h3><p>{modeLabel[preview.result.mode]} · {preview.result.email}</p>{preview.result.mode==='invite'?<><p>Период: {termLabel(preview.result.term!)}{preview.result.term?.kind==='fixed'?` — ${dateLabel(preview.result.term.end)}`:''}.</p><p>Срок ссылки: {preview.result.inviteHours} ч. Дни и месяцы начнутся после регистрации; выбранная конечная дата останется фиксированной.</p></>:<><p>Было: {preview.result.previous?.indefinite?'Бессрочно':dateLabel(preview.result.previous?.accessEnd??null)}.</p><p>Станет: {preview.result.next?.indefinite?'Бессрочно':dateLabel(preview.result.next?.accessEnd??null)}.</p>{preview.result.previousMode!=='continuous'&&preview.result.mode==='extend'&&<p>Новый период начнётся при сохранении; показанное время предварительное.</p>}</>}<p>Политика лимита · {quotaLabel(preview.result.quota)}.</p><p>Заметка · {preview.command.reason}</p><div className={styles.actions}><button className={styles.secondary} disabled={busy} onClick={()=>setPreview(null)}>Изменить параметры</button><button className={styles.primary} disabled={busy} onClick={async()=>{setBusy(true);setError('');try{onChanged(await api<ManualQueue>('/control/manual-access',preview.command));setPreview(null);setSaved(true);}catch(e){setError(e instanceof Error?e.message:'Не удалось сохранить.');}finally{setBusy(false);}}}>Подтвердить ручной доступ</button></div></div>:<form onSubmit={async e=>{e.preventDefault();const d=new FormData(e.currentTarget);setBusy(true);setError('');setSaved(false);try{
- const chosen=mode==='indefinite'?'indefinite':mode==='set_end'?'fixed':kind;
- const term:ManualTerm=chosen==='indefinite'?{kind:'indefinite'}:chosen==='fixed'?{kind:'fixed',end:new Date(String(d.get('end'))).toISOString()}:{kind:chosen,count:Number(d.get('count'))};
- const command:ManualCommand={actionId:crypto.randomUUID(),mode,reason:String(d.get('reason')),...(user?{userId:user.userId}:{email:String(d.get('email')),accessType:String(d.get('type')) as ManualCommand['accessType'],inviteHours:Number(d.get('hours'))}),...(mode!=='end_now'?{term}:{}),...(policy==='keep'?{}:{quota:policy==='tariff'?{source:'tariff',tariffId:String(d.get('tariff'))}:{source:'override',budgetMinor:moneyFromRubles(String(d.get('quota')))}})};
- const result=await api<ManualPreview>('/control/manual-preview',command);setPreview({result,command:{...command,expectedRevision:result.expectedRevision,expectedMode:result.previousMode,expectedQuota:result.quota}});
- }catch(e){setError(e instanceof Error?e.message:'Проверьте поля.');}finally{setBusy(false);}}}>
- {!user?<><label>Почта нового пользователя<input name="email" type="email" required maxLength={254}/></label><label>Внутренний тип доступа<SelectField name="type" defaultValue="Free"><option value="Free">Бесплатный</option><option value="Paid">Оплаченный — отдельный учёт оплаты</option><option value="Other">Другой</option></SelectField></label></>:<label>Действие<SelectField value={mode} onChange={e=>setMode(e.target.value as ManualCommand['mode'])}><option value="extend">Добавить период / компенсацию</option><option value="set_end">Изменить дату окончания</option><option value="indefinite">Сделать бессрочным</option><option value="end_now">Завершить доступ сейчас</option></SelectField></label>}
- {['invite','extend'].includes(mode)&&<label>Период доступа<SelectField value={kind} onChange={e=>setKind(e.target.value as ManualTerm['kind'])}><option value="days">Дни</option><option value="calendar_months">Календарные месяцы</option>{mode==='invite'&&<><option value="fixed">До выбранной даты</option><option value="indefinite">Бессрочно</option></>}</SelectField></label>}
- {(['invite','extend'].includes(mode)&&['days','calendar_months'].includes(kind))&&<label>Количество {kind==='days'?'дней':'месяцев'}<input name="count" type="number" min={1} max={kind==='days'?36500:1200} required defaultValue={7}/></label>}
- {(mode==='set_end'||mode==='invite'&&kind==='fixed')&&<label>Дата окончания<input name="end" type="datetime-local" step="60" required/></label>}
- {!user&&<label>Срок ссылки приглашения, часов<input name="hours" type="number" min={1} max={720} required defaultValue={72}/></label>}
- <label>Политика лимита Анализатора<SelectField value={policy} onChange={e=>setPolicy(e.target.value)}>{user?.cycle?.quotaPolicy&&<option value="keep">Сохранить действующую ({count(user.analyzer?.units??user.cycle.quotaPolicy.limit)} ед.)</option>}<option value="override">Задать в рублях</option><option value="tariff">Взять из действующего тарифа</option></SelectField></label>
- {policy==='override'&&<label>Максимальный расход на модель за месяц, ₽<input name="quota" type="text" inputMode="decimal" maxLength={10} required defaultValue={rublesFromMinor(user?.analyzer?.budgetMinor??'10000')}/><small>Это фактический расход CashNeuro на модель. Сумма не списывается у пользователя.</small></label>}
- {policy==='tariff'&&<><label>Тариф для лимита<SelectField name="tariff" required value={tariffId} onChange={e=>setTariffId(e.target.value)}>{data.tariffs.map(t=><option key={t.id} value={t.id}>{t.name} · {moneyLabel(t.priceMinor)} · {count(t.aiQuota)} ед.</option>)}</SelectField></label>
- {data.tariffs.find(t=>t.id===tariffId)?.duration.kind==='days'&&<p>Дневной тариф задаёт повторяющийся период лимита. Текущий оплаченный период сохраняет свои условия. Докупленные единицы переносятся.</p>}</>}
- <label>Заметка<textarea name="reason" required rows={3} maxLength={1000}/></label><button className={styles.primary} disabled={busy||policy==='tariff'&&!data.tariffs.length}>Проверить ручной доступ</button></form>}{error&&<p role="alert" className={styles.error}>{error}</p>}</section>;
+function StatusEditor({user,onClose,onDone}:{user:ManualUser;onClose:()=>void;onDone:(message:string)=>void}){
+ const [note,setNote]=useState(''),[endSessions,setEndSessions]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState(''),[missing,setMissing]=useState(false);
+ const blocking=user.status!=='suspended';
+ async function save(){
+  setError('');setMissing(false);if(!note.trim()){setError('Добавьте заметку.');setMissing(true);return;}
+  setBusy(true);
+  try{await api('/control/user-status',{actionId:crypto.randomUUID(),userId:user.userId,status:blocking?'suspended':'active',note,endSessions:blocking&&endSessions});onDone(blocking?'Доступ приостановлен. Уведомление поставлено в очередь.':'Блокировка снята. Уведомление поставлено в очередь.');}
+  catch(e){setError(e instanceof Error?e.message:'Не удалось изменить статус.');}finally{setBusy(false);}
+ }
+ return <OperationDialog narrow title={blocking?'Приостановить доступ':'Снять блокировку'} onClose={()=>{if(!busy)onClose();}} footer={<>
+  <button className={common.button} disabled={busy} onClick={onClose}>Отмена</button><button className={blocking?common.dangerButton:common.primaryButton} disabled={busy} onClick={()=>void save()}>Подтвердить</button>
+ </>}><div className={styles.renewalBody}><p><strong>{user.email}</strong></p>
+ <p>{blocking?'Операции, отчёты и Анализатор станут недоступны. Пользователь получит письмо с контактом поддержки.':'Пользователь получит письмо. Если оплаченный срок ещё действует, финансовые разделы откроются.'}</p>
+ <OperationField label="Заметка" error={missing?error:undefined}><textarea rows={2} maxLength={1000} value={note} onChange={e=>{setNote(e.target.value);setError('');}}/></OperationField>
+ {blocking&&<label className={shell.check}><input type="checkbox" checked={endSessions} onChange={e=>setEndSessions(e.target.checked)}/>Завершить активные сеансы</label>}
+ {!missing&&error&&<p className={styles.error} role="alert">{error}</p>}
+ </div></OperationDialog>;
 }
-function ManualInvitation({invite,onChanged}:{invite:ManualInvite;onChanged:(d:ManualQueue)=>void}){
- const [action,setAction]=useState(''),[link,setLink]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
- const states:Record<string,string>={active:'Действует',expired:'Ссылка истекла',cancelled:'Отменено',superseded:'Заменено',used:'Использовано'};
- return <article className={styles.record}><strong>{invite.email}</strong><p>{states[invite.state]} · {termLabel(invite.term)}{invite.term.kind==='fixed'?` — ${dateLabel(invite.term.end)}`:''} · тип {invite.accessType}</p><p>Ссылка до {dateLabel(invite.expiresAt)}. Лимит Анализатора · {quotaLabel(invite.quota)}.</p><p>Заметка · {invite.reason}</p>{invite.state==='active'&&<button className={styles.secondary} disabled={busy} onClick={async()=>{setBusy(true);setError('');try{const origin=import.meta.env.VITE_FINANCE_ORIGIN as string|undefined;if(!origin||new URL(origin).origin!==origin)throw new Error('Адрес сайта не настроен.');const r=await api<{token:string}>('/control/invitation-link',{invitationId:invite.id});setLink(origin+'/#invite?token='+encodeURIComponent(r.token));}catch(e){setError(e instanceof Error?e.message:'Ссылка недоступна.');}finally{setBusy(false);}}}>Показать ручную ссылку</button>}{invite.state==='active'&&<ResendInvitation invitationId={invite.id} disabled={busy||invite.delivery==='queued'} onResent={async()=>onChanged(await api<ManualQueue>('/control/accesses'))}/>} {link&&<label>Ручная ссылка приглашения<input className={styles.secret} readOnly value={link} onFocus={e=>e.currentTarget.select()}/></label>}
- {!['used','superseded'].includes(invite.state)&&<div className={styles.actions}>{invite.state==='active'&&<button className={styles.secondary} disabled={busy} onClick={()=>setAction('cancel')}>Отменить ручное приглашение</button>}<button className={styles.secondary} disabled={busy} onClick={()=>setAction('reissue')}>Заменить ручное приглашение</button></div>}{action&&<form onSubmit={async e=>{e.preventDefault();const d=new FormData(e.currentTarget);setBusy(true);setError('');try{onChanged(await api<ManualQueue>('/control/manual-invitation-action',{actionId:crypto.randomUUID(),invitationId:invite.id,decision:action,reason:String(d.get('reason')),inviteHours:Number(d.get('hours'))}));setAction('');setLink('');}catch(e){setError(e instanceof Error?e.message:'Не удалось сохранить.');}finally{setBusy(false);}}}><div className={styles.preview}><p>{action==='cancel'?'Ссылка станет недействительной.':'Старая ссылка станет недействительной, новая заменит её.'} Условия доступа сохранятся.</p><label>Причина изменения<textarea name="reason" required maxLength={1000}/></label><label>Срок новой ссылки, часов<input name="hours" type="number" min={1} max={720} required defaultValue={72}/></label><div className={styles.actions}><button type="button" className={styles.secondary} disabled={busy} onClick={()=>setAction('')}>Назад</button><button className={styles.primary} disabled={busy}>Подтвердить изменение приглашения</button></div></div></form>}{error&&<p role="alert" className={styles.error}>{error}</p>}</article>;
+function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'status'>;user?:ManualUser;data:ManualQueue;onClose:()=>void;onDone:(message:string)=>void}){
+ const [mode,setMode]=useState<ManualCommand['mode']>(panel==='invite'?'invite':panel==='quota'?'quota':user?.cycle?.indefinite?'set_end':'extend');
+ const [kind,setKind]=useState<ManualTerm['kind']>('days'),[policy,setPolicy]=useState<'tariff'|'override'>(data.tariffs.length?'tariff':'override');
+ const [preview,setPreview]=useState<{command:ManualCommand;result:ManualPreview}|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[field,setField]=useState('');
+ const time=useAdminTime(),inviting=panel==='invite',quota=panel==='quota';
+ const needsQuota=inviting||quota||!user?.cycle;
+ const duration=mode==='extend'||inviting,showCount=duration&&(kind==='days'||kind==='calendar_months'),fixed=mode==='set_end'||inviting&&kind==='fixed';
+ const fieldError=(name:string)=>field===name?error:undefined;
+ const mark=(name:string,message:string)=>{setField(name);setError(message);};
+ const digits=(e:React.ChangeEvent<HTMLInputElement>)=>{e.target.value=e.target.value.replace(/\D/g,'').replace(/^0+(?=\d)/,'');setError('');};
+ async function check(values:FormData){
+  setError('');setField('');
+  const note=String(values.get('note')??'').trim(),address=String(values.get('email')??'').trim();
+  if(inviting&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)){mark('email','Введите адрес электронной почты.');return;}
+  if(!note){mark('note','Добавьте заметку.');return;}
+  const amount=Number(values.get('count')),hours=Number(values.get('hours'));
+  if(showCount&&(!Number.isInteger(amount)||amount<1||amount>(kind==='days'?36500:1200))){mark('count','Проверьте количество дней или месяцев.');return;}
+  if(inviting&&(!Number.isInteger(hours)||hours<1||hours>720)){mark('hours','Введите от 1 до 720 часов.');return;}
+  let term:ManualTerm|undefined;
+  if(fixed){
+   try{const end=parseAdminDate(String(values.get('end')??''),time.zone);if(Date.parse(end)<=Date.now())throw Error('Выберите будущую дату окончания.');term={kind:'fixed',end};}
+   catch(e){mark('end',e instanceof Error?e.message:'Проверьте дату.');return;}
+  }else if(mode==='indefinite'||inviting&&kind==='indefinite')term={kind:'indefinite'};
+  else if(showCount)term={kind:kind as 'days'|'calendar_months',count:amount};
+  let nextQuota:ManualCommand['quota'];
+  if(needsQuota){
+   if(policy==='tariff'){
+    const tariffId=String(values.get('tariff')??'');if(!tariffId){mark('tariff','Выберите тариф.');return;}
+    nextQuota={source:'tariff',tariffId};
+   }else{
+    const budget=String(values.get('budget')??'');if(!/^\d+$/.test(budget)||Number(budget)>10000){mark('budget','Введите целое число от 0 до 10 000 ₽.');return;}
+    nextQuota={source:'override',budgetMinor:String(Number(budget)*100)};
+   }
+  }
+  const command:ManualCommand={actionId:crypto.randomUUID(),mode,reason:note,...(inviting?{email:address,accessType:'Free',inviteHours:hours}:{userId:user!.userId}),...(term?{term}:{}),...(nextQuota?{quota:nextQuota}:{})};
+  setBusy(true);
+  try{const result=await api<ManualPreview>('/control/manual-preview',command);setPreview({result,command:{...command,expectedRevision:result.expectedRevision,expectedMode:result.previousMode,expectedQuota:result.quota}});}
+  catch(e){
+   const target=e instanceof ApiError?({EXISTING_ACCOUNT:'email',PENDING_ACCESS:'email',INVALID_END:'end',TARIFF_UNAVAILABLE:'tariff'}[e.code]??''):'';
+   mark(target,e instanceof Error?e.message:'Не удалось проверить изменения.');
+  }finally{setBusy(false);}
+ }
+ async function apply(){
+  if(!preview)return;
+  setBusy(true);setError('');
+  try{await api('/control/manual-access',preview.command);onDone(inviting?'Приглашение создано. Письмо в очереди.':'Изменения сохранены. Письмо в очереди.');}
+  catch(e){mark('',e instanceof Error?e.message:'Не удалось сохранить.');}finally{setBusy(false);}
+ }
+ const termView=(cycle:ManualPreview['previous'])=>cycle?.indefinite?'Бессрочно':cycle?.accessEnd?'До '+time.format(cycle.accessEnd):'Срок не задан';
+ return <OperationDialog compact title={inviting?'Выдать доступ по email':quota?'Настроить лимит Анализатора':'Изменить доступ'} onClose={()=>{if(!busy)onClose();}} footer={<>
+  <button className={common.button} disabled={busy} onClick={()=>{if(preview){setPreview(null);setError('');}else onClose();}}>{preview?'Назад':'Отмена'}</button>
+  {preview?<button className={mode==='end_now'?common.dangerButton:common.primaryButton} disabled={busy} onClick={()=>void apply()}>{inviting?'Отправить приглашение':'Подтвердить'}</button>:
+   <button type="submit" form="admin-access-form" className={common.primaryButton} disabled={busy}>Проверить изменения</button>}
+ </>}>
+ {preview&&<div className={styles.renewalBody}><p><strong>{preview.result.email}</strong></p>
+  {inviting?<><p>Доступ · {termLabel(preview.result.term!)}{preview.result.term?.kind==='fixed'?' · '+time.format(preview.result.term.end):''}</p><p>Лимит · {quotaLabel(preview.result.quota)}</p></>:
+   quota?<><p>{preview.result.previous?.quotaPolicy?quotaLabel(preview.result.previous.quotaPolicy):'По умолчанию'} → {quotaLabel(preview.result.quota)}</p>{preview.result.effectiveAt&&<p>Вступит в силу после окончания оплаченного периода · {time.format(preview.result.effectiveAt)}.</p>}</>:
+   <p>{termView(preview.result.previous)} → {termView(preview.result.next)}</p>}
+  <p>{inviting?'Приглашение отправится на указанную почту.':'Пользователь получит письмо об изменении.'}</p>
+  {error&&<p className={styles.error} role="alert">{error}</p>}
+ </div>}
+ <form hidden={!!preview} id="admin-access-form" className={styles.renewalBody} noValidate onSubmit={e=>{e.preventDefault();void check(new FormData(e.currentTarget));}}>
+  {inviting?<OperationField label="Почта нового пользователя" error={fieldError('email')}><input name="email" type="email" maxLength={254} onChange={()=>setError('')}/></OperationField>:<p><strong>{user?.email}</strong></p>}
+  {!inviting&&!quota&&<OperationField label="Действие"><SelectField value={mode} onChange={e=>{setMode(e.target.value as ManualCommand['mode']);setError('');}}>
+   {!user?.cycle?.indefinite&&<option value="extend">Добавить период</option>}<option value="set_end">Изменить дату окончания</option>{!user?.cycle?.indefinite&&<option value="indefinite">Сделать бессрочным</option>}{user?.cycle&&<option value="end_now">Завершить доступ сейчас</option>}
+  </SelectField></OperationField>}
+  {duration&&<OperationField label="Период доступа"><SelectField value={kind} onChange={e=>{setKind(e.target.value as ManualTerm['kind']);setError('');}}><option value="days">Дни</option><option value="calendar_months">Календарные месяцы</option>{inviting&&<><option value="fixed">До выбранной даты</option><option value="indefinite">Бессрочно</option></>}</SelectField></OperationField>}
+  {showCount&&<OperationField label={kind==='days'?'Количество дней':'Количество месяцев'} error={fieldError('count')}><input name="count" inputMode="numeric" defaultValue="7" onChange={digits}/></OperationField>}
+  {fixed&&<OperationField label={'Дата окончания · '+time.label} error={fieldError('end')}><input name="end" type="datetime-local" step="60" defaultValue={user?.cycle?.accessEnd?localAdminDate(Date.parse(user.cycle.accessEnd),time.zone):''} onChange={()=>setError('')}/></OperationField>}
+  {needsQuota&&<><OperationField label="Политика лимита"><SelectField value={policy} onChange={e=>{setPolicy(e.target.value as typeof policy);setError('');}}><option value="tariff">Взять из тарифа</option><option value="override">Задать бюджет в рублях</option></SelectField></OperationField>
+   {policy==='tariff'?<OperationField label="Тариф для лимита" error={fieldError('tariff')}><SelectField name="tariff" defaultValue={(user?.cycle?.quotaPolicy?.source==='tariff'?user.cycle.quotaPolicy.tariffId:null)??data.tariffs[0]?.id??''}>{data.tariffs.map(t=><option key={t.id} value={t.id}>{catalogDurationLabel(t.duration)} · {count(t.aiQuota)} ед. · {moneyLabel(t.priceMinor)}</option>)}</SelectField></OperationField>:
+    <OperationField label="Максимальный расход на модель за месяц, ₽" error={fieldError('budget')}><input name="budget" inputMode="numeric" defaultValue={String(Number(user?.analyzer?.budgetMinor??10000)/100)} onChange={digits}/></OperationField>}
+  </>}
+  <OperationField label="Заметка" error={fieldError('note')}><textarea name="note" rows={2} maxLength={1000} onChange={()=>setError('')}/></OperationField>
+  {inviting&&<details open={field==='hours'||undefined}><summary>Дополнительные параметры</summary><OperationField label="Срок ссылки, часов" error={fieldError('hours')}><input name="hours" inputMode="numeric" defaultValue="72" onChange={digits}/></OperationField></details>}
+  {!preview&&!field&&error&&<p className={styles.error} role="alert">{error}</p>}
+ </form>
+ </OperationDialog>;
 }

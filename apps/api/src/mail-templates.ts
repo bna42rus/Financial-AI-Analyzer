@@ -69,6 +69,13 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
    subject='Для вас уже подготовлен доступ';body={paragraphs:['На эту почту уже выдано приглашение. Откройте ранее полученное письмо. Если ссылка недоступна, запросите новую в поддержке.'],action:contact,unexpected:'Если вы не оформляли доступ, проигнорируйте письмо.'};break;
   case 'access_activated':
    subject='Доступ активирован';body={paragraphs:['Регистрация завершена. Войдите с паролем, который выбрали при регистрации.'],facts:[['Начало доступа',at(p.activatedAt)],['Доступ',p.indefinite===true?'Бессрочный':'До '+at(p.accessEnd)]],action:signIn,unexpected:'Если вы не регистрировались, сообщите в поддержку.'};break;
+  case 'account_access_status':
+   subject=p.blocked===true?'Доступ CashNeuro приостановлен':'Ограничение доступа CashNeuro снято';
+   body={paragraphs:[p.blocked===true?'Доступ к операциям, отчётам и Анализатору приостановлен. Напишите в поддержку, чтобы уточнить причину и восстановить доступ.':'Ограничение снято. Текущий срок доступа можно проверить в аккаунте.'],action:action('Открыть CashNeuro',base+'/#account')};break;
+  case 'billing_refund':
+   subject='Возврат оплаты CashNeuro подтверждён';body={paragraphs:['ЮKassa подтвердила возврат на исходное средство оплаты.'],facts:[['Сумма возврата',money(p.amountMinor)],['Вид возврата',p.full===true?'Полный':'Частичный']],action:contact};break;
+  case 'manual_quota_changed':
+   subject='Лимит Анализатора изменён';body={paragraphs:['Настройки лимита Анализатора обновлены. Актуальный остаток и дату обновления можно проверить в аккаунте.'],action:action('Открыть CashNeuro',base+'/#analyzer')};break;
   case 'manual_access_changed':
    subject='Срок доступа изменён';body={paragraphs:[p.indefinite===true?'Доступ стал бессрочным.':'Срок доступа обновлён.'],facts:[...(p.indefinite===true?[]:[['Доступ до',at(p.accessEnd)] as [string,string]]),...(Number.isSafeInteger(p.analyzerUnits)?[['Лимит Анализатора',String(p.analyzerUnits)+' единиц'+(Number.isSafeInteger(p.periodDays)?' каждые '+String(p.periodDays)+' дн.':' в месяц')] as [string,string]]:[])],action:profile,note:'Если аккаунт заблокирован, изменение срока не снимает блокировку.'};break;
   case 'payment_decision':case 'renewal_decision':{

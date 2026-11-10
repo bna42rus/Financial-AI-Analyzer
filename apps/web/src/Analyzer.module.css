@@ -37,7 +37,7 @@
 .inputBox { display:flex; align-items:flex-end; gap:10px; border:1px solid var(--color-border); border-radius:11px; padding:10px; }
 .inputBox:focus-within { border-color:var(--color-primary); }
 .inputBox textarea { resize:none; min-width:0; width:100%; border:0; background:transparent; color:var(--color-text); font:inherit; line-height:1.5; max-height:130px; }
-.inputBox textarea:focus-visible { outline:2px solid var(--color-primary); outline-offset:2px; }
+.inputBox textarea:focus-visible { outline:none; }
 .inputBox button { padding:8px; flex-shrink:0; }
 .composer>p { font-size:calc(10px * var(--text-scale, 1)); color:var(--color-secondary-text); margin-top:7px; text-align:center; }
 .messages { padding:24px; max-width:720px; margin:auto; }

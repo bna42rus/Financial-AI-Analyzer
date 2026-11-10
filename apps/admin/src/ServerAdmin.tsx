@@ -1,63 +1,83 @@
-import {ServerAccountDeletions} from './ServerAccountDeletions';
-import {ServerAdminHistory} from './ServerAdminHistory';
-import {LegalFooter} from '../../web/src/LegalPages';
-import {useNewPasswordFields} from '../../web/src/NewPasswordFields';
-import {SelectField} from '../../web/src/SelectField';
 import {useEffect,useState} from 'react';
-import {Users,ClipboardList,CalendarDays,CreditCard,Tag,MailPlus,Mail,History,RefreshCw} from 'lucide-react';
-import {SearchField,foldSearch} from '../../web/src/SearchFilter';
-import {ServerCheckoutQueue} from './ServerCheckoutQueue';
-import {ServerCommerceCatalog} from './ServerCommerceCatalog';
+import {Users,ClipboardList,CreditCard,Tag,MailPlus,Mail,History,RefreshCw,UserRound} from 'lucide-react';
+import {LegalFooter} from '../../web/src/LegalPages';
 import {Brand} from '../../web/src/Brand';
-import shell from './ServerAdmin.module.css';
-import {ResendInvitation} from './ResendInvitation';
+import {ServerAuth} from '../../web/src/ServerAuth';
+import {useNewPasswordFields} from '../../web/src/NewPasswordFields';
+import {SignOutConfirmation} from '../../web/src/SignOutConfirmation';
 import {api,ApiError,readLink} from '../../web/src/server-client';
 import type {Session} from '../../web/src/server-client';
+import {ServerAdminHistory} from './ServerAdminHistory';
+import {ServerCheckoutQueue} from './ServerCheckoutQueue';
+import {ServerCommerceCatalog} from './ServerCommerceCatalog';
 import {ServerManualAccess} from './ServerManualAccess';
 import {ServerDeliveries} from './ServerDeliveries';
-import {ServerRenewals} from './ServerRenewals';
-import {ServerAuth} from '../../web/src/ServerAuth';
-import {dateLabel,durationLabel,moneyLabel,moneyFromRubles,rublesFromMinor,statusLabel} from '../../../packages/access/src/model';
-import type {AccessRequest,Payment,Purchase,AuditEntry,ReviewCommand} from '../../../packages/access/src/model';
+import {ServerRequests,initialRequestFilters} from './ServerRequests';
+import {ServerInvitations} from './ServerInvitations';
+import {ServerAdminAccount} from './ServerAdminAccount';
+import {AdminTimezoneProvider,adminLink,readAdminLocation} from './admin-view';
 import styles from '../../web/src/ServerAccess.module.css';
-type LiveInvite={id:string;email:string;requestId:string;purchaseId:string;createdAt:string;expiresAt:string;state:string;delivery:string};
-type Queue={requests:AccessRequest[];payments:Payment[];purchases:(Omit<Purchase,'state'>&{state:string;accessEnd:string|null})[];invitations:LiveInvite[];audit:AuditEntry[]};
-type Command=Omit<ReviewCommand,'actorId'>&{inviteHours:number};
-type Preview={request:AccessRequest;payment?:Payment;purchase?:Purchase;inviteHours:number};
+import common from '../../web/src/App.module.css';
+import shell from './ServerAdmin.module.css';
+
 const initialLink=readLink();
 const sections=[
- {id:'manual',name:'Пользователи и доступ',Icon:Users},{id:'requests',name:'Заявки',Icon:ClipboardList},
- {id:'renewals',name:'Продления',Icon:CalendarDays},{id:'payments',name:'Платежи',Icon:CreditCard},
- {id:'tariffs',name:'Тарифы',Icon:Tag},{id:'invitations',name:'Приглашения',Icon:MailPlus},
- {id:'deliveries',name:'Письма',Icon:Mail},{id:'history',name:'История',Icon:History}
+ {id:'users',name:'Пользователи и доступ',Icon:Users},{id:'requests',name:'Заявки',Icon:ClipboardList},
+ {id:'payments',name:'Платежи',Icon:CreditCard},{id:'tariffs',name:'Тарифы',Icon:Tag},
+ {id:'invitations',name:'Приглашения',Icon:MailPlus},{id:'deliveries',name:'Письма',Icon:Mail},{id:'history',name:'История',Icon:History}
 ];
-const currentTab=()=>sections.some(s=>s.id===location.hash.slice(1))?location.hash.slice(1):'requests';
 export function ServerAdmin(){
-  const newPassword=useNewPasswordFields();
-  const [session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[queue,setQueue]=useState<Queue|null>(null),[tab,setTab]=useState(currentTab),[query,setQuery]=useState(''),[status,setStatus]=useState('all'),[refreshCount,setRefreshCount]=useState(0),[selected,setSelected]=useState(''),[codes,setCodes]=useState<string[]>([]),[error,setError]=useState(''),[busy,setBusy]=useState(false),[resetDone,setResetDone]=useState(false);
-  async function refresh(newCodes?:string[]){const s=await api<Session>('/session');setSession(s);if(newCodes)setCodes(newCodes);if(s.scope==='admin')setQueue(await api<Queue>('/control/requests'));}
-  useEffect(()=>{let live=true;api<Session>('/session').then(async s=>{if(!live)return;setSession(s);if(s.scope==='admin'){const q=await api<Queue>('/control/requests');if(live)setQueue(q);}}).catch(e=>{if(live&&(!(e instanceof ApiError)||!['AUTH_REQUIRED','TOTP_REQUIRED'].includes(e.code)))setError(e instanceof Error?e.message:'Не удалось открыть админку.');}).finally(()=>{if(live)setLoaded(true);});return()=>{live=false;};},[]);
-  async function run(work:()=>Promise<void>){if(busy)return;setBusy(true);setError('');try{await work();}catch(e){setError(e instanceof Error?e.message:'Не удалось выполнить действие.');}finally{setBusy(false);}}
-  useEffect(()=>{const change=()=>{setTab(currentTab());setQuery('');};window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);},[]);
-  const visible=queue?.requests.filter(r=>(status==='all'||(status==='review'?['under_review','needs_topup'].includes(r.status):r.status===status))&&foldSearch(r.name+' '+r.email).includes(foldSearch(query.trim())))??[];
-  const row=visible.find(r=>r.id===selected);
-  return <div className={styles.page+' '+styles.entryPage+' '+shell.page+(session?.scope==='admin'?' '+shell.signedIn:'')}><header className={styles.header+' '+shell.header}><div className={shell.identity}><Brand/><span>Управление</span></div>{session?.scope==='admin'&&<button className={styles.secondary} disabled={busy} onClick={()=>run(async()=>{await api('/auth/sign-out',{});setSession(null);setQueue(null);setCodes([]);})}>Выйти</button>}</header>
-  {error&&<p role="alert" className={styles.error}>{error}</p>}{!loaded?<p role="status">Проверяем сессию…</p>:initialLink.kind==='reset'&&!resetDone?<section className={styles.card}><h1>Новый пароль администратора</h1><form onSubmit={e=>{e.preventDefault();const password=newPassword.read(new FormData(e.currentTarget));if(password===null)return;void run(async()=>{await api('/security/reset',{token:initialLink.token,newPassword:password});setResetDone(true);setSession(null);});}}>{newPassword.fields}<button className={styles.primary} disabled={busy||!initialLink.token}>Сохранить пароль</button></form><p>Сброс завершит старые сессии. Для административных прав по-прежнему потребуется TOTP или резервное восстановление.</p></section>:!session?<main className={styles.landing+' '+shell.entry}><div><p className={styles.eyebrow}>Для администраторов</p><h1>Панель управления CashNeuro</h1><p>Управляйте доступом пользователей и тарифами. Проверяйте заявки, платежи и историю действий в одном месте.</p></div><ServerAuth control onAuthenticated={refresh}/></main>:session.scope!=='admin'?<><p className={styles.success}>Открыта только настройка защиты. Административные действия пока недоступны.</p><ServerAuth key={session.scope} control enrollment onAuthenticated={refresh}/></>:<>
-  {codes.length>0&&<section className={styles.card}><h2>Сохраните резервные коды</h2><p>Они показываются один раз. Для восстановления понадобится текущий пароль и один неиспользованный код.</p><pre className={styles.codes}>{codes.join('\n')}</pre><button className={styles.secondary} onClick={()=>setCodes([])}>Коды сохранены</button></section>}
-  <div className={shell.workspace}><nav aria-label="Управление доступом" className={shell.nav}>{sections.map(({id,name,Icon})=><a key={id} href={'#'+id} aria-current={tab===id?'page':undefined}><Icon size={17}/>{name}</a>)}</nav>
-  <main className={shell.main}><div className={shell.sectionHead}><h1>{sections.find(s=>s.id===tab)?.name}</h1><button className={styles.secondary} aria-label="Обновить раздел" title="Обновить раздел" disabled={busy} onClick={()=>run(async()=>{if(['requests','payments','invitations'].includes(tab))setQueue(await api<Queue>('/control/requests'));setRefreshCount(n=>n+1);})}><RefreshCw size={16}/></button></div>
-  {tab==='requests'&&<ServerAccountDeletions key={'erasure:'+refreshCount}/>}
-  {tab==='tariffs'?<ServerCommerceCatalog key={refreshCount}/>:tab==='deliveries'?<ServerDeliveries key={refreshCount}/>:tab==='manual'?<ServerManualAccess key={refreshCount}/>:tab==='renewals'?<ServerRenewals key={refreshCount}/>:queue&&tab==='requests'?<div className={styles.layout}><section className={styles.card}><h2>Первый доступ</h2><div className={shell.filters}><SearchField value={query} onValueChange={setQuery} placeholder="Имя или почта" aria-label="Поиск заявок"/><SelectField aria-label="Статус заявки" value={status} onChange={e=>setStatus(e.target.value)}><option value="all">Все заявки</option><option value="review">Нужна сверка</option><option value="awaiting_payment">Ждут оплаты</option><option value="paid_not_activated">Оплачены</option><option value="rejected">Отклонены</option></SelectField></div>{!visible.length&&<p>{queue.requests.length?'Заявки не найдены.':'Заявок пока нет.'}</p>}<div className={styles.list}>{visible.map(r=>{const purchase=queue.purchases.find(p=>p.requestId===r.id);return <button key={r.id} className={styles.secondary} aria-pressed={selected===r.id} onClick={()=>setSelected(r.id)}><strong>{r.name}</strong><p>{r.email}</p><small>{purchase?.state==='active'?'Регистрация завершена':statusLabel[r.status]} · {moneyLabel(r.tariff.priceMinor)}</small></button>;})}</div></section>{row?<Review key={row.id+':'+row.revision} row={row} received={queue.payments.filter(p=>p.requestId===row.id).reduce((n,p)=>n+BigInt(p.actualMinor),0n).toString()} purchase={queue.purchases.find(p=>p.requestId===row.id)} onChanged={setQueue}/>:<aside className={styles.card}><h2>Ручная сверка</h2><p>Откройте заявку, проверьте отправителя и фактическую сумму. Перед сохранением сервер покажет последствия.</p></aside>}</div>:queue&&tab==='payments'?<><ServerCheckoutQueue key={refreshCount}/><section className={styles.card}><h2>Ручные переводы</h2>{!queue.payments.length&&<p>Платежей пока нет.</p>}<SearchField aria-label="Поиск ручных переводов" placeholder="Отправитель, банк или сумма" value={query} onValueChange={setQuery}/>{queue.payments.filter(p=>foldSearch([p.senderName,p.senderBank,moneyLabel(p.actualMinor),p.id].join(' ')).includes(foldSearch(query.trim()))).map(p=><article key={p.id} className={styles.record}><strong>{moneyLabel(p.actualMinor)}</strong><p>{p.senderName} · {p.senderBank}</p><p>Ожидалось {moneyLabel(p.expectedMinor)} · получено {dateLabel(p.receivedAt)}</p><p>{p.disposition==='return_required'?'Нужен ручной возврат. Деньги автоматически не возвращаются.':'Перевод записан.'}</p></article>)}</section></>:queue&&tab==='invitations'?<section className={styles.card}><h2>Выданные приглашения</h2>{!queue.invitations.length&&<p>Приглашений пока нет.</p>}<SearchField aria-label="Поиск приглашений" placeholder="Почта или номер приглашения" value={query} onValueChange={setQuery}/>{queue.invitations.filter(i=>foldSearch(i.email+' '+i.id).includes(foldSearch(query.trim()))).map(i=><Invite key={i.id+':'+i.state} invite={i} onChanged={setQueue}/>)}</section>:tab==='history'?<ServerAdminHistory key={refreshCount}/>:null}</main></div></>}<LegalFooter origin={import.meta.env.VITE_FINANCE_ORIGIN}/></div>;
-}
-function Review({row,received,purchase,onChanged}:{row:AccessRequest;received:string;purchase:Queue['purchases'][number]|undefined;onChanged:(q:Queue)=>void}){
-  const [preview,setPreview]=useState<{command:Command;result:Preview}|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  return <section className={styles.card}><h2>{row.name}</h2><p>{row.email}</p><p>Отправитель: {row.senderName||'—'} · {row.senderBank||'—'}</p><p>{row.tariff.name}: {moneyLabel(row.tariff.priceMinor)} · {durationLabel(row.tariff.duration)}</p><p>Ранее записано {moneyLabel(received)}. Заявка {dateLabel(row.createdAt)}, отметка оплаты {dateLabel(row.claimedAt)}.</p>
-  {purchase?<div className={styles.success}>{purchase.state==='active'?<>Доступ активирован, до {dateLabel(purchase.accessEnd)}.</>:<>Оплачено — ожидает регистрации. Срок доступа ещё не начался.</>}</div>:!['under_review','needs_topup'].includes(row.status)?<p>Сверка доступна после подтверждения почты и отметки оплаты.</p>:preview?<div className={styles.preview}><h3>Последствия решения</h3><p>Статус: {statusLabel[preview.result.request.status]}</p><p>Новый фактический платёж: {preview.result.payment?moneyLabel(preview.result.payment.actualMinor):'нет'}.</p><p>{preview.result.purchase?`Оплаченный период: ${durationLabel(preview.result.purchase.duration)} после регистрации. Ссылка: ${preview.result.inviteHours} ч.`:'Доступ не выдаётся.'}</p><p>{preview.result.request.decisionNote}</p><div className={styles.actions}><button className={styles.secondary} disabled={busy} onClick={()=>setPreview(null)}>Изменить решение</button><button className={styles.primary} disabled={busy} onClick={async()=>{setBusy(true);setError('');try{onChanged(await api<Queue>('/control/review',preview.command));setPreview(null);}catch(e){setError(e instanceof Error?e.message:'Не удалось сохранить.');}finally{setBusy(false);}}}>Подтвердить решение</button></div></div>:<form onSubmit={async e=>{e.preventDefault();const d=new FormData(e.currentTarget);setBusy(true);setError('');try{const command:Command={actionId:crypto.randomUUID(),requestId:row.id,expectedRevision:row.revision,actualMinor:moneyFromRubles(String(d.get('amount'))),receivedAt:new Date(String(d.get('received'))).toISOString(),decision:String(d.get('decision')) as Command['decision'],reason:String(d.get('reason')),inviteHours:Number(d.get('hours')),...(d.get('decision')==='custom'?{customDays:Number(d.get('days'))}:{})};setPreview({command,result:await api<Preview>('/control/review-preview',command)});}catch(e){setError(e instanceof Error?e.message:'Проверьте поля.');}finally{setBusy(false);}}}>
-  <label>Новый фактический платёж, ₽<input name="amount" inputMode="decimal" required defaultValue={rublesFromMinor((BigInt(received)>=BigInt(row.tariff.priceMinor)?0n:BigInt(row.tariff.priceMinor)-BigInt(received)).toString())}/></label><label>Когда получен перевод<input name="received" type="datetime-local" step="60" required defaultValue={new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}/></label><label>Решение<SelectField name="decision"><option value="confirm">Подтвердить точную сумму тарифа</option><option value="accept_full">Принять фактическую сумму за полный период</option><option value="topup">Запросить доплату</option><option value="reject">Отклонить / возврат вручную</option><option value="custom">Согласованный период с причиной</option></SelectField></label><div className={styles.formRow}><label>Согласованный период, дней<input name="days" type="number" min={1} max={36500} defaultValue={30}/></label><label>Срок ссылки, часов<input name="hours" type="number" required min={1} max={720} defaultValue={72}/></label></div><label>Заметка<textarea name="reason" rows={3} maxLength={1000}/></label><button className={styles.primary} disabled={busy}>Показать последствия</button></form>}{error&&<p role="alert" className={styles.error}>{error}</p>}</section>;
-}
-function Invite({invite,onChanged}:{invite:LiveInvite;onChanged:(q:Queue)=>void}){
-  const [action,setAction]=useState(''),[link,setLink]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
-  const labels:Record<string,string>={active:'Действует',expired:'Срок ссылки истёк',cancelled:'Отменено',superseded:'Заменено',used:'Использовано'};
-  return <article className={styles.record}><strong>{invite.email}</strong><p>{labels[invite.state]} · создано {dateLabel(invite.createdAt)} · срок {dateLabel(invite.expiresAt)}</p><p>Письмо: {{queued:'в очереди',sent:'принято почтовым сервисом',failed:'не отправлено'}[invite.delivery]??'в очереди'}. Подробности — в разделе «Письма».</p>{invite.state==='active'&&<button disabled={busy} className={styles.secondary} onClick={async()=>{setBusy(true);setError('');try{const origin=import.meta.env.VITE_FINANCE_ORIGIN as string|undefined;if(!origin||new URL(origin).origin!==origin)throw new Error('Адрес пользовательского сайта не настроен.');const r=await api<{token:string}>('/control/invitation-link',{invitationId:invite.id});setLink(origin+'/#invite?token='+encodeURIComponent(r.token));}catch(e){setError(e instanceof Error?e.message:'Ссылка недоступна.');}finally{setBusy(false);}}}>Показать ссылку</button>}{invite.state==='active'&&<ResendInvitation invitationId={invite.id} disabled={busy||invite.delivery==='queued'} onResent={async()=>onChanged(await api<Queue>('/control/requests'))}/>} {link&&<label>Ссылка приглашения<input className={styles.secret} readOnly value={link} onFocus={e=>e.currentTarget.select()}/></label>}
-  {!['used','superseded'].includes(invite.state)&&<div className={styles.actions}>{invite.state==='active'&&<button className={styles.secondary} disabled={busy} onClick={()=>setAction('cancel')}>Отменить</button>}<button className={styles.secondary} disabled={busy} onClick={()=>setAction('reissue')}>Выдать новое</button></div>}{action&&<form onSubmit={async e=>{e.preventDefault();const d=new FormData(e.currentTarget);setBusy(true);setError('');try{onChanged(await api<Queue>('/control/invitation-action',{actionId:crypto.randomUUID(),invitationId:invite.id,decision:action,reason:String(d.get('reason')),inviteHours:Number(d.get('hours'))}));setAction('');setLink('');}catch(e){setError(e instanceof Error?e.message:'Не удалось сохранить.');}finally{setBusy(false);}}}><div className={styles.preview}><p>Оплата сохраняется, срок доступа не начинается. {action==='cancel'?'Ссылка станет недействительной.':'Старая ссылка станет недействительной, появится новая.'}</p><label>Заметка<textarea name="reason" required rows={2} maxLength={1000}/></label><label>Срок новой ссылки, часов<input name="hours" type="number" min={1} max={720} required defaultValue={72}/></label><div className={styles.actions}><button type="button" className={styles.secondary} disabled={busy} onClick={()=>setAction('')}>Назад</button><button className={styles.primary} disabled={busy}>Подтвердить {action==='cancel'?'отмену':'замену'}</button></div></div></form>}{error&&<p role="alert" className={styles.error}>{error}</p>}</article>;
+ const newPassword=useNewPasswordFields();
+ const [session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[route,setRoute]=useState(readAdminLocation);
+ const [refresh,setRefresh]=useState(0),[timezone,setTimezone]=useState('device'),[codes,setCodes]=useState<string[]>([]);
+ const [error,setError]=useState(''),[busy,setBusy]=useState(false),[resetDone,setResetDone]=useState(false),[exit,setExit]=useState(false);
+ const [requestFilters,setRequestFilters]=useState(initialRequestFilters);
+ const signedIn=session?.scope==='admin';
+ useEffect(()=>{
+  const controller=new AbortController();
+  void api<Session>('/session',undefined,controller.signal).then(s=>{if(!controller.signal.aborted)setSession(s);})
+   .catch(e=>{if(!controller.signal.aborted&&(!(e instanceof ApiError)||!['AUTH_REQUIRED','TOTP_REQUIRED'].includes(e.code)))setError(e.message);})
+   .finally(()=>{if(!controller.signal.aborted)setLoaded(true);});
+  return()=>controller.abort();
+ },[]);
+ useEffect(()=>{const update=()=>setRoute(readAdminLocation());window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
+ useEffect(()=>{if(!signedIn)return;const controller=new AbortController();
+  void api<{timezone:string}>('/control/admin-preferences',undefined,controller.signal).then(r=>{if(!controller.signal.aborted)setTimezone(r.timezone);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});
+  return()=>controller.abort();
+ },[signedIn]);
+ async function authenticated(next?:string[]){setSession(await api<Session>('/session'));if(next)setCodes(next);}
+ async function run(work:()=>Promise<void>){
+  if(busy)return;setBusy(true);setError('');try{await work();}catch(e){setError(e instanceof Error?e.message:'Не удалось выполнить действие.');}finally{setBusy(false);}
+ }
+ return <AdminTimezoneProvider value={timezone}><div className={styles.page+' '+styles.entryPage+' '+shell.page} data-admin-shell>
+ <header className={shell.header}>
+  <div className={shell.headerBar}><div className={shell.identity}><Brand/><span>Управление</span></div>
+   {signedIn&&<div className={shell.headerActions}>
+    <button className={common.iconButton} aria-label="Обновить данные" title="Обновить данные" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/></button>
+    <a className={common.button} href={adminLink('account')} aria-current={route.tab==='account'?'page':undefined}><UserRound size={17}/>Аккаунт</a>
+    <button className={common.button} disabled={busy} onClick={()=>setExit(true)}>Выйти</button>
+   </div>}
+  </div>
+  {signedIn&&<nav className={shell.nav} aria-label="Разделы админки">{sections.map(({id,name,Icon})=><a key={id} href={adminLink(id)} aria-current={route.tab===id?'page':undefined}><Icon size={17}/>{name}</a>)}</nav>}
+ </header>
+ {error&&<p role="alert" className={styles.error}>{error}</p>}
+ {!loaded?<p role="status">Проверяем сессию…</p>:initialLink.kind==='reset'&&!resetDone?<section className={styles.card}><h1>Новый пароль администратора</h1>
+ <form onSubmit={e=>{e.preventDefault();const password=newPassword.read(new FormData(e.currentTarget));if(password===null)return;void run(async()=>{await api('/security/reset',{token:initialLink.token,newPassword:password});setResetDone(true);setSession(null);});}}>
+ {newPassword.fields}<button className={styles.primary} disabled={busy||!initialLink.token}>Сохранить пароль</button></form></section>:!session?
+ <main className={styles.landing+' '+shell.entry}><div><p className={styles.eyebrow}>Для администраторов</p><h1>Панель управления CashNeuro</h1><p>Управляйте доступом пользователей, заявками и платежами.</p></div><ServerAuth control onAuthenticated={authenticated}/></main>:
+ !signedIn?<ServerAuth key={session.scope} control enrollment onAuthenticated={authenticated}/>:<>
+ {codes.length>0&&<section className={styles.card}><h2>Сохраните резервные коды</h2><p>Коды показываются один раз. Для восстановления потребуется текущий пароль и один неиспользованный код.</p><pre className={styles.codes}>{codes.join('\n')}</pre><button className={styles.secondary} onClick={()=>setCodes([])}>Коды сохранены</button></section>}
+ <main className={shell.main}><h1>{route.tab==='account'?'Аккаунт':sections.find(s=>s.id===route.tab)?.name}</h1>
+  {route.tab==='users'&&<ServerManualAccess refresh={refresh} target={route.id}/>}
+  {route.tab==='requests'&&<ServerRequests refresh={refresh} target={route.id} initialSearch={route.search} filters={requestFilters} onFilters={setRequestFilters}/>}
+  {route.tab==='payments'&&<ServerCheckoutQueue refresh={refresh} target={route.id} initialSearch={route.search}/>}
+  {route.tab==='tariffs'&&<ServerCommerceCatalog refresh={refresh}/>}
+  {route.tab==='invitations'&&<ServerInvitations refresh={refresh} target={route.id}/>}
+  {route.tab==='deliveries'&&<ServerDeliveries refresh={refresh} target={route.id}/>}
+  {route.tab==='history'&&<ServerAdminHistory refresh={refresh} initialSearch={route.search}/>}
+  {route.tab==='account'&&<ServerAdminAccount email={session.email??''} timezone={timezone} onTimezone={setTimezone}/>}
+ </main>
+ </>}
+ {exit&&<SignOutConfirmation busy={busy} onClose={()=>setExit(false)} onConfirm={()=>{setExit(false);void run(async()=>{await api('/auth/sign-out',{});setSession(null);setCodes([]);setRequestFilters(initialRequestFilters);});}}/>}
+ <LegalFooter origin={import.meta.env.VITE_FINANCE_ORIGIN}/></div></AdminTimezoneProvider>;
 }
