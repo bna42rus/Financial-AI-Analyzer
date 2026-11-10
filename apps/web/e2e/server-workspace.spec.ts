@@ -857,3 +857,20 @@ test('public demo uses connected screens and leaves the signed-in API and browse
  expect(calls).toEqual([]);
  expect(await page.evaluate(()=>Object.keys(localStorage))).toEqual([]);
 });
+
+
+test('opening and closing a connected dialog never shifts the page shell',async({page})=>{
+ await setup(page);
+ const shell=page.locator('header').first();
+ const before=await shell.boundingBox();
+ expect(before).not.toBeNull();
+ await page.getByRole('button',{name:'Аккаунт',exact:true}).click();
+ await expect(page.getByRole('dialog',{name:'Аккаунт',exact:true})).toBeVisible();
+ const during=await shell.boundingBox();
+ expect(during).not.toBeNull();
+ expect(Math.abs(during!.x-before!.x)).toBeLessThan(1);
+ await page.getByRole('dialog',{name:'Аккаунт',exact:true}).getByRole('button',{name:'Готово'}).click();
+ await expect(page.getByRole('dialog',{name:'Аккаунт',exact:true})).toHaveCount(0);
+ const after=await shell.boundingBox();
+ expect(Math.abs(after!.x-before!.x)).toBeLessThan(1);
+});
