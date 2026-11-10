@@ -68,11 +68,11 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
   const messages = () => pg.owner.query("SELECT id,answer FROM finance.analyzer_message WHERE user_id='task-browser' ORDER BY created_at,id").then(r => r.rows);
   async function send(text: string) { const field = page.getByLabel('Ваш финансовый вопрос', { exact: true }); await field.fill(text); await page.getByRole('button', { name: 'Отправить вопрос', exact: true }).click(); }
   async function count(n: number) { await expect.poll(async () => (await messages()).length).toBe(n); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeDisabled(); }
-  async function idle() { await expect(page.getByRole('button', { name: 'Фильтры', exact: true })).toBeEnabled(); }
+  async function idle() { await expect(page.getByRole('group', { name: 'Общие фильтры' }).getByLabel('С даты', { exact: true })).toBeEnabled(); }
   try {
     await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Войти', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
-    await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
-    await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
+    const filters = page.getByRole('group', { name: 'Общие фильтры' });
+    await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await idle();
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();
     assert.equal((await messages())[0]!.answer.result.totals.expenses, '24690');
     await expect(page.getByRole('log', { name: 'Сообщения диалога' })).toContainText('246,90 ₽'); assert.equal(calls, 2);
