@@ -31,7 +31,7 @@ export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,s
  const roleConflict=patch.kind!==undefined&&!allowedOperationRoles(kind,op.amountMinor).includes(role);
  const repeatable=!!ruleHint&&Object.keys(patch).some(k=>['kind','role','categoryId','subcategoryId'].includes(k))&&Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId'].includes(k));
  const ready=Object.keys(patch).length>0&&!roleError&&!roleConflict&&(!remember||repeatable)&&(!requireSimilarSelection||similarIds.length>0)&&!disabled;
- const showCategories=wantsCategory&&(needCategory||needRole&&!s.category.value);
+ const showCategories=wantsCategory&&(needCategory||!s.category.value||needRole&&role!==s.role.value);
  const categoryFields=<>
   <OperationField label="Категория"><SearchFilter label="Выберите категорию" single fullWidth options={[['','Без категории'],...roots.map(c=>[c.id,c.name] as const)]} value={[cat]} disabled={disabled||!wantsCategory||!roots.length} onChange={ids=>{setCat(ids[0]??'');setSub('');}}/></OperationField>
   <OperationField label="Подкатегория"><SearchFilter label="Подкатегория" single fullWidth options={[['','Без подкатегории'],...children.map(c=>[c.id,cat?c.name:(roots.find(r=>r.id===c.parentId)?.name??'')+' / '+c.name] as const)]} value={[sub]} disabled={disabled||!wantsCategory||!children.length} onChange={ids=>{const id=ids[0]??'';setSub(id);const parent=children.find(c=>c.id===id)?.parentId;if(parent)setCat(parent);}}/></OperationField>
@@ -45,9 +45,9 @@ export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,s
   {needKind&&kindField}{(needRole||needKind)&&roleField}{showCategories&&categoryFields}
   {has('possible_duplicate','unlinked_refund','dependency_conflict','component_conflict','incomplete_credit_data','source_timezone_unknown','source_timezone_conflict','posted_timezone_unknown','posted_timezone_conflict')&&<button type="button" className={common.button} onClick={onOpen}>Открыть карточку для проверки</button>}
   <details className={layout.reviewOtherFields}><summary>Другие поля</summary><div className={fields.form}>
-   <OperationField label="Магазин"><input value={merchant} maxLength={160} onChange={e=>setMerchant(e.target.value)}/></OperationField>{!needKind&&kindField}{!needRole&&!needKind&&roleField}{!showCategories&&categoryFields}
+   <OperationField label="Магазин"><input className={layout.reviewInput} value={merchant} maxLength={160} onChange={e=>setMerchant(e.target.value)}/></OperationField>{!needKind&&kindField}{!needRole&&!needKind&&roleField}{wantsCategory&&!showCategories&&categoryFields}
    <OperationField label="Контрагент"><SearchFilter label="Контрагент" single fullWidth disabled={disabled} value={[party]} onChange={([id])=>setParty(id??'')} options={[['','Без контрагента'],...state.counterparties.filter(p=>p.state==='registered'||p.id===party).map(p=>[p.id,p.name] as const)]}/></OperationField>
-   <OperationField label="Комментарий"><input value={comment} maxLength={1000} onChange={e=>setComment(e.target.value)}/></OperationField>
+   <OperationField label="Комментарий"><input className={layout.reviewInput} value={comment} maxLength={1000} onChange={e=>setComment(e.target.value)}/></OperationField>
    {has('user_requested_review')&&<button type="button" className={common.button} onClick={()=>onApply({kind:'bulk_operations',operationIds:[op.id],patch:{reviewRequested:false}})}>Снять свою отметку проверки</button>}
   </div></details>
   <div className={layout.reviewOptions}>

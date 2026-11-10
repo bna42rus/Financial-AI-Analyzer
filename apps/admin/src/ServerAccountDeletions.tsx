@@ -24,7 +24,7 @@ export function AccountDeletionReview({target,onClose,onComplete}:{target:Deleti
  }
  return <OperationDialog compact title="Подтвердить удаление аккаунта" onClose={()=>{if(!busy)onClose();}} footer={<>
   <button className={common.button} disabled={busy} onClick={onClose}>Отмена</button>
-  <button className={preview?common.dangerButton:common.primaryButton} disabled={busy} onClick={()=>void submit()}>{preview?'Удалить аккаунт':'Проверить данные'}</button>
+  <button className={preview?common.dangerButton:common.primaryButton} disabled={busy} onClick={()=>void submit()}>{preview?'Удалить аккаунт':'Продолжить'}</button>
  </>}>
   <div className={styles.renewalBody}><p><strong>{target.email}</strong> подтвердил заявку {time.format(target.requestedAt)}.</p>
    <p>Будут удалены профиль и данные кабинета. Сеансы завершатся, автопродление отключится. Платёжные сведения и подтверждение удаления хранятся отдельно.</p>

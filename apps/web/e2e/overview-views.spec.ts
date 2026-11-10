@@ -35,7 +35,7 @@ async function setup(page:Page,number=2){
    }
   }
   await route.fulfill({status,headers,json:result});
- });await page.goto(base);await expect(page.getByRole('button',{name:'Представления обзора',exact:true})).toContainText('One');await expect(page.getByRole('article',{name:'Виджет: Расходы по категориям',exact:true})).toBeVisible();return h;
+ });await page.goto(base+'#workspace');await expect(page.getByRole('button',{name:'Представления обзора',exact:true})).toContainText('One');await expect(page.getByRole('article',{name:'Виджет: Расходы по категориям',exact:true})).toBeVisible();return h;
 }
 async function menu(page:Page){await page.getByRole('button',{name:'Представления обзора',exact:true}).click();return page.getByRole('dialog',{name:'Представления обзора',exact:true});}
 async function action(page:Page,name:string,label:string){const m=await menu(page);await m.getByLabel('Действия представления: '+name,{exact:true}).click();await page.getByRole('dialog',{name:'Действия представления: '+name,exact:true}).getByRole('button',{name:label,exact:true}).click();}

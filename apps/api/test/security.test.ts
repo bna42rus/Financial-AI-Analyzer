@@ -872,9 +872,22 @@ test('admin workspace keeps display preference, account suspension, and expiry i
  assert.equal(audit.changes[0].after,'Доступ приостановлен');
  assert.equal((await admin.post('/control/user-status',{...blocked,actionId:crypto.randomUUID(),status:'active'})).statusCode,200);
  assert.equal((await a.b.get('/session')).json().scope,'active');
- const command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,quota:{source:'override',budgetMinor:'12500'},reason:'Adjust independent cost budget'});
- assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);
+ await pg.owner.query("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor,status,paid_at) VALUES($1,$2,2000,6900,'paid',now())",[a.userId,crypto.randomUUID()]);
+ const command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,quota:{source:'override',budgetMinor:'7600'},reason:'Adjust included units'});
+ const saved=await admin.post('/control/manual-access',command);
+ assert.equal(saved.statusCode,200,saved.body);
  assert.equal((await a.b.get('/session')).json().accessEnd,before);
+ const customer=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;
+ assert.deepEqual(customer,{limit:7600,remaining:7600,extra:2000,resetAt:before,manual:true});
+ const projected=(await admin.get('/control/accesses')).json().users.find((row:{userId:string})=>row.userId===a.userId).analyzer;
+ assert.equal(projected.remaining,customer.remaining);
+ assert.equal(projected.purchased,customer.extra);
+ const extend=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:5},reason:'Extend without a second allowance'});
+ assert.equal((await admin.post('/control/manual-access',extend)).statusCode,200);
+ const extended=(await a.b.get('/session')).json().accessEnd;
+ assert.equal((await a.b.post('/finance/analyzer-state',{})).json().customerBudget.resetAt,extended);
+ assert.ok(Date.parse(extended)>Date.parse(before));
+
 });
 
 test('catalog creation and pack unit edits preserve existing top-up snapshots and record only changes',async()=>{
@@ -894,6 +907,13 @@ test('catalog creation and pack unit edits preserve existing top-up snapshots an
  assert.equal(modified.statusCode,200,modified.body);
  assert.equal(modified.json().packs.find((p:{id:string})=>p.id===pack.id).units,1750);
  assert.deepEqual((await pg.owner.query('SELECT units,price_minor FROM commerce.ai_topup_order WHERE id=$1',[order])).rows[0],{units:1500,price_minor:5900});
+ const archivePlan=await admin.post('/control/commerce-catalog-archive',{kind:'plan',id:created.id,expectedVersion:edited.json().plans[0].catalogVersion});
+ assert.equal(archivePlan.statusCode,200,archivePlan.body);assert.equal(archivePlan.json().plans.length,0);
+ assert.equal((await pg.owner.query("SELECT snapshot->>'archived' AS archived FROM access.tariff WHERE id=$1",[created.id])).rows[0].archived,'true');
+ const archivePack=await admin.post('/control/commerce-catalog-archive',{kind:'pack',id:pack.id,expectedUnits:1750,expectedPriceMinor:6900,expectedEnabled:true});
+ assert.equal(archivePack.statusCode,200,archivePack.body);assert.ok(!archivePack.json().packs.some((p:{id:string})=>p.id===pack.id));
+ assert.deepEqual((await pg.owner.query('SELECT units,price_minor FROM commerce.ai_topup_order WHERE id=$1',[order])).rows[0],{units:1500,price_minor:5900});
+
 });
 
 test('payment reconciliation uses verified provider identity and full refund closes a first-access invitation',async()=>{

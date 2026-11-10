@@ -60,6 +60,11 @@ export async function register(db:PoolClient,request:FastifyRequest,seal:Sealer,
   await db.query("SELECT set_config('app.user_id',$1,true)",[id]);
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy) VALUES($1,$2,$3,'Europe/Moscow',$4,$5,$6,$7,$8)`,[id,times.start,times.finish,duration.kind==='calendar_months'?duration.count:0,duration.kind==='days'?duration.count:0,indefinite,fixed?times.finish.getTime()-times.start.getTime():0,quotaPolicy]);
   if(grant&&quotaPolicy.source==='tariff')await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[id,times.start,quotaPolicy.limit,quotaPolicy.periodDays??null]);
+  if(grant&&quotaPolicy.source==='override'&&times.finish){
+   await db.query('SELECT commerce.start_customer_allowance($1,$2,$3)',[times.start,times.finish,quotaPolicy.budgetMinor!==undefined?Number(quotaPolicy.budgetMinor):quotaPolicy.limit]);
+   if(quotaPolicy.budgetMinor!==undefined)await db.query("UPDATE commerce.access_cycle SET quota_policy=jsonb_build_object('source','override','limit',$2::int) WHERE user_id=$1",[id,Number(quotaPolicy.budgetMinor)]);
+  }
+  if(grant&&quotaPolicy.source==='override'&&indefinite&&quotaPolicy.budgetMinor===undefined)await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units) VALUES($1,$2,$3)',[id,times.start,quotaPolicy.limit]);
   if(purchase&&times.finish&&!indefinite&&!fixed)await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[id,times.start,times.finish,duration.kind,paidAnalyzerUnits(purchase.data.tariff.id,duration.kind,quotaPolicy.limit)]);
   await db.query(`UPDATE commerce.invitation SET state='used',used_at=$1 WHERE id=$2`,[times.start,invite.id]);
   await db.query('UPDATE access.registration_proof SET consumed_at=$1 WHERE invitation_id=$2',[times.start,invite.id]);

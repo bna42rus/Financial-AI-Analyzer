@@ -386,6 +386,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regclass('commerce.manual_allowance') IS NOT NULL", '0045_admin_operations.sql'),
         ("SELECT to_regclass('identity.account_deletion') IS NOT NULL", '0046_account_deletion.sql'),
         ("SELECT to_regclass('control.display_preferences') IS NOT NULL", '0047_admin_workspace.sql'),
+        ("SELECT to_regclass('commerce.customer_allowance_override') IS NOT NULL", '0048_customer_allowance.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')

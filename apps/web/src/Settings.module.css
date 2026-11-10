@@ -217,3 +217,5 @@
 
 .reviewOtherFields { margin-top:6px; }
 .reviewOtherFields > summary + div { margin-top:4px; }
+
+.reviewOtherFields .reviewInput{font:inherit}

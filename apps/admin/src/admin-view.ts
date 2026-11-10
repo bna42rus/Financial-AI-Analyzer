@@ -1,3 +1,4 @@
+import {useNotices} from '../../web/src/Notifications';
 import {createContext,useContext,useEffect,useState} from 'react';
 import {api} from '../../web/src/server-client';
 import {deviceZone,timezoneLabel} from '../../web/src/InterfaceSettings';
@@ -54,4 +55,9 @@ export function useAdminData<T>(endpoint:string,refresh:number){
   return()=>controller.abort();
  },[endpoint,refresh,retry]);
  return {data,setData,error,loading,reload:()=>setRetry(n=>n+1)};
+}
+
+export function useAdminNotice(){
+ const notices=useNotices();
+ return (title:string)=>notices?.push({id:crypto.randomUUID(),title,duration:15000});
 }

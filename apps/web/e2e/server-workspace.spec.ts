@@ -42,7 +42,7 @@ async function setup(page:Page,empty=false,duringInitialLoad?:()=>Promise<void>)
  }state.revision=(BigInt(state.revision)+1n).toString();result={status:'committed',actionId:body.actionId,generation:state.generation,revision:state.revision};}
  await route.fulfill({status,headers,contentType:'application/json',body:JSON.stringify(result)});
  });
- await page.goto(base);await expect(page.getByRole('navigation',{name:'Разделы сайта',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();if(duringInitialLoad){await expect.poll(()=>summaryWaiting).toBe(true);try{await duringInitialLoad();}finally{releaseSummary();}}await expect(page.getByRole('status').filter({hasText:'Загружаем финансовые'})).toHaveCount(0,{timeout:duringInitialLoad?2000:5000});
+ await page.goto(base+'#workspace');await expect(page.getByRole('navigation',{name:'Разделы сайта',exact:true})).toBeVisible();await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();if(duringInitialLoad){await expect.poll(()=>summaryWaiting).toBe(true);try{await duringInitialLoad();}finally{releaseSummary();}}await expect(page.getByRole('status').filter({hasText:'Загружаем финансовые'})).toHaveCount(0,{timeout:duringInitialLoad?2000:5000});
  return {state,detail,calls,block:()=>{blocked=true;},loseCommit:()=>{lostCommit=true;}};
 }
 async function section(page:Page,title:string){await page.getByRole('link',{name:'Настройки',exact:true}).click();await page.getByRole('navigation',{name:'Подразделы настроек'}).getByRole('button',{name:new RegExp('^'+title)}).click();await expect(page.getByRole('heading',{name:title,exact:true})).toBeVisible();}
@@ -358,9 +358,9 @@ test('refresh preserves an unsaved card name and requires a deliberate conflict 
 test('start screen and default period follow device preferences and profile timezone while explicit links win',async({page})=>{
  await setup(page);await page.clock.setFixedTime(new Date('2026-10-10T01:00:00Z'));await section(page,'Интерфейс');
  await chooseOption(page.getByLabel('Стартовый экран',{exact:true}),'operations');await chooseOption(page.getByLabel('Период по умолчанию',{exact:true}),'current_month');await page.getByRole('button',{name:'Применить',exact:true}).click();
- await page.goto(base);await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
+ await page.goto(base);await page.getByRole('link',{name:'Открыть кабинет'}).click();await expect(page.getByRole('heading',{name:'Операции',exact:true})).toBeVisible();
  await expect(page.getByLabel('С даты',{exact:true})).toHaveValue('01.10.2026');await expect(page.getByLabel('По дату',{exact:true})).toHaveValue('09.10.2026');
- await page.getByRole('link',{name:'CashNeuro — Финансовый анализатор',exact:true}).click();await expect(page.getByRole('heading',{name:'Обзор',exact:true})).toBeVisible();
+ await page.getByRole('link',{name:'CashNeuro — Финансовый анализатор',exact:true}).click();await expect(page.getByRole('link',{name:'Открыть кабинет'})).toBeVisible();await expect(page).toHaveURL(base);
  await page.goto(base+'#analyzer');await expect(page.getByRole('heading',{name:'Анализатор',exact:true})).toBeVisible();
  const stored=await page.evaluate(()=>localStorage.getItem('finance-navigation-v1'));expect(JSON.parse(stored!)).toEqual({startScreen:'operations',defaultPeriod:'current_month'});
 });

@@ -41,16 +41,16 @@
 .legalChoice input[type=checkbox] { width:auto; margin:3px 0; }
 .legalChoice label { display:block; }
 
-.entryPage{display:flex;flex-direction:column;max-width:1060px;min-height:100dvh}
+.entryPage{display:flex;flex-direction:column;width:100%;max-width:1280px;min-height:100dvh;min-width:0}
 .entryPage{padding-bottom:0}
 .entryPage>footer{margin-top:auto}
-.entryPage:not([data-admin-shell])>:not(footer):has(+footer){margin-bottom:24px}
+
 .entryNav{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
 .entryCard,.authWrap{width:100%;max-width:540px;margin:18px auto 32px}
 .authWrap .card{margin-bottom:12px}
 .authActions{display:flex;align-items:stretch;gap:8px}
 .authActions>button{min-width:0;text-align:center}
-.authRecovery{margin-top:12px;padding:4px 0;border:0;background:none;color:var(--color-primary);text-decoration:underline;text-underline-offset:3px}
+.authRecovery{margin-top:12px;padding:4px 0;border:0;background:none;color:var(--color-primary);text-decoration:none;text-underline-offset:3px}
 .authActions:has(>button:nth-child(3)){flex-wrap:wrap}
 @media(max-width:480px){.authActions>button{padding-inline:10px}}
 .entryFootnote{text-align:center;color:var(--color-secondary-text)}
@@ -96,3 +96,20 @@
 .landingTrack{display:block;height:5px;border-radius:999px;background:var(--color-soft);overflow:hidden}
 .landingTrack>span{display:block;height:100%;border-radius:inherit;background:var(--color-primary)}
 .landingDemoButton{display:flex;justify-content:center;gap:8px;margin-top:18px}
+
+.entryPage{padding:0 var(--workspace-gutter,24px)}
+.entryPage>.header{min-height:60px;padding:9px 0;margin:0}
+.entryPage :where(.landing,.entryCard,.authWrap){margin:0 auto}
+.entryContent{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:safe center;gap:12px;padding-block:24px}
+.entryContent>.landing{width:100%}
+.entryContent>.card:not(.entryCard){width:min(100%,540px);margin:0 auto}
+.accountPage{width:min(100%,850px);max-width:none;border:1px solid var(--color-border);border-radius:20px;background:var(--color-surface);overflow:hidden}
+.accountPage>h1{font-size:calc(21px * var(--text-scale,1));font-weight:500;margin:0;padding:16px 18px;border-bottom:1px solid var(--color-border)}
+.accountPageBody{padding:14px 18px}
+.accountPageFooter{display:flex;justify-content:flex-end;flex-wrap:wrap;gap:8px;padding:10px 18px;border-top:1px solid var(--color-border)}
+.legalLink,.entryCard .legalChoice label{font-size:inherit;font-weight:400}
+.deletionFootnote{color:var(--color-secondary-text);font-size:.875em}
+.authRecovery:is(:hover,:focus-visible){text-decoration:underline}
+@media(max-width:760px){.entryPage{--workspace-gutter:16px}}
+
+.accountWarning button{display:inline-flex;font:inherit}

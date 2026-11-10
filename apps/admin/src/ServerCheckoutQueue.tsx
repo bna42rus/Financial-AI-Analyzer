@@ -4,7 +4,7 @@ import {api,ApiError} from '../../web/src/server-client';
 import {SearchField,foldSearch} from '../../web/src/SearchFilter';
 import {moneyLabel} from '../../../packages/access/src/model';
 import {OperationDialog,OperationField} from '../../web/src/OperationDialog';
-import {adminLink,useAdminData,useAdminTime} from './admin-view';
+import {adminLink,useAdminData,useAdminTime,useAdminNotice} from './admin-view';
 import styles from '../../web/src/ServerAccess.module.css';
 import common from '../../web/src/App.module.css';
 import shell from './ServerAdmin.module.css';
@@ -30,22 +30,24 @@ export function ServerCheckoutQueue({refresh,target,initialSearch}:{refresh:numb
   <SelectField aria-label="Статус платежа" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Все статусы</option>{Object.entries(labels).filter(([key])=>key!=='created').map(([key,title])=><option key={key} value={key}>{title}</option>)}</SelectField>
  </div>
  {error&&<p className={styles.error} role="alert">{error}</p>}{loading&&!data&&<p role="status">Загружаем платежи…</p>}{visible?.length===0&&<p>{data?.orders.length?'Платежи не найдены.':'Платежей пока нет.'}</p>}
- <div className={shell.records}>{visible?.map(order=><PaymentRow key={order.id} order={order} highlight={order.id===target} onChanged={reload}/>)}</div>
+ <div className={shell.records+' '+shell.recordCards}>{visible?.map(order=><PaymentRow key={order.id} order={order} highlight={order.id===target} onChanged={reload}/>)}</div>
  </section>;
 }
 function PaymentRow({order,highlight,onChanged}:{order:Order;highlight:boolean;onChanged:()=>void}){
  const time=useAdminTime();
- const [form,setForm]=useState<''|'check'|'apply'>(''),[providerId,setProviderId]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false);
+ const [form,setForm]=useState<''|'check'|'apply'>(''),[providerId,setProviderId]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[confirmation,setConfirmation]=useState<string|null>(null);
  const refunds=order.refunds??[],returned=refunds.filter(row=>row.state==='succeeded').reduce((total,row)=>total+row.amountMinor,0);
  const paymentKind=order.channel==='first'?'Первый доступ':order.mode==='automatic'?'Автопродление':'Продление';
  const reviewed=order.reconciliation?.state==='verified'&&['succeeded','canceled'].includes(order.reconciliation.providerStatus??'');
  const processing=['checking','applying'].includes(order.reconciliation?.state??'');
+ const notify=useAdminNotice(),needsNumber=form==='check'&&!order.provider_id;
+ function validRef(){if(needsNumber&&!/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(providerId.trim())){setError('Введите номер платежа из кабинета ЮKassa.');return false;}return true;}
  async function submit(){
   if(!form||busy)return;
   const ref=providerId.trim();
-  if(form==='check'&&!order.provider_id&&!/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(ref)){setError('Введите номер платежа из кабинета ЮKassa.');return;}
+  if(!validRef())return;
   setBusy(true);setError('');
-  try{await api('/control/checkout-reconciliation',{actionId:crypto.randomUUID(),checkoutId:order.id,step:form,...(form==='check'&&!order.provider_id?{providerId:ref}:{})});setForm('');onChanged();}
+  try{await api('/control/checkout-reconciliation',{actionId:confirmation??crypto.randomUUID(),checkoutId:order.id,step:form,...(form==='check'&&!order.provider_id?{providerId:ref}:{})});notify(form==='check'?'Сверка поставлена в очередь.':'Применение результата поставлено в очередь.');setForm('');onChanged();}
   catch(e){setError(e instanceof Error?e.message:'Не удалось отправить запрос на сверку.');if(e instanceof ApiError&&e.code==='PAYMENT_RECONCILIATION_UNAVAILABLE')onChanged();}
   finally{setBusy(false);}
  }
@@ -66,24 +68,25 @@ function PaymentRow({order,highlight,onChanged}:{order:Order;highlight:boolean;o
     <p>{reconcileReasons[order.reconcile_reason??'']??'Проверьте операцию в ЮKassa.'}</p>
     {order.reconciliation?.providerStatus&&<p>ЮKassa · {providerStates[order.reconciliation.providerStatus]}</p>}
     {order.reconciliation?.message&&<p className={order.reconciliation.state==='unknown'?styles.error:undefined}>{order.reconciliation.message}</p>}
-    {processing?<p role="status">Проверяем платёж…</p>:<div className={styles.actions}>
-     <button className={styles.secondary} onClick={()=>{setError('');setProviderId(order.reconciliation?.providerId??'');setForm('check');}}>Сверить платёж</button>
-     {reviewed&&<button className={styles.primary} onClick={()=>{setError('');setForm('apply');}}>Применить результат</button>}
+    {processing?<p role="status">Проверяем платёж…</p>:<div className={shell.detailActions}>
+     <button className={styles.secondary} onClick={()=>{setError('');setProviderId(order.reconciliation?.providerId??'');setConfirmation(null);setForm('check');}}>Сверить платёж</button>
+     {reviewed&&<button className={styles.primary} onClick={()=>{setError('');setConfirmation(crypto.randomUUID());setForm('apply');}}>Применить результат</button>}
     </div>}
    </>}
    {refunds.length>0&&<section><h3>Возвраты</h3><ul>{refunds.map(r=><li key={r.id}>{moneyLabel(String(r.amountMinor))} · {time.format(r.at)} · {r.state==='succeeded'?'Подтверждён':r.state==='pending'?'Обрабатывается':'Отменён'}</li>)}</ul></section>}
-   <div className={styles.actions}>
+   {(order.application_id||order.user_id||order.provider_id&&order.status==='paid'&&returned<Number(order.price_minor))&&<div className={shell.detailActions}>
     {order.application_id&&<a className={styles.secondary} href={adminLink('requests',{id:order.application_id})}>Открыть заявку</a>}
     {order.user_id&&<a className={styles.secondary} href={adminLink('users',{id:order.user_id})}>{returned>0?'Проверить доступ':'Открыть пользователя'}</a>}
     {order.provider_id&&order.status==='paid'&&returned<Number(order.price_minor)&&<a className={styles.secondary} href="https://yookassa.ru/my/" target="_blank" rel="noreferrer">Открыть кабинет ЮKassa</a>}
-   </div>
+   </div>}
   </div></details>
-  {form&&<OperationDialog narrow title={form==='check'?'Сверить платёж':'Применить результат сверки'} onClose={()=>{if(!busy)setForm('');}} footer={<>
-   <button className={common.button} disabled={busy} onClick={()=>setForm('')}>Отмена</button><button className={common.primaryButton} disabled={busy} onClick={()=>void submit()}>{form==='check'?'Проверить в ЮKassa':'Подтвердить'}</button>
+  {form&&<OperationDialog narrow title={confirmation?'Подтверждение сверки':form==='check'?'Сверить платёж':'Применить результат сверки'} onClose={()=>{if(!busy)setForm('');}} footer={<>
+   <button className={common.button} disabled={busy} onClick={()=>{if(needsNumber&&confirmation){setConfirmation(null);setError('');}else setForm('');}}>{needsNumber&&confirmation?'Назад':'Отмена'}</button><button className={common.primaryButton} disabled={busy} onClick={()=>{if(needsNumber&&!confirmation){if(validRef())setConfirmation(crypto.randomUUID());}else void submit();}}>{needsNumber&&!confirmation?'Продолжить':'Подтвердить'}</button>
   </>}>
    <div className={styles.renewalBody}>
     <p>{form==='check'?'CashNeuro проверит статус, сумму и связь платежа с заказом.':order.reconciliation?.providerStatus==='succeeded'?'Если ЮKassa подтверждает оплату, CashNeuro завершит обработку заказа.':'Если ЮKassa подтверждает отмену, CashNeuro закроет попытку оплаты.'}</p>
-    {form==='check'&&!order.provider_id?<OperationField label="Номер платежа в ЮKassa" error={error||undefined}><input value={providerId} maxLength={36} onChange={e=>{setProviderId(e.target.value);setError('');}}/></OperationField>:error&&<p className={styles.error} role="alert">{error}</p>}
+    {confirmation&&<p>Номер платежа: {order.provider_id??providerId}</p>}
+    {needsNumber&&!confirmation?<OperationField label="Номер платежа в ЮKassa" error={error||undefined}><input value={providerId} maxLength={36} onChange={e=>{setProviderId(e.target.value);setError('');}}/></OperationField>:error&&<p className={styles.error} role="alert">{error}</p>}
    </div>
   </OperationDialog>}
  </article>;

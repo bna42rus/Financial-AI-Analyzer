@@ -1,4 +1,4 @@
-import {paidAnalyzerUnits,unitsPerMonth} from './customer-ai-budget.ts';
+import {paidAnalyzerUnits} from './customer-ai-budget.ts';
 import {reserveMailRequest} from './mail-cooldown.ts';
 import type {PoolClient} from 'pg';
 import type {FastifyRequest} from 'fastify';
@@ -28,7 +28,7 @@ async function quota(db:PoolClient,value:unknown,fallback:QuotaPolicy|undefined)
  if(value===undefined){if(fallback)return fallback;throw new HttpError(400,'QUOTA_REQUIRED');}
  const q=object(value,['source','tariffId','limit','budgetMinor']);
  if(q.source==='override'&&Object.keys(q).length===2){
-  if(typeof q.budgetMinor==='string'&&/^\d{1,7}$/.test(q.budgetMinor))return {source:'override',limit:unitsPerMonth,budgetMinor:BigInt(q.budgetMinor).toString()};
+  if(typeof q.budgetMinor==='string'&&/^\d{1,7}$/.test(q.budgetMinor))return {source:'override',limit:Number(q.budgetMinor)};
   return {source:'override',limit:limit(q.limit)};
  }
  if(q.source==='tariff'&&Object.keys(q).length===2){
@@ -48,7 +48,7 @@ export async function manualQueue(db:PoolClient,options?:{search:string;filter:s
   ORDER BY (d.user_id=$3) DESC,d.registered_at DESC,d.user_id LIMIT $4 OFFSET $5`,
   [options?.search??'',options?.filter??'',options?.target??'',size+1,(options?.page??0)*size])).rows;
  const hasMore=users.length>size;users.splice(size);
- const limits=new Map((await db.query('SELECT * FROM commerce.control_analyzer_limits()')).rows.map(r=>[r.user_id,{units:r.units,spentAtoms:r.spent_atoms,budgetMinor:r.budget_minor,resetAt:r.reset_at?.toISOString()??null}]));
+ const limits=new Map((await db.query('SELECT * FROM commerce.control_customer_allowances($1)',[users.map(u=>u.user_id)])).rows.map(r=>[r.user_id,{units:r.units,remaining:r.remaining,used:r.used,purchased:r.purchased,manual:r.manual,spentAtoms:r.spent_atoms,budgetMinor:r.budget_minor,resetAt:r.reset_at?.toISOString()??null}]));
  const invites=options?[]:(await db.query(`SELECT i.id,i.manual_grant_id AS "grantId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",
   COALESCE((SELECT d.state FROM mail.delivery d WHERE d.subject_id=i.id AND d.kind='invitation' ORDER BY d.created_at DESC LIMIT 1),'queued') AS delivery,CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state,
   g.term,g.access_type AS "accessType",g.quota_policy AS quota,g.reason FROM commerce.invitation i JOIN commerce.manual_grant g ON g.id=i.manual_grant_id ORDER BY i.created_at DESC,i.id DESC LIMIT 100`)).rows;
@@ -67,6 +67,7 @@ async function newInvitation(db:PoolClient,grantId:string,address:string,lifetim
  const secret=token(),id=crypto.randomUUID(),expires=new Date(Date.parse(now)+lifetime*3600000).toISOString();
  await db.query(`INSERT INTO commerce.invitation(id,manual_grant_id,email,verifier,sealed_token,expires_at,state,created_at) VALUES($1,$2,$3,$4,$5,$6,'active',$7)`,[id,grantId,address,digest(secret),seal.seal(secret),expires,now]);
  await outbox(db,'access',seal,'invitation',{email:address,token:secret,expiresAt:expires},{subjectId:id,expiresAt:expires});
+ return expires;
 }
 export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean){
  const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota']);
@@ -107,6 +108,7 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    next={...next,accessEnd:end,indefinite:false,endOffsetMs:Date.parse(end)-Date.parse(grid)};
   }
  }
+ if(mode==='quota'&&q.source==='override'&&next&&!next.indefinite&&(!next.accessEnd||Date.parse(next.accessEnd)<=Date.parse(now)))throw new HttpError(409,'ALLOWANCE_ACCESS_EXPIRED');
  const paidUntil=mode==='quota'&&account&&q.source==='tariff'?(await db.query("SELECT commerce.control_paid_allowance_end($1) AS finish",[userId])).rows[0]?.finish:null;
  const result:ManualPreview={...(paidUntil?{effectiveAt:paidUntil.toISOString()}:{}),mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
  if(preview)return result;
@@ -121,8 +123,15 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,revision,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET anchor_at=EXCLUDED.anchor_at,access_end=EXCLUDED.access_end,revision=EXCLUDED.revision,calendar_months=EXCLUDED.calendar_months,extra_days=EXCLUDED.extra_days,indefinite=EXCLUDED.indefinite,end_offset_ms=EXCLUDED.end_offset_ms,quota_policy=EXCLUDED.quota_policy`,
    [userId,next.anchorAt,next.accessEnd,next.timezone,next.revision,next.calendarMonths,next.extraDays,next.indefinite??false,next.endOffsetMs??0,q]);
+  if(b.quota&&q.source==='override'&&next.accessEnd&&Date.parse(next.accessEnd)>Date.parse(now)){
+   const saved=(await db.query('SELECT commerce.set_customer_allowance($1,$2,$3,$4) AS saved',[userId,now,next.accessEnd,q.limit])).rows[0]?.saved;
+   if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
+  }else if(mode!=='quota'){
+   await db.query('SELECT commerce.move_customer_allowance_end($1,$2,$3)',[userId,now,b.quota?null:next.accessEnd]);
+  }
+  if(b.quota&&q.source==='override'&&next.indefinite)await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units) VALUES($1,$2,$3)',[userId,now,q.limit]);
   if(b.quota&&q.source==='tariff'&&!same(q,before?.quotaPolicy))await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[userId,now,q.limit,q.periodDays??null]);
-  await outbox(db,'access',seal,mode==='quota'?'manual_quota_changed':'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'&&q.budgetMinor!==undefined?{analyzerBudgetMinor:q.budgetMinor}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
+  await outbox(db,'access',seal,mode==='quota'?'manual_quota_changed':'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'?{analyzerUnits:q.limit}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
  }
  const audit={changes:mode==='quota'?[{label:'Политика лимита Анализатора',before:before?.quotaPolicy??null,after:q}]:[],actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
  await db.query('INSERT INTO commerce.manual_access_audit(action_id,user_id,data,created_at) VALUES($1,$2,$3,$4)',[id,userId??null,audit,now]);
@@ -141,7 +150,9 @@ export async function manualInvitationAction(db:PoolClient,request:FastifyReques
  const now=await clock(db);
  if(b.decision==='reissue'&&grant.term.kind==='fixed'&&Date.parse(grant.term.end)<=Date.parse(now))throw new HttpError(409,'INVALID_END');
  await db.query('UPDATE commerce.invitation SET state=$1 WHERE id=$2',[b.decision==='cancel'?'cancelled':'superseded',inviteId]);
- if(b.decision==='reissue'){await reserveMailRequest(db,seal,'control','invitation-resend',ref.email);await newInvitation(db,grant.id,ref.email,lifetime,seal,now);}
- await db.query('INSERT INTO commerce.manual_access_audit(action_id,data,created_at) VALUES($1,$2,$3)',[id,{actionId:id,actorId,at:now,email:ref.email,userId:null,mode:'invitation_'+b.decision,reason,before:null,after:null,quota:grant.quota_policy},now]);
+ let newExpiry:string|null=null;
+ if(b.decision==='reissue'){await reserveMailRequest(db,seal,'control','invitation-resend',ref.email);newExpiry=await newInvitation(db,grant.id,ref.email,lifetime,seal,now);}
+ const changes=b.decision==='cancel'?[{label:'Статус ссылки',before:'Действует',after:'Отменена'}]:[{label:'Срок ссылки',before:invite.expires_at,after:newExpiry}];
+ await db.query('INSERT INTO commerce.manual_access_audit(action_id,data,created_at) VALUES($1,$2,$3)',[id,{actionId:id,actorId,at:now,email:ref.email,userId:null,mode:'invitation_'+b.decision,reason,before:null,after:null,quota:grant.quota_policy,changes},now]);
  return {status:'committed',...await manualQueue(db)};
 }

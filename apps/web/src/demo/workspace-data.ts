@@ -36,16 +36,17 @@ export function monthStart(today=calendarDay(new Date(),demoTimezone),offset=0){
 export function demoGraph(now=new Date()):Graph{
  const today=calendarDay(now,demoTimezone);
  const operations:Operation[]=Array.from({length:573},(_,i)=>{
-  const group=(i*19+Math.floor(i/11))%groups.length;
+  const exampleReview=i===19||i===20;
+  const group=exampleReview?1:(i*19+Math.floor(i/11))%groups.length;
   const salary=i%53===9,cashback=i%43===12,transfer=i%37===18,refund=i%47===27;
   const rent=i%113===5,person=i%77===15;
   const kind:Kind=rent||person?'transfer_out':salary?'transfer_in':cashback?'cashback':transfer?'own_transfer':refund?'refund':'purchase';
-  const name=rent?'Оплата аренды':person?'Перевод Алексею К.':salary?'Зарплата':cashback?'Кешбэк':transfer?'На накопительный счёт':groups[group]![(Math.floor(i/7)%3)+1]!;
+  const name=exampleReview?'Городское кафе':rent?'Оплата аренды':person?'Перевод Алексею К.':salary?'Зарплата':cashback?'Кешбэк':transfer?'На накопительный счёт':groups[group]![(Math.floor(i/7)%3)+1]!;
   const amount=rent?-3400000:person?-250000:salary?9150000:cashback?67500:transfer?-750000:refund?25900:-((i*7919)%147000+8700+(group===3?104000:0));
   const semantics=initialSemantics(kind,name,String(amount));
   if(kind==='transfer_in'&&salary)semantics.role=facet('income');
   if(kind==='refund'||rent)semantics.role=facet('expense');
-  const needsReview=i%113===102;
+  const needsReview=exampleReview||i%113===102;
   if(!transfer&&!person&&!needsReview)semantics.category=facet(id(rent?20:salary?18:cashback?19:10+group));
   if(rent)semantics.counterparty=facet(demoParties.landlord,'user',true);
   const date=dayAt(today,Math.floor(i*152/573));

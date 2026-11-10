@@ -8,7 +8,7 @@ type Pack={id:string;units:number;priceMinor:number;enabled:boolean};
 export type CatalogChange={label:string;before:unknown;after:unknown};
 export const catalogOrder="CASE WHEN snapshot->'duration'->>'kind'='days' THEN (snapshot->'duration'->>'count')::int ELSE (snapshot->'duration'->>'count')::int*31 END,id";
 export async function commerceCatalog(db:PoolClient){return {
- plans:(await db.query<{snapshot:Tariff}>(`SELECT snapshot FROM access.tariff WHERE id LIKE 'cashneuro-%' ORDER BY ${catalogOrder}`)).rows.map(r=>r.snapshot),
+ plans:(await db.query<{snapshot:Tariff}>(`SELECT snapshot FROM access.tariff WHERE id LIKE 'cashneuro-%' AND snapshot->>'archived' IS DISTINCT FROM 'true' ORDER BY ${catalogOrder}`)).rows.map(r=>r.snapshot),
  packs:(await db.query<Pack>('SELECT catalog_id AS id,units,price_minor AS "priceMinor",enabled FROM commerce.ai_pack ORDER BY units')).rows,
 };}
 const validInt=(value:unknown,min:number,max:number):value is number=>typeof value==='number'&&Number.isSafeInteger(value)&&value>=min&&value<=max;
@@ -22,7 +22,7 @@ export async function updateCommerceCatalog(db:PoolClient,input:unknown){
   if(r.id!==undefined&&(typeof r.id!=='string'||!/^cashneuro-[a-z0-9-]{1,85}$/.test(r.id)))throw new HttpError(400,'INVALID_INPUT');
   const id=r.id??'cashneuro-'+crypto.randomUUID();
   const previous=(await db.query<{snapshot:Tariff}>('SELECT snapshot FROM access.tariff WHERE id=$1 FOR UPDATE',[id])).rows[0]?.snapshot;
-  if(r.id&&!previous||previous&&r.expectedVersion!==undefined&&r.expectedVersion!==(previous.catalogVersion??0))throw new HttpError(409,'TARIFF_CHANGED');
+  if(r.id&&(!previous||(previous as Tariff&{archived?:boolean}).archived)||previous&&r.expectedVersion!==undefined&&r.expectedVersion!==(previous.catalogVersion??0))throw new HttpError(409,'TARIFF_CHANGED');
   const kind=r.durationKind??'calendar_months',count=r.count??r.months,aiQuota=r.aiQuota??previous?.aiQuota;
   if(kind!=='days'&&kind!=='calendar_months'||!validInt(count,1,kind==='days'?36500:120))throw new HttpError(400,'INVALID_TARIFF_DURATION');
   if(!validInt(aiQuota,0,1000000))throw new HttpError(400,'INVALID_TARIFF_LIMIT');
@@ -54,4 +54,24 @@ export async function updateCommerceCatalog(db:PoolClient,input:unknown){
   else await db.query('INSERT INTO commerce.ai_pack(units,price_minor,enabled) VALUES($1,$2,$3)',[r.units,Number(r.priceMinor),r.enabled]);
  }
  return {catalog:await commerceCatalog(db),audit:changes.length?{kind:previous?'pack':'pack_created',target:r.units+' единиц',changes}:null};
+}
+
+export async function archiveCatalogItem(db:PoolClient,input:unknown){
+ const r=object(input,['kind','id','expectedVersion','expectedUnits','expectedPriceMinor','expectedEnabled']);
+ if(typeof r.id!=='string'||r.id.length>100)throw new HttpError(400,'INVALID_INPUT');
+ await db.query('SELECT pg_advisory_xact_lock(92044)');
+ if(r.kind==='plan'&&/^cashneuro-[a-z0-9-]+$/.test(r.id)){
+  const previous=(await db.query<{snapshot:Tariff&{archived?:boolean}}>('SELECT snapshot FROM access.tariff WHERE id=$1 FOR UPDATE',[r.id])).rows[0]?.snapshot;
+  if(!previous)throw new HttpError(404,'NOT_FOUND');
+  if(previous.archived)return {catalog:await commerceCatalog(db),audit:null};
+  if(r.expectedVersion!==(previous.catalogVersion??0))throw new HttpError(409,'TARIFF_CHANGED');
+  await db.query('UPDATE access.tariff SET snapshot=$2 WHERE id=$1',[r.id,{...previous,active:false,publicVisible:false,archived:true,catalogVersion:(previous.catalogVersion??0)+1}]);
+  return {catalog:await commerceCatalog(db),audit:{kind:'tariff_archived',target:previous.name,changes:[{label:'Статус в каталоге',before:previous.active?'Опубликован':'Скрыт',after:'Архив'}]}};
+ }
+ if(r.kind!=='pack')throw new HttpError(400,'INVALID_INPUT');
+ const pack=(await db.query<Pack>('SELECT catalog_id AS id,units,price_minor AS "priceMinor",enabled FROM commerce.ai_pack WHERE catalog_id=$1 FOR UPDATE',[r.id])).rows[0];
+ if(!pack)return {catalog:await commerceCatalog(db),audit:null};
+ if(r.expectedUnits!==pack.units||r.expectedPriceMinor!==pack.priceMinor||r.expectedEnabled!==pack.enabled)throw new HttpError(409,'TARIFF_CHANGED');
+ await db.query('DELETE FROM commerce.ai_pack WHERE catalog_id=$1',[r.id]);
+ return {catalog:await commerceCatalog(db),audit:{kind:'pack_archived',target:pack.units+' единиц',changes:[{label:'Статус в каталоге',before:pack.enabled?'Доступен':'Скрыт',after:'Удалён'}]}};
 }

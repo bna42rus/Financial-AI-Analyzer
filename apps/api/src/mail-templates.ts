@@ -8,7 +8,7 @@ function origin(value:string){const u=new URL(value);if(u.origin!==value||!['htt
 function at(value:unknown){const date=new Date(String(value));if(!Number.isFinite(date.getTime()))throw new Error('INVALID_PAYLOAD');return date.toLocaleString('ru-RU',{timeZone:'Europe/Moscow'})+' (Москва)';}
 function money(value:unknown){if(typeof value!=='string'||!/^\d{1,19}$/.test(value))throw new Error('INVALID_PAYLOAD');const n=BigInt(value);return (n/100n).toString()+','+(n%100n).toString().padStart(2,'0')+' ₽';}
 export function describeDevice(userAgent:string|undefined){
- const s=(userAgent??'').slice(0,512),browser=/Edg\//.test(s)?'Edge':/Firefox\//.test(s)?'Firefox':/YaBrowser\//.test(s)?'Яндекс Браузер':/Chrome\//.test(s)?'Chrome':/Safari\//.test(s)?'Safari':'Неизвестный браузер';
+ const s=(userAgent??'').slice(0,512),browser=/YaBrowser\//i.test(s)?'Яндекс Браузер':/Edg(?:A|iOS)?\//.test(s)?'Edge':/Firefox\//.test(s)?'Firefox':/Chrome\//.test(s)?'Chrome':/Safari\//.test(s)?'Safari':'Неизвестный браузер';
  const device=/iPhone|iPad/.test(s)?'iPhone / iPad':/Android/.test(s)?'Android':/Windows/.test(s)?'Windows':/Macintosh/.test(s)?'Mac':/Linux/.test(s)?'Linux':'Неизвестное устройство';
  return browser+' · '+device;
 }

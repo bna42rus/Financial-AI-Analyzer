@@ -1,10 +1,8 @@
-.page{width:100%;min-width:0;max-width:var(--workspace-width,1280px);padding-inline:var(--workspace-gutter,24px)}
+.page{width:100%;min-width:0;max-width:1280px;padding-inline:var(--workspace-gutter,24px)}
 .header{position:relative;isolation:isolate;margin-bottom:1.15rem;border-bottom:1px solid var(--color-border)}
 .header::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--color-surface);box-shadow:0 0 0 100vmax var(--color-surface);clip-path:inset(0 -100vmax)}
-.headerBar,.headerActions,.identity,.listHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.headerBar,.headerActions,.listHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .headerBar{justify-content:space-between;padding-block:14px}
-.identity{align-items:baseline;gap:.75rem}
-.identity>span:last-child{color:var(--color-secondary-text);font-size:.875rem;font-weight:600}
 .headerActions>a{text-decoration:none}
 .nav{display:flex;align-items:stretch;gap:5px;overflow:auto;scrollbar-width:thin}
 .nav a{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:10px 8px;color:var(--color-text);text-decoration:none;border-bottom:2px solid transparent;font-size:.84rem}
@@ -46,3 +44,22 @@
 .detailList dd{margin:0;overflow-wrap:anywhere}
 .detailList dt{color:var(--color-secondary-text)}
 @media(max-width:760px){.page{padding-inline:16px}.entry{grid-template-columns:minmax(0,1fr)}.entry>section{width:100%;max-width:540px}.nav a{min-height:44px}}
+
+.page[data-admin-shell=workspace]>.header{margin-bottom:20px}
+.page[data-admin-shell=workspace] .headerBar{min-height:60px;padding-block:9px}
+.page[data-admin-shell=entry]>.header::before{display:none}
+.page[data-admin-shell=entry] .headerBar{padding-block:0}
+.page[data-admin-shell=workspace] .nav{justify-content:safe center}
+.userToolbar>button{flex:0 0 auto}
+.userList p,.userHeading+ p{margin-block:4px}
+.userHeading h2{margin:0}
+.userLinks,.detailActions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--color-border)}
+.recordCards{display:grid;gap:10px}
+.records.recordCards>article{padding:12px;border:1px solid var(--color-border);border-radius:10px}
+.account{width:100%}
+.account dl>div>dd{text-align:left}
+
+.rowActions{display:flex;flex-wrap:wrap;gap:6px}
+
+.destructive{color:var(--color-danger)}
+.destructive:hover:not(:disabled){border-color:var(--color-danger)}

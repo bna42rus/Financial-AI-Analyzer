@@ -1,3 +1,4 @@
+import {reviewGroupIds} from '../../../../packages/finance-core/src/review-group';
 import {aggregate,reconcile} from '../../../../packages/finance-core/src/graph';
 import {facet,effective} from '../../../../packages/finance-core/src/model';
 import type {Graph,Operation,Semantics,Category,Account,Link} from '../../../../packages/finance-core/src/model';
@@ -288,10 +289,12 @@ export function demoApi(path:string,body:Record<string,unknown>={}):unknown{
   case '/finance/review-sessions':return {generation,sessions:[]};
   case '/finance/review-queue':{
    if(body.refresh)skipped.clear();if(typeof body.skip==='string')skipped.add(body.skip);
-   const pending=snapshot().operations.filter(op=>op.reviewReasons.length);
-   const op=pending.find(op=>!skipped.has(op.id))??pending[0];
+   const all=snapshot().operations, pending=all.filter(op=>op.reviewReasons.length);
+   const eligible=pending.filter(op=>!skipped.has(op.id)),op=eligible[0]??pending[0];
    if(op&&skipped.has(op.id))skipped.clear();
-   return {id:reviewId,generation,financeRevision:revision,revision,remaining:pending.length,anchor:op?.id,operations:op?[op]:[],similar:op?[op.id]:[]};
+   const similar=op?reviewGroupIds(all,(eligible.length?eligible:pending).map(row=>row.id),op.id,true):[];
+   const wanted=new Set(op?[op.id,...similar]:[]);
+   return {id:reviewId,generation,financeRevision:revision,revision,remaining:pending.length,anchor:op?.id,operations:all.filter(row=>wanted.has(row.id)),similar};
   }
   case '/finance/rule-candidates':{
    const ids=sample.graph.operations.filter(op=>JSON.stringify(ruleChange(sample,op,String(body.ruleId)))!==JSON.stringify(op));

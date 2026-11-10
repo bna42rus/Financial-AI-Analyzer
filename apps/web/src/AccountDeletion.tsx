@@ -25,7 +25,7 @@ export function AccountDeletion({email}:{email:string}){
    const next=await api<Status>(endpoint+path,body);
    mail.remember(next);setState(next);
    if(path==='-start')setRestart(false);
-   if(path==='-confirm'){setNote('Заявка отправлена администратору.');setOpen(false);}
+   if(path==='-confirm'){setOpen(false);}
    if(path==='-cancel'){setNote('Заявка отозвана.');setOpen(false);}
   }catch(e){
    mail.remember(e);
@@ -52,9 +52,9 @@ export function AccountDeletion({email}:{email:string}){
     <button type="button" className={common.linkButton} disabled={busy||!!mail.seconds} onClick={()=>{setFieldError('');setRestart(true);}}>{mail.label??'Запросить новый код'}</button>
    </form>:<form className={styles.renewalBody} id="account-deletion" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void request('-start',{password:data.get('password'),confirm:data.get('confirm')==='on'});}}>
     <p>Подтвердите заявку паролем и кодом из письма. После проверки администратором удалим профиль, выписки, операции, настройки и историю Анализатора. Все сеансы завершатся, автопродление отключится.</p>
-    <p className={styles.muted}>Условия хранения платёжных сведений и подтверждения удаления описаны в <a href="/privacy" target="_blank" rel="noreferrer">политике обработки персональных данных</a>.</p>
     <OperationField label="Текущий пароль" error={fieldError||undefined}><input name="password" type="password" autoComplete="current-password" required maxLength={128} onChange={()=>setFieldError('')}/></OperationField>
-    <div className={styles.legalChoice}><input id="confirm-account-deletion" type="checkbox" name="confirm" required/><label htmlFor="confirm-account-deletion">Подтверждаю, что понимаю последствия удаления аккаунта.</label></div>
+    <div className={styles.legalChoice}><input id="confirm-account-deletion" type="checkbox" name="confirm" required/><label htmlFor="confirm-account-deletion">Подтверждаю, что осознаю последствия удаления аккаунта.</label></div>
+    <p className={styles.deletionFootnote}>О хранении платёжных сведений и подтверждения удаления — в <a href="/privacy" target="_blank" rel="noreferrer">политике обработки персональных данных</a>.</p>
    </form>}
    {error&&<p role="alert" className={styles.error}>{error}</p>}
   </OperationDialog>}

@@ -13,7 +13,7 @@ import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest,FastifyReply } from 'fastify';
 import { fromNodeHeaders } from 'better-auth/node';
-import {commerceCatalog,updateCommerceCatalog} from './commerce-catalog.ts';
+import {commerceCatalog,updateCommerceCatalog,archiveCatalogItem} from './commerce-catalog.ts';
 import {accessWarning,describeDevice} from './mail-templates.ts';
 import {mailQueue,retryMail,resendInvitation} from './mail-admin.ts';
 import { envelope } from './crypto.ts';
@@ -268,10 +268,10 @@ export async function createServer(config: Config) {
         await requireAdmin(auth,db,request);
         const target=new URL(request.url,config.baseURL).searchParams.get('id');
         result={orders:(await db.query('SELECT * FROM commerce.control_checkout_queue($1)',[target&&/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(target)?target:null])).rows};
-      } else if(config.profile==='control'&&path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)){
+      } else if(config.profile==='control'&&(path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)||path==='/control/commerce-catalog-archive'&&request.method==='POST')){
         const s=await requireAdmin(auth,db,request);
         if(request.method==='POST'){
-          const updated=await updateCommerceCatalog(db,request.body);result=updated.catalog;
+          const updated=await (path.endsWith('-archive')?archiveCatalogItem:updateCommerceCatalog)(db,request.body);result=updated.catalog;
           if(updated.audit){
             await db.query('INSERT INTO commerce.action(id,actor_id,payload) VALUES($1,$2,$3)',[crypto.randomUUID(),s.user.id,updated.audit]);
             await event(db,'control',s.user.id,'commerce_catalog_updated');
@@ -279,7 +279,7 @@ export async function createServer(config: Config) {
         }
         else result=await commerceCatalog(db);
       } else if (config.profile==='control'&&path==='/control/deliveries'&&request.method==='GET'){
-        await requireAdmin(auth,db,request);result=await mailQueue(db);
+        await requireAdmin(auth,db,request);const target=new URL(request.url,config.baseURL).searchParams.get('id');result=await mailQueue(db,target&&/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(target)?target:null);
       } else if (config.profile==='control'&&path==='/control/delivery-retry'&&request.method==='POST'){
         const s=await requireAdmin(auth,db,request);result=await retryMail(db,request,s.user.id,seal);
       } else if (config.profile==='control'&&path==='/control/invitation-resend'&&request.method==='POST'){
@@ -383,7 +383,7 @@ export async function createServer(config: Config) {
       } else if (path === '/security/sessions' && request.method === 'GET') {
         const s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');
-        result = { sessions: (await db.query(`SELECT id,created_at,expires_at,user_agent FROM ${schema}.auth_session WHERE user_id=$1 AND expires_at>clock_timestamp()`, [s.user.id])).rows.map(r => ({ id: r.id, createdAt: r.created_at, expiresAt: r.expires_at, current: r.id === s.session.id,device:describeDevice(r.user_agent) })) };
+        result = { sessions: (await db.query(`SELECT id,created_at,expires_at,user_agent FROM ${schema}.auth_session WHERE user_id=$1 AND expires_at>clock_timestamp()`, [s.user.id])).rows.map(r => ({ id: r.id, createdAt: r.created_at, expiresAt: r.expires_at, current: r.id === s.session.id,device:describeDevice(r.user_agent||(r.id===s.session.id?request.headers['user-agent']:undefined)) })) };
       } else if (path === '/security/revoke-session' && request.method === 'POST') {
         const input = fields(request, ['sessionId']), s = config.profile === 'control' ? await requireAdmin(auth, db, request) : await current(auth, request);
         if (!s || !s.user.emailVerified) throw new HttpError(401, 'AUTH_REQUIRED');

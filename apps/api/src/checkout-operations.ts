@@ -63,11 +63,14 @@ export async function runReconciliations(pool:Pool,provider:AccessPaymentProvide
     }else message='Окончательный результат оплаты ещё неизвестен.';
    }
    await db.query('UPDATE commerce.checkout_reconciliation SET state=$2,provider_state=$3,message=$4,updated_at=clock_timestamp() WHERE checkout_id=$1',[id,status,payment.status,message]);
+   await db.query('SELECT commerce.record_checkout_reconciliation_result($1,$2)',[id,actionId]);
    await db.query('COMMIT');
   }catch(error){
    await db.query('ROLLBACK');
-   if(actionId)await db.query("UPDATE commerce.checkout_reconciliation SET state='unknown',message=$3,updated_at=clock_timestamp() WHERE checkout_id=$1 AND action_id=$2",[id,actionId,
+   if(actionId){await db.query("UPDATE commerce.checkout_reconciliation SET state='unknown',message=$3,updated_at=clock_timestamp() WHERE checkout_id=$1 AND action_id=$2",[id,actionId,
     error instanceof HttpError&&error.code==='PAYMENT_UNVERIFIED'?'Платёж ЮKassa не совпадает с заказом CashNeuro.':'Не удалось сверить платёж. Проверьте номер в ЮKassa и повторите.']);
+    await db.query('SELECT commerce.record_checkout_reconciliation_result($1,$2)',[id,actionId]);
+   }
   }finally{db.release();}
  }
 }

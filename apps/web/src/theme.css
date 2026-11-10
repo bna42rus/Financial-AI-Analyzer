@@ -36,3 +36,8 @@ h1,h2,h3,p{margin:0}h1,h2,h3{letter-spacing:-.025em}svg{flex-shrink:0}summary{cu
 /* The active dialog owns the backdrop. Keep earlier steps mounted to preserve their drafts. */
 body > [data-cashneuro-dialog="overlay"]:has(~ [data-cashneuro-dialog="overlay"]),
 body > [data-cashneuro-dialog="content"]:has(~ [data-cashneuro-dialog="content"]) { visibility:hidden; }
+
+html{scrollbar-gutter:stable}
+body[data-scroll-locked]{margin-right:0!important}
+:where(a[href]){color:var(--color-primary);text-decoration:none;text-underline-offset:.18em}
+:where(a[href]:hover,a[href]:focus-visible){text-decoration:underline}
