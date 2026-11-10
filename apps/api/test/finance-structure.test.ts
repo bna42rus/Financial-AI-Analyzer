@@ -49,7 +49,7 @@ test('account settings preview is atomic, updates only requested fields, and is 
  const changed=await view();
  assert.equal(changed.accounts.find((a:{id:string})=>a.id===account).name,'Renamed synthetic account');
  assert.equal(changed.accounts.find((a:{id:string})=>a.id===second).analyticsEnabled,false);
- await command({kind:'undo',value:actionId});
+ await command({kind:'undo',id:randomUUID(),value:actionId});
  assert.deepEqual((await view()).accounts,initial.accounts);
  assert.equal((await view()).summary.netExpensesMinor,'1000');
 });
@@ -59,7 +59,7 @@ test('account merge history selects only the latest active merge for its target'
  const read=async(id:string)=>(await request('/finance/history-query',{mergeTargetId:id,limit:1})).json().actions;
  assert.deepEqual((await read(account)).map((a:{id:string})=>a.id),[merged.actionId]);
  assert.deepEqual(await read(unrelated),[]);
- await command({kind:'undo',value:merged.actionId});
+ await command({kind:'undo',id:randomUUID(),value:merged.actionId});
  assert.deepEqual(await read(account),[]);
 });
 test('merge moves matching bindings, aliases, rules and corrections without overwriting bank facts',async()=>{

@@ -8,6 +8,7 @@ import { chromium, expect as playwrightExpect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { PoolClient } from 'pg';
 import { postgresFixture } from './postgres.ts';
+import {chooseOption} from '../../web/e2e/choice-picker.ts';
 import { syntheticOperations } from './operations-fixture.ts';
 import { createServer } from '../src/server.ts';
 import { createTestAssistantProvider } from '../src/analyzer-assistant-provider.ts';
@@ -82,10 +83,9 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
   const messages = () => pg.owner.query("SELECT id,answer FROM finance.analyzer_message WHERE user_id='task-browser' ORDER BY created_at,id").then(r => r.rows);
   async function send(text: string) { const field = page.getByLabel('Ваш финансовый вопрос', { exact: true }); await field.fill(text); await page.getByRole('button', { name: 'Отправить вопрос', exact: true }).click(); }
   async function count(n: number) { await expect.poll(async () => (await messages()).length).toBe(n); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeDisabled(); }
-  async function idle() { await expect(page.getByRole('button', { name: 'Фильтры', exact: true })).toBeEnabled(); }
+  async function idle() { await expect(page.getByRole('group', { name: 'Общие фильтры' }).getByLabel('С даты', { exact: true })).toBeEnabled(); }
   try {
-    await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Продолжить', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
-    await expect(page.getByText('Часовой пояс анализа: Pacific/Honolulu', { exact: true })).toBeVisible();
+    await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Войти', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
     await screen(page,'Операции');
     await page.getByRole('button',{name:'Категории с помощью ИИ',exact:true}).click();const categoryPanel=page.getByRole('region',{name:'Распределение категорий'});
@@ -94,10 +94,10 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();await classificationStarted;
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
-    await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Назначено впервые',{exact:true})}).locator('dd')).toHaveText('1');await page.keyboard.press('Escape');
+    await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Всего с категорией',{exact:true})}).locator('dd')).toHaveText('2');await page.keyboard.press('Escape');
     assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;await screen(page,'Анализатор');await idle();
-    await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
-    await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
+    const filters = page.getByRole('group', { name: 'Общие фильтры' });
+    await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await idle();
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();
     assert.equal((await messages())[0]!.answer.result.totals.expenses, '24690');
     await expect(page.getByRole('log', { name: 'Сообщения диалога' })).toContainText('246,90 ₽'); assert.equal(calls, 2);
@@ -180,12 +180,12 @@ for(const mobile of [false,true])test(`purchase split UI keeps one Ozon row, sho
  let id='',food='',clothes='';await within(async db=>{const state=await financeView(db,'task-browser'),account=randomUUID();await acceptAccount(db,'task-browser',importEpoch(state),{id:account,bankId:'tbank',systemName:'Synthetic split account',type:'bank_account'});const market=state.categories.find(c=>c.name==='Маркетплейсы')!.id;food=state.categories.find(c=>c.name==='Продукты'&&!c.parentId)!.id;clothes=state.categories.find(c=>c.name==='Одежда и аксессуары'&&!c.parentId)!.id;id=(await syntheticOperations(db,'task-browser',1,account,market,'Ozon'))[0]!;});
  const browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--disable-dev-shm-usage']}),context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},locale:'ru-RU'}),page=await context.newPage();page.setDefaultTimeout(20000);
  try{
-  await page.goto(web+'/#login');await page.getByLabel('Почта',{exact:true}).fill('task-browser@example.test');await page.getByLabel('Пароль',{exact:true}).fill(password);await page.getByRole('button',{name:'Войти',exact:true}).click();await screen(page,'Операции');
+  await page.clock.setFixedTime(new Date('2026-09-20T12:00:00Z'));await page.goto(web+'/#login');await page.getByLabel('Почта',{exact:true}).fill('task-browser@example.test');await page.getByLabel('Пароль',{exact:true}).fill(password);await page.getByRole('button',{name:'Войти',exact:true}).click();await screen(page,'Операции');
   const list=page.getByRole('list',{name:'Сохранённые операции'});await list.getByRole('button').filter({hasText:'Ozon'}).click();await page.getByRole('button',{name:'Разделить покупку по категориям',exact:true}).click();
-  await expect(page.getByLabel('Тип части 1',{exact:true})).toHaveCount(0);await page.getByLabel('Сумма части 1, ₽',{exact:true}).fill('60');await page.getByLabel('Категория части 1',{exact:true}).selectOption(food);await page.getByRole('button',{name:'Добавить часть',exact:true}).click();await page.getByLabel('Категория части 2',{exact:true}).selectOption(clothes);await page.getByRole('button',{name:'Заполнить остатком часть 2',exact:true}).click();
+  await expect(page.getByLabel('Тип части 1',{exact:true})).toHaveCount(0);await page.getByLabel('Сумма части 1, ₽',{exact:true}).fill('60');await chooseOption(page.getByLabel('Категория части 1',{exact:true}),food);await page.getByRole('button',{name:'Добавить часть',exact:true}).click();await chooseOption(page.getByLabel('Категория части 2',{exact:true}),clothes);await page.getByRole('button',{name:'Заполнить остатком часть 2',exact:true}).click();
   await expect(page.getByLabel('Остаток распределения',{exact:true})).toContainText('Осталось: 0');await expect(page.getByLabel('Сумма части 2, ₽',{exact:true})).not.toHaveValue('');
   await page.getByRole('button',{name:'Применить',exact:true}).click();await page.getByRole('button',{name:'Сохранить',exact:true}).click();await expect(page.getByRole('region',{name:'Последствия изменения'})).toBeVisible();assert.equal((await pg.owner.query('SELECT decomposition FROM finance.transaction WHERE id=$1',[id])).rows[0].decomposition,false);
-  await page.getByRole('button',{name:'Подтвердить и сохранить',exact:true}).click();await expect(page.getByRole('button',{name:'Разделить покупку по категориям',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Учёт частей операции'})).toContainText('Продукты');await expect(page.getByRole('region',{name:'Учёт частей операции'})).toContainText('Одежда и аксессуары');
+  await page.getByRole('button',{name:'Сохранить изменения',exact:true}).click();await expect(page.getByRole('button',{name:'Разделить покупку по категориям',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Учёт частей операции'})).toContainText('Продукты');await expect(page.getByRole('region',{name:'Учёт частей операции'})).toContainText('Одежда и аксессуары');
   await page.getByRole('button',{name:'Закрыть операцию',exact:true}).click();await page.reload();await screen(page,'Операции');await list.getByRole('button').filter({hasText:'Ozon'}).click();await expect(page.getByRole('button',{name:'Разделить покупку по категориям',exact:true})).toBeVisible();
   const state=await within(db=>financeView(db,'task-browser'));assert.equal(state.operations.length,1);assert.equal(state.operations[0]!.classification.merchant.value,'Ozon');assert.equal(state.operations[0]!.parts.length,2);assert.equal(state.summary.netExpensesMinor,state.operations[0]!.amountMinor.slice(1));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
  }finally{await context.close();await browser.close();}
