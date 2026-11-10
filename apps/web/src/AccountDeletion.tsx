@@ -48,12 +48,12 @@ export function AccountDeletion({email}:{email:string}){
    {pending?<div className={styles.renewalBody}><p>Заявка подана {dateLabel(state?.requestedAt??null)}.</p><p>Сообщим о результате на <strong>{email}</strong>. До рассмотрения заявку можно отозвать.</p></div>:waiting?
    <form className={styles.renewalBody} id="account-deletion" onSubmit={e=>{e.preventDefault();void request('-confirm',{code:String(new FormData(e.currentTarget).get('code')).trim()});}}>
     <p>Введите шестизначный код из письма на <strong>{email}</strong>. Код действует 15 минут.</p>
-    <OperationField label="Код из письма" error={fieldError||undefined}><input name="code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" required onChange={()=>setFieldError('')}/></OperationField>
+    <OperationField label="Код из письма" error={fieldError||undefined}><input key={state?.expiresAt??"deletion-code"} name="code" type="text" inputMode="numeric" autoComplete="off" maxLength={6} pattern="[0-9]{6}" defaultValue="" required onChange={()=>setFieldError('')}/></OperationField>
     <button type="button" className={common.linkButton} disabled={busy||!!mail.seconds} onClick={()=>{setFieldError('');setRestart(true);}}>{mail.label??'Запросить новый код'}</button>
    </form>:<form className={styles.renewalBody} id="account-deletion" onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void request('-start',{password:data.get('password'),confirm:data.get('confirm')==='on'});}}>
     <p>Подтвердите заявку паролем и кодом из письма. После проверки администратором удалим профиль, выписки, операции, настройки и историю Анализатора. Все сеансы завершатся, автопродление отключится.</p>
     <OperationField label="Текущий пароль" error={fieldError||undefined}><input name="password" type="password" autoComplete="current-password" required maxLength={128} onChange={()=>setFieldError('')}/></OperationField>
-    <div className={styles.legalChoice}><input id="confirm-account-deletion" type="checkbox" name="confirm" required/><label htmlFor="confirm-account-deletion">Подтверждаю, что осознаю последствия удаления аккаунта.</label></div>
+    <div className={styles.legalChoice+' '+styles.accountDeletionChoice}><input id="confirm-account-deletion" type="checkbox" name="confirm" required/><label htmlFor="confirm-account-deletion">Подтверждаю, что осознаю последствия удаления аккаунта.</label></div>
     <p className={styles.deletionFootnote}>О хранении платёжных сведений и подтверждения удаления — в <a href="/privacy" target="_blank" rel="noreferrer">политике обработки персональных данных</a>.</p>
    </form>}
    {error&&<p role="alert" className={styles.error}>{error}</p>}
