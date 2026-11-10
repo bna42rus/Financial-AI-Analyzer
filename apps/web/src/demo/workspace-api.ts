@@ -1,3 +1,4 @@
+import {reviewReasonsAfterEdit} from '../../../../packages/finance-core/src/review';
 import {reviewGroupIds} from '../../../../packages/finance-core/src/review-group';
 import {aggregate,reconcile} from '../../../../packages/finance-core/src/graph';
 import {facet,effective} from '../../../../packages/finance-core/src/model';
@@ -55,10 +56,8 @@ function changeOperation(op:Operation,patch:OperationPatch,verify:unknown){
  if(patch.comment!==undefined)op.comment=patch.comment;
  if(patch.corrections!==undefined)op.corrections=patch.corrections;
  if(patch.analyticsOverride!==undefined)op.analyticsOverride=patch.analyticsOverride;
- if(patch.reviewRequested!==undefined||Array.isArray(verify)&&verify.length){
-  op.reviewReasons=op.reviewReasons.filter(reason=>reason!=='user_requested_review');
-  if(patch.reviewRequested)op.reviewReasons.push('user_requested_review');
- }
+ const reviewPatch=patch.reviewRequested===undefined&&Array.isArray(verify)&&verify.length?{...patch,reviewRequested:false}:patch;
+ op.reviewReasons=reviewReasonsAfterEdit(op.reviewReasons,reviewPatch);
 }
 function replace<T extends {id:string}>(list:T[],row:T){const index=list.findIndex(item=>item.id===row.id);if(index===-1)list.push(row);else list[index]=row;}
 function find<T extends {id:string}>(list:T[],id:unknown):T{return list.find(item=>item.id===id)??fail('NOT_FOUND','Запись не найдена.');}

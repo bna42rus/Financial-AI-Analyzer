@@ -22,7 +22,7 @@ import {parseMergeDuplicate,mergeDuplicate} from './duplicate-merge.ts';
 import type {MergeDuplicateIntent} from './duplicate-merge.ts';
 import {parseBulkIntent,parseOperationPatch,bulkPatches} from './finance-bulk.ts';
 import type {BulkIntent} from './finance-bulk.ts';
-import {reviewStatus} from '../../../packages/finance-core/src/review.ts';
+import {reviewReasonsAfterEdit,reviewStatus} from '../../../packages/finance-core/src/review.ts';
 import {assertReviewGroup} from './finance-review-group.ts';
 import type {PoolClient} from 'pg';
 import {drizzle,eq} from '../../../packages/database/src/finance.ts';
@@ -339,8 +339,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
   if('kind' in p||'role' in p){const effectiveAmount=(p.corrections as {amountMinor?:string}|undefined)?.amountMinor??effective(graph.operations.find(o=>o.id===id)!).amountMinor;if(!allowedOperationRoles(semantics.kind.value,effectiveAmount).includes(semantics.role.value))throw new HttpError(409,'OPERATION_KIND_ROLE_CONFLICT');}
   categoryCompatible(graph,semantics.role.value,semantics.category.value,semantics.subcategory.value);
   values.semantics=semantics;if('comment'in p)values.comment=p.comment;if('analyticsOverride'in p)values.analytics_override=p.analyticsOverride;
-  const cleared=new Set<string>();if('kind'in p)cleared.add('low_kind_confidence');if('role'in p)for(const r of ['low_role_confidence','unresolved_role','unresolved_transfer'])cleared.add(r);if('categoryId'in p||'subcategoryId'in p)cleared.add('low_category_confidence');
-  if('reviewRequested'in p)cleared.add('user_requested_review');values.review_reasons=[...before.review_reasons.filter((r:string)=>!cleared.has(r)),...(p.reviewRequested===true?['user_requested_review']:[])];await update(db,userId,'transaction',id,values);return {table:'transaction',id,before:Object.fromEntries(columns.transaction.map(k=>[k,before[k]]))};
+  values.review_reasons=reviewReasonsAfterEdit(before.review_reasons,p);await update(db,userId,'transaction',id,values);return {table:'transaction',id,before:Object.fromEntries(columns.transaction.map(k=>[k,before[k]]))};
  }
  if(intent.kind==='components'){
   await row(db,userId,'transaction',id);const before=(await db.query('SELECT * FROM finance.component WHERE user_id=$1 AND transaction_id=$2 ORDER BY id',[userId,id])).rows;
