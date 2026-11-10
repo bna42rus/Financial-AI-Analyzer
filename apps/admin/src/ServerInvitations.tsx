@@ -71,7 +71,7 @@ function InvitationRow({row,highlight,onChanged}:{row:Invitation;highlight:boole
   </div></details>
   {linkOpen&&<OperationDialog narrow title="Ссылка приглашения" onClose={()=>{if(!busy){setLinkOpen(false);setLink('');setError('');}}} footer={link&&<button className={common.primaryButton} onClick={async()=>{try{await navigator.clipboard.writeText(link);notify('Ссылка скопирована.');}catch{setError('Не удалось скопировать ссылку.');}}}>Скопировать ссылку</button>}>
    <div className={styles.renewalBody}>{busy&&<p role="status">Открываем ссылку…</p>}
-   {link&&<OperationField label="Ссылка приглашения"><input className={styles.secret} readOnly value={link} onFocus={e=>e.currentTarget.select()}/></OperationField>}
+   {link&&<input className={styles.secret} aria-label="Ссылка приглашения" readOnly value={link} onFocus={e=>e.currentTarget.select()}/>}
    {error&&<p className={styles.error} role="alert">{error}</p>}</div>
   </OperationDialog>}
   {action&&<OperationDialog narrow title={review?'Подтверждение изменений':action==='cancel'?'Отменить приглашение':active?'Заменить ссылку':'Выдать новую ссылку'} onClose={()=>{if(!busy)setAction('');}} footer={<>
