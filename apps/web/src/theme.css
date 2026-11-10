@@ -37,7 +37,8 @@ h1,h2,h3,p{margin:0}h1,h2,h3{letter-spacing:-.025em}svg{flex-shrink:0}summary{cu
 body > [data-cashneuro-dialog="overlay"]:has(~ [data-cashneuro-dialog="overlay"]),
 body > [data-cashneuro-dialog="content"]:has(~ [data-cashneuro-dialog="content"]) { visibility:hidden; }
 
-html{scrollbar-gutter:stable}
-body[data-scroll-locked]{margin-right:0!important}
+html{overflow-y:scroll;scrollbar-gutter:stable}
+/* Radix dialogs may lock body scrolling; keep the reserved gutter in place. */
+body[data-scroll-locked]{margin-right:0!important;padding-right:0!important;width:100%!important}
 :where(a[href]){color:var(--color-primary);text-decoration:none;text-underline-offset:.18em}
 :where(a[href]:hover,a[href]:focus-visible){text-decoration:underline}
