@@ -394,6 +394,10 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     # it is safe and also catches old snapshots written after a runtime rollback.
     allowance = (source / 'packages/database/migrations/0041_legacy_analyzer_allowance.sql').read_text()
     sql('BEGIN;\n' + allowance + '\nCOMMIT;')
+    # An idempotent, narrowly scoped correction for short audited manual
+    # extensions. It does not restore units by resetting purchase history.
+    extension_allowance = (source / 'packages/database/migrations/0049_manual_access_allowance_end.sql').read_text()
+    sql('BEGIN;\n' + extension_allowance + '\nCOMMIT;')
     if restore_default_tariffs:
         sql('BEGIN;\n' + (source / 'infra/staging/restore-default-tariffs.sql').read_text() + '\nCOMMIT;')
     print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
