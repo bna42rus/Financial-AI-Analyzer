@@ -127,7 +127,19 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    const saved=(await db.query('SELECT commerce.set_customer_allowance($1,$2,$3,$4) AS saved',[userId,now,next.accessEnd,q.limit])).rows[0]?.saved;
    if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
   }else if(mode!=='quota'){
-   await db.query('SELECT commerce.move_customer_allowance_end($1,$2,$3)',[userId,now,b.quota?null:next.accessEnd]);
+   // Extend the existing allowance with a short manual access extension, rather
+   // than silently replenishing the monthly units at the original access end.
+   const oldEnd=before?.accessEnd?Date.parse(before.accessEnd):0;
+   const newEnd=next.accessEnd?Date.parse(next.accessEnd):0;
+   const isShortExtension=(mode==='extend'||mode==='set_end')&&previousMode==='continuous'
+    &&newEnd>oldEnd&&newEnd-oldEnd<=31*86400000;
+   if(isShortExtension&&next.accessEnd){
+    const allowance=(await db.query('SELECT units,reset_at FROM commerce.control_customer_allowances(ARRAY[$1]::text[])',[userId])).rows[0];
+    if(allowance?.reset_at&&Date.parse(allowance.reset_at.toISOString())<newEnd){
+     const saved=(await db.query('SELECT commerce.set_customer_allowance($1,$2,$3,$4) AS saved',[userId,now,next.accessEnd,allowance.units])).rows[0]?.saved;
+     if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
+    }else await db.query('SELECT commerce.move_customer_allowance_end($1,$2,$3)',[userId,now,next.accessEnd]);
+   }else await db.query('SELECT commerce.move_customer_allowance_end($1,$2,$3)',[userId,now,next.accessEnd]);
   }
   if(b.quota&&q.source==='override'&&next.indefinite)await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units) VALUES($1,$2,$3)',[userId,now,q.limit]);
   if(b.quota&&q.source==='tariff'&&!same(q,before?.quotaPolicy))await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[userId,now,q.limit,q.periodDays??null]);
