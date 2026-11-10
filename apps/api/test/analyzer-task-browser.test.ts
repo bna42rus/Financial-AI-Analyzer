@@ -102,7 +102,7 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
     // recovered request can be cancelled without completing or charging a unit.
     blockNext = true; barrier = deferred(); reached = deferred(); await send('Итог?'); await reached.promise;
     await page.reload(); await screen(page, 'Анализатор'); await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Отменить вопрос', exact: true }).click(); await expect(page.getByRole('button', { name: 'Отменить вопрос', exact: true })).toHaveCount(0); await idle(); barrier.resolve();
+    await page.getByRole('button', { name: 'Остановить ответ', exact: true }).click(); await expect(page.getByRole('button', { name: 'Остановить ответ', exact: true })).toHaveCount(0); await idle(); barrier.resolve();
     await expect.poll(async () => (await pg.owner.query("SELECT count(*) AS n FROM commerce.ai_cost_reservation WHERE state='reserved'")).rows[0].n).toBe('0'); assert.equal((await messages()).length, 4);
 
     // Deletion must require confirmation and discard a recovered pending UI
@@ -111,9 +111,9 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
     await page.reload(); await screen(page, 'Анализатор'); await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toBeVisible();
     if (mobile) await page.getByRole('button', { name: 'Диалоги', exact: true }).click();
     await page.getByRole('button', { name: /^Настроить диалог:/ }).filter({ visible: true }).click(); const management = page.getByRole('dialog', { name: 'Настройки диалога' });
-    await management.getByRole('button', { name: 'Удалить диалог', exact: true }).click(); assert.equal((await messages()).length, 4);
-    await management.getByRole('button', { name: 'Подтвердить удаление диалога', exact: true }).click(); await expect(management).toHaveCount(0); await idle(); barrier.resolve();
-    await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Отменить вопрос', exact: true })).toHaveCount(0);
+    await management.getByRole('button', { name: 'Удалить', exact: true }).click(); const confirmation = page.getByRole('dialog', { name: 'Удалить диалог?' }); assert.equal((await messages()).length, 4);
+    await confirmation.getByRole('button', { name: 'Удалить диалог', exact: true }).click(); await expect(confirmation).toHaveCount(0); await expect(management).toHaveCount(0); await idle(); barrier.resolve();
+    await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Остановить ответ', exact: true })).toHaveCount(0);
     assert.equal((await messages()).length, 0); await page.getByLabel('Ваш финансовый вопрос', { exact: true }).fill('Новый вопрос'); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeEnabled();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); assert.deepEqual(errors, []);
     assert.deepEqual(await page.evaluate(() => Object.keys(sessionStorage)), []); assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['finance-interface-epoch-v1']);
