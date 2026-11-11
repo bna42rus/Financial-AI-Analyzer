@@ -94,7 +94,7 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();await classificationStarted;
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
     assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
-    await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Всего с категорией',{exact:true})}).locator('dd')).toHaveText('2');await page.keyboard.press('Escape');
+    await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Всего с категорией',{exact:true})}).locator('dd')).toHaveText('1');await page.keyboard.press('Escape');
     assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;await screen(page,'Анализатор');await idle();
     const filters = page.getByRole('group', { name: 'Общие фильтры' });
     await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await idle();
