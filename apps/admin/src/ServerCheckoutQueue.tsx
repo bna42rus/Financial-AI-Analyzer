@@ -16,18 +16,22 @@ const providerStates:Record<string,string>={succeeded:'Оплачен',canceled:
 type Refund={id:string;state:'pending'|'succeeded'|'canceled';amountMinor:number;at:string};
 type Order={id:string;channel:'first'|'renewal';status:keyof typeof labels;mode:'once'|'enroll'|'automatic';tariff:string;price_minor:string;provider_id:string|null;created_at:string;paid_at:string|null;
  application_id:string|null;user_id:string|null;email:string|null;provider_paid_at:string|null;provider_expires_at:string|null;cancellation_reason:string|null;previous_end:string|null;access_end:string|null;reconcile_reason:string|null;
- reconciliation:{state:string;providerStatus:string|null;message:string|null;providerId:string|null}|null;refunds:Refund[];registered:boolean};
+ reconciliation:{state:string;providerStatus:string|null;message:string|null;providerId:string|null}|null;refunds:Refund[];registered:boolean;purpose?:'access'|'trial'|'card'|'topup';firstPurchase?:boolean};
+
+const kinds:Record<string,string>={first:'Первая покупка',renewal:'Продление',automatic:'Автопродление',trial:'Проверка карты для пробного периода',card:'Привязка карты',topup:'Докупка единиц'};
+const kindOf=(o:Order)=>o.purpose&&o.purpose!=='access'?o.purpose:o.mode==='automatic'?'automatic':o.firstPurchase||o.channel==='first'?'first':'renewal';
 
 export function ServerCheckoutQueue({refresh,target,initialSearch}:{refresh:number;target?:string;initialSearch?:string}){
  const {data,error,loading,reload}=useAdminData<{orders:Order[]}>('/control/access-checkouts'+(target?'?id='+encodeURIComponent(target):''),refresh);
- const [filter,setFilter]=useState('all'),[search,setSearch]=useState(initialSearch??'');
- const visible=data?.orders.filter(o=>o.id===target||(filter==='all'||filter===o.status)&&foldSearch([o.email,o.tariff,o.id,o.provider_id].join(' ')).includes(foldSearch(search.trim())));
+ const [filter,setFilter]=useState('all'),[search,setSearch]=useState(initialSearch??''),[kind,setKind]=useState('');
+ const visible=data?.orders.filter(o=>o.id===target||(filter==='all'||filter==='refund'?filter==='all'||o.refunds?.length>0:filter===o.status)&&(!kind||kindOf(o)===kind)&&foldSearch([o.email,o.tariff,o.id,o.provider_id].join(' ')).includes(foldSearch(search.trim())));
  useEffect(()=>{if(initialSearch!==undefined)setSearch(initialSearch);},[initialSearch]);
  const waiting=data?.orders.some(o=>['checking','applying'].includes(o.reconciliation?.state??''));
  useEffect(()=>{if(!waiting)return;const timer=setInterval(reload,3500);return()=>clearInterval(timer);},[waiting]);
  return <section className={styles.card}><div className={shell.filters}>
   <SearchField aria-label="Поиск платежей" placeholder="Почта, тариф или номер платежа" value={search} onValueChange={setSearch}/>
-  <SelectField aria-label="Статус платежа" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Все статусы</option>{Object.entries(labels).filter(([key])=>key!=='created').map(([key,title])=><option key={key} value={key}>{title}</option>)}</SelectField>
+  <SelectField aria-label="Тип платежа" value={kind} onChange={e=>setKind(e.target.value)}><option value="">Все типы</option>{Object.entries(kinds).map(([id,label])=><option key={id} value={id}>{label}</option>)}</SelectField>
+  <SelectField aria-label="Статус платежа" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Все статусы</option>{Object.entries(labels).map(([key,title])=><option key={key} value={key}>{title}</option>)}<option value="refund">С возвратами</option></SelectField>
  </div>
  {error&&<p className={styles.error} role="alert">{error}</p>}{loading&&!data&&<p role="status">Загружаем платежи…</p>}{visible?.length===0&&<p>{data?.orders.length?'Платежи не найдены.':'Платежей пока нет.'}</p>}
  <div className={shell.records+' '+shell.recordCards}>{visible?.map(order=><PaymentRow key={order.id} order={order} highlight={order.id===target} onChanged={reload}/>)}</div>
@@ -37,7 +41,7 @@ function PaymentRow({order,highlight,onChanged}:{order:Order;highlight:boolean;o
  const time=useAdminTime();
  const [form,setForm]=useState<''|'check'|'apply'>(''),[providerId,setProviderId]=useState(''),[error,setError]=useState(''),[busy,setBusy]=useState(false),[confirmation,setConfirmation]=useState<string|null>(null);
  const refunds=order.refunds??[],returned=refunds.filter(row=>row.state==='succeeded').reduce((total,row)=>total+row.amountMinor,0);
- const paymentKind=order.channel==='first'?'Первый доступ':order.mode==='automatic'?'Автопродление':'Продление';
+ const paymentKind=kinds[kindOf(order)];
  const reviewed=order.reconciliation?.state==='verified'&&['succeeded','canceled'].includes(order.reconciliation.providerStatus??'');
  const processing=['checking','applying'].includes(order.reconciliation?.state??'');
  const notify=useAdminNotice(),needsNumber=form==='check'&&!order.provider_id;
@@ -75,7 +79,7 @@ function PaymentRow({order,highlight,onChanged}:{order:Order;highlight:boolean;o
    </>}
    {refunds.length>0&&<section><h3>Возвраты</h3><ul>{refunds.map(r=><li key={r.id}>{moneyLabel(String(r.amountMinor))} · {time.format(r.at)} · {r.state==='succeeded'?'Подтверждён':r.state==='pending'?'Обрабатывается':'Отменён'}</li>)}</ul></section>}
    {(order.application_id||order.user_id||order.provider_id&&order.status==='paid'&&returned<Number(order.price_minor))&&<div className={shell.detailActions}>
-    {order.application_id&&<a className={styles.secondary} href={adminLink('requests',{id:order.application_id})}>Открыть заявку</a>}
+
     {order.user_id&&<a className={styles.secondary} href={adminLink('users',{id:order.user_id})}>{returned>0?'Проверить доступ':'Открыть пользователя'}</a>}
     {order.provider_id&&order.status==='paid'&&returned<Number(order.price_minor)&&<a className={styles.secondary} href="https://yookassa.ru/my/" target="_blank" rel="noreferrer">Открыть кабинет ЮKassa</a>}
    </div>}

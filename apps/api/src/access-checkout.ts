@@ -17,15 +17,15 @@ import {verifiedPayment} from './access-payment-provider.ts';
 import type {AccessPaymentProvider} from './access-payment-provider.ts';
 
 type Mode='once'|'enroll'|'automatic';
-type Order={save_card?:boolean;id:string;user_id:string|null;application_id:string|null;tariff:BillingPlan;offer_version:string;renewal_version:string|null;mode:Mode;cycle_revision:number|null;planned_end:Date|null;provider_id:string|null;redirect_url:string|null;payment_method_id:string|null;state:'created'|'pending'|'paid'|'cancelled'|'reconcile';created_at:Date;paid_at:Date|null};
+type Order={purpose?:string;cancel_requested?:boolean;provider_status?:string;capture_required?:boolean;desired_auto?:boolean|null;save_card?:boolean;id:string;user_id:string|null;application_id:string|null;tariff:BillingPlan;offer_version:string;renewal_version:string|null;mode:Mode;cycle_revision:number|null;planned_end:Date|null;provider_id:string|null;redirect_url:string|null;payment_method_id:string|null;state:'created'|'pending'|'paid'|'cancelled'|'reconcile';created_at:Date;paid_at:Date|null};
 type Renewal={user_id:string;checkout_id:string;tariff:BillingPlan;offer_version:string;renewal_version:string;method_id:string|null;state:'active'|'off'|'changed'|'failed';next_at:Date;notice_id:string|null};
 type Account={id:string;email:string};
-const projection=(o:Order)=>({id:o.id,state:o.state,mode:o.mode,autoRequested:o.mode==='enroll'&&!!o.renewal_version&&(o.state!=='paid'||o.application_id===null||!!o.payment_method_id),tariff:o.tariff,plannedEnd:o.planned_end,redirect:o.state==='pending'?o.redirect_url:null});
+const projection=(o:Order)=>({purpose:o.purpose??'access',cancelRequested:o.cancel_requested??false,id:o.id,state:o.state,mode:o.mode,autoRequested:o.mode==='enroll'&&!!o.renewal_version&&(o.state!=='paid'||o.application_id===null||!!o.payment_method_id),tariff:o.tariff,plannedEnd:o.planned_end,redirect:o.state==='pending'?o.redirect_url:null});
 const terminal=(o:Order)=>['paid','cancelled','reconcile'].includes(o.state);
 const catalog=async(db:PoolClient)=>(await db.query<{snapshot:Tariff}>(`SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'availableForRenewal'='true' ORDER BY ${catalogOrder}`)).rows.map(r=>r.snapshot);
 async function savedRenewal(db:PoolClient,userId:string){return (await db.query<Renewal>('SELECT * FROM commerce.autorenewal WHERE user_id=$1 FOR UPDATE',[userId])).rows[0];}
 async function paymentOrder(db:PoolClient,id:string){return (await db.query<Order>('SELECT * FROM commerce.access_checkout WHERE id=$1 FOR UPDATE',[id])).rows[0];}
-async function currentOrder(db:PoolClient,userId:string){return (await db.query<Order>("SELECT * FROM commerce.access_checkout WHERE user_id=$1 ORDER BY (state IN ('created','pending','reconcile')) DESC,created_at DESC LIMIT 1",[userId])).rows[0];}
+async function currentOrder(db:PoolClient,userId:string,purpose='access'){return (await db.query<Order>("SELECT * FROM commerce.access_checkout WHERE user_id=$1 AND purpose=$2 ORDER BY (state IN ('created','pending','reconcile')) DESC,created_at DESC LIMIT 1",[userId,purpose])).rows[0];}
 async function automaticEvent(db:PoolClient,r:Renewal,action:'enable'|'disable'|'changed'|'failed'){
  await db.query('INSERT INTO commerce.autorenewal_event(user_id,action,checkout_id,tariff,offer_version,renewal_version) VALUES($1,$2,$3,$4,$5,$6)',[r.user_id,action,r.checkout_id,r.tariff,r.offer_version,r.renewal_version]);
 }
@@ -34,12 +34,17 @@ async function stopRenewal(db:PoolClient,r:Renewal,state:'off'|'changed'|'failed
  await db.query('UPDATE commerce.autorenewal SET state=$2,method_id=NULL,notice_id=NULL WHERE user_id=$1',[r.user_id,state]);
  await automaticEvent(db,r,state==='off'?'disable':state);
 }
-export async function checkoutAccountState(db:PoolClient,userId:string,provider:AccessPaymentProvider|undefined){
+export async function checkoutAccountState(db:PoolClient,userId:string,provider:AccessPaymentProvider|undefined,seal?:Sealer){
+ if(provider&&seal){for(const purpose of ['access','trial','card']){const o=await currentOrder(db,userId,purpose);if(o&&o.provider_id&&['created','pending'].includes(o.state)){const u=(await db.query('SELECT id,email FROM identity.auth_user WHERE id=$1',[userId])).rows[0];await syncAccessCheckout(db,o.id,u,provider,seal);}}}
  const cycle=await lockedCycle(db,userId),r=await savedRenewal(db,userId),latest=await currentOrder(db,userId);
  const tariffs=cycle.indefinite?[]:await catalog(db);
- return {enabled:!!provider&&!cycle.indefinite,test:provider?.test??false,accessEnd:cycle.accessEnd,tariffs,
+ const info=await trialInfo(db,userId),card=(await db.query('SELECT last4 FROM commerce.saved_card WHERE user_id=$1',[userId])).rows[0]??null;
+ const active=!!cycle.accessEnd&&Date.parse(cycle.accessEnd)>Date.now();
+ const termsValid=!!r&&!!tariffs.find(t=>t.id===r.tariff.id&&sameBillingPlan(r.tariff,billingPlan(t)));
+ const canEnable=!!provider&&!!r&&!!card&&termsValid&&active&&Date.parse(cycle.accessEnd!)-Date.now()>noticeLeadMs&&!cycle.indefinite;
+ return {canEnable,canBind:!!r&&active&&!card,enableReason:!provider?'Оплата временно недоступна.':!r?'Сначала выберите и оплатите тариф.':!card?'Для включения автопродления привяжите карту.':!active?'Сначала продлите доступ.':!termsValid?'Условия тарифа изменились. Выберите тариф заново.':!canEnable?'До окончания доступа осталось меньше трёх дней. Продлите доступ вручную.':null,enabled:!!provider&&!cycle.indefinite,test:provider?.test??false,accessEnd:info.isNew?null:cycle.accessEnd,tariffs,
   renewal:r?{state:r.state==='active'&&!exactConsent(r,tariffs.find(t=>t.id===r.tariff.id))?'changed':r.state,tariff:r.tariff,nextAt:r.next_at}:null,
-  card:(await db.query('SELECT last4 FROM commerce.saved_card WHERE user_id=$1',[userId])).rows[0]??null,...await trialInfo(db,userId),order:latest?projection(latest):null};
+  card,...info,trialOrder:(await currentOrder(db,userId,'trial'))?projection((await currentOrder(db,userId,'trial'))!):null,cardOrder:(await currentOrder(db,userId,'card'))?projection((await currentOrder(db,userId,'card'))!):null,order:latest?projection(latest):null};
 }
 export async function quoteAccess(db:PoolClient,userId:string,input:unknown,provider:AccessPaymentProvider|undefined){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
@@ -55,7 +60,7 @@ async function orderInsert(db:PoolClient,id:string,owner:{id?:string;requestId?:
 export async function startAccessCheckout(db:PoolClient,user:Account,input:unknown,provider:AccessPaymentProvider|undefined,legalRequired=false){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
  if(legalRequired&&!(await accountLegal(db,user.id)).termsAccepted)throw new HttpError(409,'TERMS_ACCEPTANCE_REQUIRED');
- const r=object(input,['id','tariffId','priceMinor','catalogVersion','offerVersion','renewalVersion','cycleRevision','saveCardConsent']);
+ const r=object(input,['id','tariffId','priceMinor','catalogVersion','offerVersion','renewalVersion','cycleRevision','saveCardConsent','autoRenewal']);
  checkLegalVersion(r.offerVersion,legalDocuments.offer.version,true);
  if(r.renewalVersion!==undefined)checkLegalVersion(r.renewalVersion,legalDocuments.renewal.version,true);
  const mode=r.renewalVersion===undefined?'once':'enroll',id=uuid(r.id);
@@ -72,6 +77,7 @@ export async function startAccessCheckout(db:PoolClient,user:Account,input:unkno
  if(q.tariff.catalogVersion!==r.catalogVersion||q.tariff.priceMinor!==r.priceMinor||q.cycleRevision!==r.cycleRevision)throw new HttpError(409,'TARIFF_CHANGED');
  const created=await orderInsert(db,id,user,q.tariff,mode,q.cycleRevision,q.endsAt);
  if(r.saveCardConsent===true)await db.query('UPDATE commerce.access_checkout SET save_card=true WHERE id=$1',[id]);
+ if(typeof r.autoRenewal==='boolean')await db.query('UPDATE commerce.access_checkout SET desired_auto=$2 WHERE id=$1',[id,r.autoRenewal]);
  return projection(created);
 }
 export async function startFirstCheckout(db:PoolClient,row:AccessRequest,input:unknown,provider:AccessPaymentProvider|undefined){
@@ -126,6 +132,7 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
  await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,user.id,e.mode==='continuous']);
  await db.query('UPDATE commerce.access_checkout SET previous_end=$2,access_end=$3 WHERE id=$1',[o.id,cycle.accessEnd,e.accessEnd]);
  await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[user.id,start,e.accessEnd,o.tariff.duration.kind,paidAnalyzerUnits(o.tariff.id,o.tariff.duration.kind,o.tariff.aiQuota)]);
+ await db.query("UPDATE commerce.access_cycle SET quota_policy=jsonb_build_object('source','tariff','tariffId',$2::text,'limit',$3::int) WHERE user_id=$1 AND quota_policy->>'source'='override' AND quota_policy->>'limit'='0' AND EXISTS(SELECT 1 FROM commerce.onboarding_account WHERE user_id=$1)",[user.id,o.tariff.id,o.tariff.aiQuota]);
  const old=await savedRenewal(db,user.id);
  if(o.mode==='enroll'&&savedMethod){
   // Enablement is tied to the original, explicitly accepted checkout. A disable while it is pending wins.
@@ -141,7 +148,8 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
  }else if(o.mode!=='automatic'&&old?.state==='active'){
   await db.query('UPDATE commerce.autorenewal SET next_at=$2,notice_id=NULL WHERE user_id=$1',[user.id,e.accessEnd]);
  }
- if(savedMethod&&!old&&o.mode==='once')await db.query(`INSERT INTO commerce.autorenewal(user_id,checkout_id,tariff,offer_version,renewal_version,method_id,state,next_at) VALUES($1,$2,$3,$4,$5,NULL,'off',$6)`,[user.id,o.id,o.tariff,o.offer_version,legalDocuments.renewal.version,e.accessEnd]);
+ if(!old&&o.mode==='once')await db.query(`INSERT INTO commerce.autorenewal(user_id,checkout_id,tariff,offer_version,renewal_version,method_id,state,next_at) VALUES($1,$2,$3,$4,$5,NULL,'off',$6)`,[user.id,o.id,o.tariff,o.offer_version,legalDocuments.renewal.version,e.accessEnd]);
+ if(o.desired_auto===false){const current=await savedRenewal(db,user.id);const changed=(await db.query("SELECT 1 FROM commerce.autorenewal_event WHERE user_id=$1 AND recorded_at>$2",[user.id,o.created_at])).rowCount;if(current?.state==='active'&&!changed)await stopRenewal(db,current,'off');}
  await outbox(db,'identity',seal,'billing_paid',{email:user.email,accessEnd:e.accessEnd,priceMinor:o.tariff.priceMinor},{subjectId:user.id,dedupeKey:'billing-paid:'+o.id});
 }
 async function finishFirst(db:PoolClient,o:Order,row:AccessRequest,seal:Sealer){
@@ -157,7 +165,8 @@ export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|A
  if(first)await db.query("SELECT set_config('app.checkout_application',$1,true)",[owner.id]);else await lockedCycle(db,owner.id);
  const o=await paymentOrder(db,uuid(id));
  if(!o||(first?o.application_id!==owner.id:o.user_id!==owner.id))throw new HttpError(404,'NOT_FOUND');
- if(terminal(o)&&!(resolveReconciliation&&o.state==='reconcile'&&o.provider_id))return projection(o);
+ if(o.cancel_requested&&!o.provider_id)return projection(o);
+ if(terminal(o)&&!o.cancel_requested&&!(resolveReconciliation&&o.state==='reconcile'&&o.provider_id))return projection(o);
  const now=Date.parse(await clock(db));
  if(!o.provider_id){
   if(!first&&(await db.query('SELECT status FROM identity.security_state WHERE user_id=$1',[owner.id])).rows[0]?.status!=='active')throw new HttpError(403,'SUSPENDED');
@@ -173,9 +182,23 @@ export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|A
   }
  }
  const trial=!first&&await isTrial(db,o.id);
- const payment=o.provider_id?await provider.read(o.provider_id):await provider.create({id:o.id,value:rubleValue(o.tariff.priceMinor),title:o.tariff.name,first,...(trial||o.save_card||o.mode==='enroll'&&o.renewal_version?{save:true}:o.mode==='automatic'?{method:o.payment_method_id?seal.open(o.payment_method_id):undefined}:{})});
+ let payment=o.provider_id?await provider.read(o.provider_id):await provider.create({id:o.id,value:rubleValue(o.tariff.priceMinor),title:o.tariff.name,first,authorize:!first&&o.mode!=='automatic',cardOnly:trial,...(trial||o.save_card||o.mode==='enroll'&&o.renewal_version?{save:true}:o.mode==='automatic'?{method:o.payment_method_id?seal.open(o.payment_method_id):undefined}:{})});
  const redirect=verifiedPayment(payment,{id:o.id,providerId:o.provider_id,value:rubleValue(o.tariff.priceMinor),test:provider.test});
+ const providerExpiry=payment.confirmation?.expires_at?Date.parse(payment.confirmation.expires_at):o.created_at.getTime()+3600000;
+ if(!first&&o.mode!=='automatic'&&['pending','waiting_for_capture'].includes(payment.status)&&now>=providerExpiry){o.cancel_requested=true;await db.query("UPDATE commerce.access_checkout SET cancel_requested=true WHERE id=$1",[o.id]);}
+ if(o.cancel_requested){
+  if(payment.status==='waiting_for_capture'){if(!provider.cancel)throw new HttpError(503,'PAYMENT_UNAVAILABLE');payment=await provider.cancel(payment.id,o.id);verifiedPayment(payment,{id:o.id,providerId:payment.id,value:rubleValue(o.tariff.priceMinor),test:provider.test});}
+  await db.query("UPDATE commerce.access_checkout SET provider_id=$2,provider_status=$3,state='cancelled',redirect_url=NULL WHERE id=$1",[o.id,payment.id,payment.status]);
+  if(payment.status==='succeeded'){await db.query('INSERT INTO commerce.card_refund_job(checkout_id,user_id,provider_id,refund_key,amount_minor) VALUES($1,$2,$3,$4,$5) ON CONFLICT(checkout_id) DO NOTHING',[o.id,owner.id,payment.id,randomUUID(),Number(o.tariff.priceMinor)]);await refundTrial(db,o.id,provider);}
+  return projection({...o,state:'cancelled',redirect_url:null});
+ }
+ if(payment.status==='waiting_for_capture'&&o.mode!=='automatic'&&!first){
+  if(!provider.capture)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
+  payment=await provider.capture(payment.id,o.id,rubleValue(o.tariff.priceMinor));verifiedPayment(payment,{id:o.id,providerId:payment.id,value:rubleValue(o.tariff.priceMinor),test:provider.test});
+ }
+ await db.query('UPDATE commerce.access_checkout SET capture_required=$2,provider_status=$3 WHERE id=$1',[o.id,!first&&o.mode!=='automatic',payment.status]);
  const savedMethod=payment.payment_method?.saved&&typeof payment.payment_method.id==='string'&&payment.payment_method.id.length<=160?seal.seal(payment.payment_method.id):null;
+ if(payment.status==='pending'&&now-o.created_at.getTime()>=3600000){await db.query("UPDATE commerce.access_checkout SET cancel_requested=true,state='cancelled',provider_id=$2,provider_status='pending',redirect_url=NULL WHERE id=$1",[o.id,payment.id]);return projection({...o,state:'cancelled',redirect_url:null});}
  const state=payment.status==='succeeded'?'paid':payment.status==='canceled'?'cancelled':'pending';
  if(resolveReconciliation&&state==='pending')return projection(o);
  const timestamp=(value:unknown)=>typeof value==='string'&&Number.isFinite(Date.parse(value))?new Date(value).toISOString():null;
@@ -203,6 +226,8 @@ export async function disableAutoRenewal(db:PoolClient,userId:string){
  return {status:'disabled'};
 }
 export async function runAutoRenewals(pool:Pool,provider:AccessPaymentProvider,seal:Sealer){
+ const interactive=(await pool.query('SELECT * FROM commerce.interactive_checkouts_due()')).rows;
+ for(const item of interactive){const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[item.user_id]);const u=(await db.query('SELECT id,email FROM identity.auth_user WHERE id=$1',[item.user_id])).rows[0];if(u)await syncAccessCheckout(db,item.id,u,provider,seal);await db.query('COMMIT');}catch{await db.query('ROLLBACK');}finally{db.release();}}
  await runTrialRefunds(pool,provider);
  await pool.query('SELECT commerce.flag_stale_checkouts()');
  const first=(await pool.query<{id:string;application_id:string}>('SELECT * FROM commerce.billing_first_due()')).rows;
@@ -248,4 +273,13 @@ export async function runAutoRenewals(pool:Pool,provider:AccessPaymentProvider,s
   }catch{await db.query('ROLLBACK');}
   finally{db.release();}
  }
+}
+
+export async function cancelAccessCheckout(db:PoolClient,user:Account,input:unknown,provider:AccessPaymentProvider|undefined,seal:Sealer){
+ if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');const b=object(input,['id']);await lockedCycle(db,user.id);let o=await paymentOrder(db,uuid(b.id));
+ if(!o||o.user_id!==user.id)throw new HttpError(404,'NOT_FOUND');if(o.state==='paid'||o.state==='cancelled')return projection(o);
+ if(o.provider_id){const p=await provider.read(o.provider_id);verifiedPayment(p,{id:o.id,providerId:o.provider_id,value:rubleValue(o.tariff.priceMinor),test:provider.test});if(p.status==='succeeded')return syncAccessCheckout(db,o.id,user,{...provider,read:async()=>p},seal);}
+ await db.query("UPDATE commerce.access_checkout SET cancel_requested=true,state='cancelled',redirect_url=NULL WHERE id=$1",[o.id]);
+ if(o.provider_id){try{return await syncAccessCheckout(db,o.id,user,provider,seal);}catch(e){if(!(e instanceof HttpError)||e.code!=='PAYMENT_UNAVAILABLE')throw e;return projection({...o,state:'cancelled',redirect_url:null,cancel_requested:true});}}
+ return projection({...o,state:'cancelled',cancel_requested:true});
 }

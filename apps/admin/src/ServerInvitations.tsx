@@ -16,7 +16,7 @@ const delivery:Record<string,string>={queued:'В очереди',sent:'Прин�
 export function ServerInvitations({refresh,target}:{refresh:number;target?:string}){
  const {data,error,loading,reload}=useAdminData<{invitations:Invitation[]}>('/control/workspace-invitations'+(target?'?id='+encodeURIComponent(target):''),refresh);
  const [query,setQuery]=useState(''),[filter,setFilter]=useState('');
- const visible=data?.invitations.filter(row=>row.id===target||(!filter||row.state===filter)&&foldSearch(row.email+' '+row.id).includes(foldSearch(query.trim())));
+ const visible=data?.invitations.filter(row=>row.id===target||row.origin==='manual'&&(!filter||row.state===filter)&&foldSearch(row.email+' '+row.id).includes(foldSearch(query.trim())));
  return <section className={styles.card}>
   <div className={shell.filters}><SearchField value={query} onValueChange={setQuery} placeholder="Почта или номер приглашения" aria-label="Поиск приглашений"/>
    <SelectField value={filter} aria-label="Статус приглашения" onChange={e=>setFilter(e.target.value)}><option value="">Все статусы</option>{Object.entries(states).map(([key,label])=><option key={key} value={key}>{label}</option>)}</SelectField></div>

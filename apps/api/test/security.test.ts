@@ -964,7 +964,7 @@ test('payment reconciliation uses verified provider identity and full refund clo
  assert.equal(order.refunds.length,2);
  invites=(await admin.get('/control/workspace-invitations')).json().invitations;
  assert.equal(invites[0].state,'cancelled');
- assert.equal((await admin.get('/control/workspace-requests')).json().requests[0].status,'closed');
+ assert.equal((await admin.get('/control/workspace-requests')).json().requests.length,0);
  assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='billing_refund'")).rowCount,2);
 });
 
@@ -1043,6 +1043,7 @@ test('trial grants 2500 once, refunds 10 without revocation, toggles renewal, an
  const address='new-trial@example.test',a=await newSignup(address);await finishSignup(a,address);
  const input={id:crypto.randomUUID(),device:crypto.randomUUID(),cardConsent:true,tariffId:weekly.id,catalogVersion:0,priceMinor:'11900',offerVersion:legalDocuments.offer.version};let r=await a.b.post('/access/trial-create',input);assert.equal(r.statusCode,200,r.body);
  r=await a.b.post('/access/billing-sync',{id:input.id});assert.equal(r.statusCode,200,r.body);assert.equal(r.json().state,'paid');await a.b.post('/access/billing-sync',{id:input.id});assert.equal(calls,1);assert.equal(refunds,1);assert.equal((await a.b.get('/session')).json().scope,'active');
+ const analyzer=await a.b.post('/finance/analyzer-state',{});assert.equal(analyzer.statusCode,200,analyzer.body);assert.equal(analyzer.json().customerBudget.remaining,2500);
  const user=(await pg.owner.query('SELECT id FROM identity.auth_user WHERE email=$1',[address])).rows[0].id;
  let units=(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,clock_timestamp())',[user])).rows[0];assert.equal(units.quota,2500);assert.equal(Number(units.base_remaining),25000000000);
  assert.equal((await a.b.get('/access/billing')).json().renewal.state,'off');const consent={offerVersion:legalDocuments.offer.version,renewalVersion:legalDocuments.renewal.version};assert.equal((await a.b.post('/access/billing-enable',consent)).statusCode,200);await a.b.post('/access/billing-disable',{});assert.equal((await a.b.post('/access/billing-enable',consent)).statusCode,200);
@@ -1078,4 +1079,49 @@ test('trial webhook is idempotent, refund retries are durable, and a second acco
 test('an expired invitation still reserves already-issued access for its owner during signup migration',async()=>{
  const {legalDocuments}=await import('../../../packages/access/src/legal.ts');const admin=await enrolledAdmin(),command=await manualCommand(admin.b,manualInvite());assert.equal((await admin.b.post('/control/manual-access',command)).statusCode,200);
  await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 minute'");const b=userBrowser(),r=await b.post('/access/signup-start',{email:'manual@example.test',name:'Synthetic',password:testPassword,confirmPassword:testPassword,termsVersion:legalDocuments.terms.version,consentVersion:legalDocuments.consent.version});assert.equal(r.statusCode,409,r.body);assert.equal(r.json().code,'USE_EXISTING_INVITATION');assert.equal((await pg.owner.query("SELECT 1 FROM identity.auth_user WHERE email='manual@example.test'")).rowCount,0);
+});
+
+async function followupProvider(){
+ const payments=new Map<string,any>();let captures=0,voids=0,refunds=0;
+ fc.accessPayments={test:true,read:async id=>payments.get(id),create:async input=>{assert.equal(input.authorize,true);const id=crypto.randomUUID(),p={id,test:true,paid:false,status:'pending',amount:{value:input.value,currency:'RUB'},metadata:{orderId:input.id},confirmation:{confirmation_url:'https://yookassa.ru/checkout/synthetic'},...(input.save?{payment_method:{id:'saved-'+id,saved:true,card:{first6:'451234',last4:'4321',expiry_month:'12',expiry_year:'2032'}}}:{})};payments.set(id,p);return p;},capture:async id=>{captures++;const p=payments.get(id);p.paid=true;p.status='succeeded';return p;},cancel:async id=>{voids++;const p=payments.get(id);p.status='canceled';p.paid=false;return p;},createRefund:async input=>{refunds++;return {id:input.id,payment_id:input.paymentId,status:'succeeded',created_at:new Date().toISOString(),amount:{currency:'RUB',value:input.value}};}};
+ const weekly={...tariff,id:'followup-week',duration:{kind:'days' as const,count:7},priceMinor:'11900',aiQuota:2500,catalogVersion:0};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
+ const {legalDocuments}=await import('../../../packages/access/src/legal.ts');
+ const trialInput=()=>({id:crypto.randomUUID(),device:crypto.randomUUID(),cardConsent:true,tariffId:weekly.id,catalogVersion:0,priceMinor:'11900',offerVersion:legalDocuments.offer.version});
+ async function access(b:Browser,auto=false){const q=(await b.post('/access/billing-quote',{tariffId:tariff.id})).json(),id=crypto.randomUUID();const r=await b.post('/access/billing-create',{id,tariffId:q.tariff.id,priceMinor:q.tariff.priceMinor,catalogVersion:q.tariff.catalogVersion,cycleRevision:q.cycleRevision,offerVersion:q.offerVersion,autoRenewal:auto,...(auto?{renewalVersion:q.renewalVersion}:{})});assert.equal(r.statusCode,200,r.body);assert.equal((await b.post('/access/billing-sync',{id})).statusCode,200);return {id,p:payments.get((await pg.owner.query('SELECT provider_id FROM commerce.access_checkout WHERE id=$1',[id])).rows[0].provider_id)};}
+ return {payments,trialInput,access,counts:()=>({captures,voids,refunds})};
+}
+test('signup resend respects server cooldown, replaces the code and retains the registration draft',async()=>{
+ const a=await newSignup('resend-new@example.test');assert.equal((await a.b.post('/access/signup-resend',{id:a.id})).statusCode,429);
+ await pg.owner.query("UPDATE mail.request_cooldown SET retry_at=clock_timestamp()-interval '1 second'");
+ const r=await a.b.post('/access/signup-resend',{id:a.id});assert.equal(r.statusCode,200,r.body);assert.ok(r.json().retryAfterSeconds>0);
+ const payload=(await pg.owner.query("SELECT sealed_payload FROM identity.outbox WHERE kind='signup_code' ORDER BY created_at DESC LIMIT 1")).rows[0].sealed_payload,code=JSON.parse(envelope(fc.wrappingKey).open(payload)).code;
+ if(code!==a.code)assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code:a.code})).statusCode,400);
+ assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code})).statusCode,200);assert.equal((await a.b.post('/access/signup-resend',{id:a.id})).statusCode,400);
+});
+test('tariff and trial checkout are independent; first paid tariff loads Analyzer and consumes trial eligibility',async()=>{
+ const f=await followupProvider(),address='first-paid@example.test',a=await newSignup(address);await finishSignup(a,address);
+ const paid=await f.access(a.b,true),trial=f.trialInput();assert.equal((await a.b.post('/access/trial-create',trial)).statusCode,200);await a.b.post('/access/billing-sync',{id:trial.id});
+ let state=(await a.b.get('/access/billing')).json();assert.equal(state.order.id,paid.id);assert.equal(state.trialOrder.id,trial.id);assert.equal(state.accessEnd,null);
+ paid.p.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:paid.id})).json().state,'paid');
+ const session=(await a.b.get('/session')).json();assert.equal(session.scope,'active');assert.equal(session.trialAvailable,false);
+ const analyzer=await a.b.post('/finance/analyzer-state',{});assert.equal(analyzer.statusCode,200,analyzer.body);assert.equal(analyzer.json().customerBudget.remaining,10000);assert.ok(analyzer.json().quota.remaining>0);
+ const tp=[...f.payments.values()].find(p=>p.amount.value==='10.00');tp.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:trial.id})).json().state,'paid');
+ assert.equal((await a.b.get('/session')).json().accessEnd,session.accessEnd);assert.equal((await a.b.get('/access/billing')).json().trialResult,'denied');assert.equal(f.counts().refunds,1);
+ const admin=await enrolledAdmin(),users=(await admin.b.get('/control/accesses')).json().users;assert.equal(users[0].trialState,'used');assert.equal(users[0].renewal.state,'active');
+ const orders=await admin.b.get('/control/access-checkouts');assert.equal(orders.statusCode,200,orders.body);assert.ok(orders.json().orders.some((o:any)=>o.purpose==='trial'&&o.refunds.length===1));assert.equal((await admin.b.get('/control/workspace-requests')).json().requests.length,0);
+ fc.accessPayments=undefined;
+});
+test('cancel closes the order, late authorization is voided, expired links reset, and only a fresh link can grant access',async()=>{
+ const f=await followupProvider(),address='cancel-pending@example.test',a=await newSignup(address);await finishSignup(a,address);
+ const old=await f.access(a.b);assert.equal((await a.b.post('/access/billing-cancel',{id:old.id})).json().state,'cancelled');
+ old.p.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:old.id})).json().state,'cancelled');assert.deepEqual(f.counts(),{captures:0,voids:1,refunds:0});assert.equal((await a.b.get('/session')).json().scope,'restricted');
+ const expired=await f.access(a.b);await pg.owner.query("UPDATE commerce.access_checkout SET created_at=clock_timestamp()-interval '2 hours' WHERE id=$1",[expired.id]);assert.equal((await a.b.get('/access/billing')).json().order.state,'cancelled');
+ expired.p.status='succeeded';expired.p.paid=true;await a.b.post('/access/billing-sync',{id:expired.id});assert.equal(f.counts().refunds,1);assert.equal((await a.b.get('/session')).json().scope,'restricted');
+ const fresh=await f.access(a.b);fresh.p.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:fresh.id})).json().state,'paid');assert.equal((await a.b.get('/session')).json().scope,'active');assert.equal(f.counts().captures,1);fc.accessPayments=undefined;
+});
+test('suspending and blocking preserve included and purchased balances while finance stays denied',async()=>{
+ const a=await manualRegistered(),admin=a.admin.b,cmd=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,purchasedUnits:233,reason:'Balance before suspension'});assert.equal((await admin.post('/control/manual-access',cmd)).statusCode,200);
+ const balances=async()=>((await admin.get('/control/accesses')).json().users.find((u:any)=>u.userId===a.userId)).analyzer,before=await balances();
+ const input={actionId:crypto.randomUUID(),userId:a.userId,status:'suspended',note:'Preserve allowance',endSessions:false};assert.equal((await admin.post('/control/user-status',input)).statusCode,200);const after=await balances();assert.equal(after.remaining,before.remaining);assert.equal(after.purchased,233);assert.equal((await a.b.post('/finance/analyzer-state',{})).statusCode,403);
+ assert.equal((await admin.post('/control/user-status',{...input,actionId:crypto.randomUUID(),status:'active'})).statusCode,200);assert.equal((await balances()).remaining,before.remaining);assert.equal((await a.b.post('/finance/analyzer-state',{})).statusCode,200);
 });

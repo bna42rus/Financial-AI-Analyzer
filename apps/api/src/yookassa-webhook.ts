@@ -16,7 +16,7 @@ export async function handleYooKassaNotification(db:PoolClient,body:unknown,acce
  const notification=body as {type?:unknown;event?:unknown;object?:{id?:unknown;payment_id?:unknown}}|null;
  if(notification?.type!=='notification')throw new HttpError(400,'INVALID_NOTIFICATION');
  const event=notification.event;
- if(event!=='payment.succeeded'&&event!=='payment.canceled'&&event!=='refund.succeeded')return;
+ if(event!=='payment.succeeded'&&event!=='payment.canceled'&&event!=='payment.waiting_for_capture'&&event!=='refund.succeeded')return;
  const id=notification.object?.id;
  const paymentId=event==='refund.succeeded'?notification.object?.payment_id:id;
  if(!reference(id)||!reference(paymentId))throw new HttpError(400,'INVALID_NOTIFICATION');
@@ -46,7 +46,7 @@ export async function handleYooKassaNotification(db:PoolClient,body:unknown,acce
  const provider=target.kind==='access'?access:topups;
  if(!provider)return;
  const payment=await provider.read(paymentId);
- const expected=event==='payment.succeeded'?'succeeded':'canceled';
+ const expected=event==='payment.succeeded'?'succeeded':event==='payment.waiting_for_capture'?'waiting_for_capture':'canceled';
  if(payment.status!==expected){
   if(payment.status!=='succeeded'&&payment.status!=='canceled')throw new HttpError(503,'PAYMENT_UNAVAILABLE');
   return;

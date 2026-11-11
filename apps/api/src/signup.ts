@@ -16,7 +16,7 @@ export async function signupStart(db:PoolClient,b:Record<string,unknown>,seal:Se
  if((await db.query("SELECT 1 FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE i.email=$1 AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp()))",[address])).rowCount)throw new HttpError(409,'USE_EXISTING_INVITATION');
  const retryAfterSeconds=await reserveMailRequest(db,seal,'finance','registration',address);
  const id=randomUUID(),code=String(randomInt(0,1000000)).padStart(6,'0');
- await db.query('DELETE FROM identity.signup_pending WHERE expires_at<clock_timestamp()');
+ await db.query("DELETE FROM identity.signup_pending WHERE created_at<clock_timestamp()-interval '24 hours'");
  await db.query("INSERT INTO identity.signup_pending(id,email,name,password_hash,code_hash,terms_version,consent_version,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,clock_timestamp()+interval '15 minutes')",[id,address,name,await hashPassword(chosen),digest(id+':'+code),b.termsVersion,b.consentVersion]);
  await outbox(db,'identity',seal,'signup_code',{email:address,code},{subjectId:id,expiresAt:new Date(Date.now()+900000).toISOString()});
  return {id,retryAfterSeconds};
@@ -42,4 +42,10 @@ export async function signupComplete(db:PoolClient,b:Record<string,unknown>){
  await recordLegal(db,user,'terms',p.terms_version);await recordLegal(db,user,'privacy_notice',legalDocuments.privacy.version);
  await db.query("UPDATE identity.signup_pending SET registered_user_id=$2,password_hash='' WHERE id=$1",[id,user]);
  return {status:'registered'};
+}
+export async function signupResend(db:PoolClient,b:Record<string,unknown>,seal:Sealer){
+ const id=string(b.id,36),p=(await db.query("SELECT * FROM identity.signup_pending WHERE id=$1 AND registered_user_id IS NULL AND created_at>clock_timestamp()-interval '24 hours' FOR UPDATE",[id])).rows[0];
+ if(!p)throw new HttpError(400,'INVALID_SIGNUP_CODE');const retryAfterSeconds=await reserveMailRequest(db,seal,'finance','registration',p.email),code=String(randomInt(0,1000000)).padStart(6,'0');
+ await db.query("UPDATE identity.signup_pending SET code_hash=$2,attempts=0,expires_at=clock_timestamp()+interval '15 minutes' WHERE id=$1",[id,digest(id+':'+code)]);
+ await outbox(db,'identity',seal,'signup_code',{email:p.email,code},{subjectId:id,expiresAt:new Date(Date.now()+900000).toISOString()});return {retryAfterSeconds};
 }

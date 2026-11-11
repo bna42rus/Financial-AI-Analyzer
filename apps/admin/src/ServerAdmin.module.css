@@ -2,7 +2,7 @@
 .header{position:relative;isolation:isolate;margin-bottom:1.15rem;border-bottom:1px solid var(--color-border)}
 .header::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--color-surface);box-shadow:0 0 0 100vmax var(--color-surface);clip-path:inset(0 -100vmax)}
 .headerBar,.headerActions,.listHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.headerBar{justify-content:space-between;padding-block:14px;border-bottom:1px solid var(--color-border)}
+.headerBar{justify-content:space-between;padding-block:14px;}
 .headerActions>a{text-decoration:none}
 .nav{display:flex;align-items:stretch;gap:5px;overflow:auto;scrollbar-width:thin;padding-top:3px}
 .nav a{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:10px 8px;color:var(--color-text);text-decoration:none;border-bottom:2px solid transparent;font-size:.84rem}

@@ -1,4 +1,4 @@
-import {signupStart,signupComplete} from './signup.ts';
+import {signupStart,signupComplete,signupResend} from './signup.ts';
 import {startTrial,trialInfo,enableRenewal} from './trial.ts';
 import {requestReconciliation} from './checkout-operations.ts';
 import {adminInvitations,adminPreferences,adminRequests,changeUserAccessStatus} from './admin-workspace.ts';
@@ -28,7 +28,7 @@ import { isAssistantProvider } from './analyzer-assistant-provider.ts';
 import { isCloudTaskProvider } from './analyzer-task-provider.ts';
 
 import {accountLegal,recordLegal} from './launch-legal.ts';
-import {checkoutAccountState,disableAutoRenewal,firstCheckoutState,quoteAccess,startAccessCheckout,startFirstCheckout,disableFirstAutoRenewal,syncAccessCheckout} from './access-checkout.ts';
+import {cancelAccessCheckout,checkoutAccountState,disableAutoRenewal,firstCheckoutState,quoteAccess,startAccessCheckout,startFirstCheckout,disableFirstAutoRenewal,syncAccessCheckout} from './access-checkout.ts';
 
 export async function createServer(config: Config) {
   if (config.assistantProvider && (config.profile !== 'finance' || !['test','staging'].includes(config.environment) || !isAssistantProvider(config.assistantProvider) || config.environment !== config.assistantProvider.environment || config.assistantProvider.pool !== config.pool || config.taskProvider || config.yandexAnalyzer || config.analyzerAdapter)) throw new Error('Assistant provider requires explicit matching acceptance configuration');
@@ -222,16 +222,19 @@ export async function createServer(config: Config) {
         if(path==='/account/name')result=await accountProfile!.saveAccountName(db,s.user.id,fields(request,['name']).name);
         else if(path==='/account/timezone')result=await financialProfile!.financeProfile(db,s.user.id,fields(request,['timezone','followsDevice','syncDevice']));
         else result=await accountProfile!.accountEmail(db,{id:s.user.id,email:s.user.email,sessionId:s.session.id},fields(request,path.endsWith('-request')?['email','password']:['code']),seal);
-       } else if(config.profile==='finance'&&['/access/signup-start','/access/signup-complete'].includes(path)&&request.method==='POST'){
+       } else if(config.profile==='finance'&&['/access/signup-start','/access/signup-complete','/access/signup-resend'].includes(path)&&request.method==='POST'){
         if(path.endsWith('start'))result=await signupStart(db,fields(request,['email','name','password','confirmPassword','termsVersion','consentVersion']),seal);
+        else if(path.endsWith('resend'))result=await signupResend(db,fields(request,['id']),seal);
         else{result=await signupComplete(db,fields(request,['id','code']));if((result as {code?:string}).code)status=400;}
-      } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable','/access/trial-create','/access/billing-enable'].includes(path)&&request.method==='POST'))){
+      } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable','/access/trial-create','/access/card-create','/access/billing-enable','/access/billing-cancel'].includes(path)&&request.method==='POST'))){
         const u=await current(auth,request);if(!u||!u.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await db.query("SELECT set_config('app.user_id',$1,true)",[u.user.id]);
-        if(path==='/access/billing')result=await checkoutAccountState(db,u.user.id,config.accessPayments);
+        if(path==='/access/billing')result=await checkoutAccountState(db,u.user.id,config.accessPayments,seal);
         else if(path==='/access/billing-quote')result=await quoteAccess(db,u.user.id,fields(request,['tariffId']),config.accessPayments);
         else if(path==='/access/billing-create')result=await startAccessCheckout(db,u.user,request.body,config.accessPayments,config.launchLegal);
         else if(path==='/access/billing-sync')result=await syncAccessCheckout(db,string(fields(request,['id']).id,36),u.user,config.accessPayments,seal);
+        else if(path==='/access/billing-cancel')result=await cancelAccessCheckout(db,u.user,request.body,config.accessPayments,seal);
+        else if(path==='/access/card-create')result=await startTrial(db,u.user,request.body,config.accessPayments,seal,true);
         else if(path==='/access/trial-create')result=await startTrial(db,u.user,request.body,config.accessPayments,seal);
         else if(path==='/access/billing-enable')result=await enableRenewal(db,u.user.id,request.body);
         else {fields(request,[]);result=await disableAutoRenewal(db,u.user.id);}
@@ -257,7 +260,8 @@ export async function createServer(config: Config) {
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { ...await trialInfo(db,s.user.id),name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,...await financialProfile!.financialTimezonePreference(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          const onboarding=await trialInfo(db,s.user.id);
+          result = { ...onboarding,name: s.user.name,email:s.user.email,accessWarning:onboarding.isNew?null:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:onboarding.isNew?null:state.access_end,...await financialProfile!.financialTimezonePreference(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
       } else if(config.profile==='control'&&path==='/control/admin-preferences'&&['GET','POST'].includes(request.method)){
         const s=await requireAdmin(auth,db,request);
@@ -275,7 +279,9 @@ export async function createServer(config: Config) {
       } else if(config.profile==='control'&&path==='/control/access-checkouts'&&request.method==='GET'){
         await requireAdmin(auth,db,request);
         const target=new URL(request.url,config.baseURL).searchParams.get('id');
-        result={orders:(await db.query('SELECT * FROM commerce.control_checkout_queue($1)',[target&&/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(target)?target:null])).rows};
+        const facts=new Map((await db.query('SELECT * FROM commerce.control_billing_facts()')).rows.map(f=>[f.id,f]));
+        const orders=(await db.query('SELECT * FROM commerce.control_checkout_queue($1)',[target&&/^[\da-f]{8}-(?:[\da-f]{4}-){3}[\da-f]{12}$/i.test(target)?target:null])).rows.map(o=>{const f=facts.get(o.id);return {...o,purpose:f?.purpose??'access',firstPurchase:f?.first_purchase??false,refunds:[...(o.refunds??[]),...(f?.refunds??[])]};});
+        result={orders:[...orders,...(await db.query('SELECT commerce.control_topup_payments() AS value')).rows.map(r=>r.value)].sort((a,b)=>Date.parse(b.created_at)-Date.parse(a.created_at))};
       } else if(config.profile==='control'&&(path==='/control/commerce-catalog'&&['GET','POST'].includes(request.method)||path==='/control/commerce-catalog-archive'&&request.method==='POST')){
         const s=await requireAdmin(auth,db,request);
         if(request.method==='POST'){

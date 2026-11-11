@@ -27,7 +27,7 @@ import styles from './ServerAccess.module.css';
 
 const initialLink=readLink();
 const getRoute=()=>location.hash.slice(1).split('?')[0]??'';
-const isPublic=(route:string)=>['account','access','checkout','invite','reset','verify','login'].includes(route);
+const isPublic=(route:string)=>['account','access','checkout','invite','reset','verify','login','payment-return'].includes(route);
 const hasCode=(e:unknown,...codes:string[])=>e instanceof ApiError&&codes.includes(e.code);
 function setRouteHash(route:string,replace=false,state:object|null=null){if(replace){history.replaceState(state,'',route?'#'+route:'/');window.dispatchEvent(new Event('hashchange'));}else location.hash='#'+route;}
 function AccessCard({icon:Icon,title,children}:{icon:typeof Mail;title:string;children:React.ReactNode}){
@@ -79,9 +79,9 @@ export function ServerAccess(){
  useEffect(()=>{
   void refresh().catch(()=>{});
   const change=()=>{setRoute(getRoute());setTariffId(new URLSearchParams(location.hash.split('?')[1]).get('tariff')??'');setLink(readLink());setError('');setMessage('');setLinkInvalid(false);setRegistrationCodeSent(false);setSubmittedEmail('');setApplicationEmail('');
-   if(getRoute()==='account'&&new URLSearchParams(location.hash.split('?')[1]).has('payment'))setRenewalOpen(true);
+
   };
-  if(getRoute()==='account'&&new URLSearchParams(location.hash.split('?')[1]).has('payment'))setRenewalOpen(true);
+
   window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);
  },[refresh]);
  useEffect(()=>{
@@ -91,6 +91,11 @@ export function ServerAccess(){
   void reloadApplication(controller.signal);
   return()=>controller.abort();
  },[checkoutRoute,!!session,reloadApplication]);
+ useEffect(()=>{if(!session||(route!=='payment-return'&&!(route==='account'&&paymentReturn)))return;
+  let stopped=false;setRenewalOpen(false);setTrialOpen(false);
+  void api('/access/billing').then(()=>refresh()).catch(()=>{}).finally(()=>{if(!stopped){window.dispatchEvent(new Event('cashneuro-billing'));setRouteHash('',true);}});
+  return()=>{stopped=true;};
+ },[!!session,route,paymentReturn,refresh]);
  useEffect(()=>{if(!session)return;const tick=()=>{if(document.visibilityState!=='hidden')void refresh().catch(()=>{});};const t=window.setInterval(tick,60000);window.addEventListener('focus',tick);return()=>{window.clearInterval(t);window.removeEventListener('focus',tick);};},[!!session,refresh]);
  useEffect(()=>{if(!row||!['under_review','needs_topup','paid_not_activated','awaiting_payment'].includes(row.status)||!checkoutRoute)return;
   const controller=new AbortController();
@@ -110,8 +115,8 @@ export function ServerAccess(){
  <div className={styles.entryContent}>{!loaded?<AccessCard icon={ShieldCheck} title="Проверяем вход"><p role="status">Открываем CashNeuro…</p></AccessCard>:
  sessionError&&!session?<AccessCard icon={ShieldCheck} title="CashNeuro недоступен"><p role="alert">{sessionError}</p><div className={styles.actions}><button className={styles.primary} onClick={()=>void refresh().catch(()=>{})}>Повторить</button><a className={styles.secondary} href="/demo">Попробовать демо</a></div></AccessCard>:
  session?<><LegalUpdate signedIn/>{notices}<AccessCard icon={LockKeyhole} title={session.blocked?'Доступ приостановлен':session.isNew?'Начните пользоваться CashNeuro':session.accessEnd?'Срок доступа закончился':'Доступ ещё не активен'}>
-  <p>{session.blocked?'Операции, отчёты и Анализатор временно недоступны. Чтобы уточнить причину и восстановить доступ, напишите в поддержку.':session.isNew?'Выберите тариф или попробуйте 7 дней с 2 500 единицами Анализатора.':session.accessEnd?'Продлите доступ, чтобы снова открыть операции, отчёты и Анализатор. Финансовые данные сохранены.':'Финансовые разделы откроются после подтверждения доступа.'}</p>
-  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&session.trialAvailable&&<button className={styles.secondary} onClick={()=>setTrialOpen(true)}>Попробовать 7 дней</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
+  <p>{session.blocked?'Операции, отчёты и Анализатор временно недоступны. Чтобы уточнить причину и восстановить доступ, напишите в поддержку.':session.isNew?'Выберите тариф или попробуйте 7 дней бесплатно.':session.accessEnd?'Продлите доступ, чтобы снова открыть операции, отчёты и Анализатор. Финансовые данные сохранены.':'Финансовые разделы откроются после подтверждения доступа.'}</p>
+  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&session.trialAvailable&&<button className={styles.secondary} onClick={()=>setTrialOpen(true)}>Попробовать бесплатно</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
  </AccessCard>{trialOpen&&<OperationDialog title="Пробная неделя" footer={null} compact onClose={()=>setTrialOpen(false)}><TrialStart onRefresh={async()=>{await refresh();setTrialOpen(false);}}/></OperationDialog>}{accountOpen&&<ServerAccount asDialog session={session} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>:
  route==='login'||route==='account'||(!isPublic(route)&&!!route)?<div className={styles.authWrap}>{notices}<ServerAuth onAuthenticated={async()=>{await refresh();if(route==='login'||route==='account')setRouteHash('',true);}}/><p className={styles.entryFootnote}>Ещё нет аккаунта? <a href="#access">Получить доступ</a> · <a href="/demo">Попробовать демо</a></p></div>:
  route==='access'?<Signup onRegistered={async()=>{await refresh();setRouteHash('',true);}}/>:
@@ -144,7 +149,7 @@ export function ServerAccess(){
    <label>Почта<input name="email" type="email" required autoComplete="email" maxLength={254} value={applicationEmail} onChange={e=>setApplicationEmail(e.target.value)}/></label><div className={styles.legalChoice}><input type="checkbox" name="consent" required id="application-consent"/><label htmlFor="application-consent">Даю <a href="/data-consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a>.</label></div><p className={styles.legalLink}><a href="/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p><button className={styles.primary} disabled={busy||!tariffs.length||applicationMail.seconds>0}>{applicationMail.label??'Получить ссылку на почту'}</button>
   </form>
  </AccessCard>}</>:
- <main className={styles.landing}><div><p className={styles.eyebrow}>Финансовый анализатор</p><h1>Поймите, куда уходят деньги</h1><p>Попробуйте 7 дней с 2 500 единицами Анализатора. Операции из разных банков — в одном месте. Спросите Анализатор с ИИ, почему этот месяц обошёлся дороже прошлого, и увидите, какие покупки и платежи изменили итог.</p><div className={styles.actions}><a className={styles.primary} href="#access">Начать пользоваться <ArrowRight size={17}/></a><a className={styles.secondary} href="/price">Посмотреть тарифы</a></div></div>
+ <main className={styles.landing}><div><p className={styles.eyebrow}>Финансовый анализатор</p><h1>Поймите, куда уходят деньги</h1><p>Попробуйте 7 дней бесплатно. Операции из разных банков — в одном месте. Спросите Анализатор с ИИ, почему этот месяц обошёлся дороже прошлого, и увидите, какие покупки и платежи изменили итог.</p><div className={styles.actions}><a className={styles.primary} href="#access">Начать пользоваться <ArrowRight size={17}/></a><a className={styles.secondary} href="/price">Посмотреть тарифы</a></div></div>
  <LandingDemoPreview/>
  </main>}</div>
  <LegalFooter/>{exitOpen&&<SignOutConfirmation busy={busy} onClose={()=>setExitOpen(false)} onConfirm={()=>{setExitOpen(false);signOut();}}/>}</div>;
