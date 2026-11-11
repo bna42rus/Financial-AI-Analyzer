@@ -1,8 +1,8 @@
 import {HttpError} from './types.ts';
 import {uuid} from '../../../packages/finance-core/src/model.ts';
-export type AccessPayment = {id:string;test:boolean;paid:boolean;status:string;amount:{currency:string;value:string};metadata?:{orderId?:string};captured_at?:string;cancellation_details?:{reason?:string};confirmation?:{confirmation_url?:string;expires_at?:string};payment_method?:{id?:string;saved?:boolean}};
+export type AccessPayment = {id:string;test:boolean;paid:boolean;status:string;amount:{currency:string;value:string};metadata?:{orderId?:string};captured_at?:string;cancellation_details?:{reason?:string};confirmation?:{confirmation_url?:string;expires_at?:string};payment_method?:{id?:string;saved?:boolean;card?:{first6?:string;last4?:string;expiry_month?:string;expiry_year?:string}}};
 export type ProviderRefund={id:string;payment_id:string;created_at:string;status:string;amount:{value:string;currency:string}};
-export type AccessPaymentProvider={test:boolean;readRefund?:(id:string)=>Promise<ProviderRefund>;refunds?:(since:string,cursor?:string)=>Promise<{items:ProviderRefund[];next_cursor?:string}>;read(id:string):Promise<AccessPayment>;create(input:{id:string;value:string;title:string;save?:boolean;method?:string;first?:boolean}):Promise<AccessPayment>};
+export type AccessPaymentProvider={test:boolean;createRefund?:(input:{id:string;paymentId:string;value:string})=>Promise<ProviderRefund>;readRefund?:(id:string)=>Promise<ProviderRefund>;refunds?:(since:string,cursor?:string)=>Promise<{items:ProviderRefund[];next_cursor?:string}>;read(id:string):Promise<AccessPayment>;create(input:{id:string;value:string;title:string;save?:boolean;method?:string;first?:boolean}):Promise<AccessPayment>};
 export function createAccessPaymentProvider(input:{shopId:string;secret:string;origin:string;test:boolean},fetcher=fetch):AccessPaymentProvider{
  const {shopId,secret,origin,test}=input,url=new URL(origin);
  if(!/^\d{3,16}$/.test(shopId)||!(test?/^test_[A-Za-z0-9_-]{12,200}$/:/^live_[A-Za-z0-9_-]{12,200}$/).test(secret)||url.protocol!=='https:'||url.origin!==origin)throw Error('PAYMENT_CONFIGURATION_DENIED');
@@ -28,7 +28,12 @@ export function createAccessPaymentProvider(input:{shopId:string;secret:string;o
   if(!data||!Array.isArray(data.items)||data.items.length>50||data.next_cursor!==undefined&&(typeof data.next_cursor!=='string'||data.next_cursor.length>500))throw new HttpError(502,'PAYMENT_UNVERIFIED');
   return data as {items:ProviderRefund[];next_cursor?:string};
  }
- return {test,refunds,readRefund,read:id=>send(id),create:({id,value,title,save,method,first})=>send(id,{amount:{value,currency:'RUB'},capture:true,description:'CashNeuro: '+title,metadata:{orderId:id},...(method?{payment_method_id:method}:{confirmation:{type:'redirect',return_url:origin+(first?'/#checkout?payment='+id:'/#account?payment=return')},...(save?{save_payment_method:true}:{})})})};
+ async function createRefund({id,paymentId,value}:{id:string;paymentId:string;value:string}){
+  let response:Response;
+  try{response=await fetcher('https://api.yookassa.ru/v3/refunds',{method:'POST',headers:{Authorization:authorization,'Content-Type':'application/json','Idempotence-Key':uuid(id)},body:JSON.stringify({payment_id:uuid(paymentId),amount:{value,currency:'RUB'}}),signal:AbortSignal.timeout(7000),redirect:'error'});}catch{throw new HttpError(503,'PAYMENT_UNAVAILABLE');}
+  if(!response.ok)throw new HttpError(503,'PAYMENT_UNAVAILABLE');return await response.json() as ProviderRefund;
+ }
+ return {test,createRefund,refunds,readRefund,read:id=>send(id),create:({id,value,title,save,method,first})=>send(id,{amount:{value,currency:'RUB'},capture:true,description:'CashNeuro: '+title,metadata:{orderId:id},...(method?{payment_method_id:method}:{confirmation:{type:'redirect',return_url:origin+(first?'/#checkout?payment='+id:'/#account?payment=return')},...(save?{save_payment_method:true}:{})})})};
 }
 export function verifiedPayment(payment:AccessPayment,expected:{id:string;providerId:string|null;value:string;test:boolean}){
  if(payment.test!==expected.test||uuid(payment.id)!==payment.id||expected.providerId&&payment.id!==expected.providerId||payment.metadata?.orderId!==expected.id||payment.amount?.currency!=='RUB'||payment.amount.value!==expected.value||!['pending','succeeded','canceled','waiting_for_capture'].includes(payment.status)||payment.status==='succeeded'&&payment.paid!==true)throw new HttpError(502,'PAYMENT_UNVERIFIED');

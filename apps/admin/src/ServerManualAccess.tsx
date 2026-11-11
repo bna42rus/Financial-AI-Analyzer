@@ -13,7 +13,7 @@ import styles from '../../web/src/ServerAccess.module.css';
 import shell from './ServerAdmin.module.css';
 
 const count=(n:number)=>n.toLocaleString('ru-RU');
-const status=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочный':u.cycle?.accessEnd&&Date.parse(u.cycle.accessEnd)>Date.now()?'Действует':u.cycle?.accessEnd?'Истёк':'Доступ не выдан';
+const status=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочный':u.cycle?.accessEnd&&Date.parse(u.cycle.accessEnd)>Date.now()?(u.trialState==='active'?'Пробный период':'Действует'):u.trialState==='new'||u.trialState==='pending'||u.trialState==='denied'?'Новый аккаунт':u.cycle?.accessEnd?'Истёк':'Доступ не выдан';
 function quotaLabel(q:QuotaPolicy){
  if(q.source==='override'&&q.budgetMinor!==undefined)return moneyLabel(q.budgetMinor)+' в месяц на модель';
  return count(q.limit)+' единиц '+(q.source==='tariff'&&q.periodDays?'каждые '+q.periodDays+' дней':'в месяц');
@@ -52,7 +52,7 @@ export function ServerManualAccess({refresh,target}:{refresh:number;target?:stri
     <div className={shell.paymentHead+' '+shell.userHeading}><h2>{user.name||user.email}</h2><span className={shell.badge}>{status(user)}</span></div><p>{user.email}</p>
     {user.status==='suspended'&&<span className={shell.attention}>Заблокирован</span>}
     <div className={shell.records}>
-     <article><h3><CalendarDays size={17}/> Доступ</h3><dl className={shell.detailList}><div><dt>Срок</dt><dd>{formatTerm(user)}</dd></div><div><dt>Зарегистрирован</dt><dd>{time.format(user.registeredAt)}</dd></div></dl>
+     <article><h3><CalendarDays size={17}/> Доступ</h3><dl className={shell.detailList}><div><dt>Срок</dt><dd>{formatTerm(user)}</dd></div><div><dt>Зарегистрирован</dt><dd>{time.format(user.registeredAt)}</dd></div></dl>{user.trialState&&<p>Пробный период: {({new:'не использован',pending:'проверка карты',active:'предоставлен',used:'использован',denied:'недоступен'} as Record<string,string>)[user.trialState]}{user.trialRefundState?' · Возврат 10 ₽: '+({required:'ожидает отправки',pending:'обрабатывается',succeeded:'выполнен',canceled:'отменён — требуется проверка'} as Record<string,string>)[user.trialRefundState]:''}</p>}{user.renewal&&<p>Автопродление: {user.renewal.state==='active'?'включено · '+moneyLabel(user.renewal.priceMinor)+' · '+time.format(user.renewal.nextAt):'выключено'}</p>}
       <div className={shell.detailActions}><button className={styles.secondary} onClick={()=>setPanel('access')}>Изменить доступ</button><button className={styles.secondary} onClick={()=>setPanel('status')}>{user.status==='suspended'?'Снять блокировку':'Приостановить доступ'}</button></div></article>
      <article><h3><Sparkles size={17}/> Лимит Анализатора</h3><dl className={shell.detailList}>
       <div><dt>Включено</dt><dd>{user.analyzer?count(user.analyzer.units)+' единиц':'—'}</dd></div>
@@ -95,7 +95,7 @@ function StatusEditor({user,onClose,onDone}:{user:ManualUser;onClose:()=>void;on
 }
 function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'status'>;user?:ManualUser;data:ManualQueue;onClose:()=>void;onDone:(message:string)=>void}){
  const [mode,setMode]=useState<ManualCommand['mode']>(panel==='invite'?'invite':panel==='quota'?'quota':user?.cycle?.indefinite?'set_end':'extend');
- const [kind,setKind]=useState<ManualTerm['kind']>('days'),[policy,setPolicy]=useState<'tariff'|'units'|'rubles'>(user?.cycle?.quotaPolicy?.source==='override'||!data.tariffs.length?'units':'tariff');
+ const [kind,setKind]=useState<ManualTerm['kind']>('days'),[policy,setPolicy]=useState<'tariff'|'units'|'rubles'>(panel==='quota'||user?.cycle?.quotaPolicy?.source==='override'||!data.tariffs.length?'units':'tariff');
  const [preview,setPreview]=useState<{command:ManualCommand;result:ManualPreview}|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState(''),[field,setField]=useState('');
  const time=useAdminTime(),inviting=panel==='invite',quota=panel==='quota';
  const needsQuota=inviting||quota||!user?.cycle;
@@ -128,9 +128,10 @@ function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'sta
     nextQuota={source:'override',limit:Number(amount)*(rubles?100:1)};
    }
   }
-  const command:ManualCommand={actionId:crypto.randomUUID(),mode,reason:note,...(inviting?{email:address,accessType:'Free',inviteHours:hours}:{userId:user!.userId}),...(term?{term}:{}),...(nextQuota?{quota:nextQuota}:{})};
+  if(quota&&policy==='units'&&nextQuota?.source==='override'&&'limit' in nextQuota&&nextQuota.limit===user?.analyzer?.units)nextQuota=undefined;
+  const command:ManualCommand={actionId:crypto.randomUUID(),mode,reason:note,...(quota?{purchasedUnits:Number(values.get('purchased'))}:{}),...(inviting?{email:address,accessType:'Free',inviteHours:hours}:{userId:user!.userId}),...(term?{term}:{}),...(nextQuota?{quota:nextQuota}:{})};
   setBusy(true);
-  try{const result=await api<ManualPreview>('/control/manual-preview',command);setPreview({result,command:{...command,expectedRevision:result.expectedRevision,expectedMode:result.previousMode,expectedQuota:result.quota}});}
+  try{const result=await api<ManualPreview>('/control/manual-preview',command);setPreview({result,command:{...command,expectedRevision:result.expectedRevision,expectedMode:result.previousMode,expectedQuota:result.quota,expectedPurchased:result.expectedPurchased}});}
   catch(e){
    const target=e instanceof ApiError?({EXISTING_ACCOUNT:'email',PENDING_ACCESS:'email',INVALID_END:'end',TARIFF_UNAVAILABLE:'tariff'}[e.code]??''):'';
    mark(target,e instanceof Error?e.message:'Не удалось проверить изменения.');
@@ -150,7 +151,7 @@ function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'sta
  </>}>
  {preview&&<div className={styles.renewalBody}><p><strong>{preview.result.email}</strong></p>
   {inviting?<><p>Доступ · {termLabel(preview.result.term!)}{preview.result.term?.kind==='fixed'?' · '+time.format(preview.result.term.end):''}</p><p>Лимит · {quotaLabel(preview.result.quota)}</p></>:
-   quota?<><p>Включено: {count(user?.analyzer?.units??0)} → {count(preview.result.quota.limit)} ед.</p>
+   quota?<><p>Докупленных: {count(user?.analyzer?.purchased??0)} → {count(preview.command.purchasedUnits??user?.analyzer?.purchased??0)} ед.</p><p>Включено: {count(user?.analyzer?.units??0)} → {count(preview.result.quota.limit)} ед.</p>
    {preview.result.quota.source==='override'&&<><p>Уже использовано включённых: {count(user?.analyzer?.used??0)} ед. Останется: {count(Math.max(0,preview.result.quota.limit-(user?.analyzer?.used??0)))} ед.</p>{preview.result.next?.accessEnd&&<p>Ручной лимит до {time.format(preview.result.next.accessEnd)}.</p>}</>}{preview.result.effectiveAt&&<p>Вступит в силу после окончания оплаченного периода · {time.format(preview.result.effectiveAt)}.</p>}</>:
    <p>{termView(preview.result.previous)} → {termView(preview.result.next)}</p>}
   <p>{inviting?'Приглашение отправится на указанную почту.':'Пользователь получит письмо об изменении.'}</p>
@@ -168,6 +169,7 @@ function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'sta
    {policy==='tariff'?<OperationField label="Тариф для лимита" error={fieldError('tariff')}><SelectField name="tariff" defaultValue={(user?.cycle?.quotaPolicy?.source==='tariff'?user.cycle.quotaPolicy.tariffId:null)??data.tariffs[0]?.id??''}>{data.tariffs.map(t=><option key={t.id} value={t.id}>{catalogDurationLabel(t.duration)} · {count(t.aiQuota)} ед. · {moneyLabel(t.priceMinor)}</option>)}</SelectField></OperationField>:
     <OperationField label={policy==='rubles'?'Сумма, ₽ (1 ₽ = 100 единиц)':'Лимит, единиц'} error={fieldError('budget')}><input key={policy} name="budget" inputMode="numeric" defaultValue={policy==='rubles'?String(Math.floor((user?.analyzer?.units??10000)/100)):String(user?.analyzer?.units??10000)} onChange={digits}/></OperationField>}
   </>}
+  {quota&&<OperationField label="Остаток докупленных единиц"><input name="purchased" inputMode="numeric" defaultValue={String(user?.analyzer?.purchased??0)} onChange={digits}/></OperationField>}
   <OperationField label="Заметка" error={fieldError('note')}><textarea name="note" rows={2} maxLength={1000} onChange={()=>setError('')}/></OperationField>
   {inviting&&<details open={field==='hours'||undefined}><summary>Дополнительные параметры</summary><OperationField label="Срок ссылки, часов" error={fieldError('hours')}><input name="hours" inputMode="numeric" defaultValue="72" onChange={digits}/></OperationField></details>}
   {!preview&&!field&&error&&<p className={styles.error} role="alert">{error}</p>}

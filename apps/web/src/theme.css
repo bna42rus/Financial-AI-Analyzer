@@ -45,3 +45,8 @@ html{scrollbar-gutter:stable}
 }
 :where(a[href]){color:var(--color-primary);text-decoration:none;text-underline-offset:.18em}
 :where(a[href]:hover,a[href]:focus-visible){text-decoration:underline}
+
+/* Shared field typography also applies inside portals and compact filter cards. */
+:root{--field-font-size:calc(13px * var(--text-scale,1))}
+html body :is(input:not([type="checkbox"]):not([type="radio"]),textarea,select,[data-select-trigger],[data-radix-popper-content-wrapper] [role="option"]){font-family:inherit!important;font-size:var(--field-font-size)!important;font-weight:400!important;line-height:1.5!important;letter-spacing:normal!important}
+@media(pointer:coarse){:root{--field-font-size:calc(16px * var(--text-scale,1))}}

@@ -62,7 +62,7 @@ function AdminWorkspace(){
  }
  return <AdminTimezoneProvider value={timezone}><div className={styles.page+' '+styles.entryPage+' '+shell.page} data-admin-shell={signedIn?"workspace":"entry"}>
  <header className={shell.header+(!signedIn?' '+styles.header:'')}>
-  <div className={shell.headerBar}><Brand suffix="Управление"/>
+  <div className={shell.headerBar}><Brand/>
    {signedIn&&<div className={shell.headerActions}>
     <button className={common.iconButton} aria-label="Обновить данные" title="Обновить данные" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/></button>
     <button className={common.button} type="button" onClick={()=>setAccountOpen(true)}><UserRound size={17}/>Аккаунт</button>

@@ -40,6 +40,8 @@ export function renderMail(kind:string,p:Record<string,unknown>,options:MailOrig
    subject='Подтвердите создание администратора';body={paragraphs:['На сервере запущено создание первого администратора тестовой среды. Введите код в консоли при выполнении owner:complete.','После создания аккаунта настройте двухфакторную аутентификацию в админке.'],code:value(p,'code',100),note:'Код действует 15 минут. Никому его не передавайте.',unexpected:'Если вы не запускали создание администратора, проигнорируйте письмо.'};break;
   case 'invitation':case 'billing_invitation':
    subject='Приглашение в CashNeuro';body={paragraphs:[kind==='billing_invitation'?'Оплата подтверждена. Создайте аккаунт, чтобы начать оплаченный период.':'Для вас подготовлен доступ. Создайте аккаунт по приглашению.'],facts:[['Ссылка действует до',at(p.expiresAt)]],action:action('Создать аккаунт',link('invite')),note:'Если ссылка истечёт, обратитесь в поддержку. Повторно оплачивать доступ не нужно.',unexpected:'Если вы не оформляли доступ и не ждали приглашение, проигнорируйте письмо.'};break;
+  case 'signup_code':
+   subject='Код регистрации CashNeuro';body={paragraphs:['Введите шестизначный код, чтобы создать аккаунт.'],code:value(p,'code',6),note:'Код действует 15 минут.',unexpected:'Если вы не регистрировались, проигнорируйте письмо.'};break;
   case 'registration_verification':
    subject='Код для регистрации';body={paragraphs:['Введите этот код на странице регистрации CashNeuro.'],code:value(p,'proofToken',100),note:'Код действует 15 минут и подходит только к этому приглашению.',unexpected:'Если вы не запрашивали код регистрации, проигнорируйте письмо. Никому не сообщайте код.'};break;
   case 'analyzer_topup':

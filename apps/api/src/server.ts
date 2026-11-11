@@ -1,3 +1,5 @@
+import {signupStart,signupComplete} from './signup.ts';
+import {startTrial,trialInfo,enableRenewal} from './trial.ts';
 import {requestReconciliation} from './checkout-operations.ts';
 import {adminInvitations,adminPreferences,adminRequests,changeUserAccessStatus} from './admin-workspace.ts';
 import {accountDeletion,deletionQueue,deletionPreview,finishAccountDeletion} from './account-deletion.ts';
@@ -220,13 +222,18 @@ export async function createServer(config: Config) {
         if(path==='/account/name')result=await accountProfile!.saveAccountName(db,s.user.id,fields(request,['name']).name);
         else if(path==='/account/timezone')result=await financialProfile!.financeProfile(db,s.user.id,fields(request,['timezone','followsDevice','syncDevice']));
         else result=await accountProfile!.accountEmail(db,{id:s.user.id,email:s.user.email,sessionId:s.session.id},fields(request,path.endsWith('-request')?['email','password']:['code']),seal);
-      } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable'].includes(path)&&request.method==='POST'))){
+       } else if(config.profile==='finance'&&['/access/signup-start','/access/signup-complete'].includes(path)&&request.method==='POST'){
+        if(path.endsWith('start'))result=await signupStart(db,fields(request,['email','name','password','confirmPassword','termsVersion','consentVersion']),seal);
+        else{result=await signupComplete(db,fields(request,['id','code']));if((result as {code?:string}).code)status=400;}
+      } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable','/access/trial-create','/access/billing-enable'].includes(path)&&request.method==='POST'))){
         const u=await current(auth,request);if(!u||!u.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await db.query("SELECT set_config('app.user_id',$1,true)",[u.user.id]);
         if(path==='/access/billing')result=await checkoutAccountState(db,u.user.id,config.accessPayments);
         else if(path==='/access/billing-quote')result=await quoteAccess(db,u.user.id,fields(request,['tariffId']),config.accessPayments);
         else if(path==='/access/billing-create')result=await startAccessCheckout(db,u.user,request.body,config.accessPayments,config.launchLegal);
         else if(path==='/access/billing-sync')result=await syncAccessCheckout(db,string(fields(request,['id']).id,36),u.user,config.accessPayments,seal);
+        else if(path==='/access/trial-create')result=await startTrial(db,u.user,request.body,config.accessPayments,seal);
+        else if(path==='/access/billing-enable')result=await enableRenewal(db,u.user.id,request.body);
         else {fields(request,[]);result=await disableAutoRenewal(db,u.user.id);}
       } else if(application&&((path==='/access/first-checkout'&&request.method==='GET')||(['/access/first-checkout-create','/access/first-checkout-sync','/access/first-checkout-disable'].includes(path)&&request.method==='POST'))){
         const row=await application.ownedApplication(db,config,request);
@@ -250,7 +257,7 @@ export async function createServer(config: Config) {
           if (!state) throw new HttpError(403, 'AUTH_REQUIRED');
           const now = (await db.query('SELECT clock_timestamp() AS now')).rows[0].now;
           const active = state.status === 'active' && (state.indefinite || state.access_end && state.access_end > now);
-          result = { name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,...await financialProfile!.financialTimezonePreference(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
+          result = { ...await trialInfo(db,s.user.id),name: s.user.name,email:s.user.email,accessWarning:accessWarning(state.access_end?.toISOString(),state.indefinite,now), accessEnd:state.access_end,...await financialProfile!.financialTimezonePreference(db,s.user.id),indefinite:state.indefinite,blocked:state.status==='suspended', scope: active ? 'active' : 'restricted', capabilities: active ? ['account','security','access','support','privacy','delete_own_data','finance'] : ['account','security','access','support','privacy','delete_own_data'] };
         }
       } else if(config.profile==='control'&&path==='/control/admin-preferences'&&['GET','POST'].includes(request.method)){
         const s=await requireAdmin(auth,db,request);

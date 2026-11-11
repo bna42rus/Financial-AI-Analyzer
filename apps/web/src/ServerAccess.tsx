@@ -1,3 +1,5 @@
+import {Signup} from './Signup';
+import {TrialStart} from './TrialOnboarding';
 import {SignOutConfirmation} from './SignOutConfirmation';
 import {useNewPasswordFields} from './NewPasswordFields';
 import {LandingDemoPreview} from './LandingDemoPreview';
@@ -16,7 +18,7 @@ import type {Session} from './server-client';
 import {deviceZone} from './InterfaceSettings';
 import {ServerAccount} from './ServerAccount';
 import {ServerRenewal} from './ServerRenewal';
-import {FirstAccessBilling,FirstPaidRenewal} from './AccessBilling';
+import {FirstAccessBilling} from './AccessBilling';
 import {ServerAuth} from './ServerAuth';
 import {ServerFinance} from './ServerFinance';
 import {durationLabel,moneyLabel,statusLabel} from '../../../packages/access/src/model';
@@ -34,7 +36,7 @@ function AccessCard({icon:Icon,title,children}:{icon:typeof Mail;title:string;ch
 
 export function ServerAccess(){
  const newPassword=useNewPasswordFields();
- const [route,setRoute]=useState(getRoute),[link,setLink]=useState(initialLink),[session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[sessionError,setSessionError]=useState('');
+ const [trialOpen,setTrialOpen]=useState(false),[route,setRoute]=useState(getRoute),[link,setLink]=useState(initialLink),[session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[sessionError,setSessionError]=useState('');
  const [row,setRow]=useState<AccessRequest|null>(null),[applicationLoaded,setApplicationLoaded]=useState(false),[applicationError,setApplicationError]=useState('');
  const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[submittedEmail,setSubmittedEmail]=useState(''),[linkInvalid,setLinkInvalid]=useState(false);
  const [accountOpen,setAccountOpen]=useState(false),[renewalOpen,setRenewalOpen]=useState(false),[dismissed,setDismissed]=useState<string|null>(null),[registrationCodeSent,setRegistrationCodeSent]=useState(false);
@@ -107,11 +109,12 @@ export function ServerAccess(){
  return <div className={styles.page+' '+styles.entryPage}><header className={styles.header}><a className={styles.brand} href="/" aria-label="CashNeuro" onClick={()=>{setAccountOpen(false);setRenewalOpen(false);}}><Brand/></a><nav className={styles.entryNav} aria-label="Доступ">{session?<><SupportLink className={styles.secondary}/><button className={styles.secondary} disabled={busy} onClick={()=>setExitOpen(true)}>Выйти</button></>:<a className={styles.secondary} href="#login">Войти</a>}</nav></header>
  <div className={styles.entryContent}>{!loaded?<AccessCard icon={ShieldCheck} title="Проверяем вход"><p role="status">Открываем CashNeuro…</p></AccessCard>:
  sessionError&&!session?<AccessCard icon={ShieldCheck} title="CashNeuro недоступен"><p role="alert">{sessionError}</p><div className={styles.actions}><button className={styles.primary} onClick={()=>void refresh().catch(()=>{})}>Повторить</button><a className={styles.secondary} href="/demo">Попробовать демо</a></div></AccessCard>:
- session?<><LegalUpdate signedIn/>{notices}<AccessCard icon={LockKeyhole} title={session.blocked?'Доступ приостановлен':session.accessEnd?'Срок доступа закончился':'Доступ ещё не активен'}>
-  <p>{session.blocked?'Операции, отчёты и Анализатор временно недоступны. Чтобы уточнить причину и восстановить доступ, напишите в поддержку.':session.accessEnd?'Продлите доступ, чтобы снова открыть операции, отчёты и Анализатор. Финансовые данные сохранены.':'Финансовые разделы откроются после подтверждения доступа.'}</p>
-  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>Продлить доступ</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
- </AccessCard>{accountOpen&&<ServerAccount asDialog session={session} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>:
+ session?<><LegalUpdate signedIn/>{notices}<AccessCard icon={LockKeyhole} title={session.blocked?'Доступ приостановлен':session.isNew?'Начните пользоваться CashNeuro':session.accessEnd?'Срок доступа закончился':'Доступ ещё не активен'}>
+  <p>{session.blocked?'Операции, отчёты и Анализатор временно недоступны. Чтобы уточнить причину и восстановить доступ, напишите в поддержку.':session.isNew?'Выберите тариф или попробуйте 7 дней с 2 500 единицами Анализатора.':session.accessEnd?'Продлите доступ, чтобы снова открыть операции, отчёты и Анализатор. Финансовые данные сохранены.':'Финансовые разделы откроются после подтверждения доступа.'}</p>
+  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&session.trialAvailable&&<button className={styles.secondary} onClick={()=>setTrialOpen(true)}>Попробовать 7 дней</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
+ </AccessCard>{trialOpen&&<OperationDialog title="Пробная неделя" footer={null} compact onClose={()=>setTrialOpen(false)}><TrialStart onRefresh={async()=>{await refresh();setTrialOpen(false);}}/></OperationDialog>}{accountOpen&&<ServerAccount asDialog session={session} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>:
  route==='login'||route==='account'||(!isPublic(route)&&!!route)?<div className={styles.authWrap}>{notices}<ServerAuth onAuthenticated={async()=>{await refresh();if(route==='login'||route==='account')setRouteHash('',true);}}/><p className={styles.entryFootnote}>Ещё нет аккаунта? <a href="#access">Получить доступ</a> · <a href="/demo">Попробовать демо</a></p></div>:
+ route==='access'?<Signup onRegistered={async()=>{await refresh();setRouteHash('',true);}}/>:
  route==='invite'?<AccessCard icon={ShieldCheck} title={linkInvalid||!link.token?'Приглашение недоступно':'Создайте аккаунт'}>
   {notices}{linkInvalid||!link.token?<><p>Ссылка могла истечь или уже использоваться. Если вы оплатили доступ, попросите новую ссылку в поддержке.</p><div className={styles.actions}><SupportLink className={styles.primary}>Написать в поддержку</SupportLink><a className={styles.secondary} href="#login">Войти</a></div></>:<>
   <ol className={styles.registrationSteps}><li aria-current={registrationCodeSent?undefined:'step'}>1. Получить код</li><li aria-current={registrationCodeSent?'step':undefined}>2. Создать аккаунт</li></ol>
@@ -129,7 +132,7 @@ export function ServerAccess(){
  checkoutRoute&&row?<AccessCard icon={row.status==='paid_not_activated'?CheckCircle2:CreditCard} title={row.status==='awaiting_payment'?'Оплатите доступ':row.status==='paid_not_activated'?'Оплата подтверждена':statusLabel[row.status]}>
    <dl className={styles.checkoutFacts}><div><dt>Почта</dt><dd>{row.email}</dd></div><div><dt>Тариф</dt><dd>{row.tariff.name} · {durationLabel(row.tariff.duration)}</dd></div><div><dt>Стоимость</dt><dd>{moneyLabel(row.tariff.priceMinor)}</dd></div></dl>
    {['awaiting_payment','needs_topup'].includes(row.status)?<FirstAccessBilling row={row} onPaid={()=>reloadApplication()} onRestart={restartApplication} fallback={<>{row.remainingMinor&&<p>Осталось доплатить: {moneyLabel(row.remainingMinor)}.</p>}<p>Оплата через сайт сейчас недоступна.</p><SupportLink className={styles.secondary}>Связаться с поддержкой</SupportLink></>}/>:
-   row.status==='paid_not_activated'?<><p>Откройте письмо с приглашением и создайте аккаунт. Оплаченный период начнётся после регистрации.</p><FirstPaidRenewal/><div className={styles.actions}><a href="#login" className={styles.primary}>Уже создали аккаунт? Войти</a><SupportLink className={styles.secondary}>Письмо не пришло</SupportLink></div></>:
+   row.status==='paid_not_activated'?<><p>Откройте письмо с приглашением и создайте аккаунт. Оплаченный период начнётся после регистрации.</p><div className={styles.actions}><a href="#login" className={styles.primary}>Уже создали аккаунт? Войти</a><SupportLink className={styles.secondary}>Письмо не пришло</SupportLink></div></>:
    row.status==='rejected'?<><p>{row.decisionNote==='Оплата возвращена. Приглашение закрыто.'?row.decisionNote:'Платёж не подтверждён. Если деньги списались, обратитесь в поддержку.'}</p><SupportLink className={styles.primary}>Написать в поддержку</SupportLink></>:<p role="status">Проверяем платёж. После подтверждения пришлём приглашение. Повторно платить пока не нужно.</p>}
  </AccessCard>:
  submittedEmail?<AccessCard icon={Mail} title="Проверьте почту"><p>Если заявку можно продолжить, письмо придёт на <strong>{submittedEmail}</strong>. Откройте его и следуйте инструкции.</p><p>Проверьте также папку «Спам».</p><button className={styles.secondary} onClick={()=>setSubmittedEmail('')}>Изменить адрес или запросить снова</button></AccessCard>:
@@ -141,7 +144,7 @@ export function ServerAccess(){
    <label>Почта<input name="email" type="email" required autoComplete="email" maxLength={254} value={applicationEmail} onChange={e=>setApplicationEmail(e.target.value)}/></label><div className={styles.legalChoice}><input type="checkbox" name="consent" required id="application-consent"/><label htmlFor="application-consent">Даю <a href="/data-consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a>.</label></div><p className={styles.legalLink}><a href="/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p><button className={styles.primary} disabled={busy||!tariffs.length||applicationMail.seconds>0}>{applicationMail.label??'Получить ссылку на почту'}</button>
   </form>
  </AccessCard>}</>:
- <main className={styles.landing}><div><p className={styles.eyebrow}>Финансовый анализатор</p><h1>Поймите, куда уходят деньги</h1><p>Операции из разных банков — в одном месте. Спросите Анализатор с ИИ, почему этот месяц обошёлся дороже прошлого, и увидите, какие покупки и платежи изменили итог.</p><div className={styles.actions}><a className={styles.primary} href="#access">Получить доступ <ArrowRight size={17}/></a><a className={styles.secondary} href="/price">Посмотреть тарифы</a></div></div>
+ <main className={styles.landing}><div><p className={styles.eyebrow}>Финансовый анализатор</p><h1>Поймите, куда уходят деньги</h1><p>Попробуйте 7 дней с 2 500 единицами Анализатора. Операции из разных банков — в одном месте. Спросите Анализатор с ИИ, почему этот месяц обошёлся дороже прошлого, и увидите, какие покупки и платежи изменили итог.</p><div className={styles.actions}><a className={styles.primary} href="#access">Начать пользоваться <ArrowRight size={17}/></a><a className={styles.secondary} href="/price">Посмотреть тарифы</a></div></div>
  <LandingDemoPreview/>
  </main>}</div>
  <LegalFooter/>{exitOpen&&<SignOutConfirmation busy={busy} onClose={()=>setExitOpen(false)} onConfirm={()=>{setExitOpen(false);signOut();}}/>}</div>;

@@ -1,3 +1,4 @@
+import {recordTrialRefund} from './trial.ts';
 import type {PoolClient} from 'pg';
 import type {AccessRequest} from '../../../packages/access/src/model.ts';
 import type {AccessPaymentProvider} from './access-payment-provider.ts';
@@ -32,7 +33,7 @@ export async function handleYooKassaNotification(db:PoolClient,body:unknown,acce
   }
   const refund=await readRefund(id);
   if(refund?.id!==id||refund.payment_id!==paymentId||refund.status!=='succeeded')throw new HttpError(502,'PAYMENT_UNVERIFIED');
-  if(target.kind==='access')await recordAccessRefund(db,refund,seal);
+  if(target.kind==='access'){if(target.user_id)await db.query("SELECT set_config('app.user_id',$1,true)",[target.user_id]);if(!await recordTrialRefund(db,refund))await recordAccessRefund(db,refund,seal);}
   else{
    const amount=refundValue(refund);
    if(amount===null)throw new HttpError(502,'PAYMENT_UNVERIFIED');

@@ -40,8 +40,8 @@ async function quota(db:PoolClient,value:unknown,fallback:QuotaPolicy|undefined)
 }
 export async function manualQueue(db:PoolClient,options?:{search:string;filter:string;page:number;target:string}):Promise<ManualQueue>{
  const size=options?30:100;
- const users=(await db.query(`SELECT d.*,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
-  FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id)
+ const users=(await db.query(`SELECT d.*,n.trial_state,(SELECT refund_state FROM commerce.trial_checkout t WHERE t.user_id=d.user_id ORDER BY t.created_at DESC LIMIT 1) AS trial_refund_state,commerce.control_renewal_status(d.user_id) AS renewal,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
+  FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id) LEFT JOIN commerce.onboarding_account n USING(user_id)
   WHERE ($1='' OR strpos(lower(d.email||' '||d.name),lower($1))>0) AND
    ($2='' OR $2='blocked' AND d.status='suspended' OR $2='unlimited' AND c.indefinite OR
     $2='active' AND c.access_end>clock_timestamp() OR $2='expired' AND c.access_end<=clock_timestamp())
@@ -52,7 +52,7 @@ export async function manualQueue(db:PoolClient,options?:{search:string;filter:s
  const invites=options?[]:(await db.query(`SELECT i.id,i.manual_grant_id AS "grantId",i.email,i.created_at AS "createdAt",i.expires_at AS "expiresAt",
   COALESCE((SELECT d.state FROM mail.delivery d WHERE d.subject_id=i.id AND d.kind='invitation' ORDER BY d.created_at DESC LIMIT 1),'queued') AS delivery,CASE WHEN i.state='active' AND i.expires_at<=clock_timestamp() THEN 'expired' ELSE i.state END AS state,
   g.term,g.access_type AS "accessType",g.quota_policy AS quota,g.reason FROM commerce.invitation i JOIN commerce.manual_grant g ON g.id=i.manual_grant_id ORDER BY i.created_at DESC,i.id DESC LIMIT 100`)).rows;
- return {hasMore,users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null,analyzer:limits.get(u.user_id)})),invitations:invites,
+ return {hasMore,users:users.map(u=>({userId:u.user_id,email:u.email,name:u.name,status:u.status,trialState:u.trial_state,trialRefundState:u.trial_refund_state,renewal:u.renewal,registeredAt:u.registered_at.toISOString(),cycle:u.cycle_id?cycleView(u):null,analyzer:limits.get(u.user_id)})),invitations:invites,
   audit:options?[]:(await db.query('SELECT data FROM commerce.manual_access_audit ORDER BY created_at DESC,action_id DESC LIMIT 100')).rows.map(r=>r.data),
   tariffs:(await db.query('SELECT snapshot FROM access.tariff ORDER BY id')).rows.map(r=>r.snapshot).filter(t=>t.active===true&&Number.isSafeInteger(t.aiQuota)&&t.aiQuota>=0&&t.aiQuota<=1000000000).map(t=>({id:t.id,name:t.name,aiQuota:paidAnalyzerUnits(t.id,t.duration.kind,t.aiQuota),priceMinor:t.priceMinor,duration:t.duration}))};
 }
@@ -70,7 +70,7 @@ async function newInvitation(db:PoolClient,grantId:string,address:string,lifetim
  return expires;
 }
 export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean){
- const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota']);
+ const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota','purchasedUnits','expectedPurchased']);
  const id=actionId(b.actionId),reason=string(b.reason,1000).trim(),mode=string(b.mode,20);
  if(!['invite','extend','set_end','indefinite','end_now','quota'].includes(mode))throw new HttpError(400,'INVALID_INPUT');
  if(!preview&&(!Number.isInteger(b.expectedRevision)||typeof b.expectedMode!=='string'||!b.expectedQuota))throw new HttpError(400,'INVALID_INPUT');
@@ -100,7 +100,7 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    const result=await extensionAt(db,base,t as {kind:'days'|'calendar_months';count:number},now,'manual:'+id,id);
    next={...next,anchorAt:result.extension.anchorAt,accessEnd:result.extension.accessEnd,calendarMonths:result.calendarMonths,extraDays:result.extraDays,indefinite:false,endOffsetMs:previousMode==='continuous'?(base.endOffsetMs??0):0};
   }else if(mode==='indefinite')next={...next,accessEnd:null,indefinite:true};
-  else if(mode==='quota'){if(!before||!b.quota)throw new HttpError(409,'QUOTA_REQUIRED');}
+  else if(mode==='quota'){if(!before||(!b.quota&&b.purchasedUnits===undefined))throw new HttpError(409,'QUOTA_REQUIRED');}
   else{
    if(mode==='end_now'&&!before)throw new HttpError(409,'CYCLE_UNAVAILABLE');
    const end=mode==='end_now'?now:(t as {kind:'fixed';end:string}).end;
@@ -108,10 +108,10 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
    next={...next,accessEnd:end,indefinite:false,endOffsetMs:Date.parse(end)-Date.parse(grid)};
   }
  }
- if(mode==='quota'&&q.source==='override'&&next&&!next.indefinite&&(!next.accessEnd||Date.parse(next.accessEnd)<=Date.parse(now)))throw new HttpError(409,'ALLOWANCE_ACCESS_EXPIRED');
+ if(mode==='quota'&&b.quota&&q.source==='override'&&next&&!next.indefinite&&(!next.accessEnd||Date.parse(next.accessEnd)<=Date.parse(now)))throw new HttpError(409,'ALLOWANCE_ACCESS_EXPIRED');
  const paidUntil=mode==='quota'&&account&&q.source==='tariff'?(await db.query("SELECT commerce.control_paid_allowance_end($1) AS finish",[userId])).rows[0]?.finish:null;
  const result:ManualPreview={...(paidUntil?{effectiveAt:paidUntil.toISOString()}:{}),mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
- if(preview)return result;
+ if(preview)return {...result,expectedPurchased:(await db.query('SELECT purchased FROM commerce.control_customer_allowances(ARRAY[$1]::text[])',[userId])).rows[0]?.purchased??0};
  if(address){
   // Only an actually ended fixed grant can release this reservation. Link expiry alone never does.
   const expired=await db.query("UPDATE commerce.manual_grant SET state='expired' WHERE email=$1 AND state='pending' AND term->>'kind'='fixed' AND (term->>'end')::timestamptz<=$2::timestamptz RETURNING id",[address,now]);
@@ -120,8 +120,9 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await db.query('INSERT INTO commerce.manual_grant(id,email,term,access_type,quota_policy,reason,creator,created_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[grantId,address,t,b.accessType,q,reason,actorId,now]);
   await newInvitation(db,grantId,address,lifetime!,seal,now);
  }else if(next){
+  if(mode==='end_now'||previousMode==='restored')await db.query('SELECT commerce.stop_customer_allowance($1,$2)',[userId,now]);
   const extraMs=Date.parse(next.accessEnd??'')-Date.parse(before?.accessEnd??'');
-  const extendingAllowance=!b.quota&&previousMode==='continuous'&&(mode==='extend'||mode==='set_end')&&extraMs>0&&extraMs<=31*86400000;
+  const extendingAllowance=!b.quota&&previousMode==='continuous'&&(mode==='extend'||mode==='set_end')&&extraMs>0;
   if(extendingAllowance){
    const saved=(await db.query('SELECT commerce.extend_customer_allowance($1,$2,$3) AS saved',[userId,now,next.accessEnd])).rows[0]?.saved;
    if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
@@ -139,7 +140,14 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   if(b.quota&&q.source==='tariff'&&!same(q,before?.quotaPolicy))await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[userId,now,q.limit,q.periodDays??null]);
   await outbox(db,'access',seal,mode==='quota'?'manual_quota_changed':'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'?{analyzerUnits:q.limit}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
  }
- const audit={changes:mode==='quota'?[{label:'Политика лимита Анализатора',before:before?.quotaPolicy??null,after:q}]:[],actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
+ if(b.purchasedUnits!==undefined){
+  if(!Number.isSafeInteger(b.purchasedUnits)||Number(b.purchasedUnits)<0||Number(b.purchasedUnits)>1000000000)throw new HttpError(400,'INVALID_INPUT');
+  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['customer-ai-budget:'+userId]);
+  const current=(await db.query('SELECT purchased FROM commerce.control_customer_allowances(ARRAY[$1]::text[])',[userId])).rows[0]?.purchased??0;
+  if(b.expectedPurchased!==current)throw new HttpError(409,'PREVIEW_CHANGED');
+  if(!(await db.query('SELECT commerce.set_customer_purchased_units($1,$2) AS ok',[userId,b.purchasedUnits])).rows[0]?.ok)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
+ }
+ const audit={purchasedUnits:b.purchasedUnits??null,changes:mode==='quota'?[{label:'Политика лимита Анализатора',before:before?.quotaPolicy??null,after:q}]:[],actionId:id,actorId,at:now,email:result.email,userId:userId??null,mode,reason,before,after:next,quota:q};
  await db.query('INSERT INTO commerce.manual_access_audit(action_id,user_id,data,created_at) VALUES($1,$2,$3,$4)',[id,userId??null,audit,now]);
  return {status:'committed',...await manualQueue(db)};
 }

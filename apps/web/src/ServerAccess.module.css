@@ -114,3 +114,5 @@
 @media(max-width:760px){.entryPage{--workspace-gutter:16px}}
 
 .accountWarning button{display:inline-flex;font:inherit}
+
+.header .brand{text-decoration:none}.renewalBody{gap:10px}.renewalBody>p{margin:6px 0}

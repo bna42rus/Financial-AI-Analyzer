@@ -64,7 +64,7 @@ export async function postgresFixture(options: { name?: 'finance_staging' } = {}
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0042_device_timezone.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0043_analyzer_allowance_restoration.sql',import.meta.url),'utf8'));
   await owner.query(await readFile(new URL('../../../packages/database/migrations/0044_counterparty_proposals.sql',import.meta.url),'utf8'));
-  for(const name of ['0045_admin_operations','0046_account_deletion','0047_admin_workspace','0048_customer_allowance','0049_manual_allowance_extension','0050_yookassa_webhook'])await owner.query(await readFile(new URL('../../../packages/database/migrations/'+name+'.sql',import.meta.url),'utf8'));
+  for(const name of ['0045_admin_operations','0046_account_deletion','0047_admin_workspace','0048_customer_allowance','0049_manual_allowance_extension','0050_yookassa_webhook','0051_signup_trial','0052_allowance_lifecycle'])await owner.query(await readFile(new URL('../../../packages/database/migrations/'+name+'.sql',import.meta.url),'utf8'));
   const financePassword = randomBytes(32).toString('hex'), controlPassword = randomBytes(32).toString('hex');
   await owner.query(`ALTER ROLE finance_api LOGIN PASSWORD '${financePassword}'`);
   await owner.query(`ALTER ROLE control_api LOGIN PASSWORD '${controlPassword}'`);

@@ -25,6 +25,7 @@ export async function changeUserAccessStatus(db:PoolClient,actor:string,input:Re
  const payload={kind:'user_access_status',decision:next,userId,reason:note,changes:[{label:'Ограничение аккаунта',before:before==='active'?'Доступ разрешён':'Доступ приостановлен',after:next==='active'?'Доступ разрешён':'Доступ приостановлен'}],endSessions:input.endSessions};
  if(await remember(db,id,actor,payload))return {status:next};
  if(!(await db.query('SELECT commerce.control_user_access_status($1,$2,$3,$4) AS changed',[userId,before,next,input.endSessions])).rows[0]?.changed)throw new HttpError(409,'USER_STATUS_CHANGED');
+ if(next==='suspended')await db.query('SELECT commerce.stop_customer_allowance($1,clock_timestamp())',[userId]);
  await outbox(db,'access',seal,'account_access_status',{email:account.email,blocked:next==='suspended'},{subjectId:userId,dedupeKey:'account-access-status:'+id});
  return {status:next};
 }
