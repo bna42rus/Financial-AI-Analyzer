@@ -4,7 +4,7 @@ import type {AccessPayment,AccessPaymentProvider,ProviderRefund} from './access-
 import type {Sealer} from './types.ts';
 import {HttpError} from './types.ts';
 import {uuid,object} from '../../../packages/finance-core/src/model.ts';
-import {billingPlan,sameBillingPlan,noticeLeadMs} from '../../../packages/access/src/billing.ts';
+import {billingPlan,sameBillingPlan,noticeLeadMs,rubleValue} from '../../../packages/access/src/billing.ts';
 import {legalDocuments} from '../../../packages/access/src/legal.ts';
 import {checkLegalVersion} from './launch-legal.ts';
 import {lockedCycle} from './entitlement.ts';
@@ -53,7 +53,7 @@ export async function finishTrial(db:PoolClient,id:string,user:{id:string;email:
  await db.query('UPDATE commerce.trial_checkout SET result=$2 WHERE checkout_id=$1',[id,claimed?'granted':'denied']);
  await db.query('UPDATE commerce.onboarding_account SET trial_state=$2 WHERE user_id=$1',[user.id,claimed?'active':alreadyPaid?'used':'denied']);
  if(!claimed)return; // Refund the verification payment even if repeat-use protection denies access.
- await db.query("UPDATE commerce.access_cycle SET quota_policy=jsonb_build_object('source','tariff','tariffId','trial','limit',2500) WHERE user_id=$1",[user.id]);
+ await db.query('SELECT commerce.activate_checkout_counter($1)',[id]);
  const cycle=await lockedCycle(db,user.id),times=(await db.query("SELECT clock_timestamp() AS start,clock_timestamp()+interval '7 days' AS finish")).rows[0];
  await db.query('UPDATE commerce.access_cycle SET anchor_at=$2,access_end=$3,calendar_months=0,extra_days=7,end_offset_ms=0,revision=revision+1 WHERE user_id=$1',[user.id,times.start,times.finish]);
  await db.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,'days',2500)",[user.id,times.start,times.finish]);
@@ -66,7 +66,7 @@ export async function finishTrial(db:PoolClient,id:string,user:{id:string;email:
 }
 export async function recordTrialRefund(db:PoolClient,refund:ProviderRefund){
  const t=(await db.query('SELECT * FROM commerce.card_refund_job WHERE provider_id=$1 FOR UPDATE',[refund.payment_id])).rows[0];if(!t)return false;
- if(refund.amount?.currency!=='RUB'||refund.amount.value!==(Number(t.amount_minor)/100).toFixed(2)||t.refund_id&&t.refund_id!==refund.id||!['pending','succeeded','canceled'].includes(refund.status))throw new HttpError(502,'PAYMENT_UNVERIFIED');
+ if(refund.amount?.currency!=='RUB'||refund.amount.value!==rubleValue(String(t.amount_minor))||t.refund_id&&t.refund_id!==refund.id||!['pending','succeeded','canceled'].includes(refund.status))throw new HttpError(502,'PAYMENT_UNVERIFIED');
  await db.query('UPDATE commerce.card_refund_job SET refund_id=$2,refund_state=$3 WHERE checkout_id=$1',[t.checkout_id,refund.id,refund.status]);
  await db.query('UPDATE commerce.trial_checkout SET refund_id=$2,refund_state=$3 WHERE checkout_id=$1',[t.checkout_id,refund.id,refund.status]);return true;
 }
@@ -74,7 +74,7 @@ export async function refundTrial(db:PoolClient,id:string,provider:AccessPayment
  const t=(await db.query("SELECT * FROM commerce.card_refund_job WHERE checkout_id=$1 FOR UPDATE",[id])).rows[0];
  if(!t||t.refund_state==='succeeded'||t.refund_state==='canceled')return;
  await db.query('UPDATE commerce.card_refund_job SET refund_attempt_at=clock_timestamp() WHERE checkout_id=$1',[id]);
- try{const refund=t.refund_id?await provider.readRefund!(t.refund_id):await provider.createRefund!({id:t.refund_key,paymentId:t.provider_id,value:(Number(t.amount_minor)/100).toFixed(2)});
+ try{const refund=t.refund_id?await provider.readRefund!(t.refund_id):await provider.createRefund!({id:t.refund_key,paymentId:t.provider_id,value:rubleValue(String(t.amount_minor))});
   if(refund.payment_id!==t.provider_id)throw new HttpError(502,'PAYMENT_UNVERIFIED');await recordTrialRefund(db,refund);
  }catch(e){if(e instanceof HttpError&&e.code==='PAYMENT_UNVERIFIED')throw e;/* Required/pending is durable and retried by the billing worker. */}
 }

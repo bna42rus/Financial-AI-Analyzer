@@ -132,3 +132,11 @@ test('Python SMTP bridge tests acceptance, TLS verification, transient refusal a
   const result=spawnSync('/usr/bin/python3',['-I',fileURLToPath(new URL('./postbox_smtp_test.py',import.meta.url))],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
 });
+
+test('YooKassa interactive payments authorize before capture and use separate stable operation keys',async()=>{
+ const {createAccessPaymentProvider}=await import('../src/access-payment-provider.ts'),id='00000000-0000-4000-8000-000000000101',providerId='00000000-0000-4000-8000-000000000102';
+ const calls:{url:string;key:string;body:any}[]=[];
+ const provider=createAccessPaymentProvider({shopId:'123456',secret:'test_synthetic_key_123456789',origin:'https://test.cashneuro.ru',test:true},async(url,init)=>{calls.push({url:String(url),key:new Headers(init?.headers).get('Idempotence-Key')!,body:JSON.parse(String(init?.body))});return json({id:providerId,test:true});});
+ await provider.create({id,value:'10.00',title:'Проверка карты',authorize:true,save:true,cardOnly:true});await provider.capture!(providerId,id,'10.00');await provider.capture!(providerId,id,'10.00');await provider.cancel!(providerId,id);
+ assert.equal(calls[0]!.body.capture,false);assert.equal(calls[0]!.body.save_payment_method,true);assert.equal(calls[0]!.body.payment_method_data.type,'bank_card');assert.equal(calls[0]!.body.confirmation.return_url,'https://test.cashneuro.ru/#payment-return');assert.equal(calls[1]!.key,calls[2]!.key);assert.equal(new Set([calls[0]!.key,calls[1]!.key,calls[3]!.key]).size,3);assert.match(calls[1]!.url,/\/capture$/);assert.match(calls[3]!.url,/\/cancel$/);
+});

@@ -814,9 +814,14 @@ test('verified erasure request can be withdrawn and approval atomically erases t
  const checkout=crypto.randomUUID();
  await pg.owner.query("INSERT INTO commerce.access_checkout(id,user_id,tariff,offer_version,mode,state) VALUES($1,$2,$3,'synthetic','once','pending')",[checkout,user.userId,tariff]);
  assert.equal((await admin.post('/control/account-deletion-approve',{id:second.id,email:address,code:otp(uri)})).json().code,'DELETION_PAYMENT_PENDING');
- await pg.owner.query("UPDATE commerce.access_checkout SET state='cancelled' WHERE id=$1",[checkout]);
- const checked=await admin.post('/control/account-deletion-approve',{id:second.id,email:address,code:otp(uri)});
+ await pg.owner.query("UPDATE commerce.access_checkout SET state='cancelled',provider_id=$2,cancel_requested=true,provider_status='pending' WHERE id=$1",[checkout,crypto.randomUUID()]);
+ await pg.owner.query('TRUNCATE control.rate_limit');
+ assert.equal((await admin.post('/control/account-deletion-approve',{id:second.id,code:otp(uri)})).json().code,'DELETION_PAYMENT_PENDING');
+ await pg.owner.query("UPDATE commerce.access_checkout SET provider_status='canceled' WHERE id=$1",[checkout]);
+ const checked=await admin.post('/control/account-deletion-approve',{id:second.id,code:otp(uri)});
  assert.equal(checked.statusCode,200,checked.body);
+ await pg.owner.query('TRUNCATE control.rate_limit'); // Retry after an independent request-limit window.
+ assert.equal((await admin.post('/control/account-deletion-approve',{id:second.id,code:otp(uri)})).statusCode,200);
  assert.equal((await user.b.get('/session')).statusCode,401);
  assert.equal((await pg.owner.query('SELECT id FROM identity.auth_user')).rows[0].id,'separate');
  for(const [table,column] of [['finance.workspace','user_id'],['identity.auth_account','user_id'],['identity.auth_session','user_id'],['commerce.access_cycle','user_id'],['commerce.purchase','user_id'],['commerce.account_directory','user_id']])
@@ -1087,7 +1092,7 @@ async function followupProvider(){
  const weekly={...tariff,id:'followup-week',duration:{kind:'days' as const,count:7},priceMinor:'11900',aiQuota:2500,catalogVersion:0};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
  const {legalDocuments}=await import('../../../packages/access/src/legal.ts');
  const trialInput=()=>({id:crypto.randomUUID(),device:crypto.randomUUID(),cardConsent:true,tariffId:weekly.id,catalogVersion:0,priceMinor:'11900',offerVersion:legalDocuments.offer.version});
- async function access(b:Browser,auto=false){const q=(await b.post('/access/billing-quote',{tariffId:tariff.id})).json(),id=crypto.randomUUID();const r=await b.post('/access/billing-create',{id,tariffId:q.tariff.id,priceMinor:q.tariff.priceMinor,catalogVersion:q.tariff.catalogVersion,cycleRevision:q.cycleRevision,offerVersion:q.offerVersion,autoRenewal:auto,...(auto?{renewalVersion:q.renewalVersion}:{})});assert.equal(r.statusCode,200,r.body);assert.equal((await b.post('/access/billing-sync',{id})).statusCode,200);return {id,p:payments.get((await pg.owner.query('SELECT provider_id FROM commerce.access_checkout WHERE id=$1',[id])).rows[0].provider_id)};}
+ async function access(b:Browser,auto=false,tariffId=tariff.id){const q=(await b.post('/access/billing-quote',{tariffId})).json(),id=crypto.randomUUID();const r=await b.post('/access/billing-create',{id,tariffId:q.tariff.id,priceMinor:q.tariff.priceMinor,catalogVersion:q.tariff.catalogVersion,cycleRevision:q.cycleRevision,offerVersion:q.offerVersion,autoRenewal:auto,...(auto?{renewalVersion:q.renewalVersion}:{})});assert.equal(r.statusCode,200,r.body);assert.equal((await b.post('/access/billing-sync',{id})).statusCode,200);return {id,p:payments.get((await pg.owner.query('SELECT provider_id FROM commerce.access_checkout WHERE id=$1',[id])).rows[0].provider_id)};}
  return {payments,trialInput,access,counts:()=>({captures,voids,refunds})};
 }
 test('signup resend respects server cooldown, replaces the code and retains the registration draft',async()=>{
@@ -1109,6 +1114,7 @@ test('tariff and trial checkout are independent; first paid tariff loads Analyze
  assert.equal((await a.b.get('/session')).json().accessEnd,session.accessEnd);assert.equal((await a.b.get('/access/billing')).json().trialResult,'denied');assert.equal(f.counts().refunds,1);
  const admin=await enrolledAdmin(),users=(await admin.b.get('/control/accesses')).json().users;assert.equal(users[0].trialState,'used');assert.equal(users[0].renewal.state,'active');
  const orders=await admin.b.get('/control/access-checkouts');assert.equal(orders.statusCode,200,orders.body);assert.ok(orders.json().orders.some((o:any)=>o.purpose==='trial'&&o.refunds.length===1));assert.equal((await admin.b.get('/control/workspace-requests')).json().requests.length,0);
+ const off=await f.access(a.b,false,'followup-week');assert.equal((await a.b.get('/access/billing')).json().renewal.state,'active');off.p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:off.id});const saved=(await a.b.get('/access/billing')).json();assert.equal(saved.renewal.state,'off');assert.equal(saved.renewal.tariff.id,'followup-week');assert.equal(saved.card.last4,'4321');
  fc.accessPayments=undefined;
 });
 test('cancel closes the order, late authorization is voided, expired links reset, and only a fresh link can grant access',async()=>{

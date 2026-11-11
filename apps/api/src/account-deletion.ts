@@ -64,7 +64,8 @@ export async function deletionPreview(db:PoolClient,body:Record<string,unknown>)
 
 export async function finishAccountDeletion(db:PoolClient,actor:string,body:Record<string,unknown>,seal:Sealer){
  const id=actionId(body.id),row=(await db.query('SELECT email FROM commerce.control_deletion_queue() WHERE id=$1',[id])).rows[0];
- const address=body.email===undefined?row?.email:email(body.email);if(!address)throw new HttpError(409,'DELETION_NOT_PENDING');
+ const address=body.email===undefined?row?.email:email(body.email);
+ if(!address){const retry=(await db.query('SELECT commerce.finish_account_deletion($1,$2,NULL) AS status',[id,actor])).rows[0]?.status;if(retry==='already_completed')return {status:'completed'};throw new HttpError(409,'DELETION_NOT_PENDING');}
  const {status}=(await db.query<{status:string}>('SELECT commerce.finish_account_deletion($1,$2,$3) AS status',[id,actor,address])).rows[0]!;
  if(status==='already_completed')return {status:'completed'};
  if(status!=='completed')throw new HttpError(409,status);

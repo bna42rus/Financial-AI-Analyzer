@@ -132,8 +132,8 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
  await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,user.id,e.mode==='continuous']);
  await db.query('UPDATE commerce.access_checkout SET previous_end=$2,access_end=$3 WHERE id=$1',[o.id,cycle.accessEnd,e.accessEnd]);
  await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[user.id,start,e.accessEnd,o.tariff.duration.kind,paidAnalyzerUnits(o.tariff.id,o.tariff.duration.kind,o.tariff.aiQuota)]);
- await db.query("UPDATE commerce.access_cycle SET quota_policy=jsonb_build_object('source','tariff','tariffId',$2::text,'limit',$3::int) WHERE user_id=$1 AND quota_policy->>'source'='override' AND quota_policy->>'limit'='0' AND EXISTS(SELECT 1 FROM commerce.onboarding_account WHERE user_id=$1)",[user.id,o.tariff.id,o.tariff.aiQuota]);
- const old=await savedRenewal(db,user.id);
+ await db.query('SELECT commerce.activate_checkout_counter($1)',[o.id]);
+ const old=await savedRenewal(db,user.id),renewalEditedAfterOrder=!!(await db.query('SELECT 1 FROM commerce.autorenewal_event WHERE user_id=$1 AND recorded_at>$2',[user.id,o.created_at])).rowCount;
  if(o.mode==='enroll'&&savedMethod){
   // Enablement is tied to the original, explicitly accepted checkout. A disable while it is pending wins.
   const disabled=(await db.query("SELECT 1 FROM commerce.autorenewal_event WHERE user_id=$1 AND action='disable' AND recorded_at>=$2 LIMIT 1",[user.id,o.created_at])).rowCount;
@@ -149,7 +149,12 @@ async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:st
   await db.query('UPDATE commerce.autorenewal SET next_at=$2,notice_id=NULL WHERE user_id=$1',[user.id,e.accessEnd]);
  }
  if(!old&&o.mode==='once')await db.query(`INSERT INTO commerce.autorenewal(user_id,checkout_id,tariff,offer_version,renewal_version,method_id,state,next_at) VALUES($1,$2,$3,$4,$5,NULL,'off',$6)`,[user.id,o.id,o.tariff,o.offer_version,legalDocuments.renewal.version,e.accessEnd]);
- if(o.desired_auto===false){const current=await savedRenewal(db,user.id);const changed=(await db.query("SELECT 1 FROM commerce.autorenewal_event WHERE user_id=$1 AND recorded_at>$2",[user.id,o.created_at])).rowCount;if(current?.state==='active'&&!changed)await stopRenewal(db,current,'off');}
+ if(o.desired_auto===false){const current=await savedRenewal(db,user.id);const changed=renewalEditedAfterOrder;if(current?.state==='active'&&!changed)await stopRenewal(db,current,'off');}
+ if(o.mode!=='automatic'&&!(o.mode==='enroll'&&savedMethod)){
+  const changed=renewalEditedAfterOrder;
+  const current=await savedRenewal(db,user.id);
+  if(!changed&&current?.state!=='active')await db.query(`INSERT INTO commerce.autorenewal(user_id,checkout_id,tariff,offer_version,renewal_version,method_id,state,next_at) VALUES($1,$2,$3,$4,$5,NULL,'off',$6) ON CONFLICT(user_id) DO UPDATE SET checkout_id=EXCLUDED.checkout_id,tariff=EXCLUDED.tariff,offer_version=EXCLUDED.offer_version,renewal_version=EXCLUDED.renewal_version,next_at=EXCLUDED.next_at,notice_id=NULL`,[user.id,o.id,o.tariff,o.offer_version,legalDocuments.renewal.version,e.accessEnd]);
+ }
  await outbox(db,'identity',seal,'billing_paid',{email:user.email,accessEnd:e.accessEnd,priceMinor:o.tariff.priceMinor},{subjectId:user.id,dedupeKey:'billing-paid:'+o.id});
 }
 async function finishFirst(db:PoolClient,o:Order,row:AccessRequest,seal:Sealer){
@@ -278,7 +283,7 @@ export async function runAutoRenewals(pool:Pool,provider:AccessPaymentProvider,s
 export async function cancelAccessCheckout(db:PoolClient,user:Account,input:unknown,provider:AccessPaymentProvider|undefined,seal:Sealer){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');const b=object(input,['id']);await lockedCycle(db,user.id);let o=await paymentOrder(db,uuid(b.id));
  if(!o||o.user_id!==user.id)throw new HttpError(404,'NOT_FOUND');if(o.state==='paid'||o.state==='cancelled')return projection(o);
- if(o.provider_id){const p=await provider.read(o.provider_id);verifiedPayment(p,{id:o.id,providerId:o.provider_id,value:rubleValue(o.tariff.priceMinor),test:provider.test});if(p.status==='succeeded')return syncAccessCheckout(db,o.id,user,{...provider,read:async()=>p},seal);}
+ if(o.provider_id){try{const p=await provider.read(o.provider_id);verifiedPayment(p,{id:o.id,providerId:o.provider_id,value:rubleValue(o.tariff.priceMinor),test:provider.test});if(p.status==='succeeded')return syncAccessCheckout(db,o.id,user,{...provider,read:async()=>p},seal);}catch(e){if(!(e instanceof HttpError)||e.code!=='PAYMENT_UNAVAILABLE')throw e;}}
  await db.query("UPDATE commerce.access_checkout SET cancel_requested=true,state='cancelled',redirect_url=NULL WHERE id=$1",[o.id]);
  if(o.provider_id){try{return await syncAccessCheckout(db,o.id,user,provider,seal);}catch(e){if(!(e instanceof HttpError)||e.code!=='PAYMENT_UNAVAILABLE')throw e;return projection({...o,state:'cancelled',redirect_url:null,cancel_requested:true});}}
  return projection({...o,state:'cancelled',cancel_requested:true});

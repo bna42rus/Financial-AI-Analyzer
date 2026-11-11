@@ -1,3 +1,4 @@
+import {createHash} from 'node:crypto';
 import {HttpError} from './types.ts';
 import {uuid} from '../../../packages/finance-core/src/model.ts';
 export type AccessPayment = {id:string;test:boolean;paid:boolean;status:string;amount:{currency:string;value:string};metadata?:{orderId?:string};captured_at?:string;created_at?:string;cancellation_details?:{reason?:string};confirmation?:{confirmation_url?:string;expires_at?:string};payment_method?:{id?:string;saved?:boolean;card?:{first6?:string;last4?:string;expiry_month?:string;expiry_year?:string}}};
@@ -34,7 +35,9 @@ export function createAccessPaymentProvider(input:{shopId:string;secret:string;o
   if(!response.ok)throw new HttpError(503,'PAYMENT_UNAVAILABLE');return await response.json() as ProviderRefund;
  }
  async function operation(id:string,key:string,action:string,body:Record<string,unknown>){
-  let response:Response;try{response=await fetcher('https://api.yookassa.ru/v3/payments/'+uuid(id)+'/'+action,{method:'POST',headers:{Authorization:authorization,'Content-Type':'application/json','Idempotence-Key':uuid(key)},body:JSON.stringify(body),signal:AbortSignal.timeout(7000),redirect:'error'});}catch{throw new HttpError(503,'PAYMENT_UNAVAILABLE');}
+  const h=createHash('sha256').update('cashneuro-payment-operation:'+uuid(key)+':'+action).digest('hex');
+  const operationKey=[h.slice(0,8),h.slice(8,12),'5'+h.slice(13,16),'a'+h.slice(17,20),h.slice(20,32)].join('-');
+  let response:Response;try{response=await fetcher('https://api.yookassa.ru/v3/payments/'+uuid(id)+'/'+action,{method:'POST',headers:{Authorization:authorization,'Content-Type':'application/json','Idempotence-Key':operationKey},body:JSON.stringify(body),signal:AbortSignal.timeout(7000),redirect:'error'});}catch{throw new HttpError(503,'PAYMENT_UNAVAILABLE');}
   if(!response.ok)throw new HttpError(503,'PAYMENT_UNAVAILABLE');return await response.json() as AccessPayment;
  }
  return {test,capture:(id,key,value)=>operation(id,key,'capture',{amount:{value,currency:'RUB'}}),cancel:(id,key)=>operation(id,key,'cancel',{}),createRefund,refunds,readRefund,read:id=>send(id),create:({id,value,title,save,method,first,authorize,cardOnly})=>send(id,{amount:{value,currency:'RUB'},capture:!authorize,description:'CashNeuro: '+title,metadata:{orderId:id},...(cardOnly?{payment_method_data:{type:'bank_card'}}:{}),...(method?{payment_method_id:method}:{confirmation:{type:'redirect',return_url:origin+(first?'/#checkout?payment='+id:'/#payment-return')},...(save?{save_payment_method:true}:{})})})};

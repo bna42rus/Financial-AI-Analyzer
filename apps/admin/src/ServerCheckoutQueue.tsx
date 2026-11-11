@@ -13,7 +13,7 @@ const labels={created:'Создан',pending:'Ожидает оплаты',paid:
 const cancelReasons:Record<string,string>={expired_on_confirmation:'Истёк срок оплаты',insufficient_funds:'Недостаточно средств',canceled_by_merchant:'Платёж отменён магазином',general_decline:'Платёж отклонён',issuer_unavailable:'Банк недоступен',payment_method_restricted:'Ограничение способа оплаты',fraud_suspected:'Платёж отклонён платёжным сервисом'};
 const reconcileReasons:Record<string,string>={provider_reference_missing:'CashNeuro не получил номер платежа ЮKassa.',first_access_not_issued:'Оплата подтверждена, но выдача приглашения не завершилась.',autorenewal_consent_changed:'Перед списанием изменились условия автопродления.'};
 const providerStates:Record<string,string>={succeeded:'Оплачен',canceled:'Отменён',pending:'Ожидает оплаты',waiting_for_capture:'Ожидает подтверждения списания'};
-type Refund={id:string;state:'pending'|'succeeded'|'canceled';amountMinor:number;at:string};
+type Refund={id:string;state:'required'|'pending'|'succeeded'|'canceled';amountMinor:number;at:string};
 type Order={id:string;channel:'first'|'renewal';status:keyof typeof labels;mode:'once'|'enroll'|'automatic';tariff:string;price_minor:string;provider_id:string|null;created_at:string;paid_at:string|null;
  application_id:string|null;user_id:string|null;email:string|null;provider_paid_at:string|null;provider_expires_at:string|null;cancellation_reason:string|null;previous_end:string|null;access_end:string|null;reconcile_reason:string|null;
  reconciliation:{state:string;providerStatus:string|null;message:string|null;providerId:string|null}|null;refunds:Refund[];registered:boolean;purpose?:'access'|'trial'|'card'|'topup';firstPurchase?:boolean};
@@ -77,7 +77,7 @@ function PaymentRow({order,highlight,onChanged}:{order:Order;highlight:boolean;o
      {reviewed&&<button className={styles.primary} onClick={()=>{setError('');setConfirmation(crypto.randomUUID());setForm('apply');}}>Применить результат</button>}
     </div>}
    </>}
-   {refunds.length>0&&<section><h3>Возвраты</h3><ul>{refunds.map(r=><li key={r.id}>{moneyLabel(String(r.amountMinor))} · {time.format(r.at)} · {r.state==='succeeded'?'Подтверждён':r.state==='pending'?'Обрабатывается':'Отменён'}</li>)}</ul></section>}
+   {refunds.length>0&&<section><h3>Возвраты</h3><ul>{refunds.map(r=><li key={r.id}>{moneyLabel(String(r.amountMinor))} · {time.format(r.at)} · {r.state==='succeeded'?'Подтверждён':r.state==='pending'?'Обрабатывается':r.state==='required'?'Ожидает отправки':'Отменён — требуется проверка'}</li>)}</ul></section>}
    {(order.application_id||order.user_id||order.provider_id&&order.status==='paid'&&returned<Number(order.price_minor))&&<div className={shell.detailActions}>
 
     {order.user_id&&<a className={styles.secondary} href={adminLink('users',{id:order.user_id})}>{returned>0?'Проверить доступ':'Открыть пользователя'}</a>}

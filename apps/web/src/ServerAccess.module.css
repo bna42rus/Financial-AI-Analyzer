@@ -116,3 +116,12 @@
 .accountWarning button{display:inline-flex;font:inherit}
 
 .header .brand{text-decoration:none}.renewalBody{gap:10px}.renewalBody>p{margin:6px 0}
+
+.paymentActions{display:flex;justify-content:flex-end;align-items:center;flex-wrap:wrap;gap:10px;margin-top:10px}
+.cardCheck{padding:14px 16px;background:var(--color-soft);border-radius:10px}
+.cardCheck strong{font-weight:600}
+.renewalBody p{margin:0;line-height:1.55}
+.cardCheck p{margin:5px 0 0}
+.renewalBody form{gap:10px}
+.renewalBody .legalChoice{margin:4px 0}
+@media(max-width:480px){.paymentActions{display:grid;grid-template-columns:1fr 1fr}.paymentActions>*{min-width:0;width:100%;padding-inline:8px;white-space:normal}.paymentActions>:only-child{grid-column:2}}
