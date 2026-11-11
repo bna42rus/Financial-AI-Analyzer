@@ -199,7 +199,12 @@ class UpdateTests(unittest.TestCase):
                         if '--input-type=module' in args:return b'' # Local configuration validator; no provider POST.
                         self.assertEqual(args[-1],'--prepare','No live model command is allowed')
                         return json.dumps({'sourceSha256':'a'*64 if args[-2].startswith(str(current)) else 'b'*64}).encode()
-                    if args[:2]==['caddy','adapt']:return json.dumps({'root':caddy.read_text()}).encode()
+                    if args[:2]==['caddy','adapt']:return json.dumps({'root':caddy.read_text().splitlines()[0]}).encode()
+                    if args[0]=='curl':
+                        self.assertIn(['systemctl','reload','caddy'],calls)
+                        self.assertIn(m.WEBHOOK_START.decode(),caddy.read_text())
+                        self.assertEqual(args[-1],m.WEBHOOK_URL)
+                        return b'{"status":"ok"}'
                     if args[:2]==['systemctl','show']:
                         if '--property=WorkingDirectory' in args:return re.search(rb'(?m)^WorkingDirectory=(.+)$',dropin.read_bytes())[1]
                         return b'enabled'
@@ -221,7 +226,9 @@ class UpdateTests(unittest.TestCase):
                     m.m.private_write(Path(args[-4]),json.dumps(candidate).encode());m.m.private_write(Path(args[-3]),json.dumps({**candidate,'sourceSha256':'a'*64}).encode())
                 original_create=m.create_backup_directory
                 for target,key,value in [(m.m,'BASE',base),(m.m,'CONFIG',cfg),(m.m,'DROPIN',dropin),(m.m,'CADDY',caddy),(m,'WORKER_UNIT',worker),(m,'WORKER_ENV',worker_env)]:stack.enter_context(patch.object(target,key,value))
-                stack.enter_context(patch.object(m,'settings',return_value={'API_BASE_URL':origin,'DATABASE_URL':'synthetic scoped database'}));stack.enter_context(patch.object(m.m,'run',side_effect=run));stack.enter_context(patch.object(m.m,'docker_database',return_value=('synthetic','owner',sql)));stack.enter_context(patch.object(m.m,'frontend_root',side_effect=lambda v:v['root']));stack.enter_context(patch.object(m,'create_backup_directory',side_effect=lambda parent,sha:original_create(root/'backups',sha)));stack.enter_context(patch.object(m,'prepare_admission',side_effect=admit));stack.enter_context(patch.object(m.time,'sleep'))
+                config={'API_BASE_URL':origin,'DATABASE_URL':'synthetic scoped database'}
+                if mode=='preserved':config['YOOKASSA_ACCESS_TEST_ENABLED']='1'
+                stack.enter_context(patch.object(m,'settings',return_value=config));stack.enter_context(patch.object(m.m,'run',side_effect=run));stack.enter_context(patch.object(m.m,'docker_database',return_value=('synthetic','owner',sql)));stack.enter_context(patch.object(m.m,'frontend_root',side_effect=lambda v:v['root']));stack.enter_context(patch.object(m,'create_backup_directory',side_effect=lambda parent,sha:original_create(root/'backups',sha)));stack.enter_context(patch.object(m,'prepare_admission',side_effect=admit));stack.enter_context(patch.object(m.time,'sleep'))
                 def health_response(*a,**kw):
                     value={'status':'ok','profile':'finance'}
                     if b'ASSISTANT_ENABLED=1' in dropin.read_bytes():value['assistant']='cashneuro-assistant-workflow/7'
@@ -231,7 +238,10 @@ class UpdateTests(unittest.TestCase):
                 with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode in ('blocked','renewed') else None,tested_sha='b'*64 if mode in ('blocked','renewed') else None,keep_ai_paused=mode=='paused',resume_ai=mode in ('blocked','renewed'),preserve_active_ai=mode=='preserved')
                 result=json.loads(output.getvalue().splitlines()[-1]);self.assertEqual(result['status'],'UPDATED');self.assertEqual(result['paidCalls'],0)
                 self.assertEqual(sql_calls.count('BEGIN;\n' + allowance + '\nCOMMIT;'),1)
-                self.assertEqual(caddy.read_text(),str(release/'apps/web/dist'));self.assertIn(str(release/'apps/api'),dropin.read_text());self.assertTrue((release/'apps/api').is_dir())
+                expected_caddy,webhook=m.configure_payment_webhook(str(release/'apps/web/dist').encode(),config)
+                self.assertEqual(caddy.read_bytes(),expected_caddy)
+                self.assertEqual(sum(args[0]=='curl' for args in calls),int(webhook))
+                self.assertIn(str(release/'apps/api'),dropin.read_text());self.assertTrue((release/'apps/api').is_dir())
                 settings=json.loads(cfg.read_text());self.assertEqual(settings['sourceSha256'],'b'*64)
                 if mode=='renewed':
                     self.assertEqual(settings['admission']['calls'],57)

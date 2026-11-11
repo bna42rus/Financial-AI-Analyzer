@@ -507,8 +507,6 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         m.run(['systemctl', 'daemon-reload'])
         m.run(['systemctl', 'restart', m.UNIT])
         wait_release_health(release, keep_ai_paused)
-        if payment_webhook:
-            check_payment_webhook()
         if metadata['workerManaged']:
             m.run(['systemctl', 'enable', WORKER])
             m.run(['systemctl', 'restart', WORKER])
