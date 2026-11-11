@@ -1,28 +1,11 @@
-# Handoff: card and Analyzer fixes pending publication — 2026-11-11
+# Карты, повторная проба и доступ к Анализатору — 11 ноября 2026
 
-Base commit: 517f411cad38be6a569ba79be4abc224b1760032. Do not treat this checkpoint as an installable implementation.
+Работа восстановлена после технического отключения среды. Реализация сохранена в ветке feature/cashneuro-cards-20261111. Миграция 0054 создаёт отдельную commerce.payment_card, сохраняя прежнюю таблицу для совместимости. Старые карты и рекуррентный токен переносятся; дубликаты по одинаковому токену объединяются при чтении, без сопоставления только последних четырёх цифр. Токены не попадают в пользовательский API.
 
-The execution environment disconnected immediately before staging/publishing the tested changes. The implementation was in /workspace/scratch/fd5f9cc96917/cashneuro-ci on local branch feature/cashneuro-cards-20261111. Recover those working files first; they have NOT been published. The deployment branch remains at the base commit. Do not give an update command for this documentation-only checkpoint.
+Реализованы общий список карт, выбор карты в тарифах/докупках/пробе, отдельный выбор для автопродления, привязка до покупки тарифа, защищённое удаление, отдельный текст незавершённой привязки, повторная проба с ошибкой сверху, необязательные заметки и формат остатка из исходной ёмкости периода.
 
-Implemented locally:
-- Migration 0054_payment_cards.sql: separate commerce.payment_card list, old saved_card retained for compatibility, chosen card_id on renewal/access/topup, trial result_reason, finance_purchased_used() and a narrow topup card_id update grant.
-- payment-cards.ts: owner-scoped selection/removal, encrypted provider tokens, masked metadata, no primary ordinary-payment card, explicit one-card renewal, block deletion during pending payment. Normalize duplicate legacy tokens by decrypting identity, never by last-four comparison.
-- Reuse/save cards in tariff and Analyzer-topup payments; independent refundable 10 RUB binding works before purchase. Card binding pending text must not mention a trial.
-- CardPicker.tsx, PaymentCards.tsx and account/renewal/payment UI. Apply gates renewal edits; removal of renewal card requires explicit disable or replacement.
-- Failed trial remains retryable with the normal main screen, free-trial button and generic error above it. One-time claims stay enforced; every verification charge is refunded. Admin distinguishes failure from actual trial usage.
-- All admin notes optional in UI and server; actor/time/change audit remains mandatory.
-- Analyzer budget reads totalLimit; display remaining combined units out of initial period capacity, purchased units separately. Example 970 included plus 233 purchased out of 1000 included gives 1203 / 1233.
-- analyzer-access.ts and server's THREE AssistantProvider allowlist checks: retain pilot-email access and additionally authorize ACTIVE server-backed paid/trial/manual entitlements, including the per-request reauthorization callback. Retain finance/status/customer/project-cost controls.
-- createTestAssistantProvider optional allowedEmails argument permits regression with a genuinely active provider and a non-pilot customer, without invoking the model.
-- Product amendment, source manifest hash, legal card/renewal/privacy copy and architecture handoff updated locally.
+Причина ошибки новых клиентов при включённом AssistantProvider: маршруты Анализатора принимали только старый список тестовых почт, включая чтение состояния и лимитов. Действующая оплата/выданная проба/ручная выдача теперь проверяются по БД и дают право на использование. Повторная авторизация перед выполнением, состояние аккаунта и прежние ограничения расходов сохраняются.
 
-Completed checks before disconnect:
-- 8 focused PostgreSQL security/payment/note cases passed in /tmp/cn-cards-acceptance.log.
-- Latest 4 PostgreSQL cases passed in /tmp/cn-cards-analyzer-final.log: multiple cards incl legacy-token normalization and topups; retryable failed trial; optional notes and 1203/1233 capacity; BOTH first paid/trial Analyzer states with active provider outside pilot list. The last case checked profile/chat/filter context and suspension. Model calls = 0.
-- 4 desktop/mobile browser cases passed in /tmp/cn-cards-browser.log.
-- 16 access-model cases passed; 19 installer cases passed using a synthetic root-ownership adapter.
-- API/web/admin TypeScript checks and web/admin builds passed. Source hashes and git diff --check passed.
-- Initial broad security run had 78 passes and 4 failures from intentionally changed note/response expectations; those expectations were corrected and targeted cases then passed.
-- No real model or bank charges.
+Проверки восстановленного кода: 86 PostgreSQL security/payment tests (включая несколько карт, покупки, докупки, чужую карту, удаление, повторную пробу, пустые заметки и первый вход с активным ИИ вне пилотного списка); 16 access-model tests; отдельные desktop/mobile сценарии повторной пробы, текста привязки, выбора/удаления карт. Модель в регрессии первого входа не вызывается. Проверяются TypeScript, сборки web/admin, хеши источников и установщик. Реальных банковских/модельных списаний нет.
 
-Next: recover environment, inspect git diff/status without reverting edits, publish exact working tree on feature branch, advance PR #56 head feature/cashneuro-followups-20261110 and staging branch feature/cashneuro-acceptance-20261110 using leases from base 517f411. Fetch exact published tree locally and report actual CI state. Give the usual prepare-staging-release.sh --full-staging --preserve-active-ai command with the REAL implementation commit, never this checkpoint.
+Установка: scripts/prepare-staging-release.sh с --full-staging --preserve-active-ai. Работает штатное резервное копирование Staging; Production этим пакетом не публикуется. Настройки бюджета и ключи ИИ не изменяются. HTTP-события ЮKassa остаются payment.waiting_for_capture, payment.succeeded, payment.canceled, refund.succeeded.
