@@ -41,7 +41,7 @@ async function quota(db:PoolClient,value:unknown,fallback:QuotaPolicy|undefined)
 }
 export async function manualQueue(db:PoolClient,options?:{search:string;filter:string;page:number;target:string}):Promise<ManualQueue>{
  const size=options?30:100;
- const users=(await db.query(`SELECT d.*,commerce.control_trial_status(d.user_id) AS trial_state,(SELECT refund_state FROM commerce.trial_checkout t WHERE t.user_id=d.user_id AND t.result IS NOT NULL ORDER BY t.created_at DESC LIMIT 1) AS trial_refund_state,commerce.control_renewal_status(d.user_id) AS renewal,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
+ const users=(await db.query(`SELECT d.*,commerce.control_trial_status(d.user_id) AS trial_state,(SELECT refund_state FROM commerce.trial_checkout t WHERE t.user_id=d.user_id AND t.kind='trial' AND t.result IS NOT NULL ORDER BY t.created_at DESC LIMIT 1) AS trial_refund_state,commerce.control_renewal_status(d.user_id) AS renewal,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
   FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id) LEFT JOIN commerce.onboarding_account n USING(user_id)
   WHERE ($1='' OR strpos(lower(d.email||' '||d.name),lower($1))>0) AND
    ($2='' OR $2='blocked' AND d.status='suspended' OR $2='unlimited' AND c.indefinite OR
