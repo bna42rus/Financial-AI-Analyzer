@@ -22,7 +22,7 @@ before(async () => {
 });
 after(async () => { await finance?.close(); await control?.close(); await pg?.close(); });
 beforeEach(async () => {
-  await pg.owner.query(`TRUNCATE identity.erasure_evidence,commerce.erased_account_payment,mail.delivery,mail.resend_audit,mail.request_cooldown,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
+  await pg.owner.query(`TRUNCATE commerce.card_refund_job,identity.signup_pending,commerce.trial_claim,identity.erasure_evidence,commerce.erased_account_payment,mail.delivery,mail.resend_audit,mail.request_cooldown,mail.sandbox_inbox,identity.auth_user,control.auth_user,identity.auth_verification,control.auth_verification,identity.outbox,control.outbox,access.outbox,
     identity.security_event,control.security_event,identity.rate_limit,control.rate_limit,access.rate_limit,access.request,access.tariff,finance.isolation_canary,commerce.action,commerce.renewal_request,commerce.access_cycle,commerce.manual_grant CASCADE`);
   await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)', [tariff.id, tariff]);
 });
@@ -600,7 +600,7 @@ test('expiry while confirmation waits after BEGIN invalidates preview rather tha
 const manualInvite=(overrides:Record<string,unknown>={})=>({actionId:crypto.randomUUID(),mode:'invite',email:'manual@example.test',term:{kind:'days',count:7},accessType:'Free',quota:{source:'override',limit:75},reason:'Synthetic internal compensation note',inviteHours:72,...overrides});
 async function manualCommand(b:Browser,cmd:Record<string,unknown>){
  const r=await b.post('/control/manual-preview',cmd);assert.equal(r.statusCode,200,r.body);
- return {...cmd,expectedRevision:r.json().expectedRevision,expectedMode:r.json().previousMode,expectedQuota:r.json().quota};
+ return {...cmd,expectedRevision:r.json().expectedRevision,expectedMode:r.json().previousMode,expectedQuota:r.json().quota,expectedPurchased:r.json().expectedPurchased};
 }
 async function manualRegistered(term:Record<string,unknown>={kind:'days',count:7}){
  const admin=await enrolledAdmin(),cmd=await manualCommand(admin.b,manualInvite({term}));
@@ -1014,4 +1014,68 @@ test('YooKassa notifications verify provider facts and settle test payments once
   assert.equal((await pg.owner.query('SELECT state FROM commerce.invitation')).rows[0].state,'cancelled');
   assert.equal((await pg.owner.query("SELECT 1 FROM access.outbox WHERE kind='billing_refund'")).rowCount,1);
  }finally{await s.close();}
+});
+
+async function newSignup(address:string){
+ const {legalDocuments}=await import('../../../packages/access/src/legal.ts');const b=userBrowser();
+ const r=await b.post('/access/signup-start',{email:address,name:'New customer',password:testPassword,confirmPassword:testPassword,termsVersion:legalDocuments.terms.version,consentVersion:legalDocuments.consent.version});assert.equal(r.statusCode,200,r.body);
+ const sealed=(await pg.owner.query("SELECT sealed_payload FROM identity.outbox WHERE kind='signup_code' AND recipient=$1 ORDER BY created_at DESC LIMIT 1",[address])).rows[0].sealed_payload;
+ return {b,id:r.json().id,code:JSON.parse(envelope(fc.wrappingKey).open(sealed)).code};
+}
+async function finishSignup(a:Awaited<ReturnType<typeof newSignup>>,address:string){
+ const r=await a.b.post('/access/signup-complete',{id:a.id,code:a.code});assert.equal(r.statusCode,200,r.body);assert.equal((await a.b.post('/auth/sign-in/email',{email:address,password:testPassword})).statusCode,200);
+}
+test('signup creates an account only after correct six-digit verification, atomically and with safe retries',async()=>{
+ const address='new-signup@example.test',a=await newSignup(address);assert.match(a.code,/^\d{6}$/);assert.equal((await pg.owner.query('SELECT 1 FROM identity.auth_user')).rowCount,0);
+ const bad=a.code==='000000'?'111111':'000000';assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code:bad})).json().code,'INVALID_SIGNUP_CODE');
+ assert.equal((await pg.owner.query('SELECT attempts FROM identity.signup_pending WHERE id=$1',[a.id])).rows[0].attempts,1);
+ const rs=await Promise.all([a.b.post('/access/signup-complete',{id:a.id,code:a.code}),a.b.clone().post('/access/signup-complete',{id:a.id,code:a.code})]);assert.deepEqual(rs.map(r=>r.statusCode),[200,200],rs.map(r=>r.body).join(' / '));assert.equal((await pg.owner.query('SELECT 1 FROM identity.auth_user')).rowCount,1);
+ await finishSignup(a,address);const s=(await a.b.get('/session')).json();assert.equal(s.scope,'restricted');assert.equal(s.isNew,true);assert.equal(s.trialAvailable,true);assert.ok(!s.capabilities.includes('finance'));
+});
+test('signup wrong-code attempts are committed and cannot be bypassed by transaction rollback',async()=>{
+ const a=await newSignup('signup-attempts@example.test'),bad=a.code==='000000'?'111111':'000000';for(let i=0;i<5;i++)assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code:bad})).statusCode,400);
+ assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code:a.code})).statusCode,400);assert.equal((await pg.owner.query('SELECT 1 FROM identity.auth_user')).rowCount,0);
+});
+test('trial grants 2500 once, refunds 10 without revocation, toggles renewal, and defers a paid tariff until trial end',async()=>{
+ const {legalDocuments}=await import('../../../packages/access/src/legal.ts');const weekly={...tariff,id:'trial-week',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500,catalogVersion:0};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
+ let calls=0,refunds=0;const payments=new Map<string,any>();
+ fc.accessPayments={test:true,read:async id=>payments.get(id),create:async input=>{calls++;const id=crypto.randomUUID(),p={id,test:true,paid:true,status:'succeeded',amount:{value:input.value,currency:'RUB'},metadata:{orderId:input.id},payment_method:{id:'synthetic-saved-'+id,saved:true,card:{first6:'123456',last4:'1234',expiry_month:'12',expiry_year:'2030'}}};if(input.value==='10.00')assert.equal(input.save,true);payments.set(id,p);return p;},createRefund:async input=>{refunds++;assert.equal(input.value,'10.00');return {id:input.id,payment_id:input.paymentId,created_at:new Date().toISOString(),status:'succeeded',amount:{value:'10.00',currency:'RUB'}};}};
+ const address='new-trial@example.test',a=await newSignup(address);await finishSignup(a,address);
+ const input={id:crypto.randomUUID(),device:crypto.randomUUID(),cardConsent:true,tariffId:weekly.id,catalogVersion:0,priceMinor:'11900',offerVersion:legalDocuments.offer.version};let r=await a.b.post('/access/trial-create',input);assert.equal(r.statusCode,200,r.body);
+ r=await a.b.post('/access/billing-sync',{id:input.id});assert.equal(r.statusCode,200,r.body);assert.equal(r.json().state,'paid');await a.b.post('/access/billing-sync',{id:input.id});assert.equal(calls,1);assert.equal(refunds,1);assert.equal((await a.b.get('/session')).json().scope,'active');
+ const user=(await pg.owner.query('SELECT id FROM identity.auth_user WHERE email=$1',[address])).rows[0].id;
+ let units=(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,clock_timestamp())',[user])).rows[0];assert.equal(units.quota,2500);assert.equal(Number(units.base_remaining),25000000000);
+ assert.equal((await a.b.get('/access/billing')).json().renewal.state,'off');const consent={offerVersion:legalDocuments.offer.version,renewalVersion:legalDocuments.renewal.version};assert.equal((await a.b.post('/access/billing-enable',consent)).statusCode,200);await a.b.post('/access/billing-disable',{});assert.equal((await a.b.post('/access/billing-enable',consent)).statusCode,200);
+ assert.equal((await a.b.post('/access/trial-create',{...input,id:crypto.randomUUID()})).statusCode,409);
+ const p=[...payments.values()][0];await pg.finance.query("SELECT * FROM commerce.record_checkout_refund($1,$2,1000,'succeeded',clock_timestamp())",[crypto.randomUUID(),p.id]);assert.equal((await a.b.get('/session')).json().scope,'active');
+ const trialEnd=(await a.b.get('/session')).json().accessEnd,q=(await a.b.post('/access/billing-quote',{tariffId:tariff.id})).json();assert.equal(q.startsAt,trialEnd);
+ r=await a.b.post('/access/billing-create',{id:crypto.randomUUID(),tariffId:q.tariff.id,priceMinor:q.tariff.priceMinor,catalogVersion:q.tariff.catalogVersion,cycleRevision:q.cycleRevision,offerVersion:q.offerVersion});assert.equal(r.statusCode,200,r.body);r=await a.b.post('/access/billing-sync',{id:r.json().id});assert.equal(r.json().state,'paid');
+ units=(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,clock_timestamp())',[user])).rows[0];assert.equal(units.quota,2500);assert.equal(Number(units.base_remaining),25000000000);
+ const next=(await pg.owner.query("SELECT * FROM commerce.customer_allowance_usage($1,$2::timestamptz+interval '1 second')",[user,trialEnd])).rows[0];assert.equal(next.quota,10000);fc.accessPayments=undefined;
+});
+test('ending and restoring access never regenerates included units; purchased credits survive and are editable separately',async()=>{
+ const a=await manualRegistered(),admin=a.admin.b;let command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,purchasedUnits:246,reason:'Set purchased balance'});let r=await admin.post('/control/manual-access',command);assert.equal(r.statusCode,200,r.body);
+ const get=async()=>((await admin.get('/control/accesses')).json().users.find((u:any)=>u.userId===a.userId));
+ command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'end_now',userId:a.userId,reason:'End access'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);let u=await get();assert.equal(u.analyzer.units,0);assert.equal(u.analyzer.remaining,0);assert.equal(u.analyzer.purchased,246);
+ command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:7},reason:'Restore without fresh allowance'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);u=await get();assert.equal(u.analyzer.units,0);assert.equal(u.analyzer.purchased,246);
+ command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,quota:{source:'override',limit:6500},reason:'Assign manually'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);
+ command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:40},reason:'Long compensation'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);u=await get();assert.equal(u.analyzer.remaining,6500);assert.equal(u.analyzer.purchased,246);assert.equal(u.analyzer.resetAt,u.cycle.accessEnd);
+});
+test('trial webhook is idempotent, refund retries are durable, and a second account using the same card is denied and refunded',async()=>{
+ const {legalDocuments}=await import('../../../packages/access/src/legal.ts'),{runTrialRefunds}=await import('../src/trial.ts');const weekly={...tariff,id:'trial-week-retry',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500,catalogVersion:0};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
+ let refundCalls=0;const payments=new Map<string,any>(),refundByPayment=new Map<string,any>();
+ fc.accessPayments={test:true,read:async id=>payments.get(id),create:async input=>{const id=crypto.randomUUID(),p={id,test:true,paid:false,status:'pending',amount:{value:input.value,currency:'RUB'},metadata:{orderId:input.id},confirmation:{confirmation_url:'https://yookassa.ru/checkout/synthetic'},payment_method:{id:'saved-'+id,saved:true,card:{first6:'654321',last4:'9876',expiry_month:'11',expiry_year:'2032'}}};payments.set(id,p);return p;},createRefund:async input=>{refundCalls++;if(refundCalls===1)throw Error('synthetic provider timeout');const r={id:input.id,payment_id:input.paymentId,created_at:new Date().toISOString(),status:'pending',amount:{currency:'RUB',value:input.value}};refundByPayment.set(input.paymentId,r);return r;},readRefund:async id=>({...([...refundByPayment.values()].find(r=>r.id===id)),status:'succeeded'})};
+ const receiver=await createServer(fc);try{
+ const first=await newSignup('trial-refund-retry@example.test');await finishSignup(first,'trial-refund-retry@example.test');
+ const input={id:crypto.randomUUID(),device:crypto.randomUUID(),cardConsent:true,tariffId:weekly.id,catalogVersion:0,priceMinor:'11900',offerVersion:legalDocuments.offer.version};assert.equal((await first.b.post('/access/trial-create',input)).statusCode,200);assert.equal((await first.b.post('/access/billing-sync',{id:input.id})).json().state,'pending');const p=[...payments.values()][0];p.paid=true;p.status='succeeded';
+ const notify=()=>receiver.fastify.inject({method:'POST',url:'/api/payments/yookassa/webhook',payload:{type:'notification',event:'payment.succeeded',object:{id:p.id}}});let r=await notify();assert.equal(r.statusCode,200,r.body);assert.equal((await notify()).statusCode,200);assert.equal(refundCalls,1);assert.equal((await first.b.get('/session')).json().scope,'active');
+ await pg.owner.query("DELETE FROM identity.auth_user WHERE email='trial-refund-retry@example.test'"); // A pending financial refund survives erasure.
+
+ await pg.owner.query("UPDATE commerce.card_refund_job SET refund_attempt_at=clock_timestamp()-interval '6 minutes'");await runTrialRefunds(pg.finance,fc.accessPayments);assert.equal(refundCalls,2);await pg.owner.query("UPDATE commerce.card_refund_job SET refund_attempt_at=clock_timestamp()-interval '6 minutes'");await runTrialRefunds(pg.finance,fc.accessPayments);assert.equal(refundCalls,2);assert.equal((await pg.owner.query('SELECT refund_state FROM commerce.card_refund_job')).rows[0].refund_state,'succeeded');
+ const second=await newSignup('trial-duplicate-card@example.test');await finishSignup(second,'trial-duplicate-card@example.test');const id=crypto.randomUUID();assert.equal((await second.b.post('/access/trial-create',{...input,id,device:crypto.randomUUID()})).statusCode,200);await second.b.post('/access/billing-sync',{id});const duplicate=[...payments.values()][1];duplicate.paid=true;duplicate.status='succeeded';assert.equal((await second.b.post('/access/billing-sync',{id})).json().state,'paid');assert.equal((await second.b.get('/session')).json().scope,'restricted');assert.equal((await second.b.get('/access/billing')).json().trialResult,'denied');assert.equal((await pg.owner.query('SELECT 1 FROM commerce.trial_claim')).rowCount,1);assert.equal(refundCalls,3);
+ }finally{await receiver.close();fc.accessPayments=undefined;}
+});
+test('an expired invitation still reserves already-issued access for its owner during signup migration',async()=>{
+ const {legalDocuments}=await import('../../../packages/access/src/legal.ts');const admin=await enrolledAdmin(),command=await manualCommand(admin.b,manualInvite());assert.equal((await admin.b.post('/control/manual-access',command)).statusCode,200);
+ await pg.owner.query("UPDATE commerce.invitation SET expires_at=clock_timestamp()-interval '1 minute'");const b=userBrowser(),r=await b.post('/access/signup-start',{email:'manual@example.test',name:'Synthetic',password:testPassword,confirmPassword:testPassword,termsVersion:legalDocuments.terms.version,consentVersion:legalDocuments.consent.version});assert.equal(r.statusCode,409,r.body);assert.equal(r.json().code,'USE_EXISTING_INVITATION');assert.equal((await pg.owner.query("SELECT 1 FROM identity.auth_user WHERE email='manual@example.test'")).rowCount,0);
 });

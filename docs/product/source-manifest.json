@@ -10,9 +10,15 @@
       "path": "docs/product/context_handoff.docx",
       "role": "decision_context",
       "sha256": "50fb15bf485d7c5a570e6195833af8c167b811a2355fa7cfdc829b5cce8a7b26"
+    },
+    {
+      "path": "docs/product/approved-onboarding-20261111.md",
+      "role": "approved_amendment",
+      "sha256": "566e179badd0cc1deea6d8e27d667b52cd01f2a963b995b2af1a1eefc507d013"
     }
   ],
   "precedence": [
+    "Approved onboarding amendment 2026-11-11 overrides first-access registration, trial, renewal and allowance clauses in its stated scope",
     "Approved E-04 replaces mandatory admin SMS recovery; other access/security requirements remain active",
     "Approved amendments A-01..A-11 and B-01..B-10 override the specifically named clauses",
     "Other original PDF requirements remain active in full",

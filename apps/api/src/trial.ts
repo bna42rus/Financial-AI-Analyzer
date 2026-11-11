@@ -43,6 +43,7 @@ export async function saveCard(db:PoolClient,userId:string,p:AccessPayment,seal:
 }
 export async function finishTrial(db:PoolClient,id:string,user:{id:string;email:string},payment:AccessPayment,seal:Sealer){
  const t=(await db.query('SELECT * FROM commerce.trial_checkout WHERE checkout_id=$1 FOR UPDATE',[id])).rows[0];if(!t||t.result)return;
+ await db.query('INSERT INTO commerce.card_refund_job(checkout_id,user_id,provider_id,refund_key) VALUES($1,$2,$3,$4) ON CONFLICT(checkout_id) DO NOTHING',[id,user.id,payment.id,t.refund_key]);
  const c=payment.payment_method?.card,method=await saveCard(db,user.id,payment,seal);
  const mask=c&&/^\d{6}$/.test(c.first6??'')&&/^\d{4}$/.test(c.last4??'')&&/^\d{2}$/.test(c.expiry_month??'')&&/^\d{4}$/.test(c.expiry_year??'')?[c.first6,c.last4,c.expiry_month,c.expiry_year].join(':'):null;
  const claimed=method&&mask&&(await db.query('SELECT commerce.claim_trial($1,$2,$3,$4) AS ok',[id,t.email_key,t.device_key,seal.rateKey('trial-card:'+mask)])).rows[0]?.ok;
@@ -60,14 +61,15 @@ export async function finishTrial(db:PoolClient,id:string,user:{id:string;email:
  if(active)await db.query("INSERT INTO commerce.autorenewal_event(user_id,action,checkout_id,tariff,offer_version,renewal_version) VALUES($1,'enable',$2,$3,$4,$5)",[user.id,id,t.renewal_tariff,order.offer_version,order.renewal_version]);
 }
 export async function recordTrialRefund(db:PoolClient,refund:ProviderRefund){
- const t=(await db.query('SELECT t.*,o.provider_id FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id WHERE o.provider_id=$1 FOR UPDATE OF t',[refund.payment_id])).rows[0];if(!t)return false;
+ const t=(await db.query('SELECT * FROM commerce.card_refund_job WHERE provider_id=$1 FOR UPDATE',[refund.payment_id])).rows[0];if(!t)return false;
  if(refund.amount?.currency!=='RUB'||refund.amount.value!=='10.00'||t.refund_id&&t.refund_id!==refund.id||!['pending','succeeded','canceled'].includes(refund.status))throw new HttpError(502,'PAYMENT_UNVERIFIED');
+ await db.query('UPDATE commerce.card_refund_job SET refund_id=$2,refund_state=$3 WHERE checkout_id=$1',[t.checkout_id,refund.id,refund.status]);
  await db.query('UPDATE commerce.trial_checkout SET refund_id=$2,refund_state=$3 WHERE checkout_id=$1',[t.checkout_id,refund.id,refund.status]);return true;
 }
 export async function refundTrial(db:PoolClient,id:string,provider:AccessPaymentProvider){
- const t=(await db.query("SELECT t.*,o.provider_id FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id WHERE t.checkout_id=$1 AND o.state='paid' FOR UPDATE OF t",[id])).rows[0];
+ const t=(await db.query("SELECT * FROM commerce.card_refund_job WHERE checkout_id=$1 FOR UPDATE",[id])).rows[0];
  if(!t||t.refund_state==='succeeded'||t.refund_state==='canceled')return;
- await db.query('UPDATE commerce.trial_checkout SET refund_attempt_at=clock_timestamp() WHERE checkout_id=$1',[id]);
+ await db.query('UPDATE commerce.card_refund_job SET refund_attempt_at=clock_timestamp() WHERE checkout_id=$1',[id]);
  try{const refund=t.refund_id?await provider.readRefund!(t.refund_id):await provider.createRefund!({id:t.refund_key,paymentId:t.provider_id,value:'10.00'});
   if(refund.payment_id!==t.provider_id)throw new HttpError(502,'PAYMENT_UNVERIFIED');await recordTrialRefund(db,refund);
  }catch(e){if(e instanceof HttpError&&e.code==='PAYMENT_UNVERIFIED')throw e;/* Required/pending is durable and retried by the billing worker. */}

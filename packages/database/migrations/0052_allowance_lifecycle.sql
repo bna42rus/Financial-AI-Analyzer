@@ -9,7 +9,7 @@ LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
   SELECT c.anchor_at,c.access_end,s.status,z.stopped_at FROM (SELECT 1) x LEFT JOIN commerce.access_cycle c ON c.user_id=p_user LEFT JOIN identity.security_state s ON s.user_id=p_user LEFT JOIN commerce.allowance_stop z ON z.user_id=p_user
  ), current_slot AS (
   SELECT COALESCE(o.starts_at,b.starts_at) AS starts_at,COALESCE(o.ends_at,b.ends_at) AS ends_at,
-   CASE WHEN c.status='suspended' OR c.access_end<=p_at OR c.stopped_at>=COALESCE(o.changed_at,w.starts_at,c.anchor_at) THEN 0 ELSE COALESCE(o.units,CASE WHEN b.starts_at>=a.period_start THEN 10000 ELSE w.quota END,0) END AS units,
+   CASE WHEN c.status='suspended' OR c.access_end<=p_at OR c.stopped_at>COALESCE(o.changed_at,(SELECT max(p.starts_at) FROM commerce.access_paid_window p WHERE p.user_id=p_user AND p.starts_at<=p_at AND p.ends_at>p_at),(SELECT max(m.starts_at) FROM commerce.manual_allowance m WHERE m.user_id=p_user AND m.starts_at<=p_at),c.anchor_at) THEN 0 ELSE COALESCE(o.units,CASE WHEN b.starts_at>=a.period_start THEN 10000 ELSE w.quota END,0) END AS units,
    COALESCE(o.base_before,0) AS base_before
   FROM context c
   LEFT JOIN LATERAL commerce.analyzer_allowance_window(p_user,p_at) w ON true

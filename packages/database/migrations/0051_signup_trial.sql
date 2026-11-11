@@ -25,6 +25,13 @@ CREATE TABLE commerce.trial_checkout(
  refund_id uuid,refund_state text NOT NULL DEFAULT 'required' CHECK(refund_state IN ('required','pending','succeeded','canceled')),
  refund_attempt_at timestamptz,created_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
+-- Refund obligations must survive account erasure and deletion of its checkout rows.
+CREATE TABLE commerce.card_refund_job(
+ checkout_id uuid PRIMARY KEY,user_id text NOT NULL,provider_id uuid NOT NULL UNIQUE,
+ refund_key uuid NOT NULL UNIQUE,refund_id uuid,
+ refund_state text NOT NULL DEFAULT 'required' CHECK(refund_state IN ('required','pending','succeeded','canceled')),
+ refund_attempt_at timestamptz,created_at timestamptz NOT NULL DEFAULT clock_timestamp()
+);
 -- Masked-card signatures are conservative repeat-use signals, not bank fingerprints.
 -- No raw email, PAN, CVC or saved-payment token is retained in the claim ledger.
 CREATE TABLE commerce.trial_claim(
@@ -36,7 +43,7 @@ CREATE TABLE commerce.saved_card(
  method_id text NOT NULL,last4 text,updated_at timestamptz NOT NULL DEFAULT clock_timestamp()
 );
 DO $$DECLARE t text;BEGIN
- FOREACH t IN ARRAY ARRAY['onboarding_account','trial_checkout','saved_card'] LOOP
+ FOREACH t IN ARRAY ARRAY['onboarding_account','trial_checkout','saved_card','card_refund_job'] LOOP
  EXECUTE format('ALTER TABLE commerce.%I ENABLE ROW LEVEL SECURITY',t);
  EXECUTE format('ALTER TABLE commerce.%I FORCE ROW LEVEL SECURITY',t);
  EXECUTE format('CREATE POLICY own ON commerce.%I TO finance_api USING(user_id=current_setting(''app.user_id'',true)) WITH CHECK(user_id=current_setting(''app.user_id'',true))',t);
@@ -62,8 +69,8 @@ REVOKE ALL ON FUNCTION commerce.claim_trial(uuid,text,text,text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION commerce.claim_trial(uuid,text,text,text) TO finance_api;
 CREATE FUNCTION commerce.trial_refunds_due() RETURNS TABLE(user_id text,checkout_id uuid)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path=pg_catalog AS $$
- SELECT t.user_id,t.checkout_id FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id
- WHERE o.state='paid' AND t.refund_state IN ('required','pending')
+ SELECT t.user_id,t.checkout_id FROM commerce.card_refund_job t
+ WHERE t.refund_state IN ('required','pending')
  AND (t.refund_attempt_at IS NULL OR t.refund_attempt_at<clock_timestamp()-interval '5 minutes')
  ORDER BY t.created_at LIMIT 50
 $$;

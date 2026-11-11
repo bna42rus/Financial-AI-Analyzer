@@ -13,7 +13,7 @@ export async function signupStart(db:PoolClient,b:Record<string,unknown>,seal:Se
  checkLegalVersion(b.consentVersion,legalDocuments.consent.version,true);
  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['access-email:'+address]);
  if((await db.query('SELECT 1 FROM identity.auth_user WHERE email=$1',[address])).rowCount)throw new HttpError(409,'EXISTING_ACCOUNT');
- if((await db.query("SELECT 1 FROM commerce.invitation WHERE email=$1 AND state='active' AND expires_at>clock_timestamp()",[address])).rowCount)throw new HttpError(409,'USE_EXISTING_INVITATION');
+ if((await db.query("SELECT 1 FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE i.email=$1 AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp()))",[address])).rowCount)throw new HttpError(409,'USE_EXISTING_INVITATION');
  const retryAfterSeconds=await reserveMailRequest(db,seal,'finance','registration',address);
  const id=randomUUID(),code=String(randomInt(0,1000000)).padStart(6,'0');
  await db.query('DELETE FROM identity.signup_pending WHERE expires_at<clock_timestamp()');
