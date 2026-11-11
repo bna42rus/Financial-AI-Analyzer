@@ -19,11 +19,11 @@ const providers = new WeakSet<object>();
 export const isAssistantProvider = (value: unknown): value is AssistantProvider => !!value && typeof value === 'object' && providers.has(value);
 /** Isolated HTTP/DB acceptance only. No key loader, default fetch or live switch.
  * The explicit fetcher receives a synthetic key; it must be a test transport. */
-export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>): AssistantProvider {
+export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>, allowedEmails?:readonly string[]): AssistantProvider {
   if (typeof fetcher !== 'function') throw new Error('ASSISTANT_PROVIDER_CONFIGURATION_DENIED');
   const model = createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher);
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
-  const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (_email: string) => true, async authorizeDispatch(_db: PoolClient) {},
+  const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (email: string) => !allowedEmails||allowedEmails.includes(email.toLowerCase()), async authorizeDispatch(_db: PoolClient) {},
     forRequest: (purpose: 'assistant'|'classification' = 'assistant') => createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher,purpose),
     binding: { workflow: assistantWorkflowVersion, plan: assistantVersion, bound: model.bound, cost } });
   providers.add(provider); return provider;

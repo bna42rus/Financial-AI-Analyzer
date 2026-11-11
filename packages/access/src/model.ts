@@ -81,7 +81,7 @@ export function reviewRequest(store: AccessStore, cmd: ReviewCommand, now: strin
   if (cmd.decision === 'confirm' && mismatch) fail('Полученная сумма отличается от тарифа. Выберите отдельное решение');
   if (cmd.decision === 'topup' && total >= expected) fail('Доплата не требуется');
   if (!['confirm', 'accept_full', 'topup', 'reject', 'custom'].includes(cmd.decision)) fail('Выберите решение');
-  if (cmd.decision !== 'confirm') text(cmd.reason, 1000);
+  if (typeof cmd.reason !== 'string' || cmd.reason.length > 1000) fail('Проверьте заметку');
   const reason = cmd.reason.trim(); if (reason.length > 1000) fail('Сократите причину до 1000 символов');
   const receivedAt = cmd.receivedAt; if (time(receivedAt) > time(now) || time(receivedAt) < time(r.createdAt)) fail('Проверьте дату получения платежа');
   const selectedDuration = cmd.decision === 'custom' ? duration({ kind: 'days', count: cmd.customDays ?? 0 }) : duration(r.tariff.duration);
@@ -102,7 +102,7 @@ export function reviewRequest(store: AccessStore, cmd: ReviewCommand, now: strin
 export function changeInvitation(store: AccessStore, cmd: { actionId: string; invitationId: string; decision: 'cancel' | 'reissue'; actorId: string; reason: string }, now: string): AccessStore {
   if (replay(store, cmd.actionId, cmd)) return store;
   id(cmd.actorId); const invite = store.invitations.find(i => i.id === cmd.invitationId) ?? fail('Приглашение не найдено');
-  const current = invitationStatus(invite, now); text(cmd.reason, 1000);
+  const current = invitationStatus(invite, now); if (typeof cmd.reason !== 'string' || cmd.reason.length > 1000) fail('Проверьте заметку');
   const latest = store.invitations.filter(i => i.purchaseId === invite.purchaseId).at(-1);
   if (latest?.id !== invite.id || current === 'superseded' || (cmd.decision === 'cancel' && current !== 'active')) fail('Откройте последнее приглашение');
   if (!['cancel', 'reissue'].includes(cmd.decision)) fail('Неизвестное действие');

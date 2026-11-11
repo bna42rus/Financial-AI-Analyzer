@@ -1,3 +1,4 @@
+import {optionalNote} from './types.ts';
 import {reserveMailRequest} from './mail-cooldown.ts';
 import type {PoolClient} from 'pg';
 import type {FastifyRequest} from 'fastify';
@@ -11,7 +12,7 @@ export async function mailQueue(db:PoolClient,target?:string|null){
   audit:(await db.query('SELECT action_id AS "actionId",delivery_id AS "deliveryId",reason,created_at AS "createdAt" FROM mail.resend_audit ORDER BY created_at DESC LIMIT 100')).rows};
 }
 export async function retryMail(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer){
- const b=fields(request,['actionId','deliveryId','reason']),id=actionId(b.actionId),delivery=actionId(b.deliveryId),reason=string(b.reason,1000).trim();
+ const b=fields(request,['actionId','deliveryId','reason']),id=actionId(b.actionId),delivery=actionId(b.deliveryId),reason=optionalNote(b.reason);
  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['mail-retry:'+delivery]);
  if(await remember(db,id,actorId,{kind:'mail_retry',delivery,reason}))return {status:'already_committed',...await mailQueue(db)};
  if(!(await db.query('SELECT mail.retry_delivery($1::uuid) AS changed',[delivery])).rows[0].changed)throw new HttpError(409,'DELIVERY_UNAVAILABLE');
@@ -21,7 +22,7 @@ export async function retryMail(db:PoolClient,request:FastifyRequest,actorId:str
 }
 /** An intentional resend keeps the current invite/token/lifetime and creates a new delivery. */
 export async function resendInvitation(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer){
- const b=fields(request,['actionId','invitationId','reason']),id=actionId(b.actionId),invitationId=string(b.invitationId,100),reason=string(b.reason,1000).trim();
+ const b=fields(request,['actionId','invitationId','reason']),id=actionId(b.actionId),invitationId=string(b.invitationId,100),reason=optionalNote(b.reason);
  const ref=(await db.query('SELECT purchase_id,manual_grant_id,email FROM commerce.invitation WHERE id=$1',[invitationId])).rows[0];
  if(!ref)throw new HttpError(404,'NOT_FOUND');
  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['access-email:'+ref.email]);

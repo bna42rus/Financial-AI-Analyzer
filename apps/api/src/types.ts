@@ -17,6 +17,7 @@ export function string(value: unknown, max = 256): string {
   if (typeof value !== 'string' || !value.trim() || value.length > max) throw new HttpError(400, 'INVALID_INPUT');
   return value;
 }
+export function optionalNote(value:unknown):string {if(value===undefined||value===null)return '';if(typeof value!=='string'||value.length>1000)throw new HttpError(400,'INVALID_INPUT');return value.trim();}
 export function email(value: unknown): string {
   const v = string(value, 254).trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) throw new HttpError(400, 'INVALID_INPUT');

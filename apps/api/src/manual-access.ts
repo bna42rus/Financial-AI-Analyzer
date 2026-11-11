@@ -1,3 +1,4 @@
+import {optionalNote} from './types.ts';
 import {paidAnalyzerUnits} from './customer-ai-budget.ts';
 import {reserveMailRequest} from './mail-cooldown.ts';
 import type {PoolClient} from 'pg';
@@ -40,7 +41,7 @@ async function quota(db:PoolClient,value:unknown,fallback:QuotaPolicy|undefined)
 }
 export async function manualQueue(db:PoolClient,options?:{search:string;filter:string;page:number;target:string}):Promise<ManualQueue>{
  const size=options?30:100;
- const users=(await db.query(`SELECT d.*,commerce.control_trial_status(d.user_id) AS trial_state,(SELECT refund_state FROM commerce.trial_checkout t WHERE t.user_id=d.user_id ORDER BY t.created_at DESC LIMIT 1) AS trial_refund_state,commerce.control_renewal_status(d.user_id) AS renewal,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
+ const users=(await db.query(`SELECT d.*,commerce.control_trial_status(d.user_id) AS trial_state,(SELECT refund_state FROM commerce.trial_checkout t WHERE t.user_id=d.user_id AND t.result IS NOT NULL ORDER BY t.created_at DESC LIMIT 1) AS trial_refund_state,commerce.control_renewal_status(d.user_id) AS renewal,c.user_id AS cycle_id,c.anchor_at,c.access_end,c.timezone,c.revision,c.calendar_months,c.extra_days,c.indefinite,c.end_offset_ms,c.quota_policy
   FROM commerce.account_directory d LEFT JOIN commerce.access_cycle c USING(user_id) LEFT JOIN commerce.onboarding_account n USING(user_id)
   WHERE ($1='' OR strpos(lower(d.email||' '||d.name),lower($1))>0) AND
    ($2='' OR $2='blocked' AND d.status='suspended' OR $2='unlimited' AND c.indefinite OR
@@ -71,7 +72,7 @@ async function newInvitation(db:PoolClient,grantId:string,address:string,lifetim
 }
 export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean){
  const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota','purchasedUnits','expectedPurchased']);
- const id=actionId(b.actionId),reason=string(b.reason,1000).trim(),mode=string(b.mode,20);
+ const id=actionId(b.actionId),reason=optionalNote(b.reason),mode=string(b.mode,20);
  if(!['invite','extend','set_end','indefinite','end_now','quota'].includes(mode))throw new HttpError(400,'INVALID_INPUT');
  if(!preview&&(!Number.isInteger(b.expectedRevision)||typeof b.expectedMode!=='string'||!b.expectedQuota))throw new HttpError(400,'INVALID_INPUT');
  const t=mode==='end_now'||mode==='quota'?undefined:term(b.term);
@@ -152,7 +153,7 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
  return {status:'committed',...await manualQueue(db)};
 }
 export async function manualInvitationAction(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer){
- const b=fields(request,['actionId','invitationId','decision','reason','inviteHours']),id=actionId(b.actionId),inviteId=string(b.invitationId,100),reason=string(b.reason,1000).trim(),lifetime=hours(b.inviteHours);
+ const b=fields(request,['actionId','invitationId','decision','reason','inviteHours']),id=actionId(b.actionId),inviteId=string(b.invitationId,100),reason=optionalNote(b.reason),lifetime=hours(b.inviteHours);
  if(!['cancel','reissue'].includes(String(b.decision)))throw new HttpError(400,'INVALID_INPUT');
  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['manual-action:'+id]);
  if(await remember(db,id,actorId,{kind:'manual_invitation',...b,reason}))return {status:'already_committed',...await manualQueue(db)};

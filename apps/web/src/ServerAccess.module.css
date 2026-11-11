@@ -125,3 +125,7 @@
 .renewalBody form{gap:10px}
 .renewalBody .legalChoice{margin:4px 0}
 @media(max-width:480px){.paymentActions{display:grid;grid-template-columns:1fr 1fr}.paymentActions>*{min-width:0;width:100%;padding-inline:8px;white-space:normal}.paymentActions>:only-child{grid-column:2}}
+
+.savedCards{list-style:none;padding:0;margin:0 0 12px;display:grid;gap:8px}
+.savedCards li{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--color-border)}
+.savedCards small{display:block;color:var(--color-secondary-text);margin-top:4px}

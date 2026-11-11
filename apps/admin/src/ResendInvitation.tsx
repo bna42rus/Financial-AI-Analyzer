@@ -25,8 +25,8 @@ export function ResendInvitation({invitationId,disabled,onResent}:{invitationId:
  </>}>
   <div className={styles.renewalBody}>
    <p>Отправится та же действующая ссылка. Срок ссылки, оплата и период доступа сохраняются.</p>
-   {command?<><p>Заметка: {command.reason}</p>{error&&<p role="alert" className={styles.error}>{error}</p>}</>:<form id="invitation-resend-form" onSubmit={e=>{e.preventDefault();if(!reason.trim()){setError('Добавьте заметку.');return;}setCommand({actionId:crypto.randomUUID(),invitationId,reason:reason.trim()});}}>
-    <OperationField label="Заметка приглашения" error={error||undefined}><textarea value={reason} maxLength={1000} rows={2} onChange={e=>{setReason(e.target.value);setError('');}}/></OperationField>
+   {command?<><p>Заметка: {command.reason}</p>{error&&<p role="alert" className={styles.error}>{error}</p>}</>:<form id="invitation-resend-form" onSubmit={e=>{e.preventDefault();setCommand({actionId:crypto.randomUUID(),invitationId,reason:reason.trim()});}}>
+    <OperationField label="Заметка (необязательно)" error={error||undefined}><textarea value={reason} maxLength={1000} rows={2} onChange={e=>{setReason(e.target.value);setError('');}}/></OperationField>
    </form>}
   </div>
  </OperationDialog>}</>;

@@ -1,3 +1,5 @@
+import {analyzerAccess} from './analyzer-access.ts';
+import {paymentCards,removePaymentCard} from './payment-cards.ts';
 import {signupStart,signupComplete,signupResend} from './signup.ts';
 import {startTrial,trialInfo,enableRenewal} from './trial.ts';
 import {requestReconciliation} from './checkout-operations.ts';
@@ -226,10 +228,12 @@ export async function createServer(config: Config) {
         if(path.endsWith('start'))result=await signupStart(db,fields(request,['email','name','password','confirmPassword','termsVersion','consentVersion']),seal);
         else if(path.endsWith('resend'))result=await signupResend(db,fields(request,['id']),seal);
         else{result=await signupComplete(db,fields(request,['id','code']));if((result as {code?:string}).code)status=400;}
-      } else if(config.profile==='finance'&&((path==='/access/billing'&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable','/access/trial-create','/access/card-create','/access/billing-enable','/access/billing-cancel'].includes(path)&&request.method==='POST'))){
+      } else if(config.profile==='finance'&&((['/access/billing','/access/cards'].includes(path)&&request.method==='GET')||(['/access/billing-quote','/access/billing-create','/access/billing-sync','/access/billing-disable','/access/trial-create','/access/card-create','/access/billing-enable','/access/billing-cancel','/access/card-remove'].includes(path)&&request.method==='POST'))){
         const u=await current(auth,request);if(!u||!u.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await db.query("SELECT set_config('app.user_id',$1,true)",[u.user.id]);
-        if(path==='/access/billing')result=await checkoutAccountState(db,u.user.id,config.accessPayments,seal);
+        if(path==='/access/cards')result={cards:await paymentCards(db,u.user.id,seal)};
+        else if(path==='/access/card-remove')result=await removePaymentCard(db,u.user.id,request.body);
+        else if(path==='/access/billing')result=await checkoutAccountState(db,u.user.id,config.accessPayments,seal);
         else if(path==='/access/billing-quote')result=await quoteAccess(db,u.user.id,fields(request,['tariffId']),config.accessPayments);
         else if(path==='/access/billing-create')result=await startAccessCheckout(db,u.user,request.body,config.accessPayments,config.launchLegal);
         else if(path==='/access/billing-sync')result=await syncAccessCheckout(db,string(fields(request,['id']).id,36),u.user,config.accessPayments,seal);
@@ -325,15 +329,15 @@ export async function createServer(config: Config) {
         if(request.url.includes('?')||!methodAllowed)throw new HttpError(404,'NOT_FOUND');
         const s=await current(auth,request);if(!s||!s.user.emailVerified)throw new HttpError(401,'AUTH_REQUIRED');
         await finance.prepareFinance(db,s.user.id);
-        if(config.assistantProvider&&path.startsWith('/finance/analyzer')&&!config.assistantProvider.allowed(s.user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
-        if(config.assistantProvider&&path==='/finance/assistant-profile'&&!config.assistantProvider.allowed(s.user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
+        if(config.assistantProvider&&path.startsWith('/finance/analyzer')&&!(await analyzerAccess(db,s.user.id,s.user.email,config.assistantProvider)))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
+        if(config.assistantProvider&&path==='/finance/assistant-profile'&&!(await analyzerAccess(db,s.user.id,s.user.email,config.assistantProvider)))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
         if(tasks&&path==='/finance/analyzer-task'){
           // Release the outer global/auth/workspace transaction before ANY network.
           await db.query('COMMIT');db.release();db=undefined;
           const authorize=async (connection:PoolClient)=>{
             const session=await current(makeAuth(config,connection,seal),request);
             if(!session||!session.user.emailVerified||session.user.id!==s.user.id)throw new HttpError(401,'AUTH_REQUIRED');
-            if(config.assistantProvider&&!config.assistantProvider.allowed(session.user.email))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
+            if(config.assistantProvider&&!(await analyzerAccess(connection,session.user.id,session.user.email,config.assistantProvider)))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
           };
           const result=assistant
             ?await assistant.executeAssistant(config.pool,s.user.id,request.body,config.assistantProvider!,authorize)
@@ -346,7 +350,7 @@ export async function createServer(config: Config) {
         else if(tasks&&path==='/finance/analyzer-context')result=await tasks.analyzerTaskContext(db,s.user.id,request.body);
         else if(tasks&&path==='/finance/analyzer-task-cancel')result=await tasks.cancelAnalyzerTask(db,s.user.id,request.body);
         else if(['/finance/analyzer-context','/finance/analyzer-task','/finance/analyzer-task-cancel'].includes(path))throw new HttpError(503,'AI_UNAVAILABLE');
-        else if(path==='/finance/ai-packages')result=await checkout!.aiPackCatalog(db,s.user.id,config.testPayments);
+        else if(path==='/finance/ai-packages')result=await checkout!.aiPackCatalog(db,s.user.id,config.testPayments,seal);
         else if(path==='/finance/ai-topup')result=await checkout!.aiTopup(db,s.user,request.body,config.testPayments,seal);
         else if(path==='/finance/analyzer-answer-rows')result=await analyzer!.analyzerAnswerRows(db,s.user.id,request.body);
         else if(path==='/finance/analyzer-state')result={...(assistant?{assistantProtocol:assistantWorkflowVersion,assistantProfile:await assistant.assistantProfile(db,s.user.id,{})}:{}),customerBudget:await customerBudget!.customerAiBudget(db,s.user.id),taskProtocol:tasks?'analyzer-task-protocol/2':undefined,...(tasks?{pendingTasks:await tasks.pendingAnalyzerTasks(db,s.user.id)}:{}),...await analyzer!.analyzerState(db,s.user.id,request.body,!!tasks||!!config.analyzerAdapter||!!config.yandexAnalyzer?.transport.allowed(s.user.email),!!tasks||!!config.yandexAnalyzer)};

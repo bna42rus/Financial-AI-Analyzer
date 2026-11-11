@@ -1,3 +1,4 @@
+import {PaymentCards} from './PaymentCards';
 import {RenewalSettings} from './TrialOnboarding';
 import {SupportLink} from './SupportDialog';
 import {SignOutConfirmation} from './SignOutConfirmation';
@@ -33,6 +34,7 @@ export function ServerAccount({session,refresh,signOut,back,busy,accountError,as
  const content=<div className={styles.accountStack}>{accountError&&<p className={styles.error} role="alert">{accountError}</p>}
   <section className={styles.accountSection}><h2><UserRound size={18}/>Профиль</h2><dl>{([['name','Имя',session.name],['email','Почта',session.email],['timezone','Часовой пояс',timezoneLabel(session.timezone??deviceZone())]] as const).map(([field,label,value])=>value&&<div key={field}><dt>{label}</dt><dd className={styles.profileValue}><span>{value}</span><button className={common.iconButton} disabled={busy} aria-label={'Изменить: '+label.toLocaleLowerCase('ru')} onClick={()=>setProfile(field)}><Pencil size={16}/></button></dd></div>)}</dl></section>
   <section className={styles.accountSection}><h2><CalendarDays size={18}/>Доступ</h2><dl><div><dt>Статус</dt><dd>{session.blocked?'Заблокирован':session.scope==='active'?(session.trialState==='active'?'Пробный период':'Активен'):session.isNew?'Выберите тариф':session.accessEnd?'Срок истёк':'Не активен'}</dd></div><div><dt>Срок</dt><dd>{session.isNew?'—':session.indefinite?'Бессрочно':session.accessEnd?'До '+date(session.accessEnd,session.timezone):'—'}</dd></div></dl>{!session.blocked&&(session.isNew||session.accessWarning)&&<p className={styles.accountWarning}>{session.isNew?'Чтобы начать пользоваться финансовыми функциями, выберите тариф или попробуйте 7 дней бесплатно.':session.accessWarning}</p>}{session.blocked&&<p className={styles.accountWarning}>Доступ приостановлен. <SupportLink className={common.linkButton}>Написать в поддержку</SupportLink></p>}<div className={styles.accountActions}>{!session.indefinite&&!session.blocked&&<button className={common.primaryButton} disabled={busy} onClick={()=>open('renew')}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&<RenewalSettings/>}</div></section>
+  <PaymentCards/>
   <section className={styles.accountSection}><h2><ShieldCheck size={18}/>Безопасность</h2><div className={styles.accountActions}><button className={common.button} onClick={()=>open('sessions')}>Активные сеансы</button>{session.email&&<button className={common.button} onClick={()=>open('password')}>Сменить пароль</button>}</div></section>
   {session.email&&<AccountDeletion email={session.email}/>}
  </div>;

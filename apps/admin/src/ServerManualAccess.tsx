@@ -13,7 +13,7 @@ import styles from '../../web/src/ServerAccess.module.css';
 import shell from './ServerAdmin.module.css';
 
 const count=(n:number)=>n.toLocaleString('ru-RU');
-const status=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочный':u.cycle?.accessEnd&&Date.parse(u.cycle.accessEnd)>Date.now()?(u.trialState==='active'?'Пробный период':'Действует'):u.trialState==='new'||u.trialState==='pending'||u.trialState==='denied'?'Новый аккаунт':u.cycle?.accessEnd?'Истёк':'Доступ не выдан';
+const status=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочный':u.cycle?.accessEnd&&Date.parse(u.cycle.accessEnd)>Date.now()?(u.trialState==='active'?'Пробный период':'Действует'):u.trialState==='new'||u.trialState==='pending'||u.trialState==='denied'||u.trialState==='failed'?'Новый аккаунт':u.cycle?.accessEnd?'Истёк':'Доступ не выдан';
 function quotaLabel(q:QuotaPolicy){
  if(q.source==='override'&&q.budgetMinor!==undefined)return moneyLabel(q.budgetMinor)+' в месяц на модель';
  return count(q.limit)+' единиц '+(q.source==='tariff'&&q.periodDays?'каждые '+q.periodDays+' дней':'в месяц');
@@ -31,7 +31,7 @@ export function ServerManualAccess({refresh,target}:{refresh:number;target?:stri
  useEffect(()=>{const timer=setTimeout(()=>{setSearch(query.trim());setPage(0);},250);return()=>clearTimeout(timer);},[query]);
  useEffect(()=>{if(target){setSelected(target);setQuery('');setFilter('');setPage(0);}},[target]);
  const user=data?.users.find(u=>u.userId===selected);
- const formatTerm=(u:ManualUser)=>u.cycle?.indefinite?'Бессрочно':u.cycle?.accessEnd?'До '+time.format(u.cycle.accessEnd):'Срок не задан';
+ const formatTerm=(u:ManualUser)=>['new','pending','denied','failed'].includes(u.trialState??'')?'—':u.cycle?.indefinite?'Бессрочно':u.cycle?.accessEnd?'До '+time.format(u.cycle.accessEnd):'Срок не задан';
  function done(message:string){setPanel(null);notify(message);reload();}
  return <>
   <div className={styles.layout}>
@@ -52,7 +52,7 @@ export function ServerManualAccess({refresh,target}:{refresh:number;target?:stri
     <div className={shell.paymentHead+' '+shell.userHeading}><h2>{user.name||user.email}</h2><span className={shell.badge}>{status(user)}</span></div><p>{user.email}</p>
     {user.status==='suspended'&&<span className={shell.attention}>Заблокирован</span>}
     <div className={shell.records}>
-     <article><h3><CalendarDays size={17}/> Доступ</h3><dl className={shell.detailList}><div><dt>Срок</dt><dd>{formatTerm(user)}</dd></div><div><dt>Зарегистрирован</dt><dd>{time.format(user.registeredAt)}</dd></div></dl>{<p>Пробный период: {({new:'не использован',pending:'не использован',active:'активен',used:'использован',denied:'недоступен'} as Record<string,string>)[user.trialState??'used']}{user.trialRefundState?' · Возврат 10 ₽: '+({required:'ожидает отправки',pending:'обрабатывается',succeeded:'выполнен',canceled:'отменён — требуется проверка'} as Record<string,string>)[user.trialRefundState]:''}</p>}{<p>Автопродление: {user.renewal?.state==='active'?'включено · '+moneyLabel(user.renewal.priceMinor)+' · '+time.format(user.renewal.nextAt):'выключено'}</p>}
+     <article><h3><CalendarDays size={17}/> Доступ</h3><dl className={shell.detailList}><div><dt>Срок</dt><dd>{formatTerm(user)}</dd></div><div><dt>Зарегистрирован</dt><dd>{time.format(user.registeredAt)}</dd></div></dl>{<p>Пробный период: {({new:'не использован',pending:'не использован',active:'активен',used:'использован',denied:'не удалось оформить',failed:'не удалось оформить'} as Record<string,string>)[user.trialState??'used']}{user.trialRefundState?' · Возврат 10 ₽: '+({required:'ожидает отправки',pending:'обрабатывается',succeeded:'выполнен',canceled:'отменён — требуется проверка'} as Record<string,string>)[user.trialRefundState]:''}</p>}{<p>Автопродление: {user.renewal?.state==='active'?'включено · '+moneyLabel(user.renewal.priceMinor)+' · '+time.format(user.renewal.nextAt):'выключено'}</p>}
       <div className={shell.detailActions}><button className={styles.secondary} onClick={()=>setPanel('access')}>Изменить доступ</button><button className={styles.secondary} onClick={()=>setPanel('status')}>{user.status==='suspended'?'Снять блокировку':'Приостановить доступ'}</button></div></article>
      <article><h3><Sparkles size={17}/> Лимит Анализатора</h3><dl className={shell.detailList}>
       <div><dt>Включено</dt><dd>{user.analyzer?count(user.analyzer.units)+' единиц':'—'}</dd></div>
@@ -84,11 +84,11 @@ function StatusEditor({user,onClose,onDone}:{user:ManualUser;onClose:()=>void;on
  }
  return <OperationDialog narrow title={review?'Подтверждение изменений':blocking?'Приостановить доступ':'Снять блокировку'} onClose={()=>{if(!busy)onClose();}} footer={<>
   <button className={common.button} disabled={busy} onClick={()=>{if(review){setReview(null);setError('');}else onClose();}}>{review?'Назад':'Отмена'}</button>
-  {review?<button className={blocking?common.dangerButton:common.primaryButton} disabled={busy} onClick={()=>void save()}>Подтвердить</button>:<button className={common.primaryButton} onClick={()=>{if(!note.trim()){setMissing(true);setError('Добавьте заметку.');return;}setMissing(false);setError('');setReview(crypto.randomUUID());}}>Продолжить</button>}
+  {review?<button className={blocking?common.dangerButton:common.primaryButton} disabled={busy} onClick={()=>void save()}>Подтвердить</button>:<button className={common.primaryButton} onClick={()=>{setMissing(false);setError('');setReview(crypto.randomUUID());}}>Продолжить</button>}
  </>}><div className={styles.renewalBody}><p><strong>{user.email}</strong></p>
  <p>{blocking?'Операции, отчёты и Анализатор станут недоступны. Пользователь получит письмо с контактом поддержки.':'Пользователь получит письмо. Если оплаченный срок ещё действует, финансовые разделы откроются.'}</p>
- {review?<><p>Заметка: {note}</p>{blocking&&<p>Завершить сеансы: {endSessions?'Да':'Нет'}</p>}</>:<>
- <OperationField label="Заметка" error={missing?error:undefined}><textarea rows={2} maxLength={1000} value={note} onChange={e=>{setNote(e.target.value);setError('');}}/></OperationField>
+ {review?<>{note&&<p>Заметка: {note}</p>}{blocking&&<p>Завершить сеансы: {endSessions?'Да':'Нет'}</p>}</>:<>
+ <OperationField label="Заметка (необязательно)" error={missing?error:undefined}><textarea rows={2} maxLength={1000} value={note} onChange={e=>{setNote(e.target.value);setError('');}}/></OperationField>
  {blocking&&<label className={shell.check}><input type="checkbox" checked={endSessions} onChange={e=>setEndSessions(e.target.checked)}/>Завершить активные сеансы</label>}</>}
  {!missing&&error&&<p className={styles.error} role="alert">{error}</p>}
  </div></OperationDialog>;
@@ -107,7 +107,6 @@ function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'sta
   setError('');setField('');
   const note=String(values.get('note')??'').trim(),address=String(values.get('email')??'').trim();
   if(inviting&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)){mark('email','Введите адрес электронной почты.');return;}
-  if(!note){mark('note','Добавьте заметку.');return;}
   const amount=Number(values.get('count')),hours=Number(values.get('hours'));
   if(showCount&&(!Number.isInteger(amount)||amount<1||amount>(kind==='days'?36500:1200))){mark('count','Проверьте количество дней или месяцев.');return;}
   if(inviting&&(!Number.isInteger(hours)||hours<1||hours>720)){mark('hours','Введите от 1 до 720 часов.');return;}
@@ -170,7 +169,7 @@ function AccessEditor({panel,user,data,onClose,onDone}:{panel:Exclude<Panel,'sta
     <OperationField label={policy==='rubles'?'Сумма, ₽ (1 ₽ = 100 единиц)':'Лимит, единиц'} error={fieldError('budget')}><input key={policy} name="budget" inputMode="numeric" defaultValue={policy==='rubles'?String(Math.floor((user?.analyzer?.units??10000)/100)):String(user?.analyzer?.units??10000)} onChange={digits}/></OperationField>}
   </>}
   {quota&&<OperationField label="Остаток докупленных единиц"><input name="purchased" inputMode="numeric" defaultValue={String(user?.analyzer?.purchased??0)} onChange={digits}/></OperationField>}
-  <OperationField label="Заметка" error={fieldError('note')}><textarea name="note" rows={2} maxLength={1000} onChange={()=>setError('')}/></OperationField>
+  <OperationField label="Заметка (необязательно)" error={fieldError('note')}><textarea name="note" rows={2} maxLength={1000} onChange={()=>setError('')}/></OperationField>
   {inviting&&<details open={field==='hours'||undefined}><summary>Дополнительные параметры</summary><OperationField label="Срок ссылки, часов" error={fieldError('hours')}><input name="hours" inputMode="numeric" defaultValue="72" onChange={digits}/></OperationField></details>}
   {!preview&&!field&&error&&<p className={styles.error} role="alert">{error}</p>}
  </form>

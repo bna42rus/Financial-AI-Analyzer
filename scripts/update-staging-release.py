@@ -434,6 +434,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regclass('identity.signup_pending') IS NOT NULL", '0051_signup_trial.sql'),
         ("SELECT to_regprocedure('commerce.set_customer_purchased_units(text,bigint)') IS NOT NULL", '0052_allowance_lifecycle.sql'),
         ("SELECT to_regprocedure('commerce.interactive_checkouts_due()') IS NOT NULL", '0053_checkout_lifecycle.sql'),
+        ("SELECT to_regclass('commerce.payment_card') IS NOT NULL", '0054_payment_cards.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')

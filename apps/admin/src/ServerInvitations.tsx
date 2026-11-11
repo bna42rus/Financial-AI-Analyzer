@@ -41,7 +41,6 @@ function InvitationRow({row,highlight,onChanged}:{row:Invitation;highlight:boole
  }
  function preview(data:FormData){
   const reason=String(data.get('reason')??'').trim(),hours=action==='cancel'?72:Number(data.get('hours'));
-  if(!reason){setField('reason');setError('Добавьте заметку.');return;}
   if(!Number.isInteger(hours)||hours<1||hours>720){setField('hours');setError('Введите срок от 1 до 720 часов.');return;}
   setError('');setField('');setReview({reason,hours,actionId:crypto.randomUUID()});
  }
@@ -83,7 +82,7 @@ function InvitationRow({row,highlight,onChanged}:{row:Invitation;highlight:boole
     <p><strong>{row.email}</strong></p>
     <p>{action==='cancel'?'Эта ссылка перестанет действовать. Сразу после отмены здесь можно выдать новую ссылку.':active?'Старая ссылка станет недействительной. Новую отправим на эту же почту.':'Новую ссылку отправим на эту же почту.'}{row.origin==='paid'?' Оплата сохранится.':''}</p>
     {action==='reissue'&&<OperationField label="Срок новой ссылки, часов" error={field==='hours'?error:undefined}><input name="hours" inputMode="numeric" defaultValue="72" onChange={e=>{e.target.value=e.target.value.replace(/\D/g,'');setError('');}}/></OperationField>}
-    <OperationField label="Заметка" error={field==='reason'?error:undefined}><textarea name="reason" rows={2} maxLength={1000} onChange={()=>setError('')}/></OperationField>
+    <OperationField label="Заметка (необязательно)" error={field==='reason'?error:undefined}><textarea name="reason" rows={2} maxLength={1000} onChange={()=>setError('')}/></OperationField>
     {!field&&error&&<p className={styles.error} role="alert">{error}</p>}
    </form>
   </OperationDialog>}

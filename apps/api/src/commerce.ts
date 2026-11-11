@@ -1,3 +1,4 @@
+import {optionalNote} from './types.ts';
 import {reserveMailRequest} from './mail-cooldown.ts';
 import type { PoolClient } from 'pg';
 import type { FastifyRequest } from 'fastify';
@@ -55,8 +56,8 @@ export async function queue(db:PoolClient) {
 export async function review(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean) {
   const b=fields(request,['actionId','requestId','expectedRevision','actualMinor','receivedAt','decision','reason','customDays','inviteHours']);
   const id=actionId(b.actionId), requestId=string(b.requestId,100), lifetime=hours(b.inviteHours);
-  if(!Number.isSafeInteger(b.expectedRevision)||typeof b.reason!=='string'||b.reason.length>1000||b.customDays!==undefined&&(typeof b.customDays!=='number'||!Number.isInteger(b.customDays)||b.customDays<1||b.customDays>36500))throw new HttpError(400,'INVALID_INPUT');
-  const cmd:ReviewCommand={actionId:id,requestId,actorId,expectedRevision:b.expectedRevision as number,actualMinor:string(b.actualMinor,30),receivedAt:string(b.receivedAt,32),decision:string(b.decision,20) as ReviewCommand['decision'],reason:b.reason,...(b.customDays!==undefined?{customDays:b.customDays as number}:{})};
+  if(!Number.isSafeInteger(b.expectedRevision)||b.reason!==undefined&&(typeof b.reason!=='string'||b.reason.length>1000)||b.customDays!==undefined&&(typeof b.customDays!=='number'||!Number.isInteger(b.customDays)||b.customDays<1||b.customDays>36500))throw new HttpError(400,'INVALID_INPUT');
+  const cmd:ReviewCommand={actionId:id,requestId,actorId,expectedRevision:b.expectedRevision as number,actualMinor:string(b.actualMinor,30),receivedAt:string(b.receivedAt,32),decision:string(b.decision,20) as ReviewCommand['decision'],reason:optionalNote(b.reason),...(b.customDays!==undefined?{customDays:b.customDays as number}:{})};
   const before=await load(db,requestId);
   if(!preview&&await remember(db,id,actorId,{kind:'review',...cmd,inviteHours:lifetime}))return {status:'already_committed',...(await queue(db))};
   let next:AccessStore;try {next=reviewRequest(before,cmd,await clock(db));}catch {throw new HttpError(409,'REVIEW_CONFLICT');}
@@ -67,7 +68,7 @@ export async function review(db:PoolClient,request:FastifyRequest,actorId:string
 }
 export async function invitationAction(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer) {
   const b=fields(request,['actionId','invitationId','decision','reason','inviteHours']);
-  const id=actionId(b.actionId),invitationId=string(b.invitationId,100),reason=string(b.reason,1000).trim(),lifetime=hours(b.inviteHours);
+  const id=actionId(b.actionId),invitationId=string(b.invitationId,100),reason=optionalNote(b.reason),lifetime=hours(b.inviteHours);
   if(!['cancel','reissue'].includes(String(b.decision)))throw new HttpError(400,'INVALID_INPUT');
   const meta=(await db.query('SELECT p.request_id FROM commerce.invitation i JOIN commerce.purchase p ON p.id=i.purchase_id WHERE i.id=$1',[invitationId])).rows[0];
   if(!meta)throw new HttpError(404,'NOT_FOUND');

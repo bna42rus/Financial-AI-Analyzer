@@ -1,3 +1,4 @@
+import {optionalNote} from './types.ts';
 import type {PoolClient} from 'pg';
 import {actionId,remember} from './commerce.ts';
 import {deletionQueue} from './account-deletion.ts';
@@ -14,7 +15,7 @@ export async function adminPreferences(db:PoolClient,actor:string,input?:Record<
 }
 
 export async function changeUserAccessStatus(db:PoolClient,actor:string,input:Record<string,unknown>,seal:Sealer){
- const id=actionId(input.actionId),userId=string(input.userId,100),note=string(input.note,1000).trim();
+ const id=actionId(input.actionId),userId=string(input.userId,100),note=optionalNote(input.note);
  const next=input.status;
  if(next!=='active'&&next!=='suspended'||typeof input.endSessions!=='boolean')throw new HttpError(400,'INVALID_INPUT');
  const before=next==='suspended'?'active':'suspended';
