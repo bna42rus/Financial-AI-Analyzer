@@ -22,6 +22,12 @@ sys.dont_write_bytecode = True
 spec = importlib.util.spec_from_file_location('staging_install', Path(__file__).with_name('install-assistant-staging.py'))
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
+def load_staging_gate():
+    gate_spec = importlib.util.spec_from_file_location('staging_gate_config', Path(__file__).with_name('staging-gate-config.py'))
+    gate = importlib.util.module_from_spec(gate_spec)
+    gate_spec.loader.exec_module(gate)
+    return gate
+
 WORKER = 'cashneuro-staging-import.service'
 WORKER_UNIT = Path('/etc/systemd/system') / WORKER
 WORKER_ENV = Path('/etc/cashneuro/staging/finance-import.env')
@@ -435,6 +441,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regprocedure('commerce.set_customer_purchased_units(text,bigint)') IS NOT NULL", '0052_allowance_lifecycle.sql'),
         ("SELECT to_regprocedure('commerce.interactive_checkouts_due()') IS NOT NULL", '0053_checkout_lifecycle.sql'),
         ("SELECT to_regclass('commerce.payment_card') IS NOT NULL", '0054_payment_cards.sql'),
+        ("SELECT to_regclass('commerce.account_trial_activation') IS NOT NULL", '0055_periods_cards_trials.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
@@ -459,6 +466,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     if old_admin:
         next_caddy = next_caddy.replace(old_admin.encode(), str(release / 'apps/admin/dist').encode())
     next_caddy, payment_webhook = configure_payment_webhook(next_caddy, config)
+    gate = load_staging_gate()
+    next_caddy = gate.configure(next_caddy)
     m.private_write(candidate, next_caddy)
     m.run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
     rollback = 'sudo /usr/bin/python3 ' + shlex.quote(str(release / 'scripts/update-staging-release.py')) + ' --rollback ' + shlex.quote(str(backup))
@@ -522,6 +531,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             check_auxiliary(control_port, release)
         info = m.CADDY.stat()
         m.atomic_replace(m.CADDY, candidate.read_bytes(), stat.S_IMODE(info.st_mode), info.st_uid, info.st_gid)
+        gate.install(release, m.private_write, m.run, m.atomic_replace)
         m.run(['systemctl', 'reload', 'caddy'])
         wait_release_health(release, keep_ai_paused)
         if payment_webhook:

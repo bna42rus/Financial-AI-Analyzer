@@ -71,7 +71,7 @@ async function newInvitation(db:PoolClient,grantId:string,address:string,lifetim
  return expires;
 }
 export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:string,seal:Sealer,preview:boolean){
- const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota','purchasedUnits','expectedPurchased']);
+ const b=fields(request,['actionId','mode','reason','email','userId','term','accessType','quota','inviteHours','expectedRevision','expectedMode','expectedQuota','purchasedUnits','expectedPurchased','tailUnits']);
  const id=actionId(b.actionId),reason=optionalNote(b.reason),mode=string(b.mode,20);
  if(!['invite','extend','set_end','indefinite','end_now','quota'].includes(mode))throw new HttpError(400,'INVALID_INPUT');
  if(!preview&&(!Number.isInteger(b.expectedRevision)||typeof b.expectedMode!=='string'||!b.expectedQuota))throw new HttpError(400,'INVALID_INPUT');
@@ -110,9 +110,9 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   }
  }
  if(mode==='quota'&&b.quota&&q.source==='override'&&next&&!next.indefinite&&(!next.accessEnd||Date.parse(next.accessEnd)<=Date.parse(now)))throw new HttpError(409,'ALLOWANCE_ACCESS_EXPIRED');
- const paidUntil=mode==='quota'&&account&&q.source==='tariff'?(await db.query("SELECT commerce.control_paid_allowance_end($1) AS finish",[userId])).rows[0]?.finish:null;
- const result:ManualPreview={...(paidUntil?{effectiveAt:paidUntil.toISOString()}:{}),mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
- if(preview)return {...result,expectedPurchased:(await db.query('SELECT purchased FROM commerce.control_customer_allowances(ARRAY[$1]::text[])',[userId])).rows[0]?.purchased??0};
+ const tailUnits=b.tailUnits===undefined?(b.quota&&mode!=='quota'?q.limit:0):limit(b.tailUnits);
+ const result:ManualPreview={mode,previousMode,previous:before,next,quota:q,email:address??account.email,blocked:account?.status==='suspended',expectedRevision:before?.revision??-1,...(t?{term:t}:{}),...(lifetime?{inviteHours:lifetime}:{})};
+ if(preview){const current=(await db.query('SELECT * FROM commerce.control_customer_allowances(ARRAY[$1]::text[])',[userId])).rows[0];return {...result,tailUnits,includedUnits:b.quota?q.limit:current?.units??q.limit,remainingUnits:b.quota?Math.max(0,q.limit-(current?.used??0)):current?.remaining??q.limit,allowanceEnd:current?.reset_at?.toISOString()??null,expectedPurchased:current?.purchased??0};}
  if(address){
   // Only an actually ended fixed grant can release this reservation. Link expiry alone never does.
   const expired=await db.query("UPDATE commerce.manual_grant SET state='expired' WHERE email=$1 AND state='pending' AND term->>'kind'='fixed' AND (term->>'end')::timestamptz<=$2::timestamptz RETURNING id",[address,now]);
@@ -122,23 +122,15 @@ export async function manualAccess(db:PoolClient,request:FastifyRequest,actorId:
   await newInvitation(db,grantId,address,lifetime!,seal,now);
  }else if(next){
   if(mode==='end_now'||previousMode==='restored')await db.query('SELECT commerce.stop_customer_allowance($1,$2)',[userId,now]);
-  const extraMs=Date.parse(next.accessEnd??'')-Date.parse(before?.accessEnd??'');
-  const extendingAllowance=!b.quota&&previousMode==='continuous'&&(mode==='extend'||mode==='set_end')&&extraMs>0;
-  if(extendingAllowance){
-   const saved=(await db.query('SELECT commerce.extend_customer_allowance($1,$2,$3) AS saved',[userId,now,next.accessEnd])).rows[0]?.saved;
-   if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
-  }
   await db.query(`INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,revision,calendar_months,extra_days,indefinite,end_offset_ms,quota_policy)
    VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(user_id) DO UPDATE SET anchor_at=EXCLUDED.anchor_at,access_end=EXCLUDED.access_end,revision=EXCLUDED.revision,calendar_months=EXCLUDED.calendar_months,extra_days=EXCLUDED.extra_days,indefinite=EXCLUDED.indefinite,end_offset_ms=EXCLUDED.end_offset_ms,quota_policy=EXCLUDED.quota_policy`,
    [userId,next.anchorAt,next.accessEnd,next.timezone,next.revision,next.calendarMonths,next.extraDays,next.indefinite??false,next.endOffsetMs??0,q]);
-  if(b.quota&&q.source==='override'&&next.accessEnd&&Date.parse(next.accessEnd)>Date.parse(now)){
-   const saved=(await db.query('SELECT commerce.set_customer_allowance($1,$2,$3,$4) AS saved',[userId,now,next.accessEnd,q.limit])).rows[0]?.saved;
-   if(!saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
-  }else if(mode!=='quota'&&!extendingAllowance){
-   await db.query('SELECT commerce.move_customer_allowance_end($1,$2,$3)',[userId,now,b.quota?null:next.accessEnd]);
+  const periodChanged=before?.accessEnd!==next.accessEnd||!!before?.indefinite!==!!next.indefinite;
+  if(periodChanged&&!(await db.query('SELECT commerce.edit_access_periods($1,$2,$3,$4,$5,$6) AS ok',[userId,now,before?.accessEnd??now,next.accessEnd,tailUnits,b.quota&&q.source==='tariff'?(q.periodDays??0):null])).rows[0]?.ok)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
+  if(b.quota&&(!periodChanged||mode==='quota')){
+   const end=next.accessEnd??(await db.query("SELECT clock_timestamp()+interval '1 month' AS finish")).rows[0].finish.toISOString();
+   if(Date.parse(end)>Date.parse(now)&&!(await db.query('SELECT commerce.set_customer_allowance($1,$2,$3,$4) AS saved',[userId,now,end,q.limit])).rows[0]?.saved)throw new HttpError(409,'ALLOWANCE_COST_PENDING');
   }
-  if(b.quota&&q.source==='override'&&next.indefinite)await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units) VALUES($1,$2,$3)',[userId,now,q.limit]);
-  if(b.quota&&q.source==='tariff'&&!same(q,before?.quotaPolicy))await db.query('INSERT INTO commerce.manual_allowance(user_id,starts_at,units,period_days) VALUES($1,$2,$3,$4)',[userId,now,q.limit,q.periodDays??null]);
   await outbox(db,'access',seal,mode==='quota'?'manual_quota_changed':'manual_access_changed',{email:account.email,accessEnd:next.accessEnd,indefinite:next.indefinite??false,...(b.quota&&q.source==='tariff'?{analyzerUnits:q.limit,periodDays:q.periodDays}:{}),...(b.quota&&q.source==='override'?{analyzerUnits:q.limit}:{})},{subjectId:userId,dedupeKey:'manual-access:'+id});
  }
  if(b.purchasedUnits!==undefined){

@@ -18,6 +18,7 @@ from unittest.mock import patch
 spec = importlib.util.spec_from_file_location('update', Path(__file__).with_name('update-staging-release.py'))
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
+gate = m.load_staging_gate()
 
 
 class UpdateTests(unittest.TestCase):
@@ -191,7 +192,7 @@ class UpdateTests(unittest.TestCase):
                 cfg.write_text(json.dumps(old));cfg.chmod(0o600)
                 old_dropin=('[Service]\nWorkingDirectory='+str(current/'apps/api')+'\nExecStart=\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=0 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\nEnvironment=CLASSIFICATION_ENABLED=0\n').encode();dropin.write_bytes(old_dropin)
                 if mode=='preserved':old_dropin=m.activate_ai(old_dropin);dropin.write_bytes(old_dropin)
-                old_root=str(current/'web');caddy.write_text(old_root);worker.write_text('old worker');worker_env.write_text('old scoped env')
+                old_root=str(current/'web');old_caddy=old_root+'\ntest.cashneuro.ru {\n basic_auth {\n owner synthetic_hash\n }\n}\n';caddy.write_text(old_caddy);worker.write_text('old worker');worker_env.write_text('old scoped env')
                 calls=[];sql_calls=[]
                 def run(args,**kw):
                     args=list(map(str,args));calls.append(args)
@@ -216,7 +217,7 @@ class UpdateTests(unittest.TestCase):
                     sql_calls.append(query)
                     if query == 'BEGIN;\n' + allowance + '\nCOMMIT;':
                         self.assertTrue(any('pg_dump' in args for args in calls))
-                        self.assertEqual(caddy.read_text(),old_root)
+                        self.assertEqual(caddy.read_text(),old_caddy)
                         return ''
                     self.assertTrue(query.startswith('SELECT'))
                     return 't'
@@ -228,7 +229,7 @@ class UpdateTests(unittest.TestCase):
                 for target,key,value in [(m.m,'BASE',base),(m.m,'CONFIG',cfg),(m.m,'DROPIN',dropin),(m.m,'CADDY',caddy),(m,'WORKER_UNIT',worker),(m,'WORKER_ENV',worker_env)]:stack.enter_context(patch.object(target,key,value))
                 config={'API_BASE_URL':origin,'DATABASE_URL':'synthetic scoped database'}
                 if mode=='preserved':config['YOOKASSA_ACCESS_TEST_ENABLED']='1'
-                stack.enter_context(patch.object(m,'settings',return_value=config));stack.enter_context(patch.object(m.m,'run',side_effect=run));stack.enter_context(patch.object(m.m,'docker_database',return_value=('synthetic','owner',sql)));stack.enter_context(patch.object(m.m,'frontend_root',side_effect=lambda v:v['root']));stack.enter_context(patch.object(m,'create_backup_directory',side_effect=lambda parent,sha:original_create(root/'backups',sha)));stack.enter_context(patch.object(m,'prepare_admission',side_effect=admit));stack.enter_context(patch.object(m.time,'sleep'))
+                stack.enter_context(patch.object(m,'load_staging_gate',return_value=gate));stack.enter_context(patch.object(gate,'install'));stack.enter_context(patch.object(m,'settings',return_value=config));stack.enter_context(patch.object(m.m,'run',side_effect=run));stack.enter_context(patch.object(m.m,'docker_database',return_value=('synthetic','owner',sql)));stack.enter_context(patch.object(m.m,'frontend_root',side_effect=lambda v:v['root']));stack.enter_context(patch.object(m,'create_backup_directory',side_effect=lambda parent,sha:original_create(root/'backups',sha)));stack.enter_context(patch.object(m,'prepare_admission',side_effect=admit));stack.enter_context(patch.object(m.time,'sleep'))
                 def health_response(*a,**kw):
                     value={'status':'ok','profile':'finance'}
                     if b'ASSISTANT_ENABLED=1' in dropin.read_bytes():value['assistant']='cashneuro-assistant-workflow/7'
@@ -238,8 +239,8 @@ class UpdateTests(unittest.TestCase):
                 with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode in ('blocked','renewed') else None,tested_sha='b'*64 if mode in ('blocked','renewed') else None,keep_ai_paused=mode=='paused',resume_ai=mode in ('blocked','renewed'),preserve_active_ai=mode=='preserved')
                 result=json.loads(output.getvalue().splitlines()[-1]);self.assertEqual(result['status'],'UPDATED');self.assertEqual(result['paidCalls'],0)
                 self.assertEqual(sql_calls.count('BEGIN;\n' + allowance + '\nCOMMIT;'),1)
-                expected_caddy,webhook=m.configure_payment_webhook(str(release/'apps/web/dist').encode(),config)
-                self.assertEqual(caddy.read_bytes(),expected_caddy)
+                expected_caddy,webhook=m.configure_payment_webhook(old_caddy.replace(old_root,str(release/'apps/web/dist')).encode(),config)
+                self.assertEqual(caddy.read_bytes(),gate.configure(expected_caddy))
                 self.assertEqual(sum(args[0]=='curl' for args in calls),int(webhook))
                 self.assertIn(str(release/'apps/api'),dropin.read_text());self.assertTrue((release/'apps/api').is_dir())
                 settings=json.loads(cfg.read_text());self.assertEqual(settings['sourceSha256'],'b'*64)

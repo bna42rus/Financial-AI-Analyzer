@@ -835,7 +835,7 @@ test('verified erasure request can be withdrawn and approval atomically erases t
  await assert.rejects(pg.control.query('SELECT * FROM identity.erasure_evidence'),{code:'42501'});
 });
 
-test('admin records manual extensions and a weekly Analyzer allowance for an indefinite account',async()=>{
+test('indefinite access preserves its current weekly allowance without silently extending that quota',async()=>{
  await seedUser('identity','weekly');
  const weekly={...tariff,id:'cashneuro-1w',name:'1 неделя',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500};
  await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
@@ -853,10 +853,10 @@ test('admin records manual extensions and a weekly Analyzer allowance for an ind
  const state=await user.post('/finance/analyzer-state',{});
  assert.equal(state.statusCode,200,state.body);
  assert.equal(state.json().customerBudget.limit,2500);
- const time=(await pg.owner.query("SELECT starts_at FROM commerce.manual_allowance WHERE user_id='weekly'")).rows[0].starts_at.getTime();
+ const time=(await pg.owner.query("SELECT starts_at FROM commerce.access_paid_window WHERE user_id='weekly' ORDER BY starts_at LIMIT 1")).rows[0].starts_at.getTime();
  assert.equal(new Date(state.json().customerBudget.resetAt).getTime()-time,7*86400000);
  const slot=(await pg.owner.query("SELECT * FROM commerce.analyzer_allowance_window('weekly',$1)",[new Date(time+8*86400000)])).rows[0];
- assert.equal(slot.quota,2500);
+ assert.equal(slot.quota,0);
  assert.equal(slot.starts_at.getTime()-time,7*86400000);
 });
 
@@ -890,7 +890,7 @@ test('admin workspace keeps display preference, account suspension, and expiry i
  const extend=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:5},reason:'Extend without a second allowance'});
  assert.equal((await admin.post('/control/manual-access',extend)).statusCode,200);
  const extended=(await a.b.get('/session')).json().accessEnd;
- assert.equal((await a.b.post('/finance/analyzer-state',{})).json().customerBudget.resetAt,extended);
+ assert.equal((await a.b.post('/finance/analyzer-state',{})).json().customerBudget.resetAt,before);
  assert.ok(Date.parse(extended)>Date.parse(before));
 
 });
@@ -906,7 +906,7 @@ test('a short manual access extension keeps the current monthly allowance throug
  const end=(await a.b.get('/session')).json().accessEnd;
  const after=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;
  assert.ok(Date.parse(end)>Date.parse(before.resetAt));
- assert.equal(after.resetAt,end);
+ assert.equal(after.resetAt,before.resetAt);
  assert.equal(after.remaining,before.remaining);
 });
 
@@ -1041,10 +1041,10 @@ test('signup wrong-code attempts are committed and cannot be bypassed by transac
  const a=await newSignup('signup-attempts@example.test'),bad=a.code==='000000'?'111111':'000000';for(let i=0;i<5;i++)assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code:bad})).statusCode,400);
  assert.equal((await a.b.post('/access/signup-complete',{id:a.id,code:a.code})).statusCode,400);assert.equal((await pg.owner.query('SELECT 1 FROM identity.auth_user')).rowCount,0);
 });
-test('trial grants 2500 once, refunds 10 without revocation, toggles renewal, and defers a paid tariff until trial end',async()=>{
+test('trial grants 2500 once, refunds 1 without revocation, toggles renewal, and defers a paid tariff until trial end',async()=>{
  const {legalDocuments}=await import('../../../packages/access/src/legal.ts');const weekly={...tariff,id:'trial-week',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500,catalogVersion:0};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
  let calls=0,refunds=0;const payments=new Map<string,any>();
- fc.accessPayments={test:true,read:async id=>payments.get(id),create:async input=>{calls++;const id=crypto.randomUUID(),p={id,test:true,paid:true,status:'succeeded',amount:{value:input.value,currency:'RUB'},metadata:{orderId:input.id},payment_method:{id:'synthetic-saved-'+id,saved:true,card:{first6:'123456',last4:'1234',expiry_month:'12',expiry_year:'2030'}}};if(input.value==='10.00')assert.equal(input.save,true);payments.set(id,p);return p;},createRefund:async input=>{refunds++;assert.equal(input.value,'10.00');return {id:input.id,payment_id:input.paymentId,created_at:new Date().toISOString(),status:'succeeded',amount:{value:'10.00',currency:'RUB'}};}};
+ fc.accessPayments={test:true,read:async id=>payments.get(id),create:async input=>{calls++;const id=crypto.randomUUID(),p={id,test:true,paid:true,status:'succeeded',amount:{value:input.value,currency:'RUB'},metadata:{orderId:input.id},payment_method:{id:'synthetic-saved-'+id,saved:true,card:{first6:'123456',last4:'1234',expiry_month:'12',expiry_year:'2030'}}};if(input.value==='1.00')assert.equal(input.save,true);payments.set(id,p);return p;},createRefund:async input=>{refunds++;assert.equal(input.value,'1.00');return {id:input.id,payment_id:input.paymentId,created_at:new Date().toISOString(),status:'succeeded',amount:{value:'1.00',currency:'RUB'}};}};
  const address='new-trial@example.test',a=await newSignup(address);await finishSignup(a,address);
  const input={id:crypto.randomUUID(),device:crypto.randomUUID(),cardConsent:true,tariffId:weekly.id,catalogVersion:0,priceMinor:'11900',offerVersion:legalDocuments.offer.version};let r=await a.b.post('/access/trial-create',input);assert.equal(r.statusCode,200,r.body);
  r=await a.b.post('/access/billing-sync',{id:input.id});assert.equal(r.statusCode,200,r.body);assert.equal(r.json().state,'paid');await a.b.post('/access/billing-sync',{id:input.id});assert.equal(calls,1);assert.equal(refunds,1);assert.equal((await a.b.get('/session')).json().scope,'active');
@@ -1053,7 +1053,7 @@ test('trial grants 2500 once, refunds 10 without revocation, toggles renewal, an
  let units=(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,clock_timestamp())',[user])).rows[0];assert.equal(units.quota,2500);assert.equal(Number(units.base_remaining),25000000000);
  assert.equal((await a.b.get('/access/billing')).json().renewal.state,'off');const consent={offerVersion:legalDocuments.offer.version,renewalVersion:legalDocuments.renewal.version};assert.equal((await a.b.post('/access/billing-enable',consent)).statusCode,200);await a.b.post('/access/billing-disable',{});assert.equal((await a.b.post('/access/billing-enable',consent)).statusCode,200);
  assert.equal((await a.b.post('/access/trial-create',{...input,id:crypto.randomUUID()})).statusCode,409);
- const p=[...payments.values()][0];await pg.finance.query("SELECT * FROM commerce.record_checkout_refund($1,$2,1000,'succeeded',clock_timestamp())",[crypto.randomUUID(),p.id]);assert.equal((await a.b.get('/session')).json().scope,'active');
+ const p=[...payments.values()][0];await pg.finance.query("SELECT * FROM commerce.record_checkout_refund($1,$2,100,'succeeded',clock_timestamp())",[crypto.randomUUID(),p.id]);assert.equal((await a.b.get('/session')).json().scope,'active');
  const trialEnd=(await a.b.get('/session')).json().accessEnd,q=(await a.b.post('/access/billing-quote',{tariffId:tariff.id})).json();assert.equal(q.startsAt,trialEnd);
  r=await a.b.post('/access/billing-create',{id:crypto.randomUUID(),tariffId:q.tariff.id,priceMinor:q.tariff.priceMinor,catalogVersion:q.tariff.catalogVersion,cycleRevision:q.cycleRevision,offerVersion:q.offerVersion});assert.equal(r.statusCode,200,r.body);r=await a.b.post('/access/billing-sync',{id:r.json().id});assert.equal(r.json().state,'paid');
  units=(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,clock_timestamp())',[user])).rows[0];assert.equal(units.quota,2500);assert.equal(Number(units.base_remaining),25000000000);
@@ -1065,9 +1065,9 @@ test('ending and restoring access never regenerates included units; purchased cr
  command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'end_now',userId:a.userId,reason:'End access'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);let u=await get();assert.equal(u.analyzer.units,0);assert.equal(u.analyzer.remaining,0);assert.equal(u.analyzer.purchased,246);
  command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:7},reason:'Restore without fresh allowance'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);u=await get();assert.equal(u.analyzer.units,0);assert.equal(u.analyzer.purchased,246);
  command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,quota:{source:'override',limit:6500},reason:'Assign manually'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);
- command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:40},reason:'Long compensation'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);u=await get();assert.equal(u.analyzer.remaining,6500);assert.equal(u.analyzer.purchased,246);assert.equal(u.analyzer.resetAt,u.cycle.accessEnd);
+ command=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'extend',userId:a.userId,term:{kind:'days',count:40},reason:'Long compensation'});assert.equal((await admin.post('/control/manual-access',command)).statusCode,200);u=await get();assert.equal(u.analyzer.remaining,6500);assert.equal(u.analyzer.purchased,246);assert.equal(u.analyzer.resetAt,(await pg.owner.query('SELECT ends_at FROM commerce.customer_allowance_override WHERE user_id=$1 ORDER BY starts_at DESC LIMIT 1',[a.userId])).rows[0].ends_at.toISOString());
 });
-test('trial webhook is idempotent, refund retries are durable, and a second account using the same card is denied and refunded',async()=>{
+test('trial webhook is idempotent, refund retries are durable, and a second account may use the same card for its own single trial',async()=>{
  const {legalDocuments}=await import('../../../packages/access/src/legal.ts'),{runTrialRefunds}=await import('../src/trial.ts');const weekly={...tariff,id:'trial-week-retry',duration:{kind:'days',count:7},priceMinor:'11900',aiQuota:2500,catalogVersion:0};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[weekly.id,weekly]);
  let refundCalls=0;const payments=new Map<string,any>(),refundByPayment=new Map<string,any>();
  fc.accessPayments={test:true,read:async id=>payments.get(id),create:async input=>{const id=crypto.randomUUID(),p={id,test:true,paid:false,status:'pending',amount:{value:input.value,currency:'RUB'},metadata:{orderId:input.id},confirmation:{confirmation_url:'https://yookassa.ru/checkout/synthetic'},payment_method:{id:'saved-'+id,saved:true,card:{first6:'654321',last4:'9876',expiry_month:'11',expiry_year:'2032'}}};payments.set(id,p);return p;},createRefund:async input=>{refundCalls++;if(refundCalls===1)throw Error('synthetic provider timeout');const r={id:input.id,payment_id:input.paymentId,created_at:new Date().toISOString(),status:'pending',amount:{currency:'RUB',value:input.value}};refundByPayment.set(input.paymentId,r);return r;},readRefund:async id=>({...([...refundByPayment.values()].find(r=>r.id===id)),status:'succeeded'})};
@@ -1078,7 +1078,7 @@ test('trial webhook is idempotent, refund retries are durable, and a second acco
  await pg.owner.query("DELETE FROM identity.auth_user WHERE email='trial-refund-retry@example.test'"); // A pending financial refund survives erasure.
 
  await pg.owner.query("UPDATE commerce.card_refund_job SET refund_attempt_at=clock_timestamp()-interval '6 minutes'");await runTrialRefunds(pg.finance,fc.accessPayments);assert.equal(refundCalls,2);await pg.owner.query("UPDATE commerce.card_refund_job SET refund_attempt_at=clock_timestamp()-interval '6 minutes'");await runTrialRefunds(pg.finance,fc.accessPayments);assert.equal(refundCalls,2);assert.equal((await pg.owner.query('SELECT refund_state FROM commerce.card_refund_job')).rows[0].refund_state,'succeeded');
- const second=await newSignup('trial-duplicate-card@example.test');await finishSignup(second,'trial-duplicate-card@example.test');const id=crypto.randomUUID();assert.equal((await second.b.post('/access/trial-create',{...input,id,device:crypto.randomUUID()})).statusCode,200);await second.b.post('/access/billing-sync',{id});const duplicate=[...payments.values()][1];duplicate.paid=true;duplicate.status='succeeded';assert.equal((await second.b.post('/access/billing-sync',{id})).json().state,'paid');assert.equal((await second.b.get('/session')).json().scope,'restricted');assert.equal((await second.b.get('/access/billing')).json().trialResult,'denied');assert.equal((await pg.owner.query('SELECT 1 FROM commerce.trial_claim')).rowCount,1);assert.equal(refundCalls,3);
+ const second=await newSignup('trial-duplicate-card@example.test');await finishSignup(second,'trial-duplicate-card@example.test');const id=crypto.randomUUID();assert.equal((await second.b.post('/access/trial-create',{...input,id,device:crypto.randomUUID()})).statusCode,200);await second.b.post('/access/billing-sync',{id});const duplicate=[...payments.values()][1];duplicate.paid=true;duplicate.status='succeeded';assert.equal((await second.b.post('/access/billing-sync',{id})).json().state,'paid');assert.equal((await second.b.get('/session')).json().scope,'active');assert.equal((await second.b.get('/access/billing')).json().trialResult,'granted');assert.equal((await pg.owner.query('SELECT 1 FROM commerce.account_trial_activation')).rowCount,1);assert.equal(refundCalls,3);
  }finally{await receiver.close();fc.accessPayments=undefined;}
 });
 test('an expired invitation still reserves already-issued access for its owner during signup migration',async()=>{
@@ -1110,7 +1110,7 @@ test('tariff and trial checkout are independent; first paid tariff loads Analyze
  paid.p.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:paid.id})).json().state,'paid');
  const session=(await a.b.get('/session')).json();assert.equal(session.scope,'active');assert.equal(session.trialAvailable,false);
  const analyzer=await a.b.post('/finance/analyzer-state',{});assert.equal(analyzer.statusCode,200,analyzer.body);assert.equal(analyzer.json().customerBudget.remaining,10000);assert.ok(analyzer.json().quota.remaining>0);
- const tp=[...f.payments.values()].find(p=>p.amount.value==='10.00');tp.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:trial.id})).json().state,'paid');
+ const tp=[...f.payments.values()].find(p=>p.amount.value==='1.00');tp.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:trial.id})).json().state,'paid');
  assert.equal((await a.b.get('/session')).json().accessEnd,session.accessEnd);assert.equal((await a.b.get('/access/billing')).json().trialResult,'denied');assert.equal(f.counts().refunds,1);
  const admin=await enrolledAdmin(),users=(await admin.b.get('/control/accesses')).json().users;assert.equal(users[0].trialState,'used');assert.equal(users[0].renewal.state,'active');
  const orders=await admin.b.get('/control/access-checkouts');assert.equal(orders.statusCode,200,orders.body);assert.ok(orders.json().orders.some((o:any)=>o.purpose==='trial'&&o.refunds.length===1));assert.equal((await admin.b.get('/control/workspace-requests')).json().requests.length,0);
@@ -1135,7 +1135,7 @@ test('suspending and blocking preserve included and purchased balances while fin
 test('multiple owned cards are reusable for purchases and topups; renewal selection and deletion are explicit',async()=>{
  const f=await followupProvider(),a=await newSignup('cards@example.test');await finishSignup(a,'cards@example.test');const requests:any[]=[],create=fc.accessPayments!.create;
  fc.accessPayments!.create=async input=>{requests.push(input);const p=await create(input);if(input.method)p.payment_method={id:input.method,saved:true,card:{last4:'4321',card_type:'Mir'}};return p;};
- async function bind(){const x=f.trialInput(),r=await a.b.post('/access/card-create',x);assert.equal(r.statusCode,200,r.body);await a.b.post('/access/billing-sync',{id:x.id});[...f.payments.values()].at(-1).status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:x.id})).json().state,'paid');}
+ let bindCount=0;async function bind(){const x=f.trialInput(),r=await a.b.post('/access/card-create',x);assert.equal(r.statusCode,200,r.body);await a.b.post('/access/billing-sync',{id:x.id});[...f.payments.values()].at(-1).payment_method.card.last4=++bindCount===1?'4321':'8765';[...f.payments.values()].at(-1).status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:x.id})).json().state,'paid');}
  await bind();await bind();const old=(await pg.owner.query('SELECT user_id,method_id FROM commerce.payment_card ORDER BY created_at LIMIT 1')).rows[0];await pg.owner.query('INSERT INTO commerce.payment_card(user_id,method_id,last4) VALUES($1,$2,$3)',[old.user_id,envelope(fc.wrappingKey).seal(envelope(fc.wrappingKey).open(old.method_id)),'4321']);
  let billing=(await a.b.get('/access/billing')).json();assert.equal(billing.cards.length,2);assert.equal(billing.renewal,null);assert.equal((await a.b.get('/session')).json().scope,'restricted');assert.equal(f.counts().refunds,2);assert.equal(billing.cards.some((c:any)=>'method_id' in c||'methodId' in c),false);
  const [one,two]=billing.cards,q=(await a.b.post('/access/billing-quote',{tariffId:tariff.id})).json(),id=crypto.randomUUID();let r=await a.b.post('/access/billing-create',{id,cardId:one.id,autoRenewal:true,tariffId:q.tariff.id,priceMinor:q.tariff.priceMinor,catalogVersion:q.tariff.catalogVersion,cycleRevision:q.cycleRevision,offerVersion:q.offerVersion,renewalVersion:q.renewalVersion});assert.equal(r.statusCode,200,r.body);await a.b.post('/access/billing-sync',{id});assert.ok(requests.at(-1).method);[...f.payments.values()].at(-1).status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id})).json().state,'paid');
@@ -1146,8 +1146,8 @@ test('multiple owned cards are reusable for purchases and topups; renewal select
  assert.equal((await a.b.post('/access/card-remove',{id:one.id})).statusCode,200);assert.equal((await a.b.get('/access/billing')).json().renewal.state,'active');assert.equal((await a.b.post('/access/card-remove',{id:two.id})).json().code,'CARD_USED_FOR_RENEWAL');assert.equal((await a.b.post('/access/card-remove',{id:two.id,disableRenewal:true})).statusCode,200);billing=(await a.b.get('/access/billing')).json();assert.equal(billing.cards.length,0);assert.equal(billing.renewal.state,'off');assert.equal((await a.b.get('/session')).json().scope,'active');fc.accessPayments=undefined;fc.testPayments=undefined;
 });
 test('a failed trial stays retryable while one-time grants remain protected',async()=>{
- const f=await followupProvider(),a=await newSignup('retry@example.test');await finishSignup(a,'retry@example.test');const x=f.trialInput();assert.equal((await a.b.post('/access/trial-create',x)).statusCode,200);await a.b.post('/access/billing-sync',{id:x.id});const p=[...f.payments.values()][0];delete p.payment_method.card.first6;p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:x.id});let state=(await a.b.get('/session')).json();assert.equal(state.scope,'restricted');assert.equal(state.trialResult,'denied');assert.equal(state.trialAvailable,true);assert.equal((await pg.owner.query('SELECT result_reason FROM commerce.trial_checkout')).rows[0].result_reason,'card_details_missing');assert.equal(f.counts().refunds,1);
- const id=crypto.randomUUID();assert.equal((await a.b.post('/access/trial-create',{...x,id})).statusCode,200);await a.b.post('/access/billing-sync',{id});[...f.payments.values()][1].status='waiting_for_capture';await a.b.post('/access/billing-sync',{id});state=(await a.b.get('/session')).json();assert.equal(state.scope,'active');assert.equal(state.trialAvailable,false);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.trial_claim')).rowCount,1);assert.equal(f.counts().refunds,2);fc.accessPayments=undefined;
+ const f=await followupProvider(),a=await newSignup('retry@example.test');await finishSignup(a,'retry@example.test');const x=f.trialInput();assert.equal((await a.b.post('/access/trial-create',x)).statusCode,200);await a.b.post('/access/billing-sync',{id:x.id});const p=[...f.payments.values()][0];p.payment_method.saved=false;p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:x.id});let state=(await a.b.get('/session')).json();assert.equal(state.scope,'restricted');assert.equal(state.trialResult,'denied');assert.equal(state.trialAvailable,true);assert.equal((await pg.owner.query('SELECT result_reason FROM commerce.trial_checkout')).rows[0].result_reason,'card_not_saved');assert.equal(f.counts().refunds,1);
+ const id=crypto.randomUUID();assert.equal((await a.b.post('/access/trial-create',{...x,id})).statusCode,200);await a.b.post('/access/billing-sync',{id});[...f.payments.values()][1].status='waiting_for_capture';await a.b.post('/access/billing-sync',{id});state=(await a.b.get('/session')).json();assert.equal(state.scope,'active');assert.equal(state.trialAvailable,false);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.account_trial_activation')).rowCount,1);assert.equal(f.counts().refunds,2);fc.accessPayments=undefined;
 });
 test('admin notes are optional and the Analyzer denominator retains spent included units',async()=>{
  const a=await manualRegistered(),admin=a.admin.b,cmd=await manualCommand(admin,{actionId:crypto.randomUUID(),mode:'quota',userId:a.userId,quota:{source:'override',limit:1000},purchasedUnits:233,reason:''});let r=await admin.post('/control/manual-access',cmd);assert.equal(r.statusCode,200,r.body);await pg.owner.query('UPDATE commerce.customer_allowance_override SET base_before=300000000 WHERE user_id=$1',[a.userId]);const balance=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;assert.equal(balance.remaining,970);assert.equal(balance.extra,233);assert.equal(balance.totalLimit,1233);
@@ -1160,4 +1160,103 @@ test('new paid and trial customers load Analyzer with active AI outside the old 
  if(kind==='paid'){const order=await f.access(a.b);order.p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:order.id});}else{const x=f.trialInput();assert.equal((await a.b.post('/access/trial-create',x)).statusCode,200);await a.b.post('/access/billing-sync',{id:x.id});[...f.payments.values()].at(-1).status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:x.id});}
  const state=await b.post('/finance/analyzer-state',{});assert.equal(state.statusCode,200,state.body);assert.equal(state.json().providerAvailable,true);assert.equal(state.json().customerBudget.remaining,kind==='paid'?10000:2500);assert.ok(state.json().assistantProtocol);let r=await b.post('/finance/assistant-profile',{timezone:'Europe/Moscow',initialize:true});assert.equal(r.statusCode,200,r.body);r=await b.post('/finance/analyzer-chat',{id:crypto.randomUUID(),create:true});assert.equal(r.statusCode,200,r.body);const generation=(await b.get('/finance/epoch')).json().generation;r=await b.post('/finance/analyzer-context',{generation});assert.equal(r.statusCode,200,r.body);const uid=(await pg.owner.query('SELECT id FROM identity.auth_user WHERE email=$1',[email])).rows[0].id;await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id=$1",[uid]);assert.equal((await b.post('/finance/analyzer-state',{})).statusCode,403);
  }assert.equal(calls,0);}finally{await connected.close();fc.accessPayments=undefined;}
+});
+
+test('ordered week/month/week purchases retain individual boundaries and a manual override ends at the first reset',async()=>{
+ const f=await followupProvider(),a=await newSignup('ordered-periods@example.test');await finishSignup(a,'ordered-periods@example.test');
+ try{
+  const first=await f.access(a.b,true,'followup-week');first.p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:first.id});
+  const user=(await pg.owner.query("SELECT id FROM identity.auth_user WHERE email='ordered-periods@example.test'")).rows[0].id,firstEnd=(await a.b.get('/session')).json().accessEnd,admin=await enrolledAdmin();
+  const cmd=await manualCommand(admin.b,{actionId:crypto.randomUUID(),mode:'quota',userId:user,quota:{source:'override',limit:1000},purchasedUnits:233});assert.equal((await admin.b.post('/control/manual-access',cmd)).statusCode,200);
+  await pg.owner.query('UPDATE commerce.customer_allowance_override SET base_before=7000000000 WHERE user_id=$1',[user]);
+  for(const id of [tariff.id,'followup-week']){const order=await f.access(a.b,false,id);order.p.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:order.id})).json().state,'paid');}
+  const windows=(await pg.owner.query('SELECT * FROM commerce.access_paid_window WHERE user_id=$1 ORDER BY starts_at',[user])).rows;
+  assert.equal(windows.length,3);assert.equal(windows[1].starts_at.toISOString(),firstEnd);assert.equal(windows[2].starts_at.toISOString(),windows[1].ends_at.toISOString());
+  const expected=(await pg.owner.query("SELECT $1::timestamptz+interval '1 month' AS finish",[firstEnd])).rows[0].finish;assert.equal(windows[1].ends_at.toISOString(),expected.toISOString());
+  const usage=async(at:string)=>(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,$2)',[user,at])).rows[0];
+  assert.equal(Number((await usage(new Date().toISOString())).base_remaining),3000000000);assert.equal((await usage(firstEnd)).quota,10000);assert.equal((await usage(windows[2].starts_at.toISOString())).quota,2500);
+  const state=(await a.b.get('/access/billing')).json();assert.equal(state.renewal.state,'off');assert.equal(state.renewal.tariff.id,'followup-week');assert.equal(state.renewal.nextAt,windows[2].ends_at.toISOString());
+  const cut=new Date(Date.parse(firstEnd)+10*86400000).toISOString(),shorten=await manualCommand(admin.b,{actionId:crypto.randomUUID(),mode:'set_end',userId:user,term:{kind:'fixed',end:cut}});assert.equal((await admin.b.post('/control/manual-access',shorten)).statusCode,200);assert.equal((await usage(new Date(Date.parse(firstEnd)+86400000).toISOString())).quota,10000);assert.equal((await pg.owner.query('SELECT 1 FROM commerce.access_paid_window WHERE user_id=$1 AND starts_at>=$2',[user,cut])).rowCount,0);
+ }finally{fc.accessPayments=undefined;}
+});
+
+test('trial limits survive shortening, paid future periods are removed, extensions do not revive them, and every clock edit disables renewal',async()=>{
+ const f=await followupProvider(),a=await newSignup('trial-edits@example.test');await finishSignup(a,'trial-edits@example.test');
+ try{
+  const x=f.trialInput();await a.b.post('/access/trial-create',x);await a.b.post('/access/billing-sync',{id:x.id});[...f.payments.values()][0].status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:x.id});
+  const user=(await pg.owner.query("SELECT id FROM identity.auth_user WHERE email='trial-edits@example.test'")).rows[0].id,trialEnd=(await a.b.get('/session')).json().accessEnd;
+  const paid=await f.access(a.b,true,'followup-week');paid.p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:paid.id});const admin=await enrolledAdmin();
+  let cmd=await manualCommand(admin.b,{actionId:crypto.randomUUID(),mode:'quota',userId:user,quota:{source:'override',limit:1000},purchasedUnits:233});assert.equal((await admin.b.post('/control/manual-access',cmd)).statusCode,200);
+  await pg.owner.query('UPDATE commerce.customer_allowance_override SET base_before=7000000000 WHERE user_id=$1',[user]);
+  assert.equal((await a.b.get('/access/billing')).json().renewal.state,'active');
+  assert.equal((await admin.b.post('/control/user-status',{actionId:crypto.randomUUID(),userId:user,status:'suspended',endSessions:false})).statusCode,200);assert.equal((await a.b.get('/access/billing')).json().renewal.state,'active');
+  await admin.b.post('/control/user-status',{actionId:crypto.randomUUID(),userId:user,status:'active',endSessions:false});
+  const cut=new Date(Date.now()+86400000).toISOString();cmd=await manualCommand(admin.b,{actionId:crypto.randomUUID(),mode:'set_end',userId:user,term:{kind:'fixed',end:cut}});assert.equal((await admin.b.post('/control/manual-access',cmd)).statusCode,200);
+  let budget=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;assert.equal(budget.remaining,300);assert.equal(budget.extra,233);assert.equal(budget.resetAt,cut);assert.equal((await a.b.get('/access/billing')).json().renewal.state,'off');
+  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.access_paid_window WHERE user_id=$1 AND starts_at>clock_timestamp()',[user])).rowCount,0);
+  cmd=await manualCommand(admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:user,term:{kind:'days',count:20},tailUnits:500});assert.equal((await admin.b.post('/control/manual-access',cmd)).statusCode,200);
+  budget=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;assert.equal(budget.remaining,300);assert.equal(budget.resetAt,cut);
+  const next=(await pg.owner.query("SELECT * FROM commerce.customer_allowance_usage($1,$2::timestamptz+interval '1 second')",[user,cut])).rows[0];assert.equal(next.quota,500);assert.equal(Number(next.base_remaining),5000000000);
+  assert.equal((await pg.owner.query('SELECT access_end FROM commerce.access_checkout WHERE id=$1',[x.id])).rows[0].access_end.toISOString(),cut);assert.ok(Date.parse(cut)<Date.parse(trialEnd));
+  const {legalDocuments}=await import('../../../packages/access/src/legal.ts');assert.equal((await a.b.post('/access/billing-enable',{offerVersion:legalDocuments.offer.version,renewalVersion:legalDocuments.renewal.version})).statusCode,200);
+  cmd=await manualCommand(admin.b,{actionId:crypto.randomUUID(),mode:'extend',userId:user,term:{kind:'days',count:1}});assert.equal((await admin.b.post('/control/manual-access',cmd)).statusCode,200);assert.equal((await a.b.get('/access/billing')).json().renewal.state,'off');
+ }finally{fc.accessPayments=undefined;}
+});
+
+test('same masked card with a new saved token is one card across binding and payment; distinct BINs remain separate',async()=>{
+ const f=await followupProvider(),a=await newSignup('card-fingerprints@example.test');await finishSignup(a,'card-fingerprints@example.test');
+ try{
+  for(let i=0;i<3;i++){const x=f.trialInput();assert.equal((await a.b.post('/access/card-create',x)).statusCode,200);await a.b.post('/access/billing-sync',{id:x.id});const p=[...f.payments.values()].at(-1);p.status='waiting_for_capture';if(i===2)p.payment_method.card.first6='551234';assert.equal((await a.b.post('/access/billing-sync',{id:x.id})).json().state,'paid');assert.equal((await a.b.get('/access/billing')).json().cards.length,i===2?2:1);}
+  assert.equal((await pg.owner.query('SELECT 1 FROM commerce.card_refund_job WHERE amount_minor=100')).rowCount,3);
+  const old=(await pg.owner.query('SELECT * FROM commerce.payment_card WHERE active ORDER BY created_at LIMIT 1')).rows[0],latest='legacy-new-'+crypto.randomUUID();await pg.owner.query('INSERT INTO commerce.payment_card(user_id,method_id,last4) VALUES($1,$2,$3)',[old.user_id,envelope(fc.wrappingKey).seal(latest),'4321']);
+  fc.accessPayments!.readMethod=async id=>({id,saved:true,card:{first6:'451234',last4:'4321',expiry_month:'12',expiry_year:'2032'}});assert.equal((await a.b.get('/access/billing')).json().cards.length,2);assert.equal(envelope(fc.wrappingKey).open((await pg.owner.query('SELECT method_id FROM commerce.payment_card WHERE id=$1',[old.id])).rows[0].method_id),latest);
+
+ }finally{fc.accessPayments=undefined;}
+});
+
+test('a 2000-unit package charges its exact snapshot once even with concurrent retries',async()=>{
+ const a=await manualRegistered();let creates=0;const payments=new Map<string,any>();fc.testPayments={read:async id=>payments.get(id),create:async x=>{creates++;assert.equal(x.units,2000);assert.equal(x.value,'69.00');const p={id:crypto.randomUUID(),test:true,paid:false,status:'pending',amount:{currency:'RUB',value:x.value},metadata:{orderId:x.id},confirmation:{confirmation_url:'https://yookassa.ru/checkout/test'}};payments.set(p.id,p);return p;}};
+ try{
+  const pack=(await a.b.post('/finance/ai-packages',{})).json().packages.find((p:any)=>p.units===2000),id=crypto.randomUUID(),input={id,packId:pack.id,units:2000,priceMinor:pack.priceMinor};
+  assert.equal((await a.b.post('/finance/ai-topup',{...input,priceMinor:1})).statusCode,400);
+  const starts=await Promise.all([a.b.post('/finance/ai-topup',input),a.b.clone().post('/finance/ai-topup',{...input,id:crypto.randomUUID()})]);assert.equal(starts[0].statusCode,200);assert.equal(starts[1].statusCode,200);assert.equal(starts[0].json().id,starts[1].json().id);
+  const actual=starts[0].json().id;await a.b.post('/finance/ai-topup',{id:actual});const p=[...payments.values()][0];p.paid=true;p.status='succeeded';
+  const settled=await Promise.all([a.b.post('/finance/ai-topup',{id:actual}),a.b.clone().post('/finance/ai-topup',{id:actual})]);assert.ok(settled.every(r=>r.statusCode===200&&r.json().status==='paid'));assert.equal(creates,1);
+  const budget=(await a.b.post('/finance/analyzer-state',{})).json().customerBudget;assert.equal(budget.extra,2000);assert.equal((await pg.owner.query("SELECT sum(units)::int AS units,sum(price_minor)::int AS amount FROM commerce.ai_topup_order WHERE status='paid'")).rows[0].units,2000);
+ }finally{fc.testPayments=undefined;}
+});
+
+test('calendar-month purchases preserve a clamped month anchor without an extra quota reset',async()=>{
+ const f=await followupProvider(),a=await manualRegistered();try{
+  const anchor=new Date(Date.UTC(new Date().getUTCFullYear()+1,0,31,10)),finish=new Date(Date.UTC(anchor.getUTCFullYear(),2,0,10));
+  await pg.owner.query('UPDATE commerce.access_cycle SET anchor_at=$2,access_end=$3,calendar_months=1,extra_days=0,end_offset_ms=0 WHERE user_id=$1',[a.userId,anchor,finish]);
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) VALUES($1,$2,$3,'calendar_months',10000,$2)",[a.userId,anchor,finish]);
+  const order=await f.access(a.b);order.p.status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:order.id})).json().state,'paid');
+  const end=new Date(Date.UTC(anchor.getUTCFullYear(),2,31,10));assert.equal((await a.b.get('/session')).json().accessEnd,end.toISOString());
+  const usage=(await pg.owner.query("SELECT * FROM commerce.customer_allowance_usage($1,$2::timestamptz-interval '1 day')",[a.userId,end])).rows[0];assert.equal(usage.quota,10000);assert.equal(usage.period_start.toISOString(),finish.toISOString());assert.equal(usage.period_end.toISOString(),end.toISOString());
+  const multi={...tariff,id:'calendar-two-months',aiQuota:10000,duration:{kind:'calendar_months',count:2}};await pg.owner.query('INSERT INTO access.tariff(id,snapshot) VALUES($1,$2)',[multi.id,multi]);const next=await f.access(a.b,false,multi.id);next.p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:next.id});const last=(await pg.owner.query('SELECT * FROM commerce.customer_allowance_usage($1,$2)',[a.userId,new Date(Date.UTC(anchor.getUTCFullYear(),3,30,10))])).rows[0];assert.equal(last.period_start.toISOString(),new Date(Date.UTC(anchor.getUTCFullYear(),3,30,10)).toISOString());assert.equal(last.period_end.toISOString(),new Date(Date.UTC(anchor.getUTCFullYear(),4,31,10)).toISOString());assert.equal(last.quota,10000);
+ }finally{fc.accessPayments=undefined;}
+});
+
+test('scheduled renewal still charges on its original boundary while access is suspended',async()=>{
+ const f=await followupProvider(),a=await newSignup('suspended-renewal@example.test');await finishSignup(a,'suspended-renewal@example.test');
+ try{
+  const paid=await f.access(a.b,true,'followup-week');paid.p.status='waiting_for_capture';await a.b.post('/access/billing-sync',{id:paid.id});
+  const user=(await pg.owner.query("SELECT id FROM identity.auth_user WHERE email='suspended-renewal@example.test'")).rows[0].id,admin=await enrolledAdmin(),due=new Date(Date.now()-60000).toISOString(),anchor=new Date(Date.parse(due)-7*86400000).toISOString(),notice=crypto.randomUUID();
+  await pg.owner.query('UPDATE commerce.access_cycle SET anchor_at=$2,access_end=$3,calendar_months=0,extra_days=7,end_offset_ms=0 WHERE user_id=$1',[user,anchor,due]);
+  await pg.owner.query('UPDATE commerce.access_paid_window SET starts_at=$2,ends_at=$3 WHERE user_id=$1',[user,anchor,due]);
+  await pg.owner.query("INSERT INTO identity.outbox(id,kind,sealed_payload,source_scope,subject_id,state,sent_at,created_at) VALUES($1,'billing_notice',$2,'finance',$3,'sent',clock_timestamp()-interval '4 days',clock_timestamp()-interval '4 days')",[notice,envelope(fc.wrappingKey).seal('{}'),user]);
+  await pg.owner.query("UPDATE commerce.autorenewal SET next_at=$2,notice_id=$3,accepted_at=clock_timestamp()-interval '5 days' WHERE user_id=$1",[user,due,notice]);
+  assert.equal((await admin.b.post('/control/user-status',{actionId:crypto.randomUUID(),userId:user,status:'suspended',endSessions:false})).statusCode,200);
+  const create=fc.accessPayments!.create;fc.accessPayments!.create=async input=>{assert.equal(input.authorize,false);assert.ok(input.method);const p=await create({...input,authorize:true});p.paid=true;p.status='succeeded';return p;};
+  const {runAutoRenewals}=await import('../src/access-checkout.ts');await runAutoRenewals(pg.finance,fc.accessPayments!,envelope(fc.wrappingKey));await runAutoRenewals(pg.finance,fc.accessPayments!,envelope(fc.wrappingKey));
+  const renewal=(await a.b.get('/access/billing')).json().renewal;assert.equal(renewal.state,'active');assert.equal(renewal.nextAt,new Date(Date.parse(due)+7*86400000).toISOString());assert.equal((await a.b.get('/session')).json().blocked,true);assert.equal((await a.b.post('/finance/analyzer-state',{})).statusCode,403);
+ }finally{fc.accessPayments=undefined;}
+});
+
+test('an unpaid legacy account can start its one trial after a manual access grant expires',async()=>{
+ const f=await followupProvider(),a=await manualRegistered();try{
+  const cmd=await manualCommand(a.admin.b,{actionId:crypto.randomUUID(),mode:'end_now',userId:a.userId});assert.equal((await a.admin.b.post('/control/manual-access',cmd)).statusCode,200);assert.equal((await a.b.get('/session')).json().trialAvailable,true);
+  const x=f.trialInput();assert.equal((await a.b.post('/access/trial-create',x)).statusCode,200);await a.b.post('/access/billing-sync',{id:x.id});[...f.payments.values()].at(-1).status='waiting_for_capture';assert.equal((await a.b.post('/access/billing-sync',{id:x.id})).json().state,'paid');assert.equal((await a.b.get('/session')).json().scope,'active');assert.equal((await a.b.post('/access/trial-create',f.trialInput())).statusCode,409);
+ }finally{fc.accessPayments=undefined;}
 });

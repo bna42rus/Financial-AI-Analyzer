@@ -1,3 +1,4 @@
+import {paymentFailure} from './AccessBilling';
 import {CardPicker} from './CardPicker';
 import type {PaymentCard} from './CardPicker';
 import {useEffect,useRef,useState} from 'react';
@@ -7,7 +8,7 @@ import {OperationDialog} from './OperationDialog';
 import common from './App.module.css';
 import styles from './Settings.module.css';
 
-type Order={id:string;units:number;status:string;redirect:string|null};
+type Order={reason?:string|null;id:string;units:number;status:string;redirect:string|null};
 type Catalog={cards?:PaymentCard[];enabled:boolean;packages:{id:string;units:number;priceMinor:number}[];pending:Order[]};
 const number=(n:number)=>n.toLocaleString('ru-RU');
 const waiting=(order:Order|null)=>order?.status==='created'||order?.status==='pending';
@@ -69,14 +70,14 @@ export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>
  return <OperationDialog compact title="Пополнить лимит Анализатора" onClose={()=>{if(!busy)onClose();}} footer={<>
   <button className={common.button} disabled={busy} onClick={onClose}>Закрыть</button>
   {waiting(order)?order?.redirect&&<a className={common.primaryButton} href={order.redirect}>Продолжить оплату</a>:
-   !!data?.packages.length&&<button className={common.primaryButton} disabled={busy||!data.enabled||!selected} onClick={()=>void start()}>{selected?'Перейти к оплате · '+moneyLabel(String(selected.priceMinor)):'Перейти к оплате'}</button>}
+   order?.status==='paid'?<button className={common.button} onClick={()=>{setOrder(null);setChosen(null);}}>Купить ещё</button>:!!data?.packages.length&&<button className={common.primaryButton} disabled={busy||!data.enabled||!selected} onClick={()=>void start()}>{selected?'Перейти к оплате · '+moneyLabel(String(selected.priceMinor)):'Перейти к оплате'}</button>}
  </>}>
   {error&&<p className={common.error} role="alert">{error}</p>}
   {!data&&!error&&<p role="status">Загружаем пакеты…</p>}
   {!data&&error&&<button className={common.button} onClick={()=>void load()}>Повторить</button>}
   {data&&!data.packages.length&&<p>Нет доступных пакетов.</p>}
   {order?.status==='paid'&&<p role="status">Добавлено {number(order.units)} единиц.</p>}
-  {order?.status==='cancelled'&&<p role="status">Платёж отменён. Можно выбрать пакет заново.</p>}
+  {order?.status==='cancelled'&&<p role="status">{paymentFailure(order.reason)}</p>}
   {waiting(order)&&<p role="status">Ждём подтверждения оплаты за {number(order!.units)} единиц.</p>}
   {!!data?.packages.length&&!waiting(order)&&<fieldset className={styles.topupPackages} disabled={busy}>
    <legend>Выберите пакет</legend>

@@ -6,7 +6,7 @@ import {LandingDemoPreview} from './LandingDemoPreview';
 import {SelectField} from './SelectField';
 import {useMailCooldown,mailAddressKey} from './use-mail-cooldown';
 import type {MailSend} from './use-mail-cooldown';
-import {useCallback,useEffect,useState} from 'react';
+import {useCallback,useEffect,useRef,useState} from 'react';
 import {ArrowRight,CalendarDays,CheckCircle2,CreditCard,LockKeyhole,Mail,ShieldCheck,X} from 'lucide-react';
 import {OperationDialog,OperationField} from './OperationDialog';
 import {LegalFooter,LegalUpdate,usePublicTariffs} from './LegalPages';
@@ -36,12 +36,14 @@ function AccessCard({icon:Icon,title,children}:{icon:typeof Mail;title:string;ch
 
 export function ServerAccess(){
  const newPassword=useNewPasswordFields();
+ const [trialFailure,setTrialFailure]=useState(false),trialFailureSeen=useRef(false),initialLoad=useRef(true),fromPayment=useRef(getRoute()==='payment-return');
  const [trialOpen,setTrialOpen]=useState(false),[route,setRoute]=useState(getRoute),[link,setLink]=useState(initialLink),[session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[sessionError,setSessionError]=useState('');
  const [row,setRow]=useState<AccessRequest|null>(null),[applicationLoaded,setApplicationLoaded]=useState(false),[applicationError,setApplicationError]=useState('');
  const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[submittedEmail,setSubmittedEmail]=useState(''),[linkInvalid,setLinkInvalid]=useState(false);
  const [accountOpen,setAccountOpen]=useState(false),[renewalOpen,setRenewalOpen]=useState(false),[dismissed,setDismissed]=useState<string|null>(null),[registrationCodeSent,setRegistrationCodeSent]=useState(false);
  const [applicationEmail,setApplicationEmail]=useState('');
  const registrationMail=useMailCooldown(link.token),applicationMail=useMailCooldown(mailAddressKey(applicationEmail));
+ useEffect(()=>{if(!loaded)return;const denied=session?.trialResult==='denied';if(initialLoad.current){initialLoad.current=false;trialFailureSeen.current=denied;if(denied&&fromPayment.current)setTrialFailure(true);}else if(denied&&!trialFailureSeen.current)setTrialFailure(true);trialFailureSeen.current=denied;},[loaded,session,route]);
  async function sendRegistrationCode(){
   try{registrationMail.remember(await api<MailSend>('/access/registration-proof',{invitationToken:link.token}));}
   catch(e){registrationMail.remember(e);throw e;}
@@ -110,13 +112,14 @@ export function ServerAccess(){
  const renewal=(renewalOpen||!!renewalTariff)&&session&&!session.blocked&&<OperationDialog compact footer={null} title="Продление доступа" onClose={closeRenewal}><ServerRenewal embedded onRefresh={refresh} initialTariffId={renewalTariff}/></OperationDialog>;
  if(showFinance&&session)return <><LegalUpdate signedIn/>{session.accessWarning&&dismissed!==session.accessWarning&&<div className={styles.warningBar}><span role="status">{session.accessWarning}</span><button className={styles.secondary} onClick={()=>setRenewalOpen(true)}>Продлить доступ</button><button className={styles.dismissWarning} aria-label="Скрыть уведомление" onClick={()=>setDismissed(session.accessWarning??null)}><X size={17}/></button></div>}<ServerFinance session={session} onAccount={()=>{setError('');setAccountOpen(true);}} onAccessLost={()=>{setAccountOpen(false);setSession(s=>s?{...s,scope:'restricted'}:null);setRouteHash('account');void refresh().catch(()=>{});}}/>{accountOpen&&<ServerAccount asDialog session={session} accountError={error} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>;
  const restartApplication=()=>{setRow(null);setSubmittedEmail('');setLinkInvalid(false);setRouteHash('access',true);};
- const notices=<>{session?.trialResult==='denied'&&<p role="alert" className={styles.error}>Не удалось оформить пробный период. Повторите попытку или попробуйте позже.</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{message&&<p role="status" className={styles.success}>{message}</p>}</>;
+
+ const notices=<>{trialFailure&&<p role="alert" className={styles.error}>Не удалось оформить пробный период. Повторите попытку или попробуйте позже.</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{message&&<p role="status" className={styles.success}>{message}</p>}</>;
  return <div className={styles.page+' '+styles.entryPage}><header className={styles.header}><a className={styles.brand} href="/" aria-label="CashNeuro" onClick={()=>{setAccountOpen(false);setRenewalOpen(false);}}><Brand/></a><nav className={styles.entryNav} aria-label="Доступ">{session?<><SupportLink className={styles.secondary}/><button className={styles.secondary} disabled={busy} onClick={()=>setExitOpen(true)}>Выйти</button></>:<a className={styles.secondary} href="#login">Войти</a>}</nav></header>
  <div className={styles.entryContent}>{!loaded?<AccessCard icon={ShieldCheck} title="Проверяем вход"><p role="status">Открываем CashNeuro…</p></AccessCard>:
  sessionError&&!session?<AccessCard icon={ShieldCheck} title="CashNeuro недоступен"><p role="alert">{sessionError}</p><div className={styles.actions}><button className={styles.primary} onClick={()=>void refresh().catch(()=>{})}>Повторить</button><a className={styles.secondary} href="/demo">Попробовать демо</a></div></AccessCard>:
  session?<><LegalUpdate signedIn/>{notices}<AccessCard icon={LockKeyhole} title={session.blocked?'Доступ приостановлен':session.isNew?'Начните пользоваться CashNeuro':session.accessEnd?'Срок доступа закончился':'Доступ ещё не активен'}>
   <p>{session.blocked?'Операции, отчёты и Анализатор временно недоступны. Чтобы уточнить причину и восстановить доступ, напишите в поддержку.':session.isNew?'Выберите тариф или попробуйте 7 дней бесплатно.':session.accessEnd?'Продлите доступ, чтобы снова открыть операции, отчёты и Анализатор. Финансовые данные сохранены.':'Финансовые разделы откроются после подтверждения доступа.'}</p>
-  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&session.trialAvailable&&<button className={styles.secondary} onClick={()=>setTrialOpen(true)}>Попробовать бесплатно</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
+  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&session.trialAvailable&&<button className={styles.secondary} onClick={()=>{setTrialFailure(false);trialFailureSeen.current=false;setTrialOpen(true);}}>Попробовать бесплатно</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
  </AccessCard>{trialOpen&&<OperationDialog title="Пробная неделя" footer={null} compact onClose={()=>setTrialOpen(false)}><TrialStart onRefresh={async()=>{await refresh();setTrialOpen(false);}}/></OperationDialog>}{accountOpen&&<ServerAccount asDialog session={session} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>:
  route==='login'||route==='account'||(!isPublic(route)&&!!route)?<div className={styles.authWrap}>{notices}<ServerAuth onAuthenticated={async()=>{await refresh();if(route==='login'||route==='account')setRouteHash('',true);}}/><p className={styles.entryFootnote}>Ещё нет аккаунта? <a href="#access">Получить доступ</a> · <a href="/demo">Попробовать демо</a></p></div>:
  route==='access'?<Signup onRegistered={async()=>{await refresh();setRouteHash('',true);}}/>:

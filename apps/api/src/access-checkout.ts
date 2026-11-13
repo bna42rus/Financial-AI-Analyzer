@@ -8,7 +8,7 @@ import {billingPlan,mayAutoCharge,noticeLeadMs,rubleValue,sameBillingPlan} from 
 import type {BillingPlan} from '../../../packages/access/src/billing.ts';
 import type {AccessRequest,Tariff} from '@finance/access';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
-import {lockedCycle,extensionAt} from './entitlement.ts';
+import {lockedCycle,extensionAt,queuedExtensionAt} from './entitlement.ts';
 import {digest,token} from './crypto.ts';
 import {HttpError,outbox,clock} from './types.ts';
 import type {Sealer} from './types.ts';
@@ -21,7 +21,7 @@ type Mode='once'|'enroll'|'automatic';
 type Order={card_id?:string|null;purpose?:string;cancel_requested?:boolean;provider_status?:string;capture_required?:boolean;desired_auto?:boolean|null;save_card?:boolean;id:string;user_id:string|null;application_id:string|null;tariff:BillingPlan;offer_version:string;renewal_version:string|null;mode:Mode;cycle_revision:number|null;planned_end:Date|null;provider_id:string|null;redirect_url:string|null;payment_method_id:string|null;state:'created'|'pending'|'paid'|'cancelled'|'reconcile';created_at:Date;paid_at:Date|null};
 type Renewal={card_id?:string|null;user_id:string;checkout_id:string;tariff:BillingPlan;offer_version:string;renewal_version:string;method_id:string|null;state:'active'|'off'|'changed'|'failed';next_at:Date;notice_id:string|null};
 type Account={id:string;email:string};
-const projection=(o:Order)=>({cardId:o.card_id??null,purpose:o.purpose??'access',cancelRequested:o.cancel_requested??false,id:o.id,state:o.state,mode:o.mode,autoRequested:o.mode==='enroll'&&!!o.renewal_version&&(o.state!=='paid'||o.application_id===null||!!o.payment_method_id),tariff:o.tariff,plannedEnd:o.planned_end,redirect:o.state==='pending'?o.redirect_url:null});
+const projection=(o:Order)=>({cardId:o.card_id??null,purpose:o.purpose??'access',cancelRequested:o.cancel_requested??false,id:o.id,state:o.state,mode:o.mode,autoRequested:o.mode==='enroll'&&!!o.renewal_version&&(o.state!=='paid'||o.application_id===null||!!o.payment_method_id),tariff:o.tariff,plannedEnd:o.planned_end,reason:(o as Order&{cancellation_reason?:string}).cancellation_reason??null,redirect:o.state==='pending'?o.redirect_url:null});
 const terminal=(o:Order)=>['paid','cancelled','reconcile'].includes(o.state);
 const catalog=async(db:PoolClient)=>(await db.query<{snapshot:Tariff}>(`SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'availableForRenewal'='true' ORDER BY ${catalogOrder}`)).rows.map(r=>r.snapshot);
 async function savedRenewal(db:PoolClient,userId:string){return (await db.query<Renewal>('SELECT * FROM commerce.autorenewal WHERE user_id=$1 FOR UPDATE',[userId])).rows[0];}
@@ -39,19 +39,19 @@ export async function checkoutAccountState(db:PoolClient,userId:string,provider:
  if(provider&&seal){for(const purpose of ['access','trial','card']){const o=await currentOrder(db,userId,purpose);if(o&&o.provider_id&&['created','pending'].includes(o.state)){const u=(await db.query('SELECT id,email FROM identity.auth_user WHERE id=$1',[userId])).rows[0];await syncAccessCheckout(db,o.id,u,provider,seal);}}}
  const cycle=await lockedCycle(db,userId),r=await savedRenewal(db,userId),latest=await currentOrder(db,userId);
  const tariffs=await catalog(db);
- const info=await trialInfo(db,userId),cards=await paymentCards(db,userId,seal),card=cards.find(c=>c.id===r?.card_id)??cards[0]??null;
+ const info=await trialInfo(db,userId),cards=await paymentCards(db,userId,seal,provider),card=cards.find(c=>c.id===r?.card_id)??cards[0]??null;
  const active=!!cycle.accessEnd&&Date.parse(cycle.accessEnd)>Date.now()&&!(await db.query("SELECT 1 FROM identity.security_state WHERE user_id=$1 AND status='suspended'",[userId])).rowCount;
  const termsValid=!!r&&!!tariffs.find(t=>t.id===r.tariff.id&&sameBillingPlan(r.tariff,billingPlan(t)));
  const canEnable=!!provider&&!!r&&!!card&&termsValid&&active&&Date.parse(cycle.accessEnd!)-Date.now()>noticeLeadMs&&!cycle.indefinite;
  return {cardsEnabled:!!provider?.createRefund,cardResult:(await db.query("SELECT t.result FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id WHERE t.user_id=$1 AND t.kind='card' ORDER BY o.created_at DESC LIMIT 1",[userId])).rows[0]?.result??null,canEnable,canBind:!!provider,enableReason:!provider?'Оплата временно недоступна.':!r?'Сначала выберите и оплатите тариф.':!card?'Для включения автопродления привяжите карту.':!active?'Сначала продлите доступ.':!termsValid?'Условия тарифа изменились. Выберите тариф заново.':!canEnable?'До окончания доступа осталось меньше трёх дней. Продлите доступ вручную.':null,enabled:!!provider&&!cycle.indefinite,test:provider?.test??false,accessEnd:info.isNew?null:cycle.accessEnd,tariffs,
-  renewal:r?{cardId:r.card_id??null,state:r.state==='active'&&!exactConsent(r,tariffs.find(t=>t.id===r.tariff.id))?'changed':r.state,tariff:r.tariff,nextAt:r.next_at}:null,
+  renewal:r?{cardId:r.card_id??null,state:r.state==='active'&&!exactConsent(r,tariffs.find(t=>t.id===r.tariff.id))?'changed':r.state,tariff:r.tariff,nextAt:cycle.accessEnd??r.next_at}:null,
   cards,card,...info,trialOrder:(await currentOrder(db,userId,'trial'))?projection((await currentOrder(db,userId,'trial'))!):null,cardOrder:(await currentOrder(db,userId,'card'))?projection((await currentOrder(db,userId,'card'))!):null,order:latest?projection(latest):null};
 }
 export async function quoteAccess(db:PoolClient,userId:string,input:unknown,provider:AccessPaymentProvider|undefined){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
  const r=object(input,['tariffId']),cycle=await lockedCycle(db,userId),t=(await catalog(db)).find(t=>t.id===r.tariffId);
  if(!t)throw new HttpError(409,'TARIFF_CHANGED');
- const now=await clock(db),start=cycle.accessEnd&&cycle.accessEnd>now?cycle.accessEnd:now,result=await extensionAt(db,cycle,t.duration,now,'quote','quote');
+ const now=await clock(db),start=cycle.accessEnd&&cycle.accessEnd>now?cycle.accessEnd:now,result=await queuedExtensionAt(db,cycle,t.duration,now,'quote','quote');
  return {tariff:billingPlan(t),startsAt:start,endsAt:result.extension.accessEnd,cycleRevision:cycle.revision,offerVersion:legalDocuments.offer.version,renewalVersion:legalDocuments.renewal.version};
 }
 async function orderInsert(db:PoolClient,id:string,owner:{id?:string;requestId?:string},t:BillingPlan,mode:Mode,cycleRevision?:number,plannedEnd?:string|null,method?:string,cardId?:string|null){
@@ -130,13 +130,13 @@ export async function activateFirstAutoRenewal(db:PoolClient,purchase:{id:string
 async function finalizeAccount(db:PoolClient,o:Order,user:Account,savedMethod:string|null,seal:Sealer){
  const cycle=await lockedCycle(db,user.id),settled=await clock(db);
  // If payment started before expiry, processing delay should not shift the original tariff calendar.
- const continuity=cycle.accessEnd&&cycle.accessEnd<=settled&&o.created_at.toISOString()<cycle.accessEnd;
+ const continuity=cycle.accessEnd&&cycle.accessEnd<=settled&&(o.mode==='automatic'||o.created_at.toISOString()<cycle.accessEnd);
  const start=continuity?cycle.accessEnd!:(cycle.accessEnd&&cycle.accessEnd>settled?cycle.accessEnd:settled);
  const base=continuity?new Date(Date.parse(cycle.accessEnd!)-1).toISOString():settled;
- const result=await extensionAt(db,cycle,o.tariff.duration,base,o.id,o.id),e=result.extension;
- await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=CASE WHEN $6 THEN end_offset_ms ELSE 0 END WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,user.id,e.mode==='continuous']);
+ const result=await queuedExtensionAt(db,cycle,o.tariff.duration,base,o.id,o.id),e=result.extension;
+ await db.query('UPDATE commerce.access_cycle SET anchor_at=$1,access_end=$2,calendar_months=$3,extra_days=$4,revision=revision+1,end_offset_ms=$6 WHERE user_id=$5',[e.anchorAt,e.accessEnd,result.calendarMonths,result.extraDays,user.id,result.endOffsetMs]);
  await db.query('UPDATE commerce.access_checkout SET previous_end=$2,access_end=$3 WHERE id=$1',[o.id,cycle.accessEnd,e.accessEnd]);
- await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota) VALUES($1,$2,$3,$4,$5)',[user.id,start,e.accessEnd,o.tariff.duration.kind,paidAnalyzerUnits(o.tariff.id,o.tariff.duration.kind,o.tariff.aiQuota)]);
+ await db.query('INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) VALUES($1,$2,$3,$4,$5,$6)',[user.id,start,e.accessEnd,o.tariff.duration.kind,paidAnalyzerUnits(o.tariff.id,o.tariff.duration.kind,o.tariff.aiQuota),o.tariff.duration.kind==='calendar_months'?result.allowanceAnchor:null]);
  await db.query('SELECT commerce.activate_checkout_counter($1)',[o.id]);
  const old=await savedRenewal(db,user.id),renewalEditedAfterOrder=!!(await db.query('SELECT 1 FROM commerce.autorenewal_event WHERE user_id=$1 AND recorded_at>$2',[user.id,o.created_at])).rowCount;
  if(o.mode==='enroll'&&savedMethod){
@@ -180,7 +180,7 @@ export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|A
  if(terminal(o)&&!o.cancel_requested&&!(resolveReconciliation&&o.state==='reconcile'&&o.provider_id))return projection(o);
  const now=Date.parse(await clock(db));
  if(!o.provider_id){
-  if(!first&&(await db.query('SELECT status FROM identity.security_state WHERE user_id=$1',[owner.id])).rows[0]?.status!=='active')throw new HttpError(403,'SUSPENDED');
+  if(!first&&o.mode!=='automatic'&&(await db.query('SELECT status FROM identity.security_state WHERE user_id=$1',[owner.id])).rows[0]?.status!=='active')throw new HttpError(403,'SUSPENDED');
   if(now-o.created_at.getTime()>23*3600000){await db.query("UPDATE commerce.access_checkout SET state='reconcile',reconcile_reason='provider_reference_missing' WHERE id=$1",[o.id]);return projection({...o,state:'reconcile'});}
   if(first&&(!owner.verifiedAt||owner.status!=='awaiting_payment'||o.created_at.getTime()>=Date.parse(owner.expiresAt)))throw new HttpError(409,'PAYMENT_RETRY_REQUIRED');
   if(o.mode==='automatic'){
@@ -223,7 +223,7 @@ export async function syncAccessCheckout(db:PoolClient,id:string,owner:Account|A
  if(state==='paid'){
   if(first)await finishFirst(db,o,owner,seal);
   else if(trial){await finishTrial(db,o.id,owner,payment,seal);await refundTrial(db,o.id,provider);}
-  else{const stored=await saveCard(db,owner.id,payment,seal),chosen=o.card_id?(await db.query('SELECT method_id FROM commerce.payment_card WHERE user_id=$1 AND id=$2 AND active',[owner.id,o.card_id])).rows[0]?.method_id:null;await finalizeAccount(db,o,owner,stored??chosen??null,seal);await db.query("UPDATE commerce.onboarding_account SET trial_state='used' WHERE user_id=$1",[owner.id]);}
+  else{const stored=await saveCard(db,owner.id,payment,seal),chosen=o.card_id?(await db.query('SELECT method_id FROM commerce.payment_card WHERE user_id=$1 AND id=$2 AND active',[owner.id,o.card_id])).rows[0]?.method_id:null;await finalizeAccount(db,o,owner,stored??chosen??null,seal);await db.query("UPDATE commerce.onboarding_account SET trial_state='used' WHERE user_id=$1 AND NOT EXISTS(SELECT 1 FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id WHERE t.user_id=$1 AND t.kind='trial' AND t.result='granted' AND o.access_end>clock_timestamp())",[owner.id]);}
   await db.query('SELECT commerce.record_checkout_completion($1)',[o.id]);
  }else if(state==='cancelled'&&o.mode==='automatic'){
   const r=await savedRenewal(db,owner.id);if(r?.state==='active')await stopRenewal(db,r,'failed');
@@ -262,11 +262,11 @@ export async function runAutoRenewals(pool:Pool,provider:AccessPaymentProvider,s
    if(user){
     const o=await currentOrder(db,id),r=await savedRenewal(db,id);
     if(o&&(o.state==='pending'||o.state==='created'&&o.mode==='automatic')){
-     if(o.state!=='created'||user.status==='active')await syncAccessCheckout(db,o.id,user,provider,seal);
+     await syncAccessCheckout(db,o.id,user,provider,seal);
     }else if(r?.state==='active'){
      await db.query('SELECT pg_advisory_xact_lock_shared(92044)');
      const t=(await catalog(db)).find(t=>t.id===r.tariff.id),now=Date.parse(await clock(db)),due=r.next_at.getTime();
-     if(user.status!=='active'||!exactConsent(r,t)){
+     if(!exactConsent(r,t)){
       await stopRenewal(db,r,'changed');
       await outbox(db,'identity',seal,'billing_changed',{email:user.email},{subjectId:id,dedupeKey:'billing-changed:'+r.checkout_id});
      }else if(!cycle.accessEnd||Date.parse(cycle.accessEnd)!==due){

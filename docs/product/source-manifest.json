@@ -15,9 +15,15 @@
       "path": "docs/product/approved-onboarding-20261111.md",
       "role": "approved_amendment",
       "sha256": "96a7605b4c86775a939c14d744b59a511e6c74ff7fd8f6bd7fcea4111224f2a0"
+    },
+    {
+      "path": "docs/product/approved-billing-periods-20261112.md",
+      "role": "approved_amendment",
+      "sha256": "e5fa9c6b6592f509a5efa39c2f3bee301fad25585f4603e2bdc3ca5d68826c3a"
     }
   ],
   "precedence": [
+    "Approved billing-periods amendment 2026-11-12 overrides trial eligibility, verification amount, queued periods, manual allowances, suspension, cards and Staging outer login in its stated scope",
     "Approved onboarding amendment 2026-11-11 overrides first-access registration, trial, renewal and allowance clauses in its stated scope",
     "Approved E-04 replaces mandatory admin SMS recovery; other access/security requirements remain active",
     "Approved amendments A-01..A-11 and B-01..B-10 override the specifically named clauses",

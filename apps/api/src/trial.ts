@@ -13,9 +13,9 @@ import {lockedCycle} from './entitlement.ts';
 import type {Tariff} from '@finance/access';
 export async function trialInfo(db:PoolClient,userId:string){
  const row=(await db.query('SELECT trial_state FROM commerce.onboarding_account WHERE user_id=$1',[userId])).rows[0];
- const paid=(await db.query("SELECT 1 FROM commerce.access_checkout o WHERE o.user_id=$1 AND o.purpose='access' AND o.state='paid' AND NOT EXISTS(SELECT 1 FROM commerce.trial_checkout t WHERE t.checkout_id=o.id) LIMIT 1",[userId])).rowCount;
- const trial=(await db.query("SELECT t.result,t.refund_state,o.access_end>clock_timestamp() AS active FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id WHERE t.user_id=$1 AND t.kind='trial' AND o.state='paid' ORDER BY t.created_at DESC LIMIT 1",[userId])).rows[0];
- return {isNew:!!row&&!paid&&['new','pending','denied'].includes(row.trial_state),trialAvailable:!!row&&!paid&&['new','pending','denied'].includes(row.trial_state),trialState:trial?.active&&trial.result==='granted'?'active':row?.trial_state==='active'?'used':row?.trial_state??null,trialResult:trial?.result??null,refundState:trial?.refund_state??null};
+ const paid=(await db.query("SELECT 1 FROM commerce.access_checkout o WHERE o.user_id=$1 AND o.purpose='access' AND o.state='paid' AND NOT EXISTS(SELECT 1 FROM commerce.trial_checkout t WHERE t.checkout_id=o.id) UNION ALL SELECT 1 FROM commerce.purchase WHERE user_id=$1 LIMIT 1",[userId])).rowCount;
+ const trial=(await db.query("SELECT t.result,t.refund_state,least(o.access_end,c.access_end)>clock_timestamp() AS active FROM commerce.trial_checkout t JOIN commerce.access_checkout o ON o.id=t.checkout_id JOIN commerce.access_cycle c ON c.user_id=t.user_id WHERE t.user_id=$1 AND t.kind='trial' AND o.state='paid' ORDER BY t.created_at DESC LIMIT 1",[userId])).rows[0];
+ return {isNew:!!row&&!paid&&['new','pending','denied'].includes(row.trial_state),trialAvailable:!paid&&trial?.result!=='granted'&&['new','pending','denied'].includes(row?.trial_state??'new'),trialState:trial?.active&&trial.result==='granted'?'active':row?.trial_state==='active'?'used':row?.trial_state??(paid?'used':'new'),trialResult:trial?.result??null,refundState:trial?.refund_state??null};
 }
 export async function startTrial(db:PoolClient,user:{id:string;email:string},input:unknown,provider:AccessPaymentProvider|undefined,seal:Sealer,bindingOnly=false){
  if(!provider?.createRefund)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
@@ -23,7 +23,7 @@ export async function startTrial(db:PoolClient,user:{id:string;email:string},inp
  checkLegalVersion(b.offerVersion,legalDocuments.offer.version,true);
  if(b.renewalVersion!==undefined)checkLegalVersion(b.renewalVersion,legalDocuments.renewal.version,true);
  if(b.cardConsent!==true)throw new HttpError(400,'CARD_CONSENT_REQUIRED');
- const id=uuid(b.id),device=uuid(b.device),cycle=await lockedCycle(db,user.id);
+ const id=uuid(b.id),cycle=await lockedCycle(db,user.id);
  if((await db.query('SELECT o.id FROM commerce.access_checkout o JOIN commerce.trial_checkout t ON t.checkout_id=o.id WHERE o.id=$1 AND o.user_id=$2',[id,user.id])).rowCount)return {id};
  const info=await trialInfo(db,user.id);
 
@@ -33,24 +33,23 @@ export async function startTrial(db:PoolClient,user:{id:string;email:string},inp
  const tariffs=(await db.query<{snapshot:Tariff}>("SELECT snapshot FROM access.tariff WHERE snapshot->>'active'='true' AND snapshot->>'availableForRenewal'='true'")).rows.map(r=>r.snapshot);
  const weekly=tariffs.find(t=>t.id===b.tariffId&&(bindingOnly||t.duration.kind==='days'&&t.duration.count===7));
  if(!weekly||weekly.priceMinor!==b.priceMinor||(weekly.catalogVersion??0)!==b.catalogVersion)throw new HttpError(409,'TARIFF_CHANGED');
- const t=billingPlan(weekly),verification={...t,name:bindingOnly?'Привязка карты':'Проверка карты для пробной недели',priceMinor:'1000',aiQuota:2500};
+ const t=billingPlan(weekly),verification={...t,name:bindingOnly?'Привязка карты':'Проверка карты для пробной недели',priceMinor:'100',aiQuota:2500};
  await db.query('INSERT INTO commerce.access_checkout(id,user_id,tariff,offer_version,renewal_version,mode,cycle_revision,purpose) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',[id,user.id,verification,b.offerVersion,b.renewalVersion??null,b.renewalVersion?'enroll':'once',cycle.revision,bindingOnly?'card':'trial']);
- await db.query('INSERT INTO commerce.trial_checkout(checkout_id,user_id,renewal_tariff,device_key,email_key,refund_key,kind) VALUES($1,$2,$3,$4,$5,$6,$7)',[id,user.id,t,seal.rateKey('trial-device:'+device),seal.rateKey('trial-email:'+user.email.trim().toLowerCase()),randomUUID(),bindingOnly?'card':'trial']);
+ await db.query('INSERT INTO commerce.trial_checkout(checkout_id,user_id,renewal_tariff,device_key,email_key,refund_key,kind) VALUES($1,$2,$3,$4,$5,$6,$7)',[id,user.id,t,seal.rateKey('trial-account:'+user.id),seal.rateKey('trial-account:'+user.id),randomUUID(),bindingOnly?'card':'trial']);
  if(b.cardId!==undefined){const card=await savedCard(db,user.id,b.cardId);await db.query('UPDATE commerce.access_checkout SET card_id=$2,payment_method_id=$3 WHERE id=$1',[id,card.id,card.method_id]);}
- if(!bindingOnly)await db.query("UPDATE commerce.onboarding_account SET trial_state='pending' WHERE user_id=$1",[user.id]);return {id};
+ if(!bindingOnly)await db.query("INSERT INTO commerce.onboarding_account(user_id,trial_state) VALUES($1,'pending') ON CONFLICT(user_id) DO UPDATE SET trial_state='pending'",[user.id]);return {id};
 }
 export async function isTrial(db:PoolClient,id:string){return !!(await db.query('SELECT 1 FROM commerce.trial_checkout WHERE checkout_id=$1',[id])).rowCount;}
 export async function finishTrial(db:PoolClient,id:string,user:{id:string;email:string},payment:AccessPayment,seal:Sealer){
  const t=(await db.query('SELECT * FROM commerce.trial_checkout WHERE checkout_id=$1 FOR UPDATE',[id])).rows[0];if(!t||t.result)return;
- await db.query('INSERT INTO commerce.card_refund_job(checkout_id,user_id,provider_id,refund_key) VALUES($1,$2,$3,$4) ON CONFLICT(checkout_id) DO NOTHING',[id,user.id,payment.id,t.refund_key]);
- const c=payment.payment_method?.card,method=await saveCard(db,user.id,payment,seal);
+ await db.query('INSERT INTO commerce.card_refund_job(checkout_id,user_id,provider_id,refund_key,amount_minor) VALUES($1,$2,$3,$4,$5) ON CONFLICT(checkout_id) DO NOTHING',[id,user.id,payment.id,t.refund_key,Number((await db.query('SELECT tariff FROM commerce.access_checkout WHERE id=$1',[id])).rows[0].tariff.priceMinor)]);
+ const method=await saveCard(db,user.id,payment,seal)??(await db.query('SELECT c.method_id FROM commerce.payment_card c JOIN commerce.access_checkout o ON o.card_id=c.id WHERE o.id=$1 AND c.user_id=$2 AND c.active',[id,user.id])).rows[0]?.method_id??null;
  if(t.kind==='card'){await db.query("UPDATE commerce.trial_checkout SET result=$2,result_reason=$3 WHERE checkout_id=$1",[id,method?'granted':'denied',method?null:'card_not_saved']);return;}
- const alreadyPaid=(await db.query("SELECT 1 FROM commerce.access_checkout WHERE user_id=$1 AND purpose='access' AND state='paid'",[user.id])).rowCount;
- const mask=c&&/^\d{6}$/.test(c.first6??'')&&/^\d{4}$/.test(c.last4??'')&&/^\d{2}$/.test(c.expiry_month??'')&&/^\d{4}$/.test(c.expiry_year??'')?[c.first6,c.last4,c.expiry_month,c.expiry_year].join(':'):null;
- const claimed=!alreadyPaid&&method&&mask&&(await db.query('SELECT commerce.claim_trial($1,$2,$3,$4) AS ok',[id,t.email_key,t.device_key,seal.rateKey('trial-card:'+mask)])).rows[0]?.ok;
- await db.query('UPDATE commerce.trial_checkout SET result=$2,result_reason=$3 WHERE checkout_id=$1',[id,claimed?'granted':'denied',claimed?null:alreadyPaid?'paid_access':!method?'card_not_saved':!mask?'card_details_missing':'repeat_trial']);
+ const alreadyPaid=(await db.query("SELECT 1 FROM commerce.access_checkout WHERE user_id=$1 AND purpose='access' AND state='paid' UNION ALL SELECT 1 FROM commerce.purchase WHERE user_id=$1",[user.id])).rowCount;
+ const claimed=!alreadyPaid&&!!method&&(await db.query('SELECT commerce.claim_account_trial($1) AS ok',[id])).rows[0]?.ok;
+ await db.query('UPDATE commerce.trial_checkout SET result=$2,result_reason=$3 WHERE checkout_id=$1',[id,claimed?'granted':'denied',claimed?null:alreadyPaid?'paid_access':!method?'card_not_saved':'repeat_trial']);
  await db.query('UPDATE commerce.onboarding_account SET trial_state=$2 WHERE user_id=$1',[user.id,claimed?'active':alreadyPaid?'used':'denied']);
- if(!claimed)return; // Refund the verification payment even if repeat-use protection denies access.
+ if(!claimed)return; // Failed verification never consumes the account's trial.
  await db.query('SELECT commerce.activate_checkout_counter($1)',[id]);
  const cycle=await lockedCycle(db,user.id),times=(await db.query("SELECT clock_timestamp() AS start,clock_timestamp()+interval '7 days' AS finish")).rows[0];
  await db.query('UPDATE commerce.access_cycle SET anchor_at=$2,access_end=$3,calendar_months=0,extra_days=7,end_offset_ms=0,revision=revision+1 WHERE user_id=$1',[user.id,times.start,times.finish]);
