@@ -16,6 +16,15 @@ spec.loader.exec_module(m)
 
 
 class InstallationTests(unittest.TestCase):
+    def test_forward_auth_response_matcher_preserves_the_site_root(self):
+        config={'routes':[{'match':[{'host':['test.cashneuro.ru']}], 'handle':[
+            {'handler':'reverse_proxy','handle_response':[{'match':{'status_code':[2]},'routes':[{'handle':[{'handler':'static_response','status_code':204}]}]}]},
+            {'handler':'vars','root':'/srv/test/web'}]},
+            {'match':[{'host':['admin.test.cashneuro.ru']}],'handle':[{'handler':'vars','root':'/srv/admin/web'}]}]}
+        self.assertEqual(m.frontend_root(config),'/srv/test/web')
+        self.assertEqual(m.frontend_root(config,'admin.test.cashneuro.ru'),'/srv/admin/web')
+
+
     def test_real_terminal_accepts_email_without_requiring_seek(self):
         master, slave = pty.openpty()
         try:

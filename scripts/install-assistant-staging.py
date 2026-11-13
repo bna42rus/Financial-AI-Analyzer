@@ -76,7 +76,9 @@ def frontend_root(config, host="test.cashneuro.ru"):
     found = []
     def visit(node, hosts=()):
         if isinstance(node, dict):
-            local = tuple(h for match in node.get('match', []) for h in match.get('host', []))
+            matchers = node.get('match', [])
+            # Route matchers are arrays; forward_auth response matchers are objects.
+            local = tuple(h for match in matchers if isinstance(match, dict) for h in match.get('host', [])) if isinstance(matchers, list) else ()
             hosts = local or hosts
             if isinstance(node.get('root'), str):
                 found.append((hosts, node['root']))
