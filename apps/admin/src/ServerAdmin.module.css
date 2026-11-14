@@ -97,3 +97,6 @@
 .maintenanceSection .maintenanceForm>div{gap:14px;align-items:start}
 .maintenanceSection .maintenanceForm>div:last-child{margin-top:0;gap:8px}
 .maintenanceSection>p{margin:0 0 12px}
+
+.maintenanceSection>p.maintenanceFailure{margin-top:16px}
+.maintenanceSection .maintenanceForm [aria-invalid=true]{border-color:var(--color-danger);outline-color:var(--color-danger)}

@@ -10,14 +10,14 @@ import {SupportLink} from './SupportDialog';
 import {setMaintenanceActive} from './maintenance-state';
 import common from './App.module.css';
 import styles from './Maintenance.module.css';
-const cacheKey='cashneuro-public-maintenance',dismissalKey='cashneuro-maintenance-dismissed',cancellationKey='cashneuro-maintenance-cancellation-seen';
+const cacheKey='cashneuro-public-maintenance',cancellationKey='cashneuro-maintenance-cancellation-seen';
 function stored(key:string){try{return localStorage.getItem(key)??'';}catch{return '';}}
 function remember(key:string,value:string){try{localStorage.setItem(key,value);}catch{}}
 function valid(v:unknown):v is Maintenance{if(!v||typeof v!=='object')return false;const m=v as Maintenance;return Number.isSafeInteger(m.revision)&&m.revision>=0&&['none','scheduled','completed','cancelled'].includes(m.state)&&['none','scheduled','active','completed','cancelled'].includes(m.phase)&&typeof m.title==='string'&&typeof m.message==='string'&&[m.now,m.updatedAt].every(d=>typeof d==='string'&&Number.isFinite(Date.parse(d)))&&[m.startsAt,m.endsAt].every(d=>d===null||typeof d==='string'&&Number.isFinite(Date.parse(d)))&&(m.phase!=='active'&&m.phase!=='scheduled'||!!m.startsAt&&!!m.endsAt);}
 function cached():Maintenance|null{try{const v=JSON.parse(localStorage.getItem(cacheKey)??'null');return valid(v)?v:null;}catch{return null;}}
 const date=(v:string)=>new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:'Europe/Moscow'}).format(new Date(v));
 export function MaintenanceBoundary({children}:{children:ReactNode}){
- const [status,setStatus]=useState<Maintenance|null>(cached),[loaded,setLoaded]=useState(false),[held,setHeld]=useState(false),[dismissed,setDismissed]=useState(()=>stored(dismissalKey)),[seenCancellation]=useState(()=>stored(cancellationKey));
+ const [status,setStatus]=useState<Maintenance|null>(cached),[loaded,setLoaded]=useState(false),[held,setHeld]=useState(false),[dismissed,setDismissed]=useState(''),[seenCancellation]=useState(()=>stored(cancellationKey));
  const visited=useRef(false),running=useRef(false),mounted=useRef(false);
  const update=useCallback(async()=>{
   if(running.current)return;running.current=true;
@@ -39,7 +39,7 @@ export function MaintenanceBoundary({children}:{children:ReactNode}){
  const cancelled=status?.phase==='cancelled'&&Date.parse(status.now)-Date.parse(status.updatedAt)<86400000&&seenCancellation!==String(status.revision);
  useEffect(()=>{if(loaded&&!blocked&&cancelled&&dismissed!==key)remember(cancellationKey,String(status?.revision));},[loaded,blocked,cancelled,dismissed,key,status?.revision]);
  return <>
-  {!blocked&&loaded&&status&&(warning||cancelled)&&dismissed!==key&&<aside className={styles.banner} role="status"><Clock3 size={18}/><span>{cancelled?'Объявленные технические работы отменены.':maintenanceNotice(status)}</span><button className={common.iconButton} aria-label="Скрыть предупреждение о работах" onClick={()=>{setDismissed(key);remember(dismissalKey,key);}}><X size={17}/></button></aside>}
+  {!blocked&&loaded&&status&&(warning||cancelled)&&dismissed!==key&&<aside className={styles.banner} role="status"><Clock3 size={18}/><span>{cancelled?'Объявленные технические работы отменены.':maintenanceNotice(status)}</span><button className={common.iconButton} aria-label="Скрыть предупреждение о работах" onClick={()=>{setDismissed(key);}}><X size={17}/></button></aside>}
   {visited.current&&<div hidden={blocked}>{children}</div>}
   {(blocked||!loaded)&&<div className={styles.page}>
    <header className={styles.header}><a href="/" aria-label="CashNeuro — на главную"><Brand/></a><SupportLink showIcon/></header>

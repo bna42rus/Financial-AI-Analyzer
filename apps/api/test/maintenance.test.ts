@@ -41,8 +41,8 @@ test('start, overrun and extension keep access closed until manual finish',async
  assert.equal((await changeMaintenance(f.db,'admin',{id:'32345678-1234-4234-a234-123456789abc',revision:2,action:'finish'})).phase,'completed');
 });
 test('bad dates and cancelling active work are rejected',async()=>{
- const f=fixture();await assert.rejects(changeMaintenance(f.db,'admin',{...command,endsAt:now}),{code:'INVALID_INPUT'});
- await assert.rejects(changeMaintenance(f.db,'admin',{...command,endsAt:'2026-02-30T22:00:00.000Z'}),{code:'INVALID_INPUT'});
+ const f=fixture();await assert.rejects(changeMaintenance(f.db,'admin',{...command,endsAt:now}),{code:'MAINTENANCE_END_ORDER'});
+ await assert.rejects(changeMaintenance(f.db,'admin',{...command,endsAt:'2026-02-30T22:00:00.000Z'}),{code:'MAINTENANCE_END_INVALID'});
  await changeMaintenance(f.db,'admin',{...command,action:'start'});
  await assert.rejects(changeMaintenance(f.db,'admin',{id:'22345678-1234-4234-a234-123456789abc',revision:1,action:'cancel'}),{code:'ACTION_CONFLICT'});
 });
@@ -53,4 +53,12 @@ test('notice uses Moscow start day and clear timezone wording, even across midni
  assert.match(maintenanceNotice({...base,endsAt:'2026-11-15T20:12:00.000Z'}),/^Сегодня с 22:19 до 23:12 15 ноября по МСК/);
  assert.match(maintenanceNotice({...base,startsAt:'2026-11-15T19:19:00.000Z',endsAt:'2026-11-15T20:12:00.000Z'}),/^Завтра с/);
  assert.match(maintenanceNotice({...base,now:'2026-11-14T21:30:00.000Z',startsAt:'2026-11-14T22:00:00.000Z',endsAt:'2026-11-14T23:00:00.000Z'}),/^Сегодня с 01:00/);
+});
+
+test('validation identifies the precise invalid field rather than a generic form error',async()=>{
+ const f=fixture();
+ await assert.rejects(changeMaintenance(f.db,'admin',{...command,title:''}),{code:'MAINTENANCE_TITLE_REQUIRED'});
+ await assert.rejects(changeMaintenance(f.db,'admin',{...command,startsAt:'2026-11-14T19:00:00.000Z'}),{code:'MAINTENANCE_START_PAST'});
+ await assert.rejects(changeMaintenance(f.db,'admin',{...command,startsAt:'invalid'}),{code:'MAINTENANCE_START_INVALID'});
+ await assert.rejects(changeMaintenance(f.db,'admin',{...command,message:'x'.repeat(1001)}),{code:'MAINTENANCE_MESSAGE_LONG'});
 });

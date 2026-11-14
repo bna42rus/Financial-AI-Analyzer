@@ -19,11 +19,16 @@ export async function changeMaintenance(db:PoolClient,actor:string,input:unknown
  if(b.action==='cancel'){if(old.phase!=='scheduled')throw new HttpError(409,'ACTION_CONFLICT');state='cancelled';}
  else if(b.action==='finish'){if(old.phase!=='active')throw new HttpError(409,'ACTION_CONFLICT');state='completed';}
  else{
-  if(typeof b.title!=='string'||!b.title.trim()||b.title.length>100||typeof b.message!=='string'||b.message.length>1000)throw new HttpError(400,'INVALID_INPUT');
+  if(typeof b.title!=='string'||!b.title.trim())throw new HttpError(400,'MAINTENANCE_TITLE_REQUIRED');
+  if(b.title.length>100)throw new HttpError(400,'MAINTENANCE_TITLE_LONG');
+  if(typeof b.message!=='string'||b.message.length>1000)throw new HttpError(400,'MAINTENANCE_MESSAGE_LONG');
   if(b.action==='schedule'&&['scheduled','active'].includes(old.phase)||b.action==='update'&&!['scheduled','active'].includes(old.phase)||b.action==='start'&&old.phase==='active')throw new HttpError(409,'ACTION_CONFLICT');
-  const date=(v:unknown)=>{if(typeof v!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(v)||!Number.isFinite(Date.parse(v)))throw new HttpError(400,'INVALID_INPUT');const canonical=new Date(v).toISOString();if(canonical!==(v.includes('.')?v:v.replace('Z','.000Z')))throw new HttpError(400,'INVALID_INPUT');return canonical;};
-  starts=b.action==='start'?old.now:date(b.startsAt);ends=date(b.endsAt);
-  if(Date.parse(ends)<=Math.max(Date.parse(starts),Date.parse(old.now))||b.action==='schedule'&&starts<old.now||b.action==='update'&&old.phase==='active'&&starts!==old.startsAt)throw new HttpError(400,'INVALID_INPUT');
+  const date=(v:unknown,field:'START'|'END')=>{if(typeof v!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(v)||!Number.isFinite(Date.parse(v)))throw new HttpError(400,'MAINTENANCE_'+field+'_INVALID');const canonical=new Date(v).toISOString();if(canonical!==(v.includes('.')?v:v.replace('Z','.000Z')))throw new HttpError(400,'MAINTENANCE_'+field+'_INVALID');return canonical;};
+  starts=b.action==='start'?old.now:date(b.startsAt,'START');ends=date(b.endsAt,'END');
+  if(Date.parse(ends)<=Date.parse(starts))throw new HttpError(400,'MAINTENANCE_END_ORDER');
+  if(Date.parse(ends)<=Date.parse(old.now))throw new HttpError(400,'MAINTENANCE_END_PAST');
+  if(b.action!=='start'&&old.phase!=='active'&&starts<old.now)throw new HttpError(400,'MAINTENANCE_START_PAST');
+  if(b.action==='update'&&old.phase==='active'&&starts!==old.startsAt)throw new HttpError(400,'MAINTENANCE_START_FIXED');
   state='scheduled';title=b.title.trim();message=b.message.trim();
  }
  await db.query('UPDATE commerce.maintenance SET revision=revision+1,state=$1,title=$2,message=$3,starts_at=$4,ends_at=$5,updated_at=clock_timestamp() WHERE id=true',[state,title,message,starts,ends]);
