@@ -91,3 +91,9 @@
 .accessDate::-webkit-date-and-time-value{min-height:1.4em;text-align:left}
 .accessDate::-webkit-datetime-edit{padding:0}
 @media(max-width:760px){:global(body:has([data-admin-shell])) input.accessDate{font-size:16px}}
+
+.maintenanceSection .maintenanceForm{gap:14px;align-content:start}
+.maintenanceSection .maintenanceForm label{margin:0;gap:6px;align-content:start}
+.maintenanceSection .maintenanceForm>div{gap:14px;align-items:start}
+.maintenanceSection .maintenanceForm>div:last-child{margin-top:0;gap:8px}
+.maintenanceSection>p{margin:0 0 12px}

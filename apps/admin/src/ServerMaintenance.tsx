@@ -6,7 +6,7 @@ import {localAdminDate,parseAdminDate,useAdminData,useAdminNotice} from './admin
 import common from '../../web/src/App.module.css';
 import form from '../../web/src/ServerAccess.module.css';
 import shell from './ServerAdmin.module.css';
-const zone='Europe/Moscow',label=(v:string|null)=>v?new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(new Date(v))+' МСК':'—';
+const zone='Europe/Moscow',label=(v:string|null)=>v?new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:zone}).format(new Date(v))+' по МСК':'—';
 export function ServerMaintenance({refresh}:{refresh:number}){
  const {data,error,loading,reload}=useAdminData<Maintenance>('/control/maintenance',refresh),notify=useAdminNotice();
  const [busy,setBusy]=useState(false),[failure,setFailure]=useState(''),[pending,setPending]=useState<Record<string,unknown>|null>(null);
@@ -18,17 +18,17 @@ export function ServerMaintenance({refresh}:{refresh:number}){
   if(['start','finish','cancel'].includes(action))setPending(body);else void save(body);
  }catch(e){setFailure(e instanceof Error?e.message:'Проверьте даты.');}}
  const active=data?.phase==='active',planned=data?.phase==='scheduled';
- return <section className={form.card}>
+ return <section className={form.card+' '+shell.maintenanceSection}>
   {error&&<p role="alert" className={form.error}>{error}</p>}{loading&&!data&&<p role="status">Загружаем расписание…</p>}{!data&&error&&<button className={common.button} onClick={reload}>Повторить</button>}
   {data&&<><p><strong>{active?'Технические работы идут':planned?'Технические работы запланированы':'Технические работы не идут'}</strong></p>
   {(active||planned)&&<p>{label(data.startsAt)} — {label(data.endsAt)}</p>}
-  <p>Предупреждение появляется за 24 часа и обновляется за 3 часа и за час. Если назначить позже — сразу. Работы начинаются автоматически, завершение подтверждается вручную.</p>
-  <form key={data.revision} className={form.renewalBody} onSubmit={e=>{e.preventDefault();const action=(e.nativeEvent as SubmitEvent).submitter?.getAttribute('data-action')??(active||planned?'update':'schedule');command(action,new FormData(e.currentTarget));}}>
+  
+  <form key={data.revision} className={form.renewalBody+' '+shell.maintenanceForm} onSubmit={e=>{e.preventDefault();const action=(e.nativeEvent as SubmitEvent).submitter?.getAttribute('data-action')??(active||planned?'update':'schedule');command(action,new FormData(e.currentTarget));}}>
    <OperationField label="Заголовок"><input name="title" maxLength={100} required defaultValue={data.title||'Обновляем CashNeuro'}/></OperationField>
    <OperationField label="Сообщение пользователям"><textarea name="message" maxLength={1000} rows={3} defaultValue={data.message} placeholder="Что обновляем и когда планируем вернуться"/></OperationField>
-   <div className={form.formRow}><OperationField label="Начало · МСК"><input className={shell.accessDate} name="start" type="datetime-local" required disabled={active||busy} defaultValue={localAdminDate((active||planned)&&data.startsAt?Date.parse(data.startsAt):Date.now()+3600000,zone)}/></OperationField><OperationField label="Окончание · МСК"><input className={shell.accessDate} name="end" type="datetime-local" required disabled={busy} defaultValue={localAdminDate(data.endsAt&&Date.parse(data.endsAt)>Date.now()?Date.parse(data.endsAt):Date.now()+7200000,zone)}/></OperationField></div>
+   <div className={form.formRow}><OperationField label="Начало (по МСК)"><input className={shell.accessDate} name="start" type="datetime-local" required disabled={active||busy} defaultValue={localAdminDate((active||planned)&&data.startsAt?Date.parse(data.startsAt):Date.now()+3600000,zone)}/></OperationField><OperationField label="Окончание (по МСК)"><input className={shell.accessDate} name="end" type="datetime-local" required disabled={busy} defaultValue={localAdminDate(data.endsAt&&Date.parse(data.endsAt)>Date.now()?Date.parse(data.endsAt):Date.now()+7200000,zone)}/></OperationField></div>
    <div className={form.actions}><button className={common.primaryButton} disabled={busy}>{active||planned?'Сохранить изменения':'Запланировать'}</button>{!active&&<button data-action="start" className={common.button} disabled={busy}>Начать сейчас</button>}{planned&&<button type="button" className={common.button} disabled={busy} onClick={()=>command('cancel')}>Отменить работы</button>}{active&&<button type="button" className={common.button} disabled={busy} onClick={()=>command('finish')}>Завершить сейчас</button>}</div>
-  </form><p>Указанное окончание — ориентир. Пока вы не завершите работы, сайт остаётся закрытым. Админка, поддержка и приём результатов платежей доступны. Сроки доступа и лимиты не меняются.</p></>}
+  </form></>}
   {failure&&<p role="alert" className={form.error}>{failure}</p>}
   {pending&&<OperationDialog compact title={pending.action==='start'?'Начать технические работы?':pending.action==='finish'?'Открыть сайт для пользователей?':'Отменить запланированные работы?'} onClose={()=>{if(!busy)setPending(null);}} footer={<><button className={common.button} disabled={busy} onClick={()=>setPending(null)}>Назад</button><button className={common.primaryButton} disabled={busy} onClick={()=>void save(pending)}>Подтвердить</button></>}>
    <p>{pending.action==='start'?'Пользовательский сайт перейдёт на страницу технических работ. Уже начатые операции завершатся безопасно.':pending.action==='finish'?'Убедитесь, что пользовательский API и сайт готовы. Пользователи смогут вернуться в приложение.':'Пользователи увидят обновление об отмене работ.'}</p>{failure&&<p role="alert" className={form.error}>{failure}</p>}

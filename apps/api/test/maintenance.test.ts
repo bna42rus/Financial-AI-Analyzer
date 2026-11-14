@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {maintenancePhase,maintenanceWarning,maintenanceBlocks} from '../../../packages/access/src/maintenance.ts';
+import {maintenancePhase,maintenanceWarning,maintenanceBlocks,maintenanceNotice} from '../../../packages/access/src/maintenance.ts';
 import {changeMaintenance} from '../src/maintenance.ts';
 const now='2026-11-14T20:00:00.000Z';
 test('start is exact, planned end never automatically opens access, cancellation/completion are final',()=>{
@@ -45,4 +45,12 @@ test('bad dates and cancelling active work are rejected',async()=>{
  await assert.rejects(changeMaintenance(f.db,'admin',{...command,endsAt:'2026-02-30T22:00:00.000Z'}),{code:'INVALID_INPUT'});
  await changeMaintenance(f.db,'admin',{...command,action:'start'});
  await assert.rejects(changeMaintenance(f.db,'admin',{id:'22345678-1234-4234-a234-123456789abc',revision:1,action:'cancel'}),{code:'ACTION_CONFLICT'});
+});
+
+test('notice uses Moscow start day and clear timezone wording, even across midnight',()=>{
+ const base={now:'2026-11-14T18:00:00.000Z',startsAt:'2026-11-14T19:19:00.000Z',endsAt:'2026-11-14T20:12:00.000Z'} as any;
+ assert.equal(maintenanceNotice(base),'Сегодня с 22:19 до 23:12 по МСК сайт будет недоступен — запланированы технические работы.');
+ assert.match(maintenanceNotice({...base,endsAt:'2026-11-15T20:12:00.000Z'}),/^Сегодня с 22:19 до 23:12 15 ноября по МСК/);
+ assert.match(maintenanceNotice({...base,startsAt:'2026-11-15T19:19:00.000Z',endsAt:'2026-11-15T20:12:00.000Z'}),/^Завтра с/);
+ assert.match(maintenanceNotice({...base,now:'2026-11-14T21:30:00.000Z',startsAt:'2026-11-14T22:00:00.000Z',endsAt:'2026-11-14T23:00:00.000Z'}),/^Сегодня с 01:00/);
 });
