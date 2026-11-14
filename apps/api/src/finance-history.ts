@@ -4,6 +4,7 @@ import {object,uuid,dateFact} from '../../../packages/finance-core/src/model.ts'
 import {HttpError} from './types.ts';
 
 const definitions={
+ category_binding:{table:'category_binding',id:'id',keys:['target_key','category_id','subcategory_id'],readonly:[]},
  overview_view:{table:'overview_view',id:'id',keys:['name','definition','is_default','dependency_status','position'],readonly:[]},
  budget:{table:'budget',id:'id',keys:['name','definition','limits','enabled','dependency_status'],readonly:[]},
  operations_view:{table:'operations_view',id:'id',keys:['name','definition','is_default','dependency_status','position'],readonly:[]},
@@ -11,7 +12,7 @@ const definitions={
  operation:{table:'transaction',id:'id',keys:['corrections','semantics','comment','analytics_override','decomposition','review_reasons','source_observation_id','merged_into_id'],readonly:[]},
  account:{table:'account',id:'id',keys:['bank_id','system_name','display_name','account_type','currency','analytics_enabled','default_visible','loan_mode','merged_into_id'],readonly:['bank_id','system_name','currency']},
  category:{table:'category',id:'id',keys:['name','parent_id','role','hidden'],readonly:[]},
- counterparty:{table:'counterparty',id:'id',keys:['name','state','is_self','merged_into_id'],readonly:[]},
+ counterparty:{table:'counterparty',id:'id',keys:['name','state','is_self','merged_into_id','proposal_operation_ids','auto_rule_id'],readonly:[]},
  rule:{table:'rule',id:'id',keys:['name','enabled','priority','conditions','assignments','dependency_status'],readonly:[]},
  link:{table:'link',id:'id',keys:['source_id','target_id','source_component_id','target_component_id','source_allocation_id','target_allocation_id','kind','amount_minor','status','confidence','created_by'],readonly:[]},
  component:{table:'component',id:'id',keys:['transaction_id','type','amount_minor','role','category','subcategory','active'],readonly:[]},
@@ -28,7 +29,7 @@ export type SnapshotMap=Map<string,{kind:ObjectKind;id:string;snapshot:Snapshot}
 export type RestoreIntent={kind:'restore_history';id:string;actionIds:string[]};
 export type HistoryUndo={table:'history';id:string;before:null;details:Record<string,unknown>};
 type Conflict={actionId?:string;kind?:ObjectKind;id?:string;reason:string};
-type HistoryRow={id:string;generation:string;intent:{canonical:{kind:string}};change_set:Change[]|null;affected_operation_ids:string[];committed_revision:string;committed_at:Date;undone:boolean;recent:boolean;undo_patch:unknown};
+type HistoryRow={id:string;generation:string;intent:{canonical:{kind:string;id?:string}};change_set:Change[]|null;affected_operation_ids:string[];committed_revision:string;committed_at:Date;undone:boolean;recent:boolean;undo_patch:unknown;preview?:{counts?:Record<string,unknown>}};
 const key=(kind:ObjectKind,id:string)=>kind+':'+id;
 export function stableJSON(v:unknown):string{return JSON.stringify(v,(_k,r)=>r&&typeof r==='object'&&!Array.isArray(r)?Object.fromEntries(Object.keys(r).sort().map(k=>[k,r[k]])):r);}
 function ids(value:unknown,max=100){if(!Array.isArray(value)||value.length<1||value.length>max)throw new TypeError('INVALID_SELECTION');const result=value.map(uuid);if(new Set(result).size!==result.length)throw new TypeError('DUPLICATE_SELECTION');return result;}
@@ -38,7 +39,7 @@ export async function captureHistory(db:PoolClient,userId:string):Promise<Snapsh
  for(const kind of Object.keys(definitions)as ObjectKind[]){const d=definitions[kind];let rows:Record<string,unknown>[];
   if(kind==='account_source'||kind==='counterparty_source')rows=(await db.query(`SELECT b.*,finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id FROM finance.${d.table} b JOIN finance.source_observation o ON (o.user_id,o.id)=(b.user_id,b.observation_id) WHERE b.user_id=$1 ORDER BY b.observation_id`,[userId])).rows;
   else rows=(await db.query(`SELECT ${d.id},${kind==='analytics'?'config_revision AS revision':'revision'},${d.keys.join(',')} FROM finance.${d.table} WHERE user_id=$1 ORDER BY ${d.id}`,[userId])).rows;
-  for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.filter(k=>!['source_allocation_id','target_allocation_id'].includes(k)||row[k]!==null).map(k=>[k,row[k]]))}});}
+  for(const row of rows){const id=row[d.id]as string;result.set(key(kind,id),{kind,id,snapshot:{revision:String(row.revision),values:Object.fromEntries(d.keys.filter(k=>!['source_allocation_id','target_allocation_id','proposal_operation_ids','auto_rule_id'].includes(k)||row[k]!==null).map(k=>[k,row[k]]))}});}
  }
  return result;
 }
@@ -76,6 +77,7 @@ function referenceConflicts(map:SnapshotMap):Conflict[]{
  const out:Conflict[]=[],get=(k:ObjectKind,id:unknown)=>typeof id==='string'?map.get(key(k,id))?.snapshot.values:undefined;
  const compatible=(role:unknown,c:unknown,s:unknown)=>{const root=get('category',c),sub=get('category',s),allows=(v:Record<string,unknown>)=>!['expense','income'].includes(role as string)||v.role==='both'||v.role===role;return (c===null||!!root&&root.parent_id===null&&allows(root))&&(s===null||!!sub&&sub.parent_id===c&&allows(sub));};
  for(const row of map.values()){const v=row.snapshot.values;let invalid=false;
+  if(row.kind==='category_binding'){const root=get('category',v.category_id),leaf=v.subcategory_id?get('category',v.subcategory_id):undefined;invalid=!root||root.parent_id!==null||root.hidden===true||!['expense','both'].includes(root.role as string)||!!v.subcategory_id&&(!leaf||leaf.parent_id!==v.category_id||leaf.hidden===true||!['expense','both'].includes(leaf.role as string));}
   if(row.kind==='category'&&v.parent_id!==null){const parent=get('category',v.parent_id);invalid=!parent||parent.parent_id!==null||parent.role!=='both'&&parent.role!==v.role;}
   if(row.kind==='operation'){const sem=v.semantics as {role:{value:string};category:{value:string|null};subcategory:{value:string|null};counterparty:{value:string|null}};invalid=!compatible(sem.role.value,sem.category.value,sem.subcategory.value)||sem.counterparty.value!==null&&!get('counterparty',sem.counterparty.value)||!!get('counterparty',sem.counterparty.value)?.merged_into_id||!!v.corrections&&typeof v.corrections==='object'&&'accountId'in v.corrections&&!get('account',(v.corrections as Record<string,unknown>).accountId);}
   if(row.kind==='link'){
@@ -112,10 +114,12 @@ export async function restoreHistory(db:PoolClient,userId:string,intent:RestoreI
  finally{await db.query('RELEASE SAVEPOINT history_replay');}
  return {table:'history',id:intent.id,before:null,details};
 }
-type HistoryFilter={from?:string;through?:string;operationIds?:string[];kinds?:string[];beforeRevision?:string;limit:number};
-const actionKinds=['save_overview_view','delete_overview_view','reorder_overview_views','save_budget','set_budget_limit','delete_budget','operation','components','link','account','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different','merge_duplicate','delete_rule','apply_rules','save_operations_view','delete_operations_view','reorder_operations_views'];
-function parseHistoryFilter(value:unknown):HistoryFilter {const r=object(value,['from','through','operationIds','kinds','beforeRevision','limit']),f:HistoryFilter={limit:100};
+type HistoryFilter={search?:string;mergeTargetId?:string;from?:string;through?:string;operationIds?:string[];kinds?:string[];beforeRevision?:string;limit:number};
+const actionKinds=['operation_card','bulk_operations','reset_categories','set_category_binding','add_catalog_categories','save_overview_view','delete_overview_view','reorder_overview_views','save_budget','set_budget_limit','delete_budget','operation','components','link','account','account_settings','category','counterparty','rule','analytics','undo','merge_accounts','split_account','delete_financial','merge_categories','delete_category','migrate_category','merge_counterparties','split_counterparty','transfer_counterparty_operations','delete_counterparty','set_exclusion','restore_history','reset_financial','cancel_import','duplicate_different','merge_duplicate','delete_rule','apply_rules','create_rule_with_history','save_operations_view','delete_operations_view','reorder_operations_views'];
+function parseHistoryFilter(value:unknown):HistoryFilter {const r=object(value,['from','through','operationIds','kinds','beforeRevision','limit','mergeTargetId','search']),f:HistoryFilter={limit:100};
  for(const k of ['from','through']as const)if(k in r){const d=dateFact({precision:'instant',instant:r[k]});f[k]=(d as {instant:string}).instant;}if(f.from&&f.through&&f.from>f.through)throw new TypeError('INVALID_RANGE');
+ if('search'in r){if(typeof r.search!=='string'||r.search.length>160)throw new TypeError('INVALID_HISTORY_SEARCH');f.search=r.search;}
+ if('mergeTargetId'in r)f.mergeTargetId=uuid(r.mergeTargetId);
  if('operationIds'in r)f.operationIds=ids(r.operationIds);if('kinds'in r){if(!Array.isArray(r.kinds)||!r.kinds.length||r.kinds.length>actionKinds.length||r.kinds.some(k=>typeof k!=='string'||!actionKinds.includes(k)))throw new TypeError('INVALID_HISTORY_KINDS');f.kinds=[...new Set(r.kinds as string[])];}
  if('beforeRevision'in r){if(typeof r.beforeRevision!=='string'||!/^(0|[1-9]\d*)$/.test(r.beforeRevision))throw new TypeError('INVALID_REVISION');f.beforeRevision=r.beforeRevision;}
  if('limit'in r){if(typeof r.limit!=='number'||!Number.isInteger(r.limit)||r.limit<1||r.limit>100)throw new TypeError('INVALID_LIMIT');f.limit=r.limit;}return f;
@@ -123,9 +127,19 @@ function parseHistoryFilter(value:unknown):HistoryFilter {const r=object(value,[
 export async function queryHistory(db:PoolClient,userId:string,generation:string,input:unknown={}){
  const f=parseHistoryFilter(input),current=await captureHistory(db,userId),all=await historyRows(db,userId);
  if(f.operationIds)for(const id of f.operationIds)if(!current.has(key('operation',id)))throw new HttpError(404,'NOT_FOUND');
- const filtered=all.filter(r=>r.recent&&(!f.from||r.committed_at>=new Date(f.from))&&(!f.through||r.committed_at<=new Date(f.through))&&(!f.operationIds||r.affected_operation_ids.some(id=>f.operationIds!.includes(id)))&&(!f.kinds||f.kinds.includes(r.intent.canonical.kind))&&(!f.beforeRevision||BigInt(r.committed_revision)<BigInt(f.beforeRevision))),page=filtered.slice(0,f.limit),actions=page.map(r=>{
+ const normalize=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU').replaceAll('ё','е');
+ const tokens=normalize(f.search??'').trim().split(/\s+/).filter(Boolean);
+ const matches=(r:HistoryRow)=>{
+  if(!tokens.length)return true;
+  const changes=publicChanges(r.change_set??[]);
+  const operationNames=r.affected_operation_ids.map(id=>current.get(key('operation',id))?.snapshot.values.semantics).map(sem=>(sem as {merchant?:{value?:unknown}}|undefined)?.merchant?.value);
+  const data=normalize([r.id,r.committed_revision,r.committed_at.toISOString(),r.committed_at.toLocaleDateString('ru-RU',{timeZone:'Europe/Moscow'}),...r.affected_operation_ids,...operationNames,JSON.stringify(changes)].join(' '));
+  return tokens.every(term=>data.includes(term));
+ };
+ const filtered=all.filter(r=>r.recent&&matches(r)&&(!f.mergeTargetId||r.intent.canonical.kind==='merge_accounts'&&r.intent.canonical.id===f.mergeTargetId&&!r.undone)&&(!f.from||r.committed_at>=new Date(f.from))&&(!f.through||r.committed_at<=new Date(f.through))&&(!f.operationIds||r.affected_operation_ids.some(id=>f.operationIds!.includes(id)))&&(!f.kinds||f.kinds.includes(r.intent.canonical.kind))&&(!f.beforeRevision||BigInt(r.committed_revision)<BigInt(f.beforeRevision))),page=filtered.slice(0,f.limit),actions=page.map(r=>{
   const p=plan(all,[r.id],current,generation),available=!p.conflicts.length,structural=!r.change_set&&!['delete_financial','cancel_import','undo','restore_history'].includes(r.intent.canonical.kind)&&r.undo_patch&&!r.undone;
-  return {id:r.id,committed_at:r.committed_at,revision:r.committed_revision,intent:r.intent.canonical,undone:r.undone,undoable:available,requiresPreview:true,dependenciesChecked:false,rollbackStatus:available?'available':structural?'legacy':p.conflicts.some(c=>['OBJECT_CHANGED','OBJECT_MISSING','DEPENDENCY_CONFLICT'].includes(c.reason))?'conflict':'not_available',conflicts:p.conflicts,operationIds:r.affected_operation_ids,changes:publicChanges(r.change_set??[])};
+  const summary=['cancel_import','delete_financial','reset_financial'].includes(r.intent.canonical.kind)?Object.fromEntries(Object.entries(r.preview?.counts??{}).filter(([k,v])=>['operations','files','accounts','counterparties','components','analyzerChats','imports','history'].includes(k)&&Number.isSafeInteger(v)&&Number(v)>0)):null;
+  return {id:r.id,summary,committed_at:r.committed_at,revision:r.committed_revision,intent:r.intent.canonical,undone:r.undone,undoable:available,requiresPreview:true,dependenciesChecked:false,rollbackStatus:available?'available':structural?'legacy':p.conflicts.some(c=>['OBJECT_CHANGED','OBJECT_MISSING','DEPENDENCY_CONFLICT'].includes(c.reason))?'conflict':'not_available',conflicts:p.conflicts,operationIds:r.affected_operation_ids,changes:publicChanges(r.change_set??[])};
  });
  return {actions,nextBeforeRevision:filtered.length>f.limit?page.at(-1)?.committed_revision??null:null};
 }

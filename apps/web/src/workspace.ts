@@ -2,11 +2,12 @@ import type {FinanceState} from './finance-client';
 import type {Filter} from '../../../packages/finance-core/src/graph';
 import type {Appearance} from './Settings';
 import {defaultAppearance} from './Settings';
-export type WorkspaceFilters={from:string;through:string;bankId:string;accountId:string;categoryIds:string[]};
+export type WorkspaceFilters={from:string;through:string;bankId:string;accountId:string;categoryIds:string[];accountIds?:string[];search?:string};
 export const allHistory:WorkspaceFilters={from:'',through:'',bankId:'',accountId:'',categoryIds:[]};
+export const workspaceAccountFilter=(f:WorkspaceFilters)=>f.accountIds!==undefined?{accountIds:f.accountIds}:f.accountId?{accountIds:[f.accountId]}:f.bankId?{bankId:f.bankId}:{};
 export function financialFilter(filters:WorkspaceFilters,accounts:FinanceState['accounts']):Filter{
  return {...(filters.from?{from:filters.from}:{}),...(filters.through?{through:filters.through}:{}),
-  ...(filters.accountId?{accountIds:[filters.accountId]}:filters.bankId?{accountIds:accounts.filter(a=>a.bankId===filters.bankId).map(a=>a.id)}:{}),
+  ...(filters.accountIds!==undefined?{accountIds:filters.accountIds}:filters.accountId?{accountIds:[filters.accountId]}:filters.bankId?{accountIds:accounts.filter(a=>a.bankId===filters.bankId).map(a=>a.id)}:{}),
   ...(filters.categoryIds.length?{categoryIds:filters.categoryIds}:{})};
 }
 export type FinanceRoute={screen:'overview'|'operations'|'analyzer'|'settings';section:string|null};
@@ -21,10 +22,11 @@ const appearanceKey='finance-appearance-v1';
 export function acceptInterfaceEpoch(epoch:string){try{const previous=localStorage.getItem('finance-interface-epoch-v1');localStorage.setItem('finance-interface-epoch-v1',epoch);return previous!==null&&previous!==epoch;}catch{return false;}}
 export function readAppearance():Appearance{
  try{const value=JSON.parse(localStorage.getItem(appearanceKey)??'null') as Partial<Appearance>|null;
-  if(value&&['system','light','dark'].includes(value.theme??'')&&['comfortable','compact'].includes(value.density??'')&&['standard','large'].includes(value.textSize??'')&&['system','reduced','full'].includes(value.motion??''))return {theme:value.theme!,density:value.density!,textSize:value.textSize!,motion:value.motion!};
+  if(value&&['system','light','dark'].includes(value.theme??'')&&['comfortable','compact'].includes(value.density??'')&&['standard','large'].includes(value.textSize??'')&&['system','reduced','full'].includes(value.motion??''))return {theme:value.theme!,density:'comfortable',textSize:value.textSize!,motion:'system'};
  }catch{/* Appearance is optional; a blocked or corrupt store never blocks finance. */}
  return {...defaultAppearance};
 }
-export function applyAppearance(value:Appearance){const root=document.documentElement;root.dataset.theme=value.theme;root.dataset.density=value.density;root.dataset.textSize=value.textSize;root.dataset.motion=value.motion;
+export function applyAppearance(value:Appearance,persist=true){const root=document.documentElement;root.dataset.theme=value.theme;root.dataset.density=value.density;root.dataset.textSize=value.textSize;root.dataset.motion=value.motion;
+ if(!persist)return;
  try{if(Object.entries(defaultAppearance).every(([key,v])=>value[key as keyof Appearance]===v))localStorage.removeItem(appearanceKey);else localStorage.setItem(appearanceKey,JSON.stringify({theme:value.theme,density:value.density,textSize:value.textSize,motion:value.motion}));}catch{/* Safe visual preferences can remain in memory. */}
 }

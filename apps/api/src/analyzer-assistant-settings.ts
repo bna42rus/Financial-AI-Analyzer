@@ -3,11 +3,24 @@ import { rubAmount } from '../../../packages/analyzer/src/cost.ts';
 import { costPolicy } from './analyzer-cost.ts';
 import type { CostPolicy } from './analyzer-cost.ts';
 import { AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
+import type { MonthlyAuthorization } from './assistant-monthly.ts';
 
 export type AssistantStagingSettings = { realm: 'staging/finance'; apiKey: string; allowedEmails: string[]; sourceSha256: string; modelMetadataSha256: string;
-  admission: { budgetSha256: string; spentAtoms: string; calls: number; stageCapAtoms: string; stageMaximumCalls: number }; maximumCalls: number; expiresAt: string; tariffCheckedAt: string; tariffSource: string; cost: CostPolicy };
+  admission: { budgetSha256: string; spentAtoms: string; calls: number; stageCapAtoms: string; stageMaximumCalls: number }; maximumCalls: number; expiresAt: string; tariffCheckedAt: string; tariffSource: string; cost: CostPolicy; monthly?: MonthlyAuthorization };
 export const assistantTariffSource = 'https://cdn.cloud.ru/docs/legal/tariffs/evolution/current-version/foundation-models.pdf';
 export function checkAssistantStagingSettings(value: unknown, now = new Date()): AssistantStagingSettings {
+  if (value && typeof value === 'object' && 'monthly' in value) {
+    const { monthly: rawMonthly, ...legacy } = value as Record<string, unknown>;
+    const monthly = object(rawMonthly, ['version','limitRub','activatedAt']);
+    if (monthly.version !== 'cashneuro-staging-monthly/1' || monthly.limitRub !== '100' || typeof monthly.activatedAt !== 'string' ||
+        !Number.isFinite(Date.parse(monthly.activatedAt)) || Date.parse(monthly.activatedAt) > now.getTime()) throw new AssistantError('ASSISTANT_MONTHLY_CONFIGURATION_DENIED');
+    // Preserve and validate the complete historical permit without making its
+    // short trial expiration a permanent operating deadline.
+    const historical = new Date(Math.max(Date.parse(String(legacy.tariffCheckedAt)), Date.parse((legacy.cost as CostPolicy)?.projectPeriodStart)) + 1);
+    const checked = checkAssistantStagingSettings(legacy, historical);
+    if (checked.allowedEmails.length !== 1 || !checked.cost.projectId.startsWith('staging/')) throw new AssistantError('ASSISTANT_MONTHLY_CONFIGURATION_DENIED');
+    return { ...checked, monthly: monthly as MonthlyAuthorization };
+  }
   const r = object(value, ['realm','apiKey','allowedEmails','sourceSha256','modelMetadataSha256','admission','maximumCalls','expiresAt','tariffCheckedAt','tariffSource','cost']);
   const denied = () => { throw new AssistantError('ASSISTANT_STAGING_CONFIGURATION_DENIED'); };
   if (r.realm !== 'staging/finance' || typeof r.apiKey !== 'string' || !/^[\x21-\x7e]{20,512}$/.test(r.apiKey) ||

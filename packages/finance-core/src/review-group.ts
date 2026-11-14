@@ -8,8 +8,8 @@ function signature(o:ReviewGroupOperation):string|null{
 }
 /** A suggestion only, restricted to the persisted session. No new import, resolved
  * item, transfer/refund, duplicate or structural conflict can widen this scope. */
-export function reviewGroupIds(operations:ReviewGroupOperation[],fixedIds:string[],anchorId:string):string[]{
- if(fixedIds.length>1000||!fixedIds.includes(anchorId))return [];
+export function reviewGroupIds(operations:ReviewGroupOperation[],fixedIds:string[],anchorId:string,live=false):string[]{
+ if(!live&&fixedIds.length>1000||!fixedIds.includes(anchorId))return [];
  const byId=new Map(operations.map(o=>[o.id,o])),anchor=byId.get(anchorId),key=anchor?signature(anchor):null;
  if(key===null)return [];
  const ids=fixedIds.filter(id=>{const o=byId.get(id);return o&&signature(o)===key;});

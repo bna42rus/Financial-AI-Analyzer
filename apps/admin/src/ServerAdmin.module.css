@@ -1,0 +1,65 @@
+.page{width:100%;min-width:0;max-width:1280px;padding-inline:var(--workspace-gutter,24px)}
+.header{position:relative;isolation:isolate;margin-bottom:1.15rem;border-bottom:1px solid var(--color-border)}
+.header::before{content:"";position:absolute;inset:0;z-index:-1;background:var(--color-surface);box-shadow:0 0 0 100vmax var(--color-surface);clip-path:inset(0 -100vmax)}
+.headerBar,.headerActions,.listHead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.headerBar{justify-content:space-between;padding-block:14px;}
+.headerActions>a{text-decoration:none}
+.nav{display:flex;align-items:stretch;gap:5px;overflow:auto;scrollbar-width:thin;padding-top:3px}
+.nav a{display:flex;align-items:center;gap:6px;white-space:nowrap;padding:10px 8px;color:var(--color-text);text-decoration:none;border-bottom:2px solid transparent;font-size:.84rem}
+.nav a:hover{background:var(--color-soft)}
+.nav a[aria-current=page]{border-color:var(--color-primary);color:var(--color-primary)}
+.main{min-width:0;display:grid;align-content:start;gap:16px;margin-bottom:24px}
+.main>h1{margin:0;font-size:1.55rem}
+.main section{min-width:0}
+.main>section,.main>div>section,.main>div>aside{border-radius:12px;padding:clamp(14px,2vw,22px)}
+.entry{grid-template-columns:minmax(0,1fr) minmax(280px,.95fr)}
+.entry>section{margin:0;align-self:center}
+.filters{display:flex;align-items:center;flex-wrap:wrap;gap:9px;margin-bottom:12px}
+.filters>*{flex:1 1 150px;min-width:0}
+.filters>*:first-child{flex-grow:2}
+.records>article{padding-block:12px;overflow-wrap:anywhere}
+.records>article+article,.catalogRow+.catalogRow{border-top:1px solid var(--color-border)}
+.records>article:first-child{padding-top:3px}
+.records>article:last-child{padding-bottom:3px}
+.records p{margin-block:5px;color:var(--color-secondary-text)}
+.records summary{margin-top:8px;cursor:pointer}
+.records details[open]>div{margin-top:8px;background:var(--color-background);border-radius:9px;padding:12px}
+.records article:target,.records article[data-highlight=true]{border-radius:8px;outline:1px solid var(--color-primary);outline-offset:4px}
+.paymentHead,.catalogRow{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.catalogRow{padding-block:12px}
+.catalogRow p{margin-block:4px}
+.catalogRow small{color:var(--color-secondary-text)}
+.badge,.attention,.success,.mutedBadge{display:inline-block;border-radius:999px;padding:3px 8px;font-size:.78rem}
+.badge{color:var(--color-primary);background:var(--color-soft)}
+.attention{color:var(--color-warning-text,var(--color-text));background:var(--color-warning-surface,var(--color-soft))}
+.success{color:var(--color-success,var(--color-text));background:var(--color-success-surface,var(--color-soft))}
+.mutedBadge{color:var(--color-secondary-text);background:var(--color-background)}
+.listHead{justify-content:space-between}
+.listHead h2{margin:0}
+.check{display:flex!important;align-items:flex-start;gap:8px}
+.check input{inline-size:auto!important;min-block-size:0!important;margin-top:.2em;accent-color:var(--color-primary)}
+.account{width:min(100%,820px);margin-inline:auto}
+.detailList{display:grid;gap:8px;margin-block:8px}
+.detailList>div{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:8px}
+.detailList dd{margin:0;overflow-wrap:anywhere}
+.detailList dt{color:var(--color-secondary-text)}
+@media(max-width:760px){.page{padding-inline:16px}.entry{grid-template-columns:minmax(0,1fr)}.entry>section{width:100%;max-width:540px}.nav a{min-height:44px}}
+
+.page[data-admin-shell=workspace]>.header{margin-bottom:20px}
+.page[data-admin-shell=workspace] .headerBar{min-height:60px;padding-block:9px}
+.page[data-admin-shell=entry]>.header::before{display:none}
+.page[data-admin-shell=entry] .headerBar{padding-block:0}
+.page[data-admin-shell=workspace] .nav{justify-content:safe center;border-top:1px solid var(--color-border);padding-top:3px}
+.userToolbar>button{flex:0 0 auto}
+.userList p,.userHeading+ p{margin-block:4px}
+.userHeading h2{margin:0}
+.userLinks,.detailActions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid var(--color-border)}
+.recordCards{display:grid;gap:10px}
+.records.recordCards>article{padding:12px;border:1px solid var(--color-border);border-radius:10px}
+.account{width:100%}
+.account dl>div>dd{text-align:left}
+
+.rowActions{display:flex;flex-wrap:wrap;gap:6px}
+
+.destructive{color:var(--color-danger)}
+.destructive:hover:not(:disabled){border-color:var(--color-danger)}

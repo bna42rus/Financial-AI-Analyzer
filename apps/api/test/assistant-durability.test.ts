@@ -12,6 +12,9 @@ import { runAssistant } from '../src/assistant-workflow.ts';
 import type { AssistantRequest, AssistantServices } from '../src/assistant-workflow.ts';
 import { emptyConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
+import { checkedTransportDiagnostic } from '../src/benchmark-transport.ts';
+import { checkedAssistantReceipt } from '../src/assistant-journal.ts';
+import { assistantWorkflowVersion } from '../src/assistant-workflow.ts';
 const id = (n: number) => '60000000-0000-4000-8000-' + String(n).padStart(12, '0');
 const scope = { ownerId: 'independent-synthetic-owner', chatId: id(1), generation: id(2), chatEpoch: id(3) };
 const request = (): AssistantRequest => ({ requestId: id(4), scope, conversation: emptyConversation(scope), global: { revision: 0, filter: {}, touched: {} },
@@ -106,6 +109,43 @@ test('unknown HTTP delivery retains its full durable hold, blocks new requests a
   }, now);
   assert.equal(calls, 1);
 }));
+
+test('HTTP rejection and network causes survive journal reload without provider text, credentials, retries or invented usage', async () => temporary(async (_root, directory) => {
+  for (const [n, failure] of [[20, 'http'], [21, 'dns'], [22, 'timeout']] as const) {
+    const r={...request(),requestId:id(n)};let calls=0;
+    const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async()=>{
+      calls++;
+      if(failure==='dns')throw Object.assign(Error('private hostname and credential'),{cause:{code:'ENOTFOUND',message:'private cause'}});
+      if(failure==='timeout')throw new DOMException('private timeout message','TimeoutError');
+      return new Response('private token reflected in max_completion_tokens',{status:400});
+    });
+    const s=services();
+    await withAssistantJournal(directory,r,accounting,j=>runAssistant(r,model,j,s.s));
+    const raw=await readFile(join(directory,r.requestId+'.json'),'utf8'), saved=JSON.parse(raw);
+    const diagnostic=saved.receipt.calls[0].transport;
+    assert.equal(diagnostic.code,failure==='http'?'BENCH_PROVIDER_FAILURE_HTTP_400':'BENCH_DELIVERY_UNKNOWN');
+    assert.equal(diagnostic.networkCode,failure==='http'?undefined:failure==='dns'?'ENOTFOUND':'TIMEOUT');
+    if(failure==='http')assert.deepEqual(diagnostic.referencedParameters,['max_completion_tokens']);
+    assert.ok(Number.isInteger(diagnostic.elapsedMs));assert.equal(saved.receipt.calls[0].usage,undefined);
+    assert.equal(saved.receipt.calls[0].state,'unknown');assert.ok(!raw.includes('private'));assert.ok(!raw.includes('synthetic-key'));
+    checkedAssistantReceipt(saved,saved.receipt.fingerprint);
+    await withAssistantJournal(directory,r,accounting,j=>runAssistant(r,model,j,s.s));assert.equal(calls,1);
+  }
+  for(const diagnostic of [{code:'BENCH_PROVIDER_FAILURE_HTTP_400',body:'private'}, {code:'BENCH_DELIVERY_UNKNOWN',networkCode:'private'}, {code:'BENCH_DELIVERY_UNKNOWN',referencedParameters:['apiKey']}]){
+    assert.throws(()=>checkedTransportDiagnostic(diagnostic));
+    assert.throws(()=>checkedAssistantReceipt({version:assistantWorkflowVersion,receipt:{fingerprint:'a'.repeat(64),calls:[{fingerprint:'b'.repeat(64),phase:'understand',state:'unknown',transport:diagnostic}]}},'a'.repeat(64)),/JOURNAL_INVALID/);
+  }
+}));
+
+test('runtime waits up to 90 seconds for one completion without increasing its token or call budget',async()=>{
+  const original=AbortSignal.timeout;const deadlines:number[]=[];
+  AbortSignal.timeout=(ms:number)=>{deadlines.push(ms);return original(ms);};
+  try{
+    const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async()=>wire(plan));
+    let reserves=0;await model.complete({phase:'understand',prompt:'synthetic',input:{},schema:{}},async()=>{reserves++;});
+    assert.deepEqual(deadlines,[90000]);assert.equal(reserves,1);assert.equal(model.bound.outputTokens,1200);
+  }finally{AbortSignal.timeout=original;}
+});
 
 test('budget cap, total call limit, changed binding and stale tariff block before dispatch; settlement is idempotent', async () => temporary(async (root) => {
   const p = { ...permit(), maximumCalls: 1 };

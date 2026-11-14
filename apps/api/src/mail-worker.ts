@@ -18,7 +18,7 @@ export async function assertMailRole(config:WorkerConfig){
  if(config.postbox&&config.environment!=='staging')throw new Error('MAIL_CONFIGURATION_DENIED');
  try{
   for(const origin of [config.financeOrigin,config.controlOrigin]){const u=new URL(origin);if(u.origin!==origin||!['http:','https:'].includes(u.protocol))throw new Error();if(config.environment==='staging'&&(u.protocol!=='https:'||!(u.hostname==='test.cashneuro.ru'||u.hostname.endsWith('.test.cashneuro.ru'))))throw new Error();}
-  if(config.postbox){if(!config.postbox.recipients.some(r=>r.toLowerCase()===config.adminRecipient.toLowerCase()))throw new Error();}
+  if(config.postbox){const {postboxAddress}=await import('./postbox.ts');if(!postboxAddress(config.adminRecipient))throw new Error();}
   else if(!/^[^\s@]+@example\.test$/.test(config.adminRecipient))throw new Error();
  }catch{throw new Error('MAIL_CONFIGURATION_DENIED');}
  const role=(await config.pool.query('SELECT oid,current_user AS name,rolsuper,rolbypassrls FROM pg_roles WHERE rolname=current_user')).rows[0];
@@ -39,10 +39,11 @@ async function currentMessage(db:PoolClient,schema:Schema,row:Row,p:Record<strin
  if(row.expires_at&&row.expires_at<=(await db.query('SELECT clock_timestamp() AS now')).rows[0].now)return false;
  const verifier=(key:string)=>typeof p[key]==='string'?digest(p[key]):'';
  if(row.kind==='application_verification')return Boolean((await db.query(`SELECT 1 FROM access.email_token t JOIN access.request r ON r.id=t.request_id WHERE verifier=$1 AND consumed_at IS NULL AND t.expires_at>clock_timestamp() AND r.data->>'status' NOT IN ('rejected','paid_not_activated') AND ((r.data->>'expiresAt')::timestamptz>clock_timestamp() OR r.data->>'status' IN ('under_review','needs_topup'))`,[verifier('token')])).rowCount);
- if(row.kind==='invitation'||row.kind==='registration_verification'){
-  const where=row.kind==='invitation'?'i.verifier=$1':`EXISTS(SELECT 1 FROM access.registration_proof proof WHERE proof.invitation_id=i.id AND proof.verifier=$1 AND proof.consumed_at IS NULL AND proof.expires_at>clock_timestamp())`;
-  return Boolean((await db.query(`SELECT 1 FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE ${where} AND i.state='active' AND i.expires_at>clock_timestamp() AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp()))`,[verifier(row.kind==='invitation'?'token':'proofToken')])).rowCount);
+ if(row.kind==='invitation'||row.kind==='billing_invitation'||row.kind==='registration_verification'){
+  const where=row.kind!=='registration_verification'?'i.verifier=$1':`EXISTS(SELECT 1 FROM access.registration_proof proof WHERE proof.invitation_id=i.id AND proof.verifier=$1 AND proof.consumed_at IS NULL AND proof.expires_at>clock_timestamp())`;
+  return Boolean((await db.query(`SELECT 1 FROM commerce.invitation i LEFT JOIN commerce.purchase p ON p.id=i.purchase_id LEFT JOIN commerce.manual_grant g ON g.id=i.manual_grant_id WHERE ${where} AND i.state='active' AND i.expires_at>clock_timestamp() AND (p.state='paid_not_activated' OR g.state='pending' AND (g.term->>'kind'!='fixed' OR (g.term->>'end')::timestamptz>clock_timestamp()))`,[verifier(row.kind==='registration_verification'?'proofToken':'token')])).rowCount);
  }
+ if(['account_deletion_code','account_deletion_received'].includes(row.kind))return Boolean((await db.query('SELECT identity.deletion_mail_current($1,$2) AS valid',[p.requestId,row.kind==='account_deletion_code'?'awaiting_code':'pending'])).rows[0]?.valid);
  if(row.kind==='password_reset')return Boolean((await db.query(`SELECT 1 FROM ${schema}.reset_token t JOIN ${schema}.security_state s ON s.user_id=t.user_id JOIN ${schema}.auth_user u ON u.id=t.user_id WHERE verifier=$1 AND consumed_at IS NULL AND expires_at>clock_timestamp() AND t.epoch=s.epoch AND u.email_verified=true AND u.email=$2`,[verifier('token'),p.email])).rowCount);
  if(['access_reminder','access_expired'].includes(row.kind)){
   const r=(await db.query(`SELECT c.access_end,c.indefinite,u.email,u.email_verified,clock_timestamp() AS now FROM commerce.access_cycle c JOIN identity.auth_user u ON u.id=c.user_id WHERE c.user_id=$1`,[row.subject_id])).rows[0];
@@ -68,9 +69,9 @@ async function claim(config:WorkerConfig,schema:Schema,transport:Transport){
    else message=renderMail(row.kind,p,config,(await db.query('SELECT created_at FROM '+schema+'.outbox WHERE id=$1',[row.id])).rows[0].created_at.toISOString());
   }catch{error='INVALID_PAYLOAD';}
   if(row.retry_count>=5)error??='ATTEMPTS_EXHAUSTED';
-  if(error){await db.query(`UPDATE ${schema}.outbox SET state='failed',last_error=$2,lease_id=NULL,lease_until=NULL WHERE id=$1`,[row.id,error]);await db.query('COMMIT');return {suppressed:true} as const;}
+  if(error){await db.query(`UPDATE ${schema}.outbox SET state='failed',last_error=$2,lease_id=NULL,lease_until=NULL,sealed_payload=CASE WHEN kind IN ('account_deletion_completed','account_deletion_code') THEN '' ELSE sealed_payload END WHERE id=$1`,[row.id,error]);await db.query('COMMIT');return {suppressed:true} as const;}
   const lease=crypto.randomUUID();
-  await db.query(`UPDATE ${schema}.outbox SET attempts=attempts+1,retry_count=retry_count+1,lease_id=$2,lease_until=clock_timestamp()+interval '30 seconds',last_error=NULL WHERE id=$1`,[row.id,lease]);
+  await db.query(`UPDATE ${schema}.outbox SET attempts=attempts+1,retry_count=retry_count+1,lease_id=$2,lease_until=clock_timestamp()+interval '30 seconds',last_error=NULL,recipient=$3 WHERE id=$1`,[row.id,lease,row.kind==='account_deletion_completed'?null:message!.to]);
   await db.query('COMMIT');return {id:row.id,lease,message:message!,retryCount:row.retry_count+1} as const;
  }catch{await db.query('ROLLBACK');throw new Error('MAIL_CLAIM_FAILED');}finally{db.release();}
 }
@@ -85,10 +86,10 @@ export async function deliverBatch(config:WorkerConfig,transport:Transport,limit
    try{
     const result=await transport.deliver(row.id,row.message);
     if(result.acceptance!==(config.postbox?'postbox':'sandbox'))throw new DeliveryFailure('DELIVERY_UNKNOWN');
-    await config.pool.query(`UPDATE ${schema}.outbox SET state='sent',sent_at=clock_timestamp(),acceptance=$3,last_error=NULL,lease_id=NULL,lease_until=NULL WHERE id=$1 AND lease_id=$2 AND state='queued'`,[row.id,row.lease,result.acceptance]);
+    await config.pool.query(`UPDATE ${schema}.outbox SET state='sent',sent_at=clock_timestamp(),acceptance=$3,last_error=NULL,lease_id=NULL,lease_until=NULL,sealed_payload=CASE WHEN kind IN ('account_deletion_completed','account_deletion_code') THEN '' ELSE sealed_payload END WHERE id=$1 AND lease_id=$2 AND state='queued'`,[row.id,row.lease,result.acceptance]);
    }catch(error){
     const known=error instanceof DeliveryFailure,code=known?error.code:'DELIVERY_UNKNOWN',retry=known&&error.retryable&&code==='TEMPORARY'&&row.retryCount<5;
-    await config.pool.query(`UPDATE ${schema}.outbox SET state=$3,last_error=$4,lease_id=NULL,lease_until=NULL,next_attempt_at=clock_timestamp()+($5*interval '1 second') WHERE id=$1 AND lease_id=$2 AND state='queued'`,[row.id,row.lease,retry?'queued':'failed',code,Math.min(240,15*2**(row.retryCount-1))]);
+    await config.pool.query(`UPDATE ${schema}.outbox SET state=$3,last_error=$4,lease_id=NULL,lease_until=NULL,sealed_payload=CASE WHEN $3='failed' AND kind IN ('account_deletion_completed','account_deletion_code') THEN '' ELSE sealed_payload END,next_attempt_at=clock_timestamp()+($5*interval '1 second') WHERE id=$1 AND lease_id=$2 AND state='queued'`,[row.id,row.lease,retry?'queued':'failed',code,Math.min(240,15*2**(row.retryCount-1))]);
    }
   }
  }

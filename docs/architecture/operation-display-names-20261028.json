@@ -1,0 +1,2219 @@
+{
+  "schema": "cashneuro-operation-name-design/1",
+  "date": "2026-10-28",
+  "baseline_commit": "55f2f92832b44d1a75c48d87c02bb1b514a2e0c7",
+  "status": "PREPARED_FOR_OWNER_REVIEW_NOT_DEPLOYED",
+  "scope": "Full NAME contract. No runtime/product source, DB, statement facts, identities or financial logic changed; no new merchant recognition aliases/categories/broker-insurer scope.",
+  "authorization": "Owner Ок давай after completed ACT audit and stated next NAME stage; new details are proposed as a complete package, not historical approvals.",
+  "default_policy": "SOURCE_SCRIPT_SAFE_READ_ONLY_VIEW",
+  "projection_fields": [
+    {
+      "field": "title",
+      "meaning": "Основной полный допустимый title: защищённое личное имя, торговое имя/конкретный сервис либо честный fallback.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "eventLabel",
+      "meaning": "Существующий фактический вид/статус события — например Возврат/Перевод. Это не новое финансовое событие, не merchant и не услуга. В одно-поле представлении идёт перед title; одинаковый title-смысл не дублируется.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "serviceQualifier",
+      "meaning": "Только известная услуга, различающая продукты группы; не вывод из guessed category.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "fulfillmentQualifier",
+      "meaning": "Доставка/самовывоз только по доказанному способу того же заказа.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "viaLabel",
+      "meaning": "Допустимое имя доказанного агрегатора, не новая identity продавца.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "compositeLabel",
+      "meaning": "Обязательное понятное одно-поле представление title + доказанные qualifiers, если поверхность не показывает отдельные labels.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "safeBankDescriptionRef",
+      "meaning": "Ссылка на доступное уже очищенное описание, не новая raw копия.",
+      "write_authority": "NONE_READ_ONLY"
+    },
+    {
+      "field": "explanationCode",
+      "meaning": "Внутренний конечный NAME-R/S code/версия/provenance; в UI понятное объяснение по запросу без сырой строки.",
+      "write_authority": "NONE_READ_ONLY"
+    }
+  ],
+  "priority": [
+    "EXISTING_PROTECTED_NAME_WITH_PRIVACY",
+    "APPROVED_EXPLICIT_OVERRIDE",
+    "PROVEN_IDENTITY_SAME_SCRIPT_STYLE",
+    "PERMITTED_SOURCE_MERCHANT_SPAN",
+    "ALLOWED_EVENT_COUNTERPARTY_DESCRIPTION",
+    "HONEST_FALLBACK"
+  ],
+  "rules": [
+    {
+      "id": "NAME-R01",
+      "title": "Проекция отображения",
+      "contract": "NAME — read-only представление. Автоматическое упрощение не переписывает source, semantics.merchant для matching, bank/source versions, ID/HMAC, суммы/даты/счета, категории/роли, parts/links и историю. Явный пользовательский Rename использует прежний отдельный разрешённый action."
+    },
+    {
+      "id": "NAME-R02",
+      "title": "Защищённое имя",
+      "contract": "userVerified либо имя из user/personal_rule/global_rule сохраняется в рамках действующего приоритета. Стилевой каталог не отменяет личное имя. Только применимая privacy и безопасный plain-text вывод ограничивают проекцию; сохранённые значения не переписываются."
+    },
+    {
+      "id": "NAME-R03",
+      "title": "Исходная строка отдельно",
+      "contract": "Очищенное банковское описание доступно отдельно от короткого имени по действующему доступу и лимитам. Не подменять его словом Покупка; не требовать загрузки raw выписки/реквизитов на сервер ради имени."
+    },
+    {
+      "id": "NAME-R04",
+      "title": "Алфавит по умолчанию",
+      "contract": "Без явного зарегистрированного языкового override сохраняется письменность допустимого банковского торгового имени. Распознавание транслитерации/падежа/ACT не даёт право принудительно русифицировать или англизировать неизвестное имя."
+    },
+    {
+      "id": "NAME-R05",
+      "title": "Никакого общего Title Case",
+      "contract": "Не превращать DNS/МТС/DDX/5Post в Dns/Мтс/Ddx/5post общим title-case. Исправление регистра/пробелов/пунктуации известного бренда возможно только по конечному style binding после доказанной identity."
+    },
+    {
+      "id": "NAME-R06",
+      "title": "Явный TimeWeb",
+      "contract": "Ранее указанный владельцем TimeWeb — зарегистрированное исключение. Только установленный профиль/допущенный alias даёт TimeWeb, не time web как произвольные слова. Timeweb/Timeweb Cloud могут иметь разные услуги/получателей; общий label не сливает их."
+    },
+    {
+      "id": "NAME-R07",
+      "title": "Style binding не recognizer",
+      "contract": "Таблица стилей не содержит новых банковских aliases и не распознаёт бренд сама. Нужны положительная identity, услуга, допустимый source span и применимый период из merchant-каталога/его source-dispositions. Excluded/исторический профиль не активируется через NAME."
+    },
+    {
+      "id": "NAME-R08",
+      "title": "Русское публичное имя",
+      "contract": "Русское имя взамен латинского возможно только по адресному явно согласованному display override с основанием/периодом. Наличие русского варианта в интернете или русской подписи в профиле само не глобальное разрешение на смену алфавита. До такого override определён SOURCE_SCRIPT, не незакрытое правило."
+    },
+    {
+      "id": "NAME-R09",
+      "title": "Конкретный сервис",
+      "contract": "Go/Еда/Лавка/Драйв/Маркет/Заправки/Доставка/Сим/Сплит, Fresh, корпоративный/банковский продукт не удаляются как мусор бренда. Если несколько сервисов группы, общий Яндекс/Ozon/МТС/Сбер не достаточный короткий label."
+    },
+    {
+      "id": "NAME-R10",
+      "title": "Нельзя усиливать доказательства",
+      "contract": "Яндекс Go без услуги остаётся Яндекс Go, а не Такси. Сервисы Яндекса без Go не становятся Go. Название не создаёт товар, поездку, бренд Бери заряд, диагноз, ребёнка, подарок или финансовую роль из предположения категории."
+    },
+    {
+      "id": "NAME-R11",
+      "title": "Неизвестное полное имя",
+      "contract": "Если бренд не установлен, сохранить весь полезный допустимый merchant text в существующих пределах. Не первая часть до пробела/цифры/дефиса/точки; не переводить/восстанавливать написание по созвучию. Слово Ромашка не конкретная сеть."
+    },
+    {
+      "id": "NAME-R12",
+      "title": "Полезный fallback",
+      "contract": "При отсутствии merchant span использовать допустимый actual event + известную собственную counterparty/полезную безопасную часть описания. Продавец не определён допустим, когда сведений реально нет. Не всем неизвестным операциям Покупка и не вымышленное имя категории вместо продавца."
+    },
+    {
+      "id": "NAME-R13",
+      "title": "Банковский префикс",
+      "contract": "Покупка/оплата/card payment/POS/ECOM удаляются из короткого label только если это установленный служебный сегмент исходного формата/события, не часть торгового названия. В описании остаются. Возврат/перевод не теряются как вид события."
+    },
+    {
+      "id": "NAME-R14",
+      "title": "Эквайер и банк",
+      "contract": "SBER/СБЕР/SBP/Т-Банк/платёжный агрегатор могут быть реальным предметом операции либо техническим каналом. Убирать только adapter-proven канал, сохранить его допустимый контекст отдельно; не глобальный regex СБЕР + любые цифры."
+    },
+    {
+      "id": "NAME-R15",
+      "title": "Защищённые реквизиты",
+      "contract": "Карты/счета/договоры/телефоны/email/паспорт, обозначенные авторизации/операции/документы/terminal ID/ИНН/БИК и распознанные URL закрываются прежним sanitizer. Скрытый фрагмент не расшифровывать из raw/HMAC, cache, callback, внешнего поиска или URL ради узнавания."
+    },
+    {
+      "id": "NAME-R16",
+      "title": "Значимые цифры",
+      "contract": "36,6; 585; ЦЕХ85; 5Post; B2CPL; 2ГИС; 2GIS; Space 1; 4F и номер в неизвестном имени сохраняются. Обычные цифры/буквенно-цифровые слова не blanket-mask. Цифра не terminal ID только из позиции/длины."
+    },
+    {
+      "id": "NAME-R17",
+      "title": "Филиал",
+      "contract": "Известный отдельный номер торговой точки можно убрать из основного title только при доказанном typed branch field/формате и сохранённом допустимом уточнении. Иначе Магазин 24/Пятёрочка 123 не обрезаются наугад. Название филиала, важное для различения, не теряется."
+    },
+    {
+      "id": "NAME-R18",
+      "title": "Географический хвост",
+      "contract": "Moscow/Москва/RUS/Россия/Иннополис убираются лишь как доказанный технический geo tail, не как список стоп-слов. Неизвестные Кафе Москва, Магазин Россия, Столовая Иннополис сохраняются целиком. Страна/город, составляющие собственное имя, защищены."
+    },
+    {
+      "id": "NAME-R19",
+      "title": "География не timezone",
+      "contract": "Банковский город не определяет часовой пояс/местонахождение пользователя. NAME не меняет даты выписки, profile timezone, today/relative periods и не делает географическую догадку о покупке."
+    },
+    {
+      "id": "NAME-R20",
+      "title": "Правовая форма",
+      "contract": "ООО/АО/ПАО/ИП можно вынести из короткого merchant label только при уже установленном торговом имени/typed legal-name field; полная допустимая юридическая строка остаётся в деталях. Неизвестное ООО Ромашка или ИП Иванов Иван 24 сохраняются, не склеиваются с одноимёнными."
+    },
+    {
+      "id": "NAME-R21",
+      "title": "Домен как торговая форма",
+      "contract": "Точка/.ru/.cloud могут различать название услуги. Не отрезать всё после точки. Допустимый plain-text trade label REG.RU/Apteka.ru возможен только если действующая privacy разрешила именно торговый сегмент; распознанный URL всё равно скрыт целиком, без исключения из-за каталога."
+    },
+    {
+      "id": "NAME-R22",
+      "title": "Никакого обхода URL",
+      "contract": "Скрытый https://... не заменять догадкой по домену. Не переписывать .ru в ру/удалять протокол ради обхода sanitizer. Выход NAME повторно проходит действующую privacy; если label запрещён, использовать допустимое независимое имя/смысл или fallback без восстановления скрытого."
+    },
+    {
+      "id": "NAME-R23",
+      "title": "Доставка как пояснение",
+      "contract": "Известный продавец + доказанная доставка того же заказа → primary имя продавца, qualifier Доставка. При UI с одним текстовым полем вывод Продавец — доставка. В контекстных списках/экспорте этот смысл не исчезает; исходное имя/категория определяются отдельно."
+    },
+    {
+      "id": "NAME-R24",
+      "title": "Слово продукты необязательно",
+      "contract": "Пятёрочка/Ашан + доставка дают пищевое направление по ACT-M01 без буквального продукты. Ресторан/пекарня + доставка — готовая еда; аптека/одежда/техника не продуктовые. NAME показывает способ, не меняет категорию или состав заказа."
+    },
+    {
+      "id": "NAME-R25",
+      "title": "Самовывоз/неясность",
+      "contract": "Самовывоз — отдельный qualifier только при установленных сведениях. Online/order/express сами не Доставка. Без способа не выдумывать подзаголовок; отмена/отрицание/задержка применяются к тому же scope. Недоставка выбранного оплаченного заказа не самовывоз."
+    },
+    {
+      "id": "NAME-R26",
+      "title": "Продавец и агрегатор",
+      "contract": "Подтверждённые продавец/агрегатор одного заказа могут показываться Продавец — через Агрегатор, с отдельным qualifier доставки. Не создавать новую merchant identity из двух слов, не удваивать операцию; unrelated бренды не выбирать по порядку."
+    },
+    {
+      "id": "NAME-R27",
+      "title": "Курьер отдельно",
+      "contract": "Отдельная фактическая оплата курьера показывает саму услугу/подтверждённого поставщика, не стоимость товаров магазина-отправителя. Доставка бесплатно не создаёт новый расход; упаковка/чаевые/доли не выдумываются из названия."
+    },
+    {
+      "id": "NAME-R28",
+      "title": "Маркетплейс и корзина",
+      "contract": "Ozon/Wildberries остаются брендами площадок. Не переименовывать покупку в Одежда+Еда и не переносить старый split на новую. Части покупки — аналитическое распределение, не новые банковские покупки или продавцы."
+    },
+    {
+      "id": "NAME-R29",
+      "title": "ФИО и переводы",
+      "contract": "Разрешённые ФИО, обычные цифры, слова с цифрами и перевод остаются читаемыми. Перевод — Иван Петров можно собрать из разрешённого event/собственной counterparty, но ФИО само не merchant, не HMAC-идентичность и не подтверждение получателя."
+    },
+    {
+      "id": "NAME-R30",
+      "title": "Лингвистический перевод",
+      "contract": "Бюро переводов/перевод документов не очищаются как денежный transfer по подстроке перевод. Нужен actual paid subject. Финансовый перевод не становится лингвистической услугой только из сохранённого слова."
+    },
+    {
+      "id": "NAME-R31",
+      "title": "Финансовый статус отдельно",
+      "contract": "Возврат/холд/комиссия/налог/кредитное погашение/доход сохраняют вид/роль и фактический статус отдельно от имени. Короткий бренд не отменяет Refund/Review/Excluded. Уверенный title не делает неоднозначную категорию verified."
+    },
+    {
+      "id": "NAME-R32",
+      "title": "Нет одинаковой identity от label",
+      "contract": "Совпавший короткий title не объединяет разных ИП/юридических лиц/людей/операции/счета. NAME не Merge Counterparty и не dedupe; старые исходные bindings/aliases/HMAC/source IDs не меняются."
+    },
+    {
+      "id": "NAME-R33",
+      "title": "Историческое имя",
+      "contract": "Ребрендинг/поглощение не переименовывает старую выписку автоматически в современный бренд. Leroy Merlin не Лемана ПРО, Tele2 не T2, Boxberry не Яндекс Доставка на всей истории лишь из нынешней принадлежности. Действуют период/фактическая identity/личный выбор."
+    },
+    {
+      "id": "NAME-R34",
+      "title": "Матчинг отдельно от display",
+      "contract": "Поиск/каталог/личные merchantEquals/merchantContains/descriptionContains не получают новый UI title как единственный источник. Изменение Worldclass→World Class не должно ломать личный contains. Совместимость реализуется в прежнем scope/preview, не расширением всех contains по fuzzy."
+    },
+    {
+      "id": "NAME-R35",
+      "title": "TimeWeb legacy rules",
+      "contract": "Прежние разрешённые Таймвэб/Timeweb/Timeweb Cloud aliases личного правила продолжают находить тот же подходящий профиль в его допустимом контексте. Общая группировка имени не склеивает хостинг/облачный договор/возврат или другого пользователя."
+    },
+    {
+      "id": "NAME-R36",
+      "title": "Идемпотентность",
+      "contract": "Повторная проекция той же версии/входов даёт то же представление; не добавляет доставка дважды и не портит регистр на каждом проходе. Всегда читать исходные разрешённые поля/защищённое имя, а не результат прежнего UI-обрезания."
+    },
+    {
+      "id": "NAME-R37",
+      "title": "Лимиты и полный смысл",
+      "contract": "Существующие ограничения безопасного текста сохраняются. Визуальный ellipsis — только оформление; tooltip/карточка дают полный допустимый label/описание. Не отрезать единственное различающее Fresh/Go/номер ради длины; при невозможности вернуть безопасный осмысленный fallback/уточнение, не частичный ложный бренд."
+    },
+    {
+      "id": "NAME-R38",
+      "title": "Рендер без кода",
+      "contract": "Label/qualifier/описание выводятся как plain text с экранированием. HTML, Markdown-ссылка, JavaScript, команда из выписки или ответа модели не исполняются и не запускают запросов/покупок/обновлений. В CSV/табличном экспорте имя не исполняется как формула: действующий безопасный текстовый экспорт без изменения source-значения."
+    },
+    {
+      "id": "NAME-R39",
+      "title": "Без сетевого уточнения",
+      "contract": "Никаких автоматических HTTP-переходов по банковскому тексту/URL, публичного поиска ФИО или отправки raw банковской строки модели ради красивого имени. Для этого пакета используется ранее собранный каталог и локальные допустимые признаки."
+    },
+    {
+      "id": "NAME-R40",
+      "title": "Модель не редактор фактов",
+      "contract": "Если будущая модель участвует в понимании, она даёт ограниченный проверяемый кандидат с provenance. Не может писать source/фасеты/новые aliases сама; никакого SQL/password/email/sessions/admin/HMAC. Финальное отображение проходит те же правила и privacy."
+    },
+    {
+      "id": "NAME-R41",
+      "title": "Частные имена и кэш",
+      "contract": "Ручное имя/исправление остаётся внутри владельца; не попадает автоматически в общий каталог. Кэш учитывает версию NAME/identity/период/санитизацию и owner generation/revision, не переносится между людьми и не восстанавливает удалённые данные."
+    },
+    {
+      "id": "NAME-R42",
+      "title": "Удаление и повторный импорт",
+      "contract": "Повтор той же операции сохраняет ручное имя/parts/связи; другая покупка не наследует частное имя/разбиение как правило без явного решения. Удаление не восстанавливается новым cache/названием; новая generation инвалидирует старые prepared результаты."
+    },
+    {
+      "id": "NAME-R43",
+      "title": "Единые поверхности",
+      "contract": "Operations/карточка/Review/поиск/фильтры/Обзор/Бюджеты/Analyzer/экспорт используют одну NAME-проекцию и те же effective деньги/parts. Группировка по merchant identity/owner binding, не по совпавшему title. Полное очищенное описание доступно отдельно."
+    },
+    {
+      "id": "NAME-R44",
+      "title": "Явное изменение отдельно",
+      "contract": "Одно ручное переименование не создаёт правило для будущего и не массово меняет историю. Запомнить для похожих — отдельный явный scope/action/preview/commit. До любой записи сервер повторяет ownership/status/entitlement/generation/revision/deletion."
+    },
+    {
+      "id": "NAME-R45",
+      "title": "Активация и откат",
+      "contract": "NAME-документ не переключает сайт. Для реализации нужен конкретный artifact/контракт проекции и совместимости, выбранные тесты, Staging backup/rollback/приёмка. Rollback renderer не откатывает банковские факты/parts/paid receipts или чужие новые изменения."
+    },
+    {
+      "id": "NAME-R46",
+      "title": "Открытые реализации честно",
+      "contract": "NAME-I01–I06 — адресные реализации/совместимость, не исправленные этим документом баги. FIN-I01–I04, новое source privacy и полноценный rollout категорий не объявляются выполненными красивым названием."
+    },
+    {
+      "id": "NAME-R47",
+      "title": "Полный исход для неизвестного",
+      "contract": "У любого входа есть конечная ветвь: protected title, допустимый known style, безопасный исходный merchant, allowed event/counterparty/description либо честный fallback. Отсутствие бренда/чека/адреса не приглашение выдумать label или блокировать импорт."
+    },
+    {
+      "id": "NAME-R48",
+      "title": "Область согласования",
+      "contract": "Новые style bindings и примеры — цельный проект NAME для просмотра владельцем, не исторические согласования и не активная модель. Прежний явный TimeWeb/отказ от принудительной русификации остаются действующими; другие профили покрыты SOURCE_SCRIPT по умолчанию, без тысяч неявных переименований."
+    }
+  ],
+  "transformations": [
+    {
+      "id": "NAME-P01",
+      "segment": "TYPED_EVENT_PREFIX",
+      "example": "Покупка:/Оплата:/Card payment:",
+      "action": "REMOVE_FROM_TITLE_ONLY",
+      "guard": "Служебный префикс доказан adapter/типом события; слово не часть неизвестного названия."
+    },
+    {
+      "id": "NAME-P02",
+      "segment": "TYPED_ACQUIRER_PREFIX",
+      "example": "SBER_...* / SBP* / acquiring channel",
+      "action": "REMOVE_FROM_TITLE_KEEP_CONTEXT",
+      "guard": "Только доказанный channel segment, не bank product/merchant; raw IDs не выводятся."
+    },
+    {
+      "id": "NAME-P03",
+      "segment": "TYPED_GEO_TAIL",
+      "example": "Moscow RUS / Москва Россия / Innopolis RUS",
+      "action": "REMOVE_FROM_TITLE_ONLY",
+      "guard": "Отдельный typed geo tail и полный уже установленный merchant span; не город внутри имени."
+    },
+    {
+      "id": "NAME-P04",
+      "segment": "TYPED_BRANCH_SUFFIX",
+      "example": "номер магазина в отдельном поле",
+      "action": "MOVE_TO_ALLOWED_CONTEXT",
+      "guard": "Только доказанный branch, не значимая цифра бренда/неизвестного имени; сохранить различимость."
+    },
+    {
+      "id": "NAME-P05",
+      "segment": "LEGAL_FORM",
+      "example": "ООО / АО / ИП в legal-name field",
+      "action": "OPTIONAL_SEPARATE_LEGAL_CONTEXT",
+      "guard": "Торговое имя независимо известно; неизвестный legal name целиком сохраняется."
+    },
+    {
+      "id": "NAME-P06",
+      "segment": "MARKED_REQUISITES",
+      "example": "terminal/auth/account/contract/etc",
+      "action": "MASK_BY_EXISTING_PRIVACY",
+      "guard": "Распознаваемые обозначения по прежнему sanitizer; не удалить все цифры/ФИО."
+    },
+    {
+      "id": "NAME-P07",
+      "segment": "KNOWN_SAME_SCRIPT_STYLE",
+      "example": "WORLDCLASS / DDXFITNESS",
+      "action": "REGISTERED_STYLE_ONLY",
+      "guard": "Доказанный профиль, finite NAME-S binding, скрипт/период и protected name."
+    },
+    {
+      "id": "NAME-P08",
+      "segment": "UNKNOWN_NAME",
+      "example": "Кафе Москва / Магазин 24 / Ромашка-7",
+      "action": "RETAIN_SAFE_SOURCE",
+      "guard": "Никаких stop-word city/regex digits/первого токена/автоперевода."
+    },
+    {
+      "id": "NAME-P09",
+      "segment": "SPECIFIC_SERVICE",
+      "example": "Fresh / Go / Маркет / Драйв / .cloud",
+      "action": "PRESERVE_OR_EXPLICIT_SERVICE_CONTEXT",
+      "guard": "Сервис различает реальный предмет. Нельзя оставить только группу бренда."
+    },
+    {
+      "id": "NAME-P10",
+      "segment": "FULFILLMENT",
+      "example": "доставка / самовывоз",
+      "action": "SHOW_PROVEN_QUALIFIER",
+      "guard": "Тот же оплаченный заказ; online/order/express не доказательство; cancelled/refund FIN отдельно."
+    },
+    {
+      "id": "NAME-P11",
+      "segment": "SELLER_AND_AGGREGATOR",
+      "example": "магазин через агрегатор",
+      "action": "TYPED_ROLES_NOT_MERGE",
+      "guard": "Подтверждённая связь одного заказа, не два независимых merchant/платежа."
+    },
+    {
+      "id": "NAME-P12",
+      "segment": "URL_OR_FORBIDDEN_NAME",
+      "example": "https://... / email / protected identifiers",
+      "action": "PRIVACY_FALLBACK",
+      "guard": "Целиком скрыть по действующей privacy; не реконструировать домен/имя из скрытого."
+    }
+  ],
+  "style_bindings": [
+    {
+      "id": "NAME-S01",
+      "profile_label": "TimeWeb",
+      "mode": "EXPLICIT_OWNER_OVERRIDE",
+      "labels": {
+        "Latin": "TimeWeb",
+        "Cyrillic": "TimeWeb",
+        "Mixed": "TimeWeb"
+      },
+      "source_document": "purchase-category-split-20261024.md",
+      "context_guard": "TimeWeb и конкретный сервис/договор не сливаются",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PREVIOUS_OWNER_EXCEPTION"
+    },
+    {
+      "id": "NAME-S02",
+      "profile_label": "World Class",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "World Class",
+        "Cyrillic": "Ворлд Класс"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не World как любое слово",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S03",
+      "profile_label": "X-Fit",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "X-Fit",
+        "Cyrillic": "Икс Фит"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "X и Fit вместе; личный contains защищён",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S04",
+      "profile_label": "DDX Fitness",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "DDX Fitness",
+        "Cyrillic": "ДДХ Фитнес"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не один DDX без профиля",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S05",
+      "profile_label": "Spirit Fitness",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Spirit Fitness",
+        "Cyrillic": "Спирит Фитнес"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не любой Spirit",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S06",
+      "profile_label": "Пятёрочка",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Пятёрочка"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Латиница остаётся латиницей, включая 5ka при допущенном полном профиле",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S07",
+      "profile_label": "Перекрёсток",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Перекрёсток"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Транспортный перекрёсток не магазин",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S08",
+      "profile_label": "Магнит",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Магнит"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "М.Косметик/аптека не общий продуктовый Магнит",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S09",
+      "profile_label": "Ашан",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Ашан"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Auchan/Ashan не новый глобальный alias из NAME",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S10",
+      "profile_label": "Лента",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Лента"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "DOM Лента/новостная лента отдельно",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S11",
+      "profile_label": "ВкусВилл",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "ВкусВилл"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не придумывать состав корзины",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S12",
+      "profile_label": "Маковка",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Маковка"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Обычная пекарня не автоматически сеть",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S13",
+      "profile_label": "Буханка",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Буханка"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Обычное слово не бренд без контекста",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S14",
+      "profile_label": "Ozon",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Ozon",
+        "Cyrillic": "Озон"
+      },
+      "source_document": "merchant-catalog-marketplaces-20261027.md",
+      "context_guard": "Fresh/банк/карта не сокращаются до площадки",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S15",
+      "profile_label": "Wildberries",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Wildberries",
+        "Cyrillic": "Вайлдберриз"
+      },
+      "source_document": "merchant-catalog-marketplaces-20261027.md",
+      "context_guard": "Не содержимое покупки",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S16",
+      "profile_label": "Lamoda",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Lamoda",
+        "Cyrillic": "Ламода"
+      },
+      "source_document": "merchant-catalog-marketplaces-20261027.md",
+      "context_guard": "Площадка не любой товар одежды",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S17",
+      "profile_label": "DNS",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "DNS",
+        "Cyrillic": "ДНС"
+      },
+      "source_document": "merchant-catalog-marketplaces-20261027.md",
+      "context_guard": "Не сетевой DNS",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S18",
+      "profile_label": "Hoff",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Hoff",
+        "Cyrillic": "Хофф"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не любой похожий HoF",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S19",
+      "profile_label": "Fix Price",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Fix Price",
+        "Cyrillic": "Фикс Прайс"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не переводить цену как название",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S20",
+      "profile_label": "Citydrive",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Citydrive",
+        "Cyrillic": "Ситидрайв"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Штраф/аренда различимы отдельно",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S21",
+      "profile_label": "BelkaCar",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "BelkaCar",
+        "Cyrillic": "БелкаКар"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Каршеринг не Белка как обычное имя",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S22",
+      "profile_label": "Whoosh",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Whoosh",
+        "Cyrillic": "Вуш"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Профиль/сервис из прежнего каталога",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S23",
+      "profile_label": "Делимобиль",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Delimobil",
+        "Cyrillic": "Делимобиль"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Не любая аренда авто",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S24",
+      "profile_label": "Яндекс Go",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Yandex Go",
+        "Cyrillic": "Яндекс Го",
+        "Mixed": "Яндекс Go"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Go сохраняется; service не додумывать из taxi default",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S25",
+      "profile_label": "Яндекс Драйв",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Yandex Drive",
+        "Cyrillic": "Яндекс Драйв"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Драйв не удаляется как хвост",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S26",
+      "profile_label": "Яндекс Маркет",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Yandex Market",
+        "Cyrillic": "Яндекс Маркет"
+      },
+      "source_document": "merchant-catalog-marketplaces-20261027.md",
+      "context_guard": "Не общий Яндекс",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S27",
+      "profile_label": "Яндекс Доставка",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Yandex Delivery",
+        "Cyrillic": "Яндекс Доставка"
+      },
+      "source_document": "merchant-catalog-logistics-20261027.md",
+      "context_guard": "Отдельный сервис, не доказательство продуктов",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S28",
+      "profile_label": "Яндекс Заправки",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Яндекс Заправки"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Специальный category Review не исчезает от короткого имени",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S29",
+      "profile_label": "Бери заряд",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Бери заряд"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "Яндекс + заряд не доказанная identity Бери заряд",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S30",
+      "profile_label": "СДЭК",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "CDEK",
+        "Cyrillic": "СДЭК"
+      },
+      "source_document": "merchant-catalog-logistics-20261027.md",
+      "context_guard": "CDEK.Shopping отдельно",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S31",
+      "profile_label": "5Post",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "5Post"
+      },
+      "source_document": "merchant-catalog-logistics-20261027.md",
+      "context_guard": "Цифра 5 обязательна; не обычный Post",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S32",
+      "profile_label": "B2CPL",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "B2CPL"
+      },
+      "source_document": "merchant-catalog-logistics-20261027.md",
+      "context_guard": "Цифра 2/все значимые буквы сохраняются",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S33",
+      "profile_label": "Аптека 36,6",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "Аптека 36,6"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "36,6 часть бренда, не цена/код",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S34",
+      "profile_label": "2ГИС — реклама",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "2GIS",
+        "Cyrillic": "2ГИС"
+      },
+      "source_document": "merchant-catalog-office-advertising-20261027.md",
+      "context_guard": "Реклама — фактический service qualifier, не любой платёж 2ГИС",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S35",
+      "profile_label": "Space 1",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Latin": "Space 1"
+      },
+      "source_document": "merchant-catalog-office-advertising-20261027.md",
+      "context_guard": "1 часть бренда; не Space без номера",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    },
+    {
+      "id": "NAME-S36",
+      "profile_label": "ЦЕХ85",
+      "mode": "SAME_SCRIPT_STYLE",
+      "labels": {
+        "Cyrillic": "ЦЕХ85"
+      },
+      "source_document": "merchant-catalog-master-20261025.md",
+      "context_guard": "85 не номер терминала",
+      "identity_matching": "USE_PRIOR_CATALOG_IDENTITY_ONLY_NO_NEW_ALIASES",
+      "period_required": true,
+      "default_for_unlisted_script": "RETAIN_MATCHED_SAFE_SOURCE_SPELLING",
+      "status": "PROPOSED_STYLE_FOR_OWNER_REVIEW_NOT_ACTIVE"
+    }
+  ],
+  "future_scenarios": [
+    {
+      "id": "NAME-T001",
+      "synthetic_input": "Timeweb.cloud Innopolis Rus",
+      "preconditions": "KNOWN_SPECIFIC_CLOUD_PROFILE_TYPED_GEO",
+      "expected_title": "TimeWeb",
+      "expected_qualifiers": [
+        "Cloud"
+      ],
+      "expected_explanation": "Ранее согласованный primary TimeWeb; установленный Cloud-профиль остаётся видимым qualifier. В одном поле TimeWeb — Cloud, без слияния получателей/договоров.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T002",
+      "synthetic_input": "Таймвэб",
+      "preconditions": "KNOWN_TIMEWEB",
+      "expected_title": "TimeWeb",
+      "expected_qualifiers": [],
+      "expected_explanation": "Личный protected Таймвэб не перезаписать; этот пример только unprotected known brand.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T003",
+      "synthetic_input": "TIMEWEB",
+      "preconditions": "KNOWN_TIMEWEB",
+      "expected_title": "TimeWeb",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не принудительная русификация.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T004",
+      "synthetic_input": "worldclass Moscow RUS",
+      "preconditions": "KNOWN_PROFILE_TYPED_GEO",
+      "expected_title": "World Class",
+      "expected_qualifiers": [],
+      "expected_explanation": "Предлагаемый конечный same-script style; source/rule matching не меняются.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T005",
+      "synthetic_input": "World Class",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "World Class",
+      "expected_qualifiers": [],
+      "expected_explanation": "Идемпотентно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T006",
+      "synthetic_input": "Ворлд Класс",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Ворлд Класс",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не автоматический английский перевод.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T007",
+      "synthetic_input": "XFIT MOSCOW RUS",
+      "preconditions": "KNOWN_PROFILE_TYPED_GEO",
+      "expected_title": "X-Fit",
+      "expected_qualifiers": [],
+      "expected_explanation": "Предлагаемый same-script style, совместимость old contains обязательна.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T008",
+      "synthetic_input": "DDXFITNESS",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "DDX Fitness",
+      "expected_qualifiers": [],
+      "expected_explanation": "Регистровые аббревиатуры не Ddx.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T009",
+      "synthetic_input": "SPIRIT FITNESS",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Spirit Fitness",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не любой Spirit.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T010",
+      "synthetic_input": "PYATEROCHKA MOSCOW RUS",
+      "preconditions": "KNOWN_PROFILE_TYPED_GEO",
+      "expected_title": "PYATEROCHKA",
+      "expected_qualifiers": [],
+      "expected_explanation": "Латиница сохранена, автоматически Пятёрочка не подставляется.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T011",
+      "synthetic_input": "Пятёрочка Москва Рус",
+      "preconditions": "KNOWN_PROFILE_TYPED_GEO",
+      "expected_title": "Пятёрочка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Технический хвост доказан отдельно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T012",
+      "synthetic_input": "Пятёрочка доставка",
+      "preconditions": "KNOWN_SAME_ORDER_DELIVERY",
+      "expected_title": "Пятёрочка",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Одно-поле представление Пятёрочка — доставка; продукты не обязательны.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T013",
+      "synthetic_input": "Pyaterochka delivery",
+      "preconditions": "KNOWN_SAME_ORDER_DELIVERY",
+      "expected_title": "Pyaterochka",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Полный допущенный alias прежнего merchant-каталога.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T014",
+      "synthetic_input": "Ашан — доставка бесплатно",
+      "preconditions": "KNOWN_SAME_ORDER_DELIVERY",
+      "expected_title": "Ашан",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Нулевая плата за доставку не убирает qualifier и не создаёт fee.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T015",
+      "synthetic_input": "Перекрёсток самовывоз",
+      "preconditions": "KNOWN_SAME_ORDER_PICKUP",
+      "expected_title": "Перекрёсток",
+      "expected_qualifiers": [
+        "Самовывоз"
+      ],
+      "expected_explanation": "Не Доставка от online.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T016",
+      "synthetic_input": "Магнит online",
+      "preconditions": "KNOWN_PROFILE_NO_FULFILLMENT",
+      "expected_title": "Магнит",
+      "expected_qualifiers": [],
+      "expected_explanation": "Online не значит доставка.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T017",
+      "synthetic_input": "Лента express",
+      "preconditions": "UNKNOWN_UNSEGMENTED",
+      "expected_title": "Лента express",
+      "expected_qualifiers": [],
+      "expected_explanation": "Нельзя стереть express/подразделение без proven span; реальный профиль отдельно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T018",
+      "synthetic_input": "Кафе Москва",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "Кафе Москва",
+      "expected_qualifiers": [],
+      "expected_explanation": "Москва часть неизвестного названия, не typed geo tail.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T019",
+      "synthetic_input": "Магазин Россия",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "Магазин Россия",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Магазин.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T020",
+      "synthetic_input": "Столовая Иннополис",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "Столовая Иннополис",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Столовая.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T021",
+      "synthetic_input": "Кафе Москва RUS",
+      "preconditions": "UNKNOWN_UNSEGMENTED",
+      "expected_title": "Кафе Москва RUS",
+      "expected_qualifiers": [],
+      "expected_explanation": "Без typed fields не угадывать, какая часть собственное имя.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T022",
+      "synthetic_input": "ИП Иванов Иван 24",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "ИП Иванов Иван 24",
+      "expected_qualifiers": [],
+      "expected_explanation": "ФИО/обычные цифры не скрывать и не обрезать.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T023",
+      "synthetic_input": "ООО Ромашка",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "ООО Ромашка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не слить с любой Ромашкой/не выдать за сеть.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T024",
+      "synthetic_input": "ООО Ромашка, торговое имя известно независимо",
+      "preconditions": "TYPED_TRADING_NAME",
+      "expected_title": "Ромашка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Legal name остаётся в деталях, identity не меняется.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T025",
+      "synthetic_input": "СБЕР 24 Москва Рус",
+      "preconditions": "UNKNOWN_UNSEGMENTED",
+      "expected_title": "СБЕР 24 Москва Рус",
+      "expected_qualifiers": [],
+      "expected_explanation": "Без adapter не вырезать банк/цифры и не оставить Москву.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T026",
+      "synthetic_input": "POSHOP 7",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "POSHOP 7",
+      "expected_qualifiers": [],
+      "expected_explanation": "POS как начало слова не служебный префикс.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T027",
+      "synthetic_input": "Покупка: DNS Moscow RUS",
+      "preconditions": "ADAPTER_EVENT_MERCHANT_GEO",
+      "expected_title": "DNS",
+      "expected_qualifiers": [],
+      "expected_explanation": "Prefix/geo отдельно доказаны; source description сохраняется.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T028",
+      "synthetic_input": "Оплата: Магазин 24",
+      "preconditions": "ADAPTER_EVENT_PREFIX_ONLY",
+      "expected_title": "Магазин 24",
+      "expected_qualifiers": [],
+      "expected_explanation": "24 не маскируется/не удаляется как terminal.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T029",
+      "synthetic_input": "Ромашка-7",
+      "preconditions": "UNKNOWN_NAME",
+      "expected_title": "Ромашка-7",
+      "expected_qualifiers": [],
+      "expected_explanation": "Дефис/цифра могут различать название.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T030",
+      "synthetic_input": "5Post",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "5Post",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Post; новая посылка не продуктовая покупка.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T031",
+      "synthetic_input": "B2CPL",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "B2CPL",
+      "expected_qualifiers": [],
+      "expected_explanation": "Все значимые буквы/цифра сохранены.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T032",
+      "synthetic_input": "Аптека 36,6",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Аптека 36,6",
+      "expected_qualifiers": [],
+      "expected_explanation": "36,6 не цена/terminal number.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T033",
+      "synthetic_input": "585 Золотой",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "585 Золотой",
+      "expected_qualifiers": [],
+      "expected_explanation": "585 часть установленного бренда; не новая identity из цифр.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T034",
+      "synthetic_input": "ЦЕХ85",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "ЦЕХ85",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Цех и не terminal 85.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T035",
+      "synthetic_input": "Space 1",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Space 1",
+      "expected_qualifiers": [],
+      "expected_explanation": "1 различает бренд.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T036",
+      "synthetic_input": "2GIS",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "2GIS",
+      "expected_qualifiers": [],
+      "expected_explanation": "Сохранить source script, не 2gis.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T037",
+      "synthetic_input": "2ГИС реклама",
+      "preconditions": "KNOWN_PAID_SERVICE",
+      "expected_title": "2ГИС",
+      "expected_qualifiers": [
+        "Реклама"
+      ],
+      "expected_explanation": "Подтверждённая реклама отдельно от карты; не все платежи 2ГИС реклама.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T038",
+      "synthetic_input": "OZON FRESH MOSCOW RUS",
+      "preconditions": "KNOWN_SPECIFIC_PROFILE_TYPED_GEO",
+      "expected_title": "Ozon Fresh",
+      "expected_qualifiers": [],
+      "expected_explanation": "Fresh обязателен, не Ozon; новый alias этим примером не активируется.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T039",
+      "synthetic_input": "OZON",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Ozon",
+      "expected_qualifiers": [],
+      "expected_explanation": "Только предлагаемый same-script style.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T040",
+      "synthetic_input": "Озон",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Озон",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не принудительный Ozon.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T041",
+      "synthetic_input": "Wildberries",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Wildberries",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не содержимое корзины.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T042",
+      "synthetic_input": "Ozon: 50% одежда, 50% продукты",
+      "preconditions": "KNOWN_MANUAL_PARTS",
+      "expected_title": "Ozon",
+      "expected_qualifiers": [],
+      "expected_explanation": "Parts не переименовывают продавца; итог не удваивается.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T043",
+      "synthetic_input": "Lamoda",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Lamoda",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Ламода автоматически.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T044",
+      "synthetic_input": "DNS",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "DNS",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Dns.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T045",
+      "synthetic_input": "МТС",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "МТС",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Мтс, не МТС Банк из общего имени.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T046",
+      "synthetic_input": "Яндекс Go",
+      "preconditions": "KNOWN_PROFILE_NO_SPECIFIC_SERVICE",
+      "expected_title": "Яндекс Go",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Яндекс и не Такси; отдельный прежний Review категории не снимается.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T047",
+      "synthetic_input": "Yandex Go",
+      "preconditions": "KNOWN_PROFILE_NO_SPECIFIC_SERVICE",
+      "expected_title": "Yandex Go",
+      "expected_qualifiers": [],
+      "expected_explanation": "Сохранить язык; не принудительно Яндекс Go.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T048",
+      "synthetic_input": "Яндекс Го",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Яндекс Го",
+      "expected_qualifiers": [],
+      "expected_explanation": "Кириллический вариант не переводить в Go без адресного override.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T049",
+      "synthetic_input": "Яндекс Go: аренда пауэрбанка",
+      "preconditions": "KNOWN_PAID_SERVICE",
+      "expected_title": "Яндекс Go",
+      "expected_qualifiers": [
+        "Аренда пауэрбанка"
+      ],
+      "expected_explanation": "Не выдумать identity Бери заряд по одному заряду.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T050",
+      "synthetic_input": "Сервисы Яндекса",
+      "preconditions": "UNKNOWN_GROUP_SERVICE",
+      "expected_title": "Сервисы Яндекса",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Go/такси/еда без evidence.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T051",
+      "synthetic_input": "Яндекс Драйв",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Яндекс Драйв",
+      "expected_qualifiers": [],
+      "expected_explanation": "Драйв обязательная часть.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T052",
+      "synthetic_input": "Яндекс Маркет доставка",
+      "preconditions": "KNOWN_SAME_ORDER_DELIVERY",
+      "expected_title": "Яндекс Маркет",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Сервис Маркет сохраняется; способ покупки — qualifier.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T053",
+      "synthetic_input": "Яндекс Лавка",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Яндекс Лавка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Лавка не общий Яндекс и не лавка подарков.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T054",
+      "synthetic_input": "Яндекс Еда",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Яндекс Еда",
+      "expected_qualifiers": [],
+      "expected_explanation": "Еда обязательна, состав заказа/продавец не выдуманы.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T055",
+      "synthetic_input": "Яндекс Доставка",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Яндекс Доставка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Отдельная логистика; это service name, не дублировать qualifier Доставка автоматически.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T056",
+      "synthetic_input": "Яндекс Заправки",
+      "preconditions": "KNOWN_PROFILE",
+      "expected_title": "Яндекс Заправки",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не общий Яндекс; actual service/Review отдельно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T057",
+      "synthetic_input": "Купер + Пятёрочка, доставка",
+      "preconditions": "KNOWN_SELLER_AGGREGATOR_ORDER",
+      "expected_title": "Пятёрочка",
+      "expected_qualifiers": [
+        "Доставка",
+        "через Купер"
+      ],
+      "expected_explanation": "Одна операция, роль агрегатора не merchant merge.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T058",
+      "synthetic_input": "Аптека Север, доставка",
+      "preconditions": "KNOWN_PHARMACY_ORDER",
+      "expected_title": "Аптека Север",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Имя и способ; не Продукты и не вымышленная Ригла.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T059",
+      "synthetic_input": "Магазин одежды Север, доставка",
+      "preconditions": "KNOWN_CLOTHING_ORDER",
+      "expected_title": "Магазин одежды Север",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Не товарный состав и не новая категория Доставка одежды.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T060",
+      "synthetic_input": "Отдельный курьер: отправитель Пятёрочка",
+      "preconditions": "KNOWN_COURIER_ONLY",
+      "expected_title": "Курьерская услуга",
+      "expected_qualifiers": [],
+      "expected_explanation": "Если свой поставщик известен — его имя; магазин отправителя не имя оплаченного продавца продуктов.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T061",
+      "synthetic_input": "Кафе Роза, еда ещё не доставлена",
+      "preconditions": "PAID_ORDER_SELECTED_DELIVERY_DELAY",
+      "expected_title": "Кафе Роза",
+      "expected_qualifiers": [
+        "Доставка"
+      ],
+      "expected_explanation": "Задержка не самовывоз; cancellation/refund FIN отдельно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T062",
+      "synthetic_input": "Кафе Роза, доставка отменена, возврат",
+      "preconditions": "KNOWN_REFUND",
+      "expected_title": "Кафе Роза",
+      "expected_qualifiers": [],
+      "expected_explanation": "Вид Возврат отдельно; не новый расход/не положительное delivery-событие.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": "Возврат"
+    },
+    {
+      "id": "NAME-T063",
+      "synthetic_input": "Покупка — продавец отсутствует, описание пустое",
+      "preconditions": "NO_SAFE_MERCHANT",
+      "expected_title": "Продавец не определён",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не придумывать магазин/категорию; тип покупки в обычном поле события.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": "Покупка"
+    },
+    {
+      "id": "NAME-T064",
+      "synthetic_input": "Неизвестная операция с допустимым полезным описанием",
+      "preconditions": "SAFE_DESCRIPTION_EXPLICIT_SUBJECT",
+      "expected_title": "Услуга мастерской Север",
+      "expected_qualifiers": [],
+      "expected_explanation": "Пример содержит независимо установленный допустимый предмет, не inference по слову неизвестно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T065",
+      "synthetic_input": "Перевод — Иван Петров",
+      "preconditions": "KNOWN_OWN_COUNTERPARTY_ALLOWED_NAME",
+      "expected_title": "Иван Петров",
+      "expected_qualifiers": [],
+      "expected_explanation": "Counterparty не merchant; composite Перевод — Иван Петров, ФИО разрешено.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": "Перевод"
+    },
+    {
+      "id": "NAME-T066",
+      "synthetic_input": "Перевод — Иван Петров, получатель не подтверждён",
+      "preconditions": "UNVERIFIED_ALLOWED_PARTY_TEXT",
+      "expected_title": "Иван Петров",
+      "expected_qualifiers": [],
+      "expected_explanation": "Имя не подтверждает связь/получателя; соответствующий Review остаётся, карточка не создаётся.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": "Перевод"
+    },
+    {
+      "id": "NAME-T067",
+      "synthetic_input": "Оплата услуг бюро переводов",
+      "preconditions": "EXPLICIT_COMMERCIAL_MERCHANT",
+      "expected_title": "Бюро переводов Север",
+      "expected_qualifiers": [],
+      "expected_explanation": "Север есть в independently provided merchant field; перевод не blanket transfer veto.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T068",
+      "synthetic_input": "Комиссия банка",
+      "preconditions": "KNOWN_EVENT_NO_MERCHANT",
+      "expected_title": "Комиссия банка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не приписывать продавца по источнику Сбер/МТС без предмета.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T069",
+      "synthetic_input": "Возврат в магазине Hoff",
+      "preconditions": "KNOWN_REFUND_MERCHANT",
+      "expected_title": "Hoff",
+      "expected_qualifiers": [],
+      "expected_explanation": "Возврат/дата/link отдельно; не обычная покупка.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": "Возврат"
+    },
+    {
+      "id": "NAME-T070",
+      "synthetic_input": "https://example.invalid/only-hidden",
+      "preconditions": "ONLY_MASKED_URL",
+      "expected_title": "Продавец не определён",
+      "expected_qualifiers": [],
+      "expected_explanation": "В actual NAME входе уже [скрыто], не raw URL; не вытащить example из домена.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T071",
+      "synthetic_input": "REG.RU",
+      "preconditions": "ALLOWED_PLAIN_TRADE_SEGMENT",
+      "expected_title": "REG.RU",
+      "expected_qualifiers": [],
+      "expected_explanation": "Только если действующая privacy разрешила торговую форму; не network URL, вывод plain text. Иначе privacy fallback.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T072",
+      "synthetic_input": "Apteka.ru",
+      "preconditions": "ALLOWED_PLAIN_TRADE_SEGMENT",
+      "expected_title": "Apteka.ru",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не отрезать .ru в обычную аптеку; если уже скрыто — не восстанавливать.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T073",
+      "synthetic_input": "Профи.ру",
+      "preconditions": "ALLOWED_PLAIN_TRADE_SEGMENT",
+      "expected_title": "Профи.ру",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не доказывает предмет заказа/расход исполнителя.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T074",
+      "synthetic_input": "LEROY MERLIN 2019",
+      "preconditions": "KNOWN_HISTORICAL_IDENTITY_YEAR_FIELD",
+      "expected_title": "LEROY MERLIN",
+      "expected_qualifiers": [],
+      "expected_explanation": "2019 отдельное typed date metadata; не Лемана ПРО по нынешнему ребрендингу.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T075",
+      "synthetic_input": "Tele2 в старой выписке",
+      "preconditions": "KNOWN_HISTORICAL_IDENTITY",
+      "expected_title": "Tele2",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не T2 автоматически.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T076",
+      "synthetic_input": "Boxberry в старой выписке",
+      "preconditions": "KNOWN_HISTORICAL_IDENTITY",
+      "expected_title": "Boxberry",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не Яндекс Доставка автоматически, source bindings не слиты.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T077",
+      "synthetic_input": "Моё личное имя Дом",
+      "preconditions": "PROTECTED_USER_NAME",
+      "expected_title": "Дом",
+      "expected_qualifiers": [],
+      "expected_explanation": "Каталог/стиль не перезаписывают.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T078",
+      "synthetic_input": "Личное правило назначает Таймвэб",
+      "preconditions": "PROTECTED_RULE_NAME",
+      "expected_title": "Таймвэб",
+      "expected_qualifiers": [],
+      "expected_explanation": "Защищённое имя важнее автоматического TimeWeb.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T079",
+      "synthetic_input": "Два известных одинаково названных ИП",
+      "preconditions": "DISTINCT_IDENTITIES_SAME_LABEL",
+      "expected_title": "ИП Ромашка",
+      "expected_qualifiers": [],
+      "expected_explanation": "Одинаковый label не Merge, операции/счета/CP отдельно.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T080",
+      "synthetic_input": "Имя очень длинное с Fresh в конце",
+      "preconditions": "WITHIN_EXISTING_TEXT_LIMIT",
+      "expected_title": "Полное допустимое имя с Fresh",
+      "expected_qualifiers": [],
+      "expected_explanation": "Только визуальное сокращение; проверка фактического лимита отдельно без потери различителя.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T081",
+      "synthetic_input": "Имя с HTML, формулой или текстом команды",
+      "preconditions": "UNTRUSTED_NAME_TEXT",
+      "expected_title": "Буквальный безопасный текст",
+      "expected_qualifiers": [],
+      "expected_explanation": "Plain text/privacy и защищённый текстовый экспорт, без HTML/формул/ссылок/действий.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T082",
+      "synthetic_input": "Повтор NAME той же версии",
+      "preconditions": "IDEMPOTENT_VIEW",
+      "expected_title": "Тот же title и qualifiers",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не доставка доставка и не повторная canonicalization записей.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T083",
+      "synthetic_input": "Повторный импорт той же операции с ручным именем",
+      "preconditions": "REIMPORT_PROTECTED",
+      "expected_title": "Прежнее ручное имя",
+      "expected_qualifiers": [],
+      "expected_explanation": "Source/dedupe/parts/links/имя владельца сохраняются.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T084",
+      "synthetic_input": "Новая покупка того же Ozon после split",
+      "preconditions": "NEW_INDEPENDENT_PURCHASE",
+      "expected_title": "Ozon",
+      "expected_qualifiers": [],
+      "expected_explanation": "Старая доля/ручной title не переносится автоматически как правило.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T085",
+      "synthetic_input": "Удалённая операция и старый кэш имени",
+      "preconditions": "DELETED_SCOPE",
+      "expected_title": "Недоступно",
+      "expected_qualifiers": [],
+      "expected_explanation": "Не раскрыть/восстановить данные по label/старому preview.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    },
+    {
+      "id": "NAME-T086",
+      "synthetic_input": "Другой пользователь с таким же именем магазина",
+      "preconditions": "OWNER_SCOPE",
+      "expected_title": "Своё допустимое представление",
+      "expected_qualifiers": [],
+      "expected_explanation": "Никакого переноса частных имён/категорий/правил или authority чужих IDs.",
+      "source_write": false,
+      "status": "NOT_RUN_PRODUCT_OR_MODEL",
+      "expected_event_label": null
+    }
+  ],
+  "implementation_findings": [
+    {
+      "id": "NAME-I01",
+      "status": "REPRODUCED_NOT_FIXED",
+      "path": "packages/finance-core/src/merchant-recognition.ts",
+      "symbol": "locationTail / recognizeMerchant",
+      "evidence": "Geo cleanup runs before identity. Кафе Москва → Кафе; Магазин Россия → Магазин; Столовая Иннополис → Столовая.",
+      "required": "Only proven typed geo tail; unknown useful full name retained.",
+      "rules": [
+        "NAME-R11",
+        "NAME-R18"
+      ]
+    },
+    {
+      "id": "NAME-I02",
+      "status": "REPRODUCED_NOT_FIXED",
+      "path": "packages/finance-core/src/merchant-recognition.ts",
+      "symbol": "bankBrandName / displayPatterns",
+      "evidence": "OZON FRESH MOSCOW RUS → OZON using broad Ozon alias; specific qualifier Fresh lost.",
+      "required": "Specific identity/service before display; preserve Fresh/Go/service, no broad-brand overwrite.",
+      "rules": [
+        "NAME-R07",
+        "NAME-R09"
+      ]
+    },
+    {
+      "id": "NAME-I03",
+      "status": "REPRODUCED_NOT_FIXED",
+      "path": "packages/finance-core/src/merchant-recognition.ts",
+      "symbol": "genericPrefixes / locationTail",
+      "evidence": "Unsegmented synthetic СБЕР 24 Москва Рус → Москва. Prefix and geography regex can erase useful unknown name. No actual bank sample is claimed.",
+      "required": "Adapter-proven channel/prefix only; unknown source name retained.",
+      "rules": [
+        "NAME-R13",
+        "NAME-R14",
+        "NAME-R18"
+      ]
+    },
+    {
+      "id": "NAME-I04",
+      "status": "REPRODUCED_NOT_FIXED",
+      "path": "packages/imports/src/bank-description.ts",
+      "symbol": "bankDescription",
+      "evidence": "Explicit merchant Бюро переводов Север with description Оплата услуг бюро переводов becomes empty merchantText due substring перевод. Sanitized description remains present.",
+      "required": "Distinguish commercial translation from money transfer without blanket merchant suppression; keep allowed FIO/transfer text.",
+      "rules": [
+        "NAME-R29",
+        "NAME-R30"
+      ]
+    },
+    {
+      "id": "NAME-I05",
+      "status": "REPRODUCED_NOT_FIXED",
+      "path": "packages/imports/src/safe-source.ts",
+      "symbol": "sourceFields / merchantNames",
+      "evidence": "/4 details.merchantText retains PYATEROCHKA MOSCOW RUS, but sourceFields returns merchantText Пятёрочка. Latin can be replaced before bankBrandName.",
+      "required": "Source-script NAME must consider permitted original span/provenance; do not rewrite historical bank facts or recover raw/HMAC.",
+      "rules": [
+        "NAME-R01",
+        "NAME-R03",
+        "NAME-R04"
+      ]
+    },
+    {
+      "id": "NAME-I06",
+      "status": "INTEGRATION_REQUIREMENT_NOT_FIXED",
+      "path": "packages/finance-core/src/rules.ts",
+      "symbol": "ruleMatches merchantEquals/merchantContains",
+      "evidence": "Current contains uses semantics.merchant text and a narrow TimeWeb compatibility. New spacing/casing style must not be fed back as matching identity.",
+      "required": "Read-only NAME projection, rules/source matching unchanged. Verify legacy Worldclass/World Class/XFit/TimeWeb conditions before rollout; no general fuzzy contains migration.",
+      "rules": [
+        "NAME-R01",
+        "NAME-R34",
+        "NAME-R35"
+      ]
+    }
+  ],
+  "frozen_sources": [
+    {
+      "path": "packages/finance-core/src/merchant-recognition.ts",
+      "blob": "4fd8dd24886b7e572a0768cd0b73230451f83988"
+    },
+    {
+      "path": "packages/finance-core/src/merchant-aliases.ts",
+      "blob": "448d7fb322e246b5d7a230c124c66896f21ef032"
+    },
+    {
+      "path": "packages/finance-core/src/grocery-evidence.ts",
+      "blob": "85d9e3179081611a099b147de4e38378dbc76f1b"
+    },
+    {
+      "path": "packages/finance-core/src/grocery-catalog.ts",
+      "blob": "dbb1abd8a487f79481f149724aba2d334836794a"
+    },
+    {
+      "path": "packages/finance-core/src/merchant-catalog.ts",
+      "blob": "d0e52ad961b59e2c13e9a840b2682b3f24c0ab94"
+    },
+    {
+      "path": "packages/finance-core/src/starter.ts",
+      "blob": "f67d375dd00854fe2126d399a00673402f479019"
+    },
+    {
+      "path": "packages/finance-core/src/model.ts",
+      "blob": "221a2b3dce4ce863b8be07e0f5b26662ad167c11"
+    },
+    {
+      "path": "packages/finance-core/src/money.ts",
+      "blob": "624d91f98e38fc6b69258487957cca1b51921cc3"
+    },
+    {
+      "path": "packages/imports/src/bank-description.ts",
+      "blob": "25504b1b9a4b0a97702ed3cfbc216c77a1067cea"
+    },
+    {
+      "path": "packages/imports/src/safe-source.ts",
+      "blob": "0e9e1d84dd095044c3ce35e4cf720d3c5e7a5d4d"
+    },
+    {
+      "path": "packages/privacy/src/text.ts",
+      "blob": "412e84afdc4bed598f4ddf32e3841e4ec3989750"
+    },
+    {
+      "path": "packages/finance-core/src/rules.ts",
+      "blob": "4a52fbb821e5c73a1940b092087f6367b51d7fcd"
+    }
+  ],
+  "retained_inputs": [
+    {
+      "path": "docs/architecture/activity-spelling-review-20261028.json",
+      "sha256": "fbf71028bf2868daf64c35e56b46e19330a7d683c0363eca06e7c18f97082fe3"
+    },
+    {
+      "path": "docs/architecture/activity-spelling-review-20261028.md",
+      "sha256": "4b7a76e1a719e7312a033afb7e686f7845e1b309a4a8c04d9514b0f995b6f8de"
+    },
+    {
+      "path": "docs/architecture/activity-vocabulary-20261028.json",
+      "sha256": "ddb75404b30060c59e1b7a226b5ce55bf4e02ce85877ce080f0feb84e2207120"
+    },
+    {
+      "path": "docs/architecture/activity-vocabulary-20261028.md",
+      "sha256": "bceb02f514f4d8ce50084931cc974a02f6e813cca49d8ad4de2e9034065ff7f9"
+    },
+    {
+      "path": "docs/architecture/activity-vocabulary-audit-20261028.json",
+      "sha256": "a4c94e921ea418ac2ba577d03e93740690fb1b759015daf3ac11091a20f27ec2"
+    },
+    {
+      "path": "docs/architecture/categorization-owner-review-20261024.md",
+      "sha256": "8a4200eea87b5516a7bdad5a255c1cde96f7f320ae59f06c2ae21ff5a2a3eef8"
+    },
+    {
+      "path": "docs/architecture/category-counterparty-structure.md",
+      "sha256": "d07fccb04aeeb6e681d214f580ff5a833c2f2daabc09540f23ae6100b02909de"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-animals-20261027.md",
+      "sha256": "7e878d7bed74083b970627d23227049d25b7482107725b3df11142a2ed6735f0"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-beauty-categories-20261026.md",
+      "sha256": "740423ce969d9cf85e85986b30ea9387dc6c4fe6d4e05924d98704b358aaf095"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-complete-20261027.md",
+      "sha256": "45cf1fb6626037375a10760bfb3e76a11f639bb160818b0dabf739b2a75197af"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-categories-20261026.md",
+      "sha256": "a7b00b1075665786e2caea7887dbb4534b2844d534ef77251f04d0c943df3a4a"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-checks-20261026.md",
+      "sha256": "c426678fc45dfc24f002695147ceefb7c01e9719d4b105a0a60a1d9274de7d87"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-list-20261026.md",
+      "sha256": "97ff69c25819885832dd06fc674cc653a03511e249c7ecab77175d2a4f6efdfd"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-spellings-20261026.md",
+      "sha256": "8e95fdf5a60d971d04dd60b747ec9ae39769446a03453c009847ea165c01a5b6"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-consolidation-index-20261027.json",
+      "sha256": "cee1e88aa92225c571cd9b19c9186ea77f10ab35f5595ae183b26cebbd14ed0b"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-categories-20261027.md",
+      "sha256": "ff2ee90ce90e0c0810aa6954d0bc5094977b5893cc14a74c56527b328527aec8"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-checks-20261027.md",
+      "sha256": "cffa6fe003bb254fc6844827d57e24a78fcfe905cbae771d4502a885756ed55c"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-list-20261026.md",
+      "sha256": "4c4a151289f8e89d720c821daf16bcc867bbd4fddffbf5a017d9ee489a1def80"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-spellings-20261027.md",
+      "sha256": "8a2330cdb77db6d7be316c0f2a86d0c57c0dd89367e816535e4086459f63c45d"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-education-family-20261027.md",
+      "sha256": "421abef5b68f10cdcdafb14ea3a10fb609d02994d72c15cc282b395b3ce09d99"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-entertainment-20261027.md",
+      "sha256": "4bef0dbfbf5e2de2987b247bd172a001cc782d2f635d0e50ba1b123a9ae4d44c"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-financial-events-20261027.md",
+      "sha256": "4b2b089ba6f20171adf8abfc0e6dd2c45b74627f5cc03fcf2e8cb82311632501"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-gifts-charity-20261027.md",
+      "sha256": "7e3655429b248bbd3d39b65fe7f9e66f3bb22645a8453c32fea8d11402bb1361"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-household-services-20261027.md",
+      "sha256": "f5973dfa9de2ba5f8301c35931f42b007e8e709f708e0f816d584e71918e6575"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-logistics-20261027.md",
+      "sha256": "c86bc1360481e1ea9b3f4c1187c6f4157b27ecbaac45ade93111d96a2b098a4a"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-marketplaces-20261027.md",
+      "sha256": "f4f4f9489cc73d3db4f32f91e6489df9c8451f317d11a8f350c683f96fb3e369"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-master-20261025.md",
+      "sha256": "7b1c42ba4e0a6a5429545b4aff26615f92f84474a6e540ad1898c6b28aff2350"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-office-advertising-20261027.md",
+      "sha256": "907002b4dcda56a9b4e84a94584f8a464ca85889ea47c63ce7ed336ab2f95dd8"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-professional-services-20261027.md",
+      "sha256": "9f445557e4d4590c8976412b280b32f890a0b07a1256afcade1f8eb08f522ab2"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-source-dispositions-20261027.json",
+      "sha256": "ed406829461c7b17411572e493f76c6a08a3250d5da8afcc1db1ab89983250c6"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-telecom-20261026.md",
+      "sha256": "1e60429aafed997223810b1a2015b2d62606cda7c598db9e2b8c5af52e263049"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-travel-20261027.md",
+      "sha256": "c6539074bd63e012e34f5bdac3adf46457050b7653b72c45697e0b68b372f562"
+    },
+    {
+      "path": "docs/architecture/merchant-recognition-20261024.md",
+      "sha256": "984af77b99f2191afb1d53f6a0e358211bab0b1aa7ee3d2f580d4f390dea2515"
+    },
+    {
+      "path": "docs/architecture/merchant-recognition-audit-20261024.md",
+      "sha256": "f39877cba97e11edf80ee5aede2c77f1c6e3cb3277e3c85f6d98d3d450f3c626"
+    },
+    {
+      "path": "docs/architecture/purchase-category-split-20261024.md",
+      "sha256": "2585e61957aa23177cc0872bc1866611334ac083874fdcd2095fb2ec7239a012"
+    },
+    {
+      "path": "docs/product/source-manifest.json",
+      "sha256": "cdc7b6725210bc29390d9d360539e9811590b89ef15fe555457d7a0b750b990d"
+    }
+  ],
+  "immutable_fields": [
+    "source",
+    "bank/source versions",
+    "semantics for matching",
+    "amountMinor",
+    "currency",
+    "operationDate",
+    "postedDate",
+    "accountId",
+    "operation ID",
+    "HMAC/dedupe/alias identity",
+    "kind/role/category/subcategory",
+    "components/allocations",
+    "links/counterparty bindings",
+    "user rules",
+    "review facets"
+  ],
+  "pdf_basis": {
+    "version": "1.3",
+    "sha256": "5255d758534e74c9329cb8437e8a862f4bf989999172903a862462294b4ce9c8",
+    "chapters_from_existing_approved_derivations": [
+      "6.4",
+      "8.1–8.3",
+      "13–17",
+      "18.11",
+      "35.2–35.5"
+    ],
+    "fresh_binary_read": false,
+    "note": "Prior stage read primary PDF; this docs-only snapshot verified unchanged source-manifest and relevant approved architecture/code. GitHub content connector returned no binary body for >1 MB PDF; no fresh full-PDF review is claimed."
+  },
+  "runtime_product_tests": "NOT_RUN",
+  "model_tests": "NOT_RUN",
+  "new_paid_calls": 0,
+  "counts": {
+    "rules": 48,
+    "projection_fields": 8,
+    "transformations": 12,
+    "style_bindings": 36,
+    "future_scenario_families": 86,
+    "implementation_findings": 6,
+    "frozen_source_files": 12,
+    "retained_inputs": 36
+  },
+  "composition_contract": {
+    "primary": "Protected permitted name, known full service/trade title, retained safe source merchant, permitted actual counterparty/event description or honest fallback. Never a guessed category as seller.",
+    "ordering": "Actual eventLabel if needed → title → distinct known serviceQualifier → fulfillmentQualifier → viaLabel. Presentation labels may use separate badges, but compositeLabel keeps meaningful information wherever only one string is available.",
+    "deduplication": "Do not repeat a service already in title: Яндекс Доставка is a specific service title, not Яндекс Доставка — доставка from the name alone. Repeated projection is idempotent.",
+    "matching": "Matching reads original permitted source/semantic identity, never the composite title as its sole source; same display name is not equal ownership or merchant identity.",
+    "badges": "Review/role/link/duplicate/exclusion remain separate factual facets, not removed because the label looks confident."
+  },
+  "method_limits": {
+    "new_style_bindings": "Style proposals for owner review, not newly approved language overrides; only TimeWeb is an already explicit owner exception.",
+    "unknown_profiles": "Every unlisted profile/script has the final SOURCE_SCRIPT_SAFE fallback. The 36 style bindings are not the entire organization catalog and do not enable global unknown matching.",
+    "fresh_pdf": "Fresh binary not read in this snapshot; immutable source-manifest plus previously approved relevant derivations and pinned code examined. No new source/PDF amendment or runtime behavior change.",
+    "baseline_probes": "Read-only execution of pinned existing functions on 15 synthetic inputs. This records 5 existing drifts, not a new NAME implementation or complete import/UI acceptance.",
+    "future_scenarios": "86 future scenario families, not complete executable typed integration payloads; NAME runtime/model/UI scenarios remain NOT_RUN."
+  }
+}

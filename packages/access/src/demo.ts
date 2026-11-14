@@ -4,7 +4,7 @@ import type { AccessStore, Tariff } from './model.ts';
 /** Synthetic fixtures, opt-in only. Prices/quotas are examples, not approved offers. */
 export const demoTariffs: Tariff[] = [
   { id: 'example-week', name: 'На неделю', duration: { kind: 'days', count: 7 }, priceMinor: '39000', aiQuota: 30, publicVisible: true, availableForNew: true, active: true },
-  { id: 'example-month', name: 'На месяц', duration: { kind: 'calendar_months', count: 1 }, priceMinor: '119000', aiQuota: 150, publicVisible: true, availableForNew: true, active: true },
+  { id: 'example-month', name: 'На месяц', duration: { kind: 'calendar_months', count: 1 }, priceMinor: '119000', aiQuota: 10000, publicVisible: true, availableForNew: true, active: true },
   { id: 'example-quarter', name: 'На три месяца', duration: { kind: 'calendar_months', count: 3 }, priceMinor: '249000', aiQuota: 450, publicVisible: true, availableForNew: true, active: true },
 ];
 export function seedAccessExample(now: string): AccessStore {

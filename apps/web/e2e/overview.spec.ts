@@ -1,3 +1,4 @@
+import {chooseOption} from './choice-picker';
 import { expect, test } from '@playwright/test';
 
 test('first visit is empty; demo is opt-in, ephemeral and performs no financial network request', async ({ page }) => {
@@ -24,7 +25,7 @@ test('first visit is empty; demo is opt-in, ephemeral and performs no financial 
 test('bank and period filters control totals, empty result and negative refund-only data', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button',{ name:'Посмотреть пример', exact:true }).click();
-  await page.getByLabel('Банк',{ exact:true }).selectOption('Сбер');
+  await chooseOption(page.getByLabel('Банк',{ exact:true }),'Сбер');
   await expect(page.getByTestId('expenses')).toHaveText('32 199 ₽');
   await expect(page.getByTestId('income')).toHaveText('120 000 ₽');
   await page.getByRole('button',{ name:'Сбросить фильтры' }).click();

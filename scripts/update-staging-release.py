@@ -1,5 +1,6 @@
 """Update the connected Staging UI/API without changing credentials or cost admission."""
 import argparse
+from datetime import datetime, timezone
 import fcntl
 import importlib.util
 import json
@@ -10,15 +11,62 @@ import shlex
 import shutil
 import stat
 import sys
+import tempfile
+import urllib.request
 import time
 from urllib.parse import urlsplit
+
+# Root inspection must not create root-owned cache files in the user's build.
+sys.dont_write_bytecode = True
 
 spec = importlib.util.spec_from_file_location('staging_install', Path(__file__).with_name('install-assistant-staging.py'))
 m = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(m)
+def load_staging_gate():
+    gate_spec = importlib.util.spec_from_file_location('staging_gate_config', Path(__file__).with_name('staging-gate-config.py'))
+    gate = importlib.util.module_from_spec(gate_spec)
+    gate_spec.loader.exec_module(gate)
+    return gate
+
 WORKER = 'cashneuro-staging-import.service'
 WORKER_UNIT = Path('/etc/systemd/system') / WORKER
 WORKER_ENV = Path('/etc/cashneuro/staging/finance-import.env')
+AUX_UNITS = ('cashneuro-staging-api@control.service', 'cashneuro-staging-mail@finance.service',
+             'cashneuro-staging-mail@control.service')
+
+
+def auxiliary_dropin(unit):
+    return Path('/etc/systemd/system') / (unit + '.d') / '99-z-cashneuro-release.conf'
+
+
+def control_settings():
+    values = {}
+    for line in Path('/etc/cashneuro/staging/control-api.env').read_text().splitlines():
+        match = re.fullmatch(r'\s*([A-Z_]+)\s*=\s*(.*?)\s*', line)
+        if match:
+            values[match[1]] = match[2].strip('\"\'')
+    origin = values.get('API_BASE_URL', '').rstrip('/')
+    port = values.get('PORT', '')
+    if origin not in ('https://admin.test.cashneuro.ru', 'https://admin.test.cashneuro.ru/api') or not port.isascii() or not port.isdigit() or not 1 <= int(port) <= 65535 or port == '3000':
+        raise m.InstallationError('CONTROL_STAGING_SETTINGS_CHANGED')
+    return origin, int(port)
+
+
+def check_auxiliary(port, release=None):
+    for _ in range(15):
+        try:
+            if all(m.run(['systemctl', 'show', unit, '--property=ActiveState', '--value']).strip() == b'active' for unit in AUX_UNITS):
+                if release and any(Path(m.run(['systemctl', 'show', unit, '--property=WorkingDirectory', '--value']).decode().strip()).resolve() != release / 'apps/api' for unit in AUX_UNITS):
+                    raise m.InstallationError('AUXILIARY_WORKING_DIRECTORY_CHANGED')
+                with urllib.request.urlopen('http://127.0.0.1:' + str(port) + '/health', timeout=2) as response:
+                    value = json.load(response)
+                if value.get('status') == 'ok' and value.get('profile') == 'control':
+                    return
+        except (OSError, ValueError):
+            pass
+        time.sleep(1)
+    raise m.InstallationError('CONTROL_OR_MAIL_NOT_HEALTHY')
+
 
 
 def settings():
@@ -36,6 +84,48 @@ def settings():
     return values
 
 
+WEBHOOK_PATH = '/api/payments/yookassa/webhook'
+WEBHOOK_URL = 'https://test.cashneuro.ru' + WEBHOOK_PATH
+WEBHOOK_START = b'# BEGIN CASHNEURO STAGING PAYMENT WEBHOOK'
+WEBHOOK_END = b'# END CASHNEURO STAGING PAYMENT WEBHOOK'
+
+
+def configure_payment_webhook(caddyfile, config):
+    # A site address with an exact path is routed ahead of the host-only SPA
+    # block. Its own POST handler never enters the SPA's Basic Auth or rewrites.
+    blocks = caddyfile.count(WEBHOOK_START), caddyfile.count(WEBHOOK_END)
+    if blocks == (1, 1) and caddyfile.index(WEBHOOK_START) < caddyfile.index(WEBHOOK_END):
+        start = caddyfile.index(WEBHOOK_START)
+        end = caddyfile.index(WEBHOOK_END) + len(WEBHOOK_END)
+        caddyfile = caddyfile[:start] + caddyfile[end:].lstrip(b'\r\n')
+    elif blocks != (0, 0):
+        raise m.InstallationError('PAYMENT_WEBHOOK_CONFIG_CHANGED')
+    if not any(config.get(flag) == '1' for flag in ('YOOKASSA_ACCESS_TEST_ENABLED', 'YOOKASSA_TEST_ENABLED')):
+        return caddyfile, False
+    port = config.get('PORT', '3000')
+    if not port.isascii() or not port.isdecimal() or not 1 <= int(port) <= 65535:
+        raise m.InstallationError('PAYMENT_WEBHOOK_PORT_INVALID')
+    block = f"""test.cashneuro.ru{WEBHOOK_PATH} {{
+    @notification method POST
+    route {{
+        reverse_proxy @notification 127.0.0.1:{port}
+        respond 405
+    }}
+}}""".encode()
+    return caddyfile.rstrip() + b'\n\n' + WEBHOOK_START + b'\n' + block + b'\n' + WEBHOOK_END + b'\n', True
+
+
+def check_payment_webhook():
+    payload = {'type': 'notification', 'event': 'payment.succeeded',
+               'object': {'id': '00000000-0000-0000-0000-000000000000'}}
+    # Check the public route locally with the real host and TLS certificate.
+    result = m.run(['curl', '--fail', '--silent', '--show-error', '--max-time', '5',
+                    '--noproxy', '*', '--resolve', 'test.cashneuro.ru:443:127.0.0.1',
+                    '-H', 'Content-Type: application/json', '--data-binary', json.dumps(payload), WEBHOOK_URL])
+    if json.loads(result) != {'status': 'ok'}:
+        raise m.InstallationError('PAYMENT_WEBHOOK_ROUTE_NOT_HEALTHY')
+
+
 def validate_origin(value):
     url = urlsplit(value)
     if url.scheme != 'https' or url.hostname != 'test.cashneuro.ru' or url.port or url.username or url.password or url.query or url.fragment or url.path not in ('', '/', '/api', '/api/'):
@@ -43,14 +133,14 @@ def validate_origin(value):
     return value.rstrip('/')
 
 
-def validate_manifest(value, sha, origin):
-    if value != {'schema': 'cashneuro-web-build/1', 'revision': sha, 'profile': 'finance', 'mode': 'connected', 'apiOrigin': origin}:
+def validate_manifest(value, sha, origin, profile="finance"):
+    if value != {'schema': 'cashneuro-web-build/1', 'revision': sha, 'profile': profile, 'mode': 'connected', 'apiOrigin': origin}:
         raise m.InstallationError('CONNECTED_FRONTEND_REQUIRED')
 
 
 def worker_unit(release):
     return ('[Unit]\nDescription=CashNeuro Staging import worker (Finance)\nAfter=network-online.target\nWants=network-online.target\n'
-            '[Service]\nType=exec\nDynamicUser=yes\nWorkingDirectory=' + str(release / 'apps/api') + '\n'
+            '[Service]\nType=exec\nDynamicUser=yes\nSupplementaryGroups=cashneuro-staging-code\nWorkingDirectory=' + str(release / 'apps/api') + '\n'
             'EnvironmentFile=' + str(WORKER_ENV) + '\nExecStart=/usr/bin/node --import tsx src/import-main.ts\n'
             'Restart=on-failure\nRestartSec=5\nTimeoutStopSec=30\nNoNewPrivileges=yes\nPrivateTmp=yes\nProtectSystem=strict\nProtectHome=yes\n'
             'ProtectKernelTunables=yes\nProtectKernelModules=yes\nProtectControlGroups=yes\nRestrictSUIDSGID=yes\nRestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX\nLimitCORE=0\nUMask=0077\n'
@@ -65,8 +155,76 @@ def snapshot(backup, name, path):
     return {'mode': stat.S_IMODE(info.st_mode), 'uid': info.st_uid, 'gid': info.st_gid}
 
 
+def create_backup_directory(root, sha):
+    return Path(tempfile.mkdtemp(prefix='connected-release-' + sha[:12] + '-', dir=root))
+
+
+def rollback_files(backup, assistant_config=False, original_ai_config=False, old_dropin=None, paused_dropin=None):
+    metadata = {name: snapshot(backup, name, path) for name, path in [('caddy', m.CADDY), ('dropin', m.DROPIN), ('workerUnit', WORKER_UNIT), ('workerEnv', WORKER_ENV)]}
+    if assistant_config:
+        metadata['assistantConfig'] = snapshot(backup, 'assistantConfig', m.CONFIG)
+        if original_ai_config:
+            m.private_write(backup / 'assistantConfig.original', m.CONFIG.read_bytes())
+    if paused_dropin is not None:
+        # Snapshot already created dropin. Replace it atomically; keep the exact original separately.
+        m.private_write(backup / 'dropin.original', old_dropin)
+        owner = backup.stat()
+        m.atomic_replace(backup / 'dropin', paused_dropin, 0o600, owner.st_uid, owner.st_gid)
+        metadata['expiredAiPaused'] = True
+    return metadata
+
+
+def rebind_classification_settings(previous, installed_sha, next_sha):
+    if previous.get('sourceSha256') != installed_sha or not re.fullmatch('[a-f0-9]{64}', next_sha):
+        raise m.InstallationError('INSTALLED_ASSISTANT_BINDING_CHANGED')
+    rebound = json.loads(json.dumps(previous))
+    rebound['sourceSha256'] = next_sha
+    return rebound
+
+
+def admission_expired(previous, now=None):
+    if previous.get('monthly', {}).get('version') == 'cashneuro-staging-monthly/1':
+        return False
+    try:
+        expires = datetime.fromisoformat(previous['expiresAt'].replace('Z', '+00:00'))
+        if expires.tzinfo is None:
+            raise ValueError('timezone required')
+    except (KeyError, TypeError, ValueError, AttributeError):
+        raise m.InstallationError('EXPIRED_AI_ADMISSION_REQUIRED')
+    return expires <= (now or datetime.now(timezone.utc))
+
+
+def pause_expired_ai(previous, dropin, now=None):
+    """UI/read-calculator releases cannot renew expired paid authority or dispatch a probe."""
+    if not admission_expired(previous, now):
+        raise m.InstallationError('EXPIRED_AI_ADMISSION_REQUIRED')
+    commands = re.findall(rb'(?m)^ExecStart=(.+)$', dropin)
+    if len(commands) != 1 or not re.search(rb'^/usr/bin/env CREDENTIALS_DIRECTORY=\S+ ASSISTANT_ENABLED=[01] AI_ENABLED=0 /usr/bin/node --import tsx src/main\.ts$', commands[0]):
+        raise m.InstallationError('INSTALLED_API_AI_COMMAND_CHANGED')
+    return dropin.replace(b'ASSISTANT_ENABLED=1', b'ASSISTANT_ENABLED=0') + b'\n[Service]\nEnvironment=ASSISTANT_ENABLED=0\nEnvironment=CLASSIFICATION_ENABLED=0\nEnvironment=AI_ENABLED=0\n'
+
+
+def require_active_monthly_ai(previous, dropin):
+    """Only existing, running monthly AI can use the preservation-only update."""
+    monthly = previous.get('monthly') or {}
+    if monthly.get('version') != 'cashneuro-staging-monthly/1' or monthly.get('limitRub') != '100':
+        raise m.InstallationError('ACTIVE_MONTHLY_AI_REQUIRED')
+    commands = re.findall(rb'(?m)^ExecStart=(.+)$', dropin)
+    expected = rb'/usr/bin/env CREDENTIALS_DIRECTORY=\S+ ASSISTANT_ENABLED=1 AI_ENABLED=0 /usr/bin/node --import tsx src/main\.ts'
+    if len(commands) != 1 or not re.fullmatch(expected, commands[0]):
+        raise m.InstallationError('ACTIVE_MONTHLY_AI_COMMAND_CHANGED')
+    for key in (b'ASSISTANT_ENABLED', b'CLASSIFICATION_ENABLED'):
+        if len(re.findall(rb'(?m)^Environment=' + key + rb'=1$', dropin)) != 1 or re.search(rb'(?m)^Environment=' + key + rb'=0$', dropin):
+            raise m.InstallationError('ACTIVE_MONTHLY_AI_ENVIRONMENT_CHANGED')
+    if not re.search(rb'(?m)^Environment=AI_ENABLED=0$', dropin):
+        raise m.InstallationError('ACTIVE_MONTHLY_AI_ENVIRONMENT_CHANGED')
+
+
 def restore(backup):
     metadata = json.loads((backup / 'rollback.json').read_text())
+    if metadata.get('assistantConfig'):
+        previous = metadata['assistantConfig']
+        m.atomic_replace(m.CONFIG, (backup / 'assistantConfig').read_bytes(), previous['mode'], previous['uid'], previous['gid'])
     if metadata.get('workerManaged'):
         if WORKER_UNIT.exists():
             m.run(['systemctl', 'daemon-reload'])
@@ -79,49 +237,221 @@ def restore(backup):
                 path.unlink(missing_ok=True)
             else:
                 m.atomic_replace(path, (backup / name).read_bytes(), previous['mode'], previous['uid'], previous['gid'])
+    if metadata.get('auxiliary'):
+        for unit in AUX_UNITS:
+            path = auxiliary_dropin(unit)
+            previous = metadata['auxiliary'][unit]
+            if previous is None:
+                path.unlink(missing_ok=True)
+            else:
+                m.atomic_replace(path, (backup / unit).read_bytes(), previous['mode'], previous['uid'], previous['gid'])
     m.restore(backup)
+    if metadata.get('auxiliary'):
+        m.run(['systemctl', 'reset-failed', *AUX_UNITS])
+        m.run(['systemctl', 'restart', *AUX_UNITS])
+        check_auxiliary(control_settings()[1])
     if metadata.get('workerManaged') and metadata.get('workerWasActive'):
         m.run(['systemctl', 'start', WORKER])
 
 
-def install(source, sha):
+def validate_admission_pair(previous, next_settings, fallback, installed_sha, tested_sha, monthly_budget=None):
+    converting = monthly_budget == '100'
+    if not converting and previous.get('monthly') != next_settings.get('monthly'):
+        raise m.InstallationError('CLASSIFICATION_MONTHLY_AUTHORIZATION_REQUIRED')
+    if converting:
+        monthly = next_settings.get('monthly', {})
+        if monthly.get('version') != 'cashneuro-staging-monthly/1' or monthly.get('limitRub') != '100' or set(monthly) != {'version', 'limitRub', 'activatedAt'} or fallback != previous:
+            raise m.InstallationError('CLASSIFICATION_MONTHLY_AUTHORIZATION_CHANGED')
+        expected = {**previous, 'sourceSha256': tested_sha, 'monthly': monthly}
+        if next_settings != expected:
+            raise m.InstallationError('CLASSIFICATION_MONTHLY_HISTORY_CHANGED')
+    if next_settings.get('sourceSha256') != tested_sha or fallback.get('sourceSha256') != installed_sha or not converting and {**fallback, 'sourceSha256': tested_sha} != next_settings:
+        raise m.InstallationError('CLASSIFICATION_ADMISSION_BINDING_CHANGED')
+    for key in ['realm', 'apiKey', 'allowedEmails', 'modelMetadataSha256', 'tariffSource']:
+        if previous.get(key) != next_settings.get(key):
+            raise m.InstallationError('CLASSIFICATION_ADMISSION_AUTHORITY_CHANGED')
+    old, new = previous['admission'], next_settings['admission']
+    if any(old[key] != new[key] for key in ['stageCapAtoms', 'stageMaximumCalls']) or int(new['spentAtoms']) < int(old['spentAtoms']) or new['calls'] < old['calls'] or next_settings['maximumCalls'] > previous['maximumCalls']:
+        raise m.InstallationError('CLASSIFICATION_ADMISSION_ACCOUNTING_CHANGED')
+    if previous['cost']['projectId'] != next_settings['cost']['projectId'] or previous['cost']['price'] != next_settings['cost']['price']:
+        raise m.InstallationError('CLASSIFICATION_ADMISSION_PROJECT_CHANGED')
+
+
+def prepare_admission(args):
+    # The helper prints only its closed public receipt. Keep stderr/private
+    # exceptions out of the terminal while preserving a useful refusal code.
+    with tempfile.TemporaryFile() as output:
+        try:
+            m.run(args, output=output, timeout=60)
+        except m.InstallationError:
+            output.seek(0)
+            lines = output.read(32769)
+            if len(lines) <= 32768:
+                for line in reversed(lines.splitlines()):
+                    try:
+                        value = json.loads(line)
+                    except (ValueError, UnicodeDecodeError):
+                        continue
+                    code = value.get('code') if isinstance(value, dict) else None
+                    if isinstance(value, dict) and value.get('status') == 'STOP' and isinstance(code, str) and re.fullmatch(r'(CLASSIFICATION|ASSISTANT)_[A-Z0-9_]{1,75}', code):
+                        raise m.InstallationError(code) from None
+            raise
+        output.seek(0)
+        value = json.loads(output.read(32768))
+        public = {key: value[key] for key in ['cases','evidenceSha256','paidCalls','sourceSha256','expiresAt','maximumCallsRemaining','operatingMode','monthlyLimitRub'] if key in value}
+        print(json.dumps(public, ensure_ascii=False), flush=True)
+
+
+def activate_ai(dropin):
+    commands = re.findall(rb'(?m)^ExecStart=(.+)$', dropin)
+    sections = re.findall(rb'(?m)^\[([^\]]+)\]$', dropin)
+    if not sections or sections[-1] != b'Service' or len(commands) != 1 or not re.fullmatch(rb'/usr/bin/env CREDENTIALS_DIRECTORY=\S+ ASSISTANT_ENABLED=[01] AI_ENABLED=0 /usr/bin/node --import tsx src/main\.ts', commands[0]):
+        raise m.InstallationError('AI_RESUME_DROPIN_CHANGED')
+    value = re.sub(rb'(?m)^Environment=(?:ASSISTANT_ENABLED|CLASSIFICATION_ENABLED|AI_ENABLED)=[01]\n', b'', dropin)
+    return value.replace(b'ASSISTANT_ENABLED=0', b'ASSISTANT_ENABLED=1').rstrip() + b'\nEnvironment=ASSISTANT_ENABLED=1\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
+
+
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False, full_staging=False, restore_default_tariffs=False):
+    if restore_default_tariffs and not full_staging:
+        raise m.InstallationError('TARIFF_RESTORE_REQUIRES_FULL_STAGING')
+    if preserve_active_ai and (keep_ai_paused or resume_ai or enable_classification or evidence or tested_sha or monthly_budget is not None):
+        raise m.InstallationError('ACTIVE_MONTHLY_AI_ARGUMENTS_CONFLICT')
+    if monthly_budget is not None and (monthly_budget != '100' or not resume_ai):
+        raise m.InstallationError('MONTHLY_AI_ARGUMENTS_INVALID')
+    if resume_ai:
+        if keep_ai_paused or enable_classification or not evidence or not tested_sha:
+            raise m.InstallationError('AI_RESUME_ARGUMENTS_INVALID')
+        enable_classification = True
+    if keep_ai_paused and (enable_classification or evidence or tested_sha):
+        raise m.InstallationError('PAUSED_AI_ARGUMENTS_CONFLICT')
+    if bool(evidence) != bool(tested_sha) or evidence and (not enable_classification or not re.fullmatch('[a-f0-9]{64}', tested_sha)):
+        raise m.InstallationError('CLASSIFICATION_EVIDENCE_ARGUMENTS_INVALID')
+    print('Подготовка: проверяем релиз и резервную копию Staging.', flush=True)
     if not re.fullmatch('[a-f0-9]{40}', sha):
         raise m.InstallationError('RELEASE_INVALID')
     config = settings()
     origin = validate_origin(config['API_BASE_URL'])
     validate_manifest(json.loads((source / 'apps/web/dist/release.json').read_text()), sha, origin)
-    m.wait_health(True)
+    # The running API may be the previous workflow. Post-switch checks below
+    # still require the candidate workflow; preflight checks liveness/profile.
+    m.wait_health(False)
     current = Path(m.run(['systemctl', 'show', m.UNIT, '--property=WorkingDirectory', '--value']).decode().strip()).parents[1]
     if current.parent != m.BASE / 'backend-releases' or not re.fullmatch('[a-f0-9]{40}', current.name):
         raise m.InstallationError('INSTALLED_API_LAYOUT_CHANGED')
     private = m.CONFIG.lstat()
     if not stat.S_ISREG(private.st_mode) or private.st_uid != 0 or private.st_mode & 0o077:
         raise m.InstallationError('PRIVATE_CONFIGURATION_REQUIRED')
-    binding = json.loads(m.CONFIG.read_text())['sourceSha256']
+    original_settings = json.loads(m.CONFIG.read_text())
+    binding = original_settings['sourceSha256']
     identity = json.loads(m.run(['/usr/bin/node', '--experimental-transform-types', source / 'apps/api/src/assistant-staging-main.ts', '--prepare']))
-    if identity['sourceSha256'] != binding:
-        raise m.InstallationError('API_SOURCE_CHANGED_REQUIRES_SEPARATE_ADMISSION')
+    if evidence and identity['sourceSha256'] != tested_sha:
+        raise m.InstallationError('CLASSIFICATION_TESTED_RELEASE_CHANGED')
+    if identity['sourceSha256'] != binding or preserve_active_ai:
+        if not enable_classification and not keep_ai_paused and not preserve_active_ai:
+            raise m.InstallationError('API_SOURCE_CHANGED_REQUIRES_SEPARATE_ADMISSION')
+        installed = json.loads(m.run(['/usr/bin/node', '--experimental-transform-types', current / 'apps/api/src/assistant-staging-main.ts', '--prepare']))
+        rebind_classification_settings(original_settings, installed['sourceSha256'], identity['sourceSha256'])
+    rebound = rebind_classification_settings(original_settings, binding, identity['sourceSha256'])
+    if (enable_classification and not evidence) or preserve_active_ai:
+        # Explicit feature opt-in changes only source identity. No new key,
+        # ceiling, accounting period, tariff or expiration is manufactured.
+        validation = 'import {checkAssistantStagingSettings} from ' + json.dumps((source / 'apps/api/src/analyzer-assistant-settings.ts').as_uri()) + ';import {readFileSync} from "node:fs";checkAssistantStagingSettings(JSON.parse(readFileSync(0,"utf8")));'
+        m.run(['/usr/bin/node', '--experimental-transform-types', '--input-type=module', '-e', validation], data=json.dumps(rebound).encode())
     original = m.CADDY.read_bytes()
-    old_root = m.frontend_root(json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty'])))
+    caddy_config = json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty']))
+    old_root = m.frontend_root(caddy_config)
+    control_port, old_admin = None, None
+    if full_staging:
+        control_origin, control_port = control_settings()
+        validate_manifest(json.loads((source / 'apps/admin/dist/release.json').read_text()), sha, control_origin, 'control')
+        old_admin = m.frontend_root(caddy_config, 'admin.test.cashneuro.ru')
+        if original.count(old_admin.encode()) != 1:
+            raise m.InstallationError('ADMIN_FRONTEND_LAYOUT_CHANGED')
+        check_auxiliary(control_port)
+        for unit in AUX_UNITS:
+            directory = Path(m.run(['systemctl', 'show', unit, '--property=WorkingDirectory', '--value']).decode().strip())
+            if not directory.is_absolute() or not directory.is_relative_to(m.BASE) or not directory.resolve().is_relative_to(m.BASE):
+                raise m.InstallationError('AUXILIARY_WORKING_DIRECTORY_CHANGED')
+
     if original.count(old_root.encode()) != 1:
         raise m.InstallationError('FRONTEND_LAYOUT_CHANGED')
     old_dropin = m.DROPIN.read_bytes()
+    paused_dropin = pause_expired_ai(original_settings, old_dropin) if keep_ai_paused else None
+    if preserve_active_ai:
+        require_active_monthly_ai(original_settings, old_dropin)
+        m.wait_health(True)
     if str(current).encode() not in old_dropin:
         raise m.InstallationError('INSTALLED_API_DROPIN_CHANGED')
     release = m.BASE / 'backend-releases' / sha
     if release.exists():
         raise m.InstallationError('RELEASE_ALREADY_EXISTS_REQUIRES_REVIEW')
-    backup = Path('/var/lib/cashneuro') / ('connected-release-' + sha[:12] + '-' + str(int(time.time())))
-    backup.mkdir(mode=0o700)
-    metadata = {name: snapshot(backup, name, path) for name, path in [('caddy', m.CADDY), ('dropin', m.DROPIN), ('workerUnit', WORKER_UNIT), ('workerEnv', WORKER_ENV)]}
+    backup = create_backup_directory(Path('/var/lib/cashneuro'), sha)
+    # A failed renewal must not roll back to enabled but already expired keys.
+    rollback_paused = pause_expired_ai(original_settings, old_dropin) if resume_ai and admission_expired(original_settings) else paused_dropin
+    metadata = rollback_files(backup, enable_classification or keep_ai_paused or preserve_active_ai, bool(evidence), old_dropin, rollback_paused)
     services = m.run(['systemctl', 'list-units', '--all', '--plain', '--no-legend', '--type=service', 'cashneuro*import*']).decode().splitlines()
     existing = [line.split()[0] for line in services if len(line.split()) > 3 and line.split()[2] == 'active']
     metadata['workerManaged'] = not existing or existing == [WORKER]
     metadata['workerWasActive'] = WORKER in existing
     enabled = m.run(['systemctl', 'show', WORKER, '--property=UnitFileState', '--value']).decode().strip() if WORKER_UNIT.exists() else ''
     metadata['workerWasEnabled'] = enabled == 'enabled'
+    if full_staging:
+        metadata['auxiliary'] = {unit: snapshot(backup, unit, auxiliary_dropin(unit)) for unit in AUX_UNITS}
     m.private_write(backup / 'rollback.json', json.dumps(metadata).encode())
-    print('1/3: сохранена конфигурация отката; ключ, лимиты и БД остаются прежними.', flush=True)
+    container, owner, sql = m.docker_database()
+    with os.fdopen(os.open(backup / 'database.dump', os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'wb') as stream:
+        m.run(['docker', 'exec', container, 'pg_dump', '-U', owner, '-d', 'finance_staging', '-Fc'], output=stream, timeout=300)
+        stream.flush()
+        os.fsync(stream.fileno())
+    if enable_classification:
+        if sql("SELECT to_regclass('finance.classification_run') IS NOT NULL") == 'f':
+            migration = (source / 'packages/database/migrations/0028_ai_classification.sql').read_text()
+            sql('BEGIN;\n' + migration + '\nCOMMIT;')
+        if sql("SELECT position('details' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") == 'f':
+            sql('BEGIN;\n' + (source / 'packages/database/migrations/0029_bank_description.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='marketplace_catalog_initialized')") == 'f':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0030_marketplace_catalog.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT position('textEvidence' IN pg_get_constraintdef(oid))>0 FROM pg_constraint WHERE conrelid='finance.ingestion_row'::regclass AND conname='finite_source_evidence'") == 'f':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0031_merchant_source.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('finance.category_binding') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0032_category_bindings.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='review_session' AND column_name='live_queue')") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0033_attention_queue.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('commerce.ai_pack') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0034_commerce_catalog.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('identity.legal_event') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0035_launch_legal.sql').read_text() + '\nCOMMIT;')
+    if sql("SELECT to_regclass('commerce.access_checkout') IS NOT NULL") != 't':
+        sql('BEGIN;\n' + (source / 'packages/database/migrations/0036_access_checkout.sql').read_text() + '\nCOMMIT;')
+    for probe, filename in (
+        ("SELECT to_regprocedure('finance.record_budget_settings()') IS NOT NULL", '0037_budget_settings_history.sql'),
+        ("SELECT coalesce(to_regprocedure('commerce.control_checkout_queue()'),to_regprocedure('commerce.control_checkout_queue(uuid)')) IS NOT NULL", '0038_admin_checkout_projection.sql'),
+        ("SELECT EXISTS (SELECT 1 FROM pg_constraint WHERE conrelid='commerce.access_checkout'::regclass AND contype='c' AND position('application_id' IN pg_get_constraintdef(oid))>0 AND position('enroll' IN pg_get_constraintdef(oid))>0)", '0039_first_checkout_autorenewal.sql'),
+        ("SELECT to_regclass('mail.request_cooldown') IS NOT NULL", '0040_mail_request_cooldown.sql'),
+        ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='assistant_profile' AND column_name='follows_device')", '0042_device_timezone.sql'),
+        ("SELECT to_regprocedure('commerce.restore_legacy_analyzer_allowance(text)') IS NOT NULL", '0043_analyzer_allowance_restoration.sql'),
+        ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='counterparty' AND column_name='auto_rule_id')", '0044_counterparty_proposals.sql'),
+        ("SELECT to_regclass('commerce.manual_allowance') IS NOT NULL", '0045_admin_operations.sql'),
+        ("SELECT to_regclass('identity.account_deletion') IS NOT NULL", '0046_account_deletion.sql'),
+        ("SELECT to_regclass('control.display_preferences') IS NOT NULL", '0047_admin_workspace.sql'),
+        ("SELECT to_regclass('commerce.customer_allowance_override') IS NOT NULL", '0048_customer_allowance.sql'),
+        ("SELECT to_regprocedure('commerce.extend_customer_allowance(text,timestamptz,timestamptz)') IS NOT NULL", '0049_manual_allowance_extension.sql'),
+        ("SELECT to_regprocedure('commerce.yookassa_payment_target(uuid)') IS NOT NULL", '0050_yookassa_webhook.sql'),
+        ("SELECT to_regclass('identity.signup_pending') IS NOT NULL", '0051_signup_trial.sql'),
+        ("SELECT to_regprocedure('commerce.set_customer_purchased_units(text,bigint)') IS NOT NULL", '0052_allowance_lifecycle.sql'),
+        ("SELECT to_regprocedure('commerce.interactive_checkouts_due()') IS NOT NULL", '0053_checkout_lifecycle.sql'),
+        ("SELECT to_regclass('commerce.payment_card') IS NOT NULL", '0054_payment_cards.sql'),
+        ("SELECT to_regclass('commerce.account_trial_activation') IS NOT NULL", '0055_periods_cards_trials.sql'),
+    ):
+        if sql(probe) != 't':
+            sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
+    # 0041 is a data correction with an exact legacy-source predicate. Replaying
+    # it is safe and also catches old snapshots written after a runtime rollback.
+    allowance = (source / 'packages/database/migrations/0041_legacy_analyzer_allowance.sql').read_text()
+    sql('BEGIN;\n' + allowance + '\nCOMMIT;')
+    if restore_default_tariffs:
+        sql('BEGIN;\n' + (source / 'infra/staging/restore-default-tariffs.sql').read_text() + '\nCOMMIT;')
+    print('1/3: сохранены настройки отката и резервная копия тестовой БД; схема импорта проверена.', flush=True)
     shutil.copytree(source, release, symlinks=True)
     for directory, dirs, files in os.walk(release, followlinks=False):
         for name in ['.'] + dirs + files:
@@ -132,40 +462,100 @@ def install(source, sha):
             os.chmod(path, stat.S_IMODE(path.stat().st_mode) & ~0o022 | (0o555 if path.is_dir() else 0o444))
     new_root = release / 'apps/web/dist'
     candidate = backup / 'Caddyfile.candidate'
-    m.private_write(candidate, original.replace(old_root.encode(), str(new_root).encode()))
+    next_caddy = original.replace(old_root.encode(), str(new_root).encode())
+    if old_admin:
+        next_caddy = next_caddy.replace(old_admin.encode(), str(release / 'apps/admin/dist').encode())
+    next_caddy, payment_webhook = configure_payment_webhook(next_caddy, config)
+    gate = load_staging_gate()
+    next_caddy = gate.configure(next_caddy)
+    m.private_write(candidate, next_caddy)
     m.run(['caddy', 'validate', '--config', candidate, '--adapter', 'caddyfile'])
     rollback = 'sudo /usr/bin/python3 ' + shlex.quote(str(release / 'scripts/update-staging-release.py')) + ' --rollback ' + shlex.quote(str(backup))
     print('Откат: ' + rollback, flush=True)
+    resume_blocker = None
+    if evidence:
+        print('Проверяем два сохранённых ответа и оплаченные квитанции; новых модельных запросов: 0.', flush=True)
+        next_path, fallback_path = backup / 'assistantConfig.next', backup / 'assistantConfig.rollbackFresh'
+        try:
+            prepare_admission(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-admit-main.ts', '--prepare-monthly-100' if monthly_budget else '--prepare', evidence, next_path, fallback_path, tested_sha, binding])
+        except m.InstallationError as error:
+            if not resume_ai or str(error) not in ('CLASSIFICATION_RECONCILIATION_REQUIRED', 'CLASSIFICATION_ORIGINAL_LIMIT_EXHAUSTED') or not rollback_paused:
+                raise
+            resume_blocker = str(error)
+            keep_ai_paused, enable_classification, paused_dropin = True, False, rollback_paused
+            print('ИИ пока не возобновлён: ' + resume_blocker + '. Интерфейс обновится отдельно; квитанции, резерв и лимит вызовов сохраняются.', flush=True)
+        else:
+            rebound = json.loads(next_path.read_text())
+            fallback = json.loads(fallback_path.read_text())
+            validate_admission_pair(original_settings, rebound, fallback, binding, tested_sha, monthly_budget)
+            m.atomic_replace(backup / 'assistantConfig', fallback_path.read_bytes(), 0o600)
     print('2/3: подключение собранного интерфейса к API и проверка обработчика импорта.', flush=True)
     try:
-        m.atomic_replace(m.DROPIN, old_dropin.replace(str(current).encode(), str(release).encode()))
+        new_dropin = (paused_dropin if keep_ai_paused else old_dropin).replace(str(current).encode(), str(release).encode())
+        if keep_ai_paused or preserve_active_ai:
+            m.atomic_replace(m.CONFIG, json.dumps(rebound).encode(), 0o600)
+            if keep_ai_paused:
+                print('Срок допуска ИИ истёк. Обновляем интерфейс и расчёты с отключённой моделью; прежние квитанции, резерв и лимиты сохранены. Платных вызовов: 0.', flush=True)
+            else:
+                print('Активный месячный ИИ 100 ₽ сохранён; ключи, расход, история и лимит неизменны. Платных вызовов: 0.', flush=True)
+        if enable_classification:
+            new_dropin = activate_ai(new_dropin)
+            m.atomic_replace(m.CONFIG, json.dumps(rebound).encode(), 0o600)
+            if evidence:
+                print('Категоризация: два сохранённых PASS приняты на проверенном runtime; повторных POST нет.', flush=True)
+            else:
+                print('Проверка категоризации: два платных запроса на синтетике в пределах прежнего лимита.', flush=True)
+                m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-smoke-main.ts', '--live'], output=sys.stdout.buffer, timeout=180)
+        m.atomic_replace(m.DROPIN, new_dropin)
         if metadata['workerManaged']:
             # Copy only the scoped DB connection, never auth/KMS/AI credentials.
             worker_env = 'APP_ENV=staging\nAPI_PROFILE=finance\nDATABASE_URL=' + json.dumps(config['DATABASE_URL']) + '\n'
             m.atomic_replace(WORKER_ENV, worker_env.encode(), 0o600)
             m.atomic_replace(WORKER_UNIT, worker_unit(release).encode())
+        if full_staging:
+            for unit in AUX_UNITS:
+                path = auxiliary_dropin(unit)
+                path.parent.mkdir(parents=True, exist_ok=True)
+                m.atomic_replace(path, ('[Service]\nSupplementaryGroups=cashneuro-staging-code\nWorkingDirectory=' + str(release / 'apps/api') + '\n').encode())
         m.run(['systemctl', 'daemon-reload'])
         m.run(['systemctl', 'restart', m.UNIT])
-        m.wait_health(True)
+        wait_release_health(release, keep_ai_paused)
         if metadata['workerManaged']:
             m.run(['systemctl', 'enable', WORKER])
             m.run(['systemctl', 'restart', WORKER])
             time.sleep(2)
             if m.run(['systemctl', 'is-active', WORKER]).decode().strip() != 'active':
                 raise m.InstallationError('IMPORT_WORKER_NOT_ACTIVE')
+        if full_staging:
+            m.run(['systemctl', 'restart', *AUX_UNITS])
+            check_auxiliary(control_port, release)
         info = m.CADDY.stat()
         m.atomic_replace(m.CADDY, candidate.read_bytes(), stat.S_IMODE(info.st_mode), info.st_uid, info.st_gid)
+        gate.install(release, m.private_write, m.run, m.atomic_replace)
         m.run(['systemctl', 'reload', 'caddy'])
-        m.wait_health(True)
-        actual = m.frontend_root(json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty'])))
-        if actual != str(new_root):
+        wait_release_health(release, keep_ai_paused)
+        if payment_webhook:
+            check_payment_webhook()
+        active_caddy = json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty']))
+        actual = m.frontend_root(active_caddy)
+        if actual != str(new_root) or full_staging and m.frontend_root(active_caddy, 'admin.test.cashneuro.ru') != str(release / 'apps/admin/dist'):
             raise m.InstallationError('FRONTEND_SWITCH_FAILED')
     except Exception:
         print('Ошибка переключения. Возвращаем прежнюю конфигурацию.', flush=True)
         restore(backup)
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
-    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'unchanged', 'paidCalls': 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_active_preserved' if preserve_active_ai else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), **({'paymentWebhook': WEBHOOK_URL} if payment_webhook else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+
+
+def wait_release_health(release, keep_ai_paused):
+    # /health deliberately omits `assistant` when no provider is loaded.
+    # Requiring an enabled assistant here caused a healthy paused API to roll back.
+    # Verify the selected release independently instead of weakening the enabled check.
+    actual = m.run(['systemctl', 'show', m.UNIT, '--property=WorkingDirectory', '--value']).decode().strip()
+    if actual != str(release / 'apps/api'):
+        raise m.InstallationError('API_RELEASE_DIRECTORY_MISMATCH')
+    m.wait_health(not keep_ai_paused, assistant_enabled=False if keep_ai_paused else None)
 
 
 def main():
@@ -173,19 +563,32 @@ def main():
         raise m.InstallationError('ROOT_REQUIRED')
     parser = argparse.ArgumentParser()
     parser.add_argument('--inspect-api-origin', action='store_true')
+    parser.add_argument('--inspect-control-origin', action='store_true')
+    parser.add_argument('--full-staging', action='store_true')
+    parser.add_argument('--restore-default-tariffs', action='store_true')
     parser.add_argument('--source')
     parser.add_argument('--sha')
     parser.add_argument('--rollback')
+    parser.add_argument('--enable-classification', action='store_true')
+    parser.add_argument('--keep-ai-paused', action='store_true')
+    parser.add_argument('--preserve-active-ai', action='store_true')
+    parser.add_argument('--resume-ai', action='store_true')
+    parser.add_argument('--monthly-ai-budget', choices=['100'])
+    parser.add_argument('--classification-evidence')
+    parser.add_argument('--tested-runtime-sha')
     args = parser.parse_args()
     if args.inspect_api_origin:
         print(validate_origin(settings()['API_BASE_URL']))
+        return
+    if args.inspect_control_origin:
+        print(control_settings()[0])
         return
     lock = os.open('/run/lock/cashneuro-assistant-install.lock', os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai, args.full_staging, args.restore_default_tariffs)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

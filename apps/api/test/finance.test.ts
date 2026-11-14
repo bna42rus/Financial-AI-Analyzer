@@ -28,6 +28,33 @@ async function append(amount:string,kind:Kind='purchase',transactionId:string|nu
 }
 async function command(intent:unknown){const w=await view(),actionId=randomUUID(),preview=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(preview.statusCode,200,preview.body);const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);return {actionId,preview:preview.json(),result:commit.json()};}
 function link(sourceId:string,targetId:string,amountMinor:string,kind='refund'){return {kind:'link',link:{sourceId,targetId,kind,amountMinor,status:'confirmed'}};}
+test('category binding preview is read-only, confirms/undoes atomically, remaps merges and rejects hidden targets',async()=>{
+ let w=await view();const root=w.categories.find((c:any)=>c.name==='Здоровье и спорт'&&!c.parentId),leaf=w.categories.find((c:any)=>c.name==='Аптеки'&&c.parentId===root.id),actionId=randomUUID(),input={actionId,generation:w.generation,revision:w.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:root.id,subcategoryId:leaf.id}};
+ const preview=await request('/finance/preview',input);assert.equal(preview.statusCode,200,preview.body);assert.deepEqual((await view()).categoryBindings,{});const applied=await request('/finance/commit',{actionId});assert.equal(applied.statusCode,200,applied.body);assert.deepEqual((await view()).categoryBindings.pharmacy,{categoryId:root.id,subcategoryId:leaf.id});
+ await command({kind:'undo',id:randomUUID(),value:actionId});assert.deepEqual((await view()).categoryBindings,{});await command(input.intent);
+ const custom=randomUUID();await command({kind:'category',id:custom,create:true,patch:{name:'Моя медицина',role:'expense',parentId:null,hidden:false}});await command({kind:'merge_categories',id:custom,sourceIds:[root.id]});w=await view();assert.equal(w.categoryBindings.pharmacy.categoryId,custom);assert.equal(w.categoryBindings.pharmacy.subcategoryId,leaf.id);
+ await command({kind:'category',id:leaf.id,patch:{hidden:true}});w=await view();assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent:{kind:'set_category_binding',targetKey:'pharmacy',categoryId:custom,subcategoryId:leaf.id}})).json().code,'CATEGORY_BINDING_INVALID');
+ await command({kind:'set_category_binding',targetKey:'pharmacy',categoryId:null,subcategoryId:null});assert.deepEqual((await view()).categoryBindings,{});
+});
+test('selected catalog categories are present only in new starters; existing users get authorized read-only preview, atomic commit and Undo',async()=>{
+ const additions=['Аренда пауэрбанков','Спортивное питание','Техника и электроника','Стоматология','Оптика','Медицинские изделия'];let w=await view();for(const name of additions)assert.ok(w.categories.some((c:any)=>c.name===name));
+ await pg.owner.query("DELETE FROM finance.category WHERE user_id='first' AND name=ANY($1::text[])",[additions]);w=await view();assert.ok(additions.every(name=>!w.categories.some((c:any)=>c.name===name)));const before=structuredClone(w.categories),id=randomUUID(),keys=['powerbank','sport_nutrition','electronics','dentistry','optics','medical_devices'];
+ const p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'add_catalog_categories',keys}});assert.equal(p.statusCode,200,p.body);assert.equal(p.json().impact.details.createdCategories.length,6);assert.deepEqual((await view()).categories,before);
+ const applied=await request('/finance/commit',{actionId:id});assert.equal(applied.statusCode,200,applied.body);assert.deepEqual((await request('/finance/commit',{actionId:id})).json(),applied.json());w=await view();for(const name of additions)assert.equal(w.categories.filter((c:any)=>c.name===name).length,1);
+ await command({kind:'undo',id:randomUUID(),value:id});assert.deepEqual((await view()).categories,before);
+});
+test('catalog additions reuse own synonyms, preserve hidden and ambiguous nodes, and reject stale/foreign-shaped requests',async()=>{
+ let w=await view();const power=w.categories.find((c:any)=>c.name==='Аренда пауэрбанков'),optics=w.categories.find((c:any)=>c.name==='Оптика');await command({kind:'category',id:power.id,patch:{name:'Прокат зарядок'}});await command({kind:'category',id:optics.id,patch:{hidden:true}});w=await view();
+ const id=randomUUID(),p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'add_catalog_categories',keys:['powerbank','optics']}});assert.equal(p.statusCode,200,p.body);assert.equal(p.json().impact.details.createdCategories.length,0);assert.deepEqual(p.json().impact.details.categoryDecisions.map((d:any)=>d.status),['present','hidden']);
+ await command({kind:'category',id:power.id,patch:{name:'Мои зарядки'}});assert.equal((await request('/finance/commit',{actionId:id})).json().code,'FINANCE_CHANGED');
+ w=await view();for(const intent of [{kind:'add_catalog_categories',keys:['powerbank'],ids:{powerbank:randomUUID()}},{kind:'add_catalog_categories',keys:['foreign-key']},{kind:'add_catalog_categories',keys:['powerbank','powerbank']}])assert.equal((await request('/finance/preview',{actionId:randomUUID(),generation:w.generation,revision:w.revision,intent})).statusCode,400);
+ const deniedId=randomUUID();const ready=await request('/finance/preview',{actionId:deniedId,generation:w.generation,revision:w.revision,intent:{kind:'add_catalog_categories',keys:['powerbank']}});assert.equal(ready.statusCode,200,ready.body);await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId:deniedId})).statusCode,403);
+});
+test('FIN-T49/T50: trusted bank interest uses actual signed amount in initial and repeated observations and protects owner role',async()=>{
+ const received=(await append('450000','interest')).transactionId,paid=(await append('-50000','interest')).transactionId;let w=await view();assert.equal(w.operations.find((o:any)=>o.id===received).analyticsRole,'income');assert.equal(w.operations.find((o:any)=>o.id===paid).analyticsRole,'expense');assert.equal(w.summary.incomeMinor,'450000');assert.equal(w.summary.netExpensesMinor,'50000');
+ await append('450001','interest',received);w=await view();assert.equal(w.operations.find((o:any)=>o.id===received).classification.role.value,'income');
+ await command({kind:'operation',id:received,patch:{kind:'other',role:'neutral'}});await append('450002','interest',received);const manual=(await view()).operations.find((o:any)=>o.id===received);assert.equal(manual.analyticsRole,'neutral');assert.equal(manual.classification.role.userVerified,true);
+});
 test('HTTP financial text boundary rejects passport, email and invisible-identifier bypasses without writes or reflection',async()=>{
  const operationId=(await append('-1000')).transactionId;
  for(const raw of ['Паспорт 4510 123456','Email synthetic.private@example.test','Карта 1234\u200b5678\u20609012\u200e3456','Договор No TEST-123456']){
@@ -81,7 +108,7 @@ test('bulk verification confirms each saved facet without resolving unknown mean
 test('bulk invalid scope and contradictory or component edits fail as a whole, with a bounded 1000-ID HTTP body',async()=>{
  const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId,w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id;await command({kind:'operation',id:b,patch:{categoryId:food}});
  async function attempt(intent:unknown){const s=await view();return request('/finance/preview',{actionId:randomUUID(),generation:s.generation,revision:s.revision,intent});}
- const before=(await pg.owner.query("SELECT to_jsonb(t) AS data FROM finance.transaction t WHERE user_id='first' ORDER BY id")).rows;assert.equal((await attempt({kind:'bulk_operations',operationIds:[a,b],patch:{role:'income'}})).json().code,'CATEGORY_ROLE_CONFLICT');assert.deepEqual((await pg.owner.query("SELECT to_jsonb(t) AS data FROM finance.transaction t WHERE user_id='first' ORDER BY id")).rows,before);
+ const before=(await pg.owner.query("SELECT to_jsonb(t) AS data FROM finance.transaction t WHERE user_id='first' ORDER BY id")).rows;assert.equal((await attempt({kind:'bulk_operations',operationIds:[a,b],patch:{kind:'other',role:'income'}})).json().code,'CATEGORY_ROLE_CONFLICT');assert.deepEqual((await pg.owner.query("SELECT to_jsonb(t) AS data FROM finance.transaction t WHERE user_id='first' ORDER BY id")).rows,before);
  assert.equal((await attempt({kind:'bulk_operations',operationIds:[a,randomUUID()],patch:{comment:'Synthetic'}})).statusCode,404);assert.equal((await attempt({kind:'bulk_operations',operationIds:[a,a],verify:['kind']})).statusCode,400);assert.equal((await attempt({kind:'bulk_operations',operationIds:[a],patch:{corrections:{amountMinor:'-1'}}})).statusCode,400);
  const ids=Array.from({length:1000},()=>randomUUID());assert.equal((await attempt({kind:'bulk_operations',operationIds:ids,verify:['kind']})).statusCode,404);assert.equal((await attempt({kind:'bulk_operations',operationIds:[...ids,randomUUID()],verify:['kind']})).statusCode,400);
  await command({kind:'components',id:a,parts:[{amountMinor:'-1000',type:'other',role:'expense',categoryId:food}]});assert.equal((await attempt({kind:'bulk_operations',operationIds:[a,b],patch:{categoryId:food}})).json().code,'BULK_COMPONENT_REVIEW_REQUIRED');
@@ -101,7 +128,7 @@ test('bulk preview cannot commit after a new import or access expiry and does no
 });
 
 test('new workspace has starter categories, no invented transactions and scoped runtime roles',async()=>{
- const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,30);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
+ const w=await view();assert.equal(w.operations.length,0);assert.equal(w.summary.netExpensesMinor,'0');assert.equal(w.categories.filter((c:{parentId:string|null})=>c.parentId===null).length,32);assert.equal(w.categories.some((c:{name:string})=>c.name==='Возврат'),false);
  for(const pool of [pg.control,pg.mailControl,pg.mailFinance])await assert.rejects(pool.query('SELECT * FROM finance.transaction'),{code:'42501'});
  assert.equal((await control.fastify.inject({method:'GET',url:'/finance/state',headers:{cookie,origin:'https://admin.example.test'}})).statusCode,404);
 });
@@ -246,13 +273,37 @@ test('component removal and updates cannot cross tenants or silently disregard e
 });
 
 test('future rule edits leave history unchanged; explicit fixed historical application is read-only until commit and grouped Undo restores facets',async()=>{
- const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId,w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,id=randomUUID();
+ const a=(await append('-1000')).transactionId,b=(await append('-2000','transfer_out')).transactionId,w=await view(),food=w.categories.find((c:{name:string;parentId:string|null})=>c.name==='Продукты'&&c.parentId===null).id,id=randomUUID();
  const patch={name:'Synthetic future rule',enabled:true,priority:10,conditions:{merchantContains:'Synthetic',direction:'out'},assignments:{role:'expense',categoryId:food}};
  await command({kind:'rule',id,patch,create:true});assert.equal((await view()).operations.find((o:{id:string})=>o.id===a).classification.category.value,null);
  await command({kind:'operation',id:b,patch:{role:'neutral'}});const before=(await pg.owner.query("SELECT id,semantics,analytics_override,review_reasons FROM finance.transaction WHERE user_id='first' ORDER BY id")).rows,facts=(await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,s=await view(),actionId=randomUUID();
  const p=await request('/finance/preview',{actionId,generation:s.generation,revision:s.revision,intent:{kind:'apply_rules',ruleId:id,operationIds:[a,b]}});assert.equal(p.statusCode,200,p.body);assert.equal(p.json().impact.details.selectedCount,2);assert.deepEqual(p.json().impact.details.protectedOperationIds,[b]);assert.deepEqual((await pg.owner.query("SELECT id,semantics,analytics_override,review_reasons FROM finance.transaction WHERE user_id='first' ORDER BY id")).rows,before);
  const committed=await request('/finance/commit',{actionId});assert.equal(committed.statusCode,200,committed.body);assert.deepEqual((await request('/finance/commit',{actionId})).json(),committed.json());let state=await view();assert.equal(state.operations.find((o:{id:string})=>o.id===a).classification.category.ruleId,id);assert.equal(state.operations.find((o:{id:string})=>o.id===b).classification.role.value,'neutral');assert.equal(state.operations.find((o:{id:string})=>o.id===a).classification.kind.source,'bank');
  const history=await request('/finance/history-query',{kinds:['apply_rules']});assert.equal(history.json().actions.length,1);await command({kind:'undo',id:randomUUID(),value:actionId});assert.deepEqual((await pg.owner.query("SELECT id,semantics,analytics_override,review_reasons FROM finance.transaction WHERE user_id='first' ORDER BY id")).rows,before);assert.deepEqual((await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,facts);
+});
+
+test('create historical rule previews without writes, refuses a changed epoch, commits and undoes the rule and matching changes together',async()=>{
+ const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId,unmatched=(await append('1000','transfer_in')).transactionId,id=randomUUID();
+ await command({kind:'operation',id:b,patch:{role:'expense'}});
+ const intent={kind:'create_rule_with_history',id,patch:{name:'Synthetic historical rule',enabled:true,priority:10,conditions:{direction:'out'},assignments:{role:'neutral'}}};
+ const prepare=async()=>{const w=await view(),actionId=randomUUID();const p=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(p.statusCode,200,p.body);return {actionId,details:p.json().impact.details,changes:p.json().impact.changes};};
+ let initial=await view(),draft=await prepare();
+ assert.deepEqual(draft.details.operationIds,[a,b].sort());assert.deepEqual(draft.details.changedOperationIds,[a]);assert.deepEqual(draft.details.protectedOperationIds,[b]);assert.ok(draft.changes.some((c:{kind:string;id:string})=>c.kind==='rule'&&c.id===id));assert.deepEqual((await view()).operations,initial.operations);assert.deepEqual((await view()).rules,[]);
+ await append('3000','transfer_in');assert.equal((await request('/finance/commit',{actionId:draft.actionId})).json().code,'FINANCE_CHANGED');assert.deepEqual((await view()).rules,[]);
+ initial=await view();draft=await prepare();const committed=await request('/finance/commit',{actionId:draft.actionId});assert.equal(committed.statusCode,200,committed.body);
+ const state=await view();assert.equal(state.rules[0].enabled,true);assert.equal(state.operations.find((o:{id:string})=>o.id===a).classification.role.ruleId,id);
+ for(const unchanged of [b,unmatched])assert.deepEqual(state.operations.find((o:{id:string})=>o.id===unchanged),initial.operations.find((o:{id:string})=>o.id===unchanged));
+ const history=await request('/finance/history-query',{kinds:['create_rule_with_history']});assert.equal(history.json().actions.length,1);
+ await command({kind:'undo',id:randomUUID(),value:draft.actionId});assert.deepEqual((await view()).rules,[]);assert.deepEqual((await view()).operations,initial.operations);
+});
+
+test('numbered operations pages keep stable slices and clamp pages after the result shrinks',async()=>{
+ const ids:string[]=[];for(let i=0;i<12;i++)ids.push((await append(String(-(1000+i)),'purchase',null,account,'2026-09-'+String(i+1).padStart(2,'0'))).transactionId);
+ const query={filter:{},sort:'date',direction:'desc',group:'none'};
+ const get=async(page:number)=>(await request('/finance/operations-page',{query,page,displayLimit:10})).json();
+ const a=await get(1),b=await get(2),c=await get(99);
+ assert.equal(a.total,12);assert.equal(a.offset,0);assert.equal(b.offset,10);assert.deepEqual(b,c);assert.deepEqual([...a.operations,...b.operations].map(o=>o.id),ids.reverse());
+ assert.equal((await request('/finance/operations-page',{query,page:0})).statusCode,400);assert.equal((await request('/finance/operations-page',{query,page:2,cursor:a.nextCursor})).statusCode,400);
 });
 
 test('rule deletion preserves past classification, exposes dependencies and is restored through object-version History',async()=>{
@@ -272,7 +323,7 @@ test('historical rule selection is tenant scoped, rejects disabled, duplicate, e
 
 test('historical rules use the full active priority set, preserve conflicts and cannot commit after new imports or suspension',async()=>{
  const a=(await append('-1000')).transactionId,one=randomUUID(),two=randomUUID(),base={name:'Synthetic priority',enabled:true,priority:10,conditions:{merchantContains:'Synthetic'},assignments:{role:'neutral',analyticsOverride:'include'}};
- await command({kind:'rule',id:one,patch:base,create:true});await command({kind:'rule',id:two,patch:{...base,name:'Synthetic conflict',assignments:{role:'expense',analyticsOverride:'exclude'}},create:true});let w=await view(),id=randomUUID(),p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'apply_rules',ruleId:one,operationIds:[a]}});assert.equal(p.statusCode,200,p.body);assert.deepEqual(p.json().impact.details.conflictingOperationIds,[a]);assert.equal(p.json().impact.details.ruleIds.length,2);await append('-2000');assert.equal((await request('/finance/commit',{actionId:id})).json().code,'FINANCE_CHANGED');
+ await command({kind:'rule',id:one,patch:base,create:true});await command({kind:'rule',id:two,patch:{...base,name:'Synthetic conflict',assignments:{role:'expense',analyticsOverride:'exclude'}},create:true});let w=await view(),id=randomUUID(),p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'apply_rules',ruleId:one,operationIds:[a]}});assert.equal(p.statusCode,200,p.body);assert.deepEqual(p.json().impact.details.conflictingOperationIds,[a]);assert.deepEqual(p.json().impact.details.ruleIds,[one]);await append('-2000');assert.equal((await request('/finance/commit',{actionId:id})).json().code,'FINANCE_CHANGED');
  w=await view();id=randomUUID();p=await request('/finance/preview',{actionId:id,generation:w.generation,revision:w.revision,intent:{kind:'apply_rules',ruleId:one,operationIds:[a]}});assert.equal(p.statusCode,200,p.body);await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/commit',{actionId:id})).statusCode,403);assert.equal((await pg.owner.query("SELECT semantics->'role'->>'value' AS role FROM finance.transaction WHERE user_id='first' AND id=$1",[a])).rows[0].role,'expense');
 });
 
@@ -287,7 +338,74 @@ test('explicit reapplication removes resolved rule conflicts and Undo restores t
 });
 
 test('category editor metadata covers retired duplicate operations and inactive components so all role conflicts can be resolved explicitly',async()=>{
- const c=randomUUID(),part=randomUUID(),a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId;await command({kind:'category',id:c,create:true,patch:{name:'Synthetic retired category',role:'income',parentId:null}});await command({kind:'operation',id:a,patch:{role:'income',categoryId:c}});await command({kind:'components',id:b,parts:[{id:part,type:'other',amountMinor:'-2000',role:'income',categoryId:c}]});await command({kind:'components',id:b,parts:[]});await pg.owner.query("UPDATE finance.transaction SET merged_into_id=$2 WHERE user_id='first' AND id=$1",[a,b]);const s=await view(),facts=(await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows;
+ const c=randomUUID(),part=randomUUID(),a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId;await command({kind:'category',id:c,create:true,patch:{name:'Synthetic retired category',role:'income',parentId:null}});await command({kind:'operation',id:a,patch:{kind:'other',role:'income',categoryId:c}});await command({kind:'components',id:b,parts:[{id:part,type:'other',amountMinor:'-2000',role:'income',categoryId:c}]});await command({kind:'components',id:b,parts:[]});await pg.owner.query("UPDATE finance.transaction SET merged_into_id=$2 WHERE user_id='first' AND id=$1",[a,b]);const s=await view(),facts=(await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows;
  assert.equal(s.operations.length,1);assert.ok(s.categoryOperations.some((o:{id:string;retired:boolean;categoryId:string})=>o.id===a&&o.retired&&o.categoryId===c));assert.ok(s.categoryComponents.some((p:{id:string;retired:boolean;categoryId:string})=>p.id===part&&p.retired&&p.categoryId===c));assert.ok(!JSON.stringify(s.categoryOperations).includes('bankRefHmac'));
  const blocked=await request('/finance/preview',{actionId:randomUUID(),generation:s.generation,revision:s.revision,intent:{kind:'migrate_category',id:c,parentId:null,role:'expense'}});assert.equal(blocked.json().code,'CATEGORY_ROLE_DECISION_REQUIRED');const result=await command({kind:'migrate_category',id:c,parentId:null,role:'expense',roleDecisions:[{kind:'operation',id:a,role:'expense'},{kind:'component',id:part,role:'expense'}]});assert.equal(result.preview.impact.details.financialOperationsDeleted,0);let after=await view();assert.equal(after.categoryOperations.find((o:{id:string})=>o.id===a).role,'expense');assert.equal(after.categoryComponents.find((p:{id:string})=>p.id===part).role,'expense');await command({kind:'undo',id:randomUUID(),value:result.actionId});after=await view();assert.equal(after.categoryComponents.find((p:{id:string})=>p.id===part).role,'income');assert.equal(after.categoryOperations.find((o:{id:string})=>o.id===a).role,'income');assert.deepEqual((await pg.owner.query("SELECT to_jsonb(o) AS data FROM finance.source_observation o WHERE user_id='first' ORDER BY id")).rows,facts);
+});
+
+test('marketplace starter addition is one-time, tenant scoped and reuses hidden or nested user categories',async()=>{
+ let state=await view();const market=state.categories.filter((c:any)=>c.name==='Маркетплейсы');assert.equal(market.length,1);assert.equal(market[0].role,'expense');
+ await pg.owner.query("DELETE FROM finance.category WHERE user_id='first' AND id=$1",[market[0].id]);
+ assert.equal((await view()).categories.some((c:any)=>c.name==='Маркетплейсы'),false);
+ // Simulate an existing workspace from before the additive migration.
+ await pg.owner.query("UPDATE finance.workspace SET marketplace_catalog_initialized=false WHERE user_id='first'");
+ state=await view();assert.equal(state.categories.filter((c:any)=>c.name==='Маркетплейсы').length,1);
+ const current=state.categories.find((c:any)=>c.name==='Маркетплейсы');await pg.owner.query("UPDATE finance.category SET hidden=true WHERE user_id='first' AND id=$1",[current.id]);await pg.owner.query("UPDATE finance.workspace SET marketplace_catalog_initialized=false WHERE user_id='first'");
+ state=await view();assert.equal(state.categories.filter((c:any)=>c.name==='Маркетплейсы').length,1);assert.equal(state.categories.find((c:any)=>c.id===current.id).hidden,true);
+ const parent=state.categories.find((c:any)=>c.name==='Прочие расходы'&&!c.parentId);await pg.owner.query("UPDATE finance.category SET hidden=false,parent_id=$2 WHERE user_id='first' AND id=$1",[current.id,parent.id]);await pg.owner.query("UPDATE finance.workspace SET marketplace_catalog_initialized=false WHERE user_id='first'");state=await view();assert.equal(state.categories.filter((c:any)=>c.name==='Маркетплейсы').length,1);assert.equal(state.categories.find((c:any)=>c.id===current.id).parentId,parent.id);
+ assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM finance.category WHERE user_id='second'")).rows[0].n,0);
+});
+test('a purchase split keeps one bank operation, categories count only their parts, a partial refund targets its chosen part, and Undo restores the whole purchase',async()=>{
+ const purchase=(await append('-1000000')).transactionId,state=await view(),market=state.categories.find((c:any)=>c.name==='Маркетплейсы').id,food=state.categories.find((c:any)=>c.name==='Продукты'&&!c.parentId).id,clothes=state.categories.find((c:any)=>c.name==='Одежда и аксессуары'&&!c.parentId).id;
+ await command({kind:'operation',id:purchase,patch:{categoryId:market,merchant:'Ozon'}});
+ const originals=(await pg.owner.query('SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id=$1',['first'])).rows;
+ const a=randomUUID(),b=randomUUID(),split=await command({kind:'components',id:purchase,parts:[{id:a,type:'other',amountMinor:'-500000',role:'expense',categoryId:food},{id:b,type:'other',amountMinor:'-500000',role:'expense',categoryId:clothes}]});
+ assert.equal((await view()).summary.netExpensesMinor,'1000000');assert.equal((await view()).operations.length,1);assert.equal((await request('/finance/summary',{categoryIds:[market]})).json().summary.netExpensesMinor,'0');
+ for(const cat of [food,clothes])assert.equal((await request('/finance/summary',{categoryIds:[cat]})).json().summary.netExpensesMinor,'500000');
+ const list=(await request('/finance/operations-page',{query:{filter:{merchant:'Ozon',categoryIds:[food]},group:'none',sort:'date',direction:'desc'}})).json();assert.equal(list.total,1);assert.equal(list.summary.netExpensesMinor,'500000');
+ let detail=(await request('/finance/operation',{id:purchase})).json();assert.equal(detail.semantics.merchant.value,'Ozon');assert.equal(detail.source.amountMinor,'-1000000');
+ const refund=(await append('300000','refund')).transactionId;await command({...link(refund,purchase,'300000'),link:{...link(refund,purchase,'300000').link,targetComponentId:a}});
+ assert.equal((await request('/finance/summary',{categoryIds:[food]})).json().summary.netExpensesMinor,'200000');assert.equal((await request('/finance/summary',{categoryIds:[clothes]})).json().summary.netExpensesMinor,'500000');assert.equal((await view()).summary.netExpensesMinor,'700000');
+ assert.deepEqual((await pg.owner.query('SELECT to_jsonb(o) AS fact FROM finance.source_observation o WHERE user_id=$1 AND transaction_id=$2',['first',purchase])).rows,originals);
+ // Removing the split must preview the dependency conflict instead of guessing a refund category.
+ const removal=await command({kind:'components',id:purchase,parts:[]});assert.ok(removal.preview.impact.dependencyConflicts.length>0);await command({kind:'undo',id:randomUUID(),value:removal.actionId});detail=(await request('/finance/operation',{id:purchase})).json();assert.equal(detail.components.length,2);assert.equal(detail.semantics.merchant.value,'Ozon');assert.equal((await view()).summary.netExpensesMinor,'700000');
+});
+
+test('financial profile is owner scoped, initializes once without AI and stays independent of the commercial calendar',async()=>{
+ const before=await view();assert.equal((await request('/session')).json().timezone,null);
+ const initial=await request('/finance/profile',{timezone:'Asia/Tokyo',initialize:true});assert.equal(initial.statusCode,200,initial.body);assert.equal(initial.json().timezone,'Asia/Tokyo');assert.equal((await request('/session')).json().timezone,'Asia/Tokyo');
+ assert.equal((await request('/finance/profile',{timezone:'Pacific/Honolulu',initialize:true})).json().timezone,'Asia/Tokyo');assert.equal((await request('/finance/profile',{timezone:'Pacific/Honolulu'})).json().timezone,'Pacific/Honolulu');assert.equal((await view()).revision,before.revision);assert.deepEqual((await view()).operations,before.operations);
+ assert.equal(await within('second',async db=>(await db.query('SELECT * FROM finance.assistant_profile')).rowCount),0);
+ for(const payload of [{timezone:'Not/A_Zone'},{timezone:'Etc/UTC',userId:'second'},{initialize:true},{timezone:'Asia/Tokyo',initialize:'true'}]){const rejected=await request('/finance/profile',payload);assert.equal(rejected.statusCode,400,rejected.body);assert.equal(rejected.body.includes('Not/A_Zone'),false);}
+ const denied=await control.fastify.inject({method:'POST',url:'/finance/profile',payload:{timezone:'Etc/UTC'},headers:{origin:'https://admin.example.test'}});assert.equal(denied.statusCode,404);
+ await pg.owner.query("UPDATE identity.security_state SET status='suspended' WHERE user_id='first'");assert.equal((await request('/finance/profile',{timezone:'Etc/UTC'})).statusCode,403);
+});
+
+test('live review skips persist and refresh restores the first unresolved operation',async()=>{
+ const a=(await append('-1000')).transactionId,b=(await append('-2000')).transactionId;
+ for(const id of [a,b])await command({kind:'operation',id,patch:{reviewRequested:true}});
+ const first=(await request('/finance/review-queue',{})).json();assert.equal(first.remaining,2);
+ const skip=await request('/finance/review-queue',{generation:first.generation,revision:first.revision,skip:first.anchor});assert.equal(skip.statusCode,200,skip.body);
+ const second=(await request('/finance/review-queue',{})).json();assert.notEqual(second.anchor,first.anchor);assert.equal(second.id,first.id);
+ const reset=await request('/finance/review-queue',{refresh:true});assert.equal(reset.json().anchor,first.anchor);
+});
+
+test('a saved counterparty without a bank identifier can create, edit and reuse one explicit future rule',async()=>{
+ const id=randomUUID(),ruleId=randomUUID(),name='Арендодатель';
+ await command({kind:'counterparty',id,create:true,patch:{name,state:'registered'}});
+ await command({kind:'counterparty',id,patch:{rememberForFuture:true,autoRuleId:ruleId}});
+ let state=await view();assert.equal(state.counterparties[0].autoRuleId,ruleId);
+ assert.equal(state.rules[0].enabled,false);assert.equal(state.rules[0].dependencyStatus,'needs_setup');
+ assert.deepEqual(state.rules[0].conditions,{});
+ const beforeSetup=(await append('-500','transfer_out')).transactionId;
+ assert.equal((await view()).operations.find((o:any)=>o.id===beforeSetup).classification.counterparty.value,null);
+ const {name:ruleName,assignments,priority}=state.rules[0];
+ await command({kind:'rule',id:ruleId,patch:{name:ruleName,enabled:true,priority,conditions:{direction:'out',descriptionContains:'Sanitized example'},assignments}});
+ await command({kind:'counterparty',id,patch:{rememberForFuture:false}});
+ const inactive=(await append('-1000','transfer_out')).transactionId;
+ assert.equal((await view()).operations.find((o:any)=>o.id===inactive).classification.counterparty.value,null);
+ await command({kind:'counterparty',id,patch:{rememberForFuture:true}});
+ const active=(await append('-2000','transfer_out')).transactionId;
+ state=await view();assert.equal(state.rules.length,1);assert.equal(state.rules[0].conditions.descriptionContains,'Sanitized example');
+ assert.equal(state.operations.find((o:any)=>o.id===active).classification.counterparty.ruleId,ruleId);
 });

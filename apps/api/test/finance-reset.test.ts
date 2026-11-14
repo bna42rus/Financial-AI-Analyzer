@@ -40,10 +40,10 @@ const prepared=(c:{contextId:string;generation:string;keyVersion:string})=>({con
 async function context(contextId=randomUUID()){
  const r=await request('/finance/import-context',{contextId});assert.equal(r.statusCode,200,r.body);assert.equal(r.headers['cache-control'],'no-store');return r.json();
 }
-async function resetPreview(intent=resetIntent()){
+async function resetPreview(intent:unknown=resetIntent()){
  const r=await request('/finance/epoch');assert.equal(r.statusCode,200,r.body);const w=r.json(),actionId=randomUUID(),p=await request('/finance/preview',{actionId,generation:w.generation,revision:w.revision,intent});assert.equal(p.statusCode,200,p.body);return {actionId,preview:p.json(),epoch:w};
 }
-async function reset(intent=resetIntent()){
+async function reset(intent:unknown=resetIntent()){
  const p=await resetPreview(intent),r=await request('/finance/commit',{actionId:p.actionId,confirmReset:true});assert.equal(r.statusCode,200,r.body);return {...p,result:r.json()};
 }
 async function counts(user='first'){
@@ -191,4 +191,35 @@ test('password proof failures persist a subject limit across rejected transactio
  const r=await resetPreview();await pg.owner.query("UPDATE identity.auth_session SET created_at=clock_timestamp()-interval '6 minutes' WHERE user_id='first'");
  for(let i=0;i<5;i++){const result=await server.fastify.inject({method:'POST',url:'/finance/commit',payload:{actionId:r.actionId,confirmReset:true,password:'Wrong password 123!'},headers:{origin:fc.origin,cookie,'content-type':'application/json'},remoteAddress:'192.0.2.'+(i+1)});assert.equal(result.statusCode,401);}
  const limited=await request('/finance/commit',{actionId:r.actionId,confirmReset:true,password:pw});assert.equal(limited.statusCode,429);assert.equal((await counts()).account,1);assert.equal((await counts()).action,1);
+});
+
+test('selective reset retains chosen cards and their aliases without accepting an old import',async()=>{
+ const p=await party(),before=await context(),loan=randomUUID();
+ await within('first',async db=>{
+  const epoch=importEpoch(await financeView(db,'first'));
+  await acceptAccount(db,'first',epoch,{id:loan,bankId:'synthetic-bank',systemName:'Synthetic loan',type:'loan'});
+ });
+ const proof=await alias(p);
+ await append('-1000');
+ const outcome=await reset({...resetIntent(true,true,true),keepCounterparties:true,keepBudgets:true,keepAccounts:false,keepCredits:true});
+ const state=await view(),after=await context();
+ assert.deepEqual(state.accounts.map((a:{id:string})=>a.id),[loan]);assert.deepEqual(state.operations,[]);
+ assert.equal(state.counterparties[0].id,p);assert.equal(state.counterpartyAliases[0].id,proof.id);
+ assert.equal(before.keyVersion,after.keyVersion);assert.notEqual(before.generation,after.generation);
+ assert.equal(outcome.preview.impact.details.preserved.credits,1);
+});
+
+test('test top-up fixes the price and credits a verified payment once',async()=>{
+ const {aiTopup}=await import('../src/yookassa-topups.ts'),{customerAiBudget}=await import('../src/customer-ai-budget.ts');
+ const owner={id:'first',email:'first@example.test'},id=randomUUID(),paymentId=randomUUID(),seal=envelope(fc.wrappingKey);
+ const payment={id:paymentId,test:true,status:'pending',paid:false,amount:{currency:'RUB',value:'39.00'},metadata:{orderId:id},confirmation:{confirmation_url:'https://yookassa.ru/checkout'}};
+ let returned={...payment,status:'succeeded',paid:true},requests=0;
+ const provider={async create(input:{id:string;value:string;units:number}){assert.deepEqual(input,{id,value:'39.00',units:1000});return payment;},async read(providerId:string){assert.equal(providerId,paymentId);requests++;return returned;}};
+ const step=(input:{id:string;units?:number})=>within('first',db=>aiTopup(db,owner,input,provider,seal));
+ assert.equal((await step({id,units:1000})).status,'created');assert.equal((await step({id})).status,'pending');
+ returned={...returned,amount:{currency:'RUB',value:'1.00'}};
+ await assert.rejects(step({id}),/PAYMENT_UNVERIFIED/);assert.equal((await within('first',db=>customerAiBudget(db,'first'))).extra,0);
+ returned={...returned,amount:payment.amount};
+ assert.equal((await step({id})).status,'paid');assert.equal((await step({id})).status,'paid');assert.equal(requests,2);
+ assert.equal((await within('first',db=>customerAiBudget(db,'first'))).extra,1000);
 });

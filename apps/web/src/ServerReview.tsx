@@ -1,42 +1,47 @@
 import {useEffect,useRef,useState} from 'react';
-import {api,ApiError} from './server-client';
+import {RefreshCw} from 'lucide-react';
+import {api} from './server-client';
 import type {FinanceState} from './finance-client';
-import {displayBankDate,displayRole,kindNames,reviewNames} from './finance-client';
+import {displayBankDate,kindNames,reviewNames} from './finance-client';
 import {formatMoney} from './demo/overview';
-import {OperationChoice} from './OperationChoice';
-import {reviewGroupIds} from '../../../packages/finance-core/src/review-group';
-import {operationDay} from '../../../packages/finance-core/src/model';
+import {QuickReviewFields} from './QuickReviewFields';
 import type {WorkspaceCommand} from './workspace-command';
 import common from './App.module.css';
-import styles from './Workspace.module.css';
-type ReviewSession={id:string;generation:string;operationIds:string[];cursor:number;decisions:Record<string,string>;status:'created'|'in_progress'|'paused'|'completed'|'abandoned';revision:string};
-export function ServerReview({state,initialIds,onInitialUsed,command,disabled,timezone,onOpen,onAccessError,onBusy}:{state:FinanceState;initialIds:string[]|null;onInitialUsed:()=>void;command:WorkspaceCommand|null;disabled:boolean;timezone:string;onOpen:(id:string)=>void;onAccessError:(e:unknown)=>boolean;onBusy:(v:boolean)=>void}){
- const [sessions,setSessions]=useState<ReviewSession[]>([]),[activeId,setActive]=useState<string|null>(null),[error,setError]=useState(''),[loading,setLoading]=useState(true),[sending,setSending]=useState(false),[retry,setRetry]=useState(false),[formVersion,setFormVersion]=useState(0);
- const [group,setGroup]=useState<{ids:string[];sessionId:string;revision:string;anchorId:string}|null>(null);
- const live=useRef(true),turn=useRef(0),pending=useRef<Record<string,unknown>|null>(null),processing=useRef(false),started=useRef<string|null>(null);
- async function read(){const n=++turn.current;setLoading(true);try{const r=await api<{generation:string;sessions:ReviewSession[]}>('/finance/review-sessions',{});if(live.current&&n===turn.current&&(!r.generation||r.generation===state.generation)){setSessions(Array.isArray(r.sessions)?r.sessions:[]);setError('');}}catch(e){if(onAccessError(e))return;if(live.current&&n===turn.current)setError(e instanceof Error?e.message:'Не удалось открыть проверку.');throw e;}finally{if(live.current&&n===turn.current)setLoading(false);}}
- async function send(body:Record<string,unknown>){if(processing.current||disabled)return;processing.current=true;pending.current=body;++turn.current;setSending(true);setRetry(false);setError('');onBusy(true);try{const result=await api<ReviewSession>('/finance/review-command',body);if(!live.current)return;setActive(result.id);await read();if(!live.current)return;pending.current=null;onInitialUsed();}
-  catch(e){if(!live.current||onAccessError(e))return;if(e instanceof ApiError&&e.code==='NETWORK_ERROR'){setRetry(true);setError('Сервер не подтвердил сохранение прогресса. Повторите то же действие.');}else{pending.current=null;setError(e instanceof Error?e.message:'Прогресс не изменён. Обновите проверку.');}}
-  finally{processing.current=false;if(live.current){setSending(false);onBusy(pending.current!==null);}}
+import styles from './Settings.module.css';
+
+type Queue={id:string;generation:string;revision:string;financeRevision:string;remaining:number;anchor?:string;operations:FinanceState['operations'];similar:string[]};
+export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,onAccessError,onBusy}:{state:FinanceState;refreshKey:number;command:WorkspaceCommand|null;disabled:boolean;timezone:string;onOpen:(id:string)=>void;onAccessError:(e:unknown)=>boolean;onBusy:(v:boolean)=>void}){
+ const [queue,setQueue]=useState<Queue|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[applySimilar,setApplySimilar]=useState(false),[selected,setSelected]=useState<string[]>([]);
+ const turn=useRef(0),seenRefresh=useRef(refreshKey);
+ async function load(params:Record<string,unknown>={}){
+  const version=++turn.current;setBusy(true);setError('');
+  try{const data=await api<Queue>('/finance/review-queue',{generation:state.generation,...params});if(version!==turn.current)return;setQueue(data);}
+  catch(e){if(version===turn.current&&!onAccessError(e))setError(e instanceof Error?e.message:'Не удалось открыть список проверки.');}
+  finally{if(version===turn.current){setBusy(false);onBusy(false);}}
  }
- function create(ids:string[]){if(!ids.length||ids.length>1000)return;void send({commandId:crypto.randomUUID(),sessionId:crypto.randomUUID(),generation:state.generation,kind:'create',operationIds:[...ids],financeRevision:state.revision});}
- function control(s:ReviewSession,kind:string){void send({commandId:crypto.randomUUID(),sessionId:s.id,generation:s.generation,revision:s.revision,kind});}
- useEffect(()=>{live.current=true;return()=>{live.current=false;++turn.current;pending.current=null;onBusy(false);};},[]);
- useEffect(()=>{if(!disabled&&!pending.current)void read().catch(()=>{});},[state.generation,state.revision,disabled]);
- useEffect(()=>{if(initialIds&&!disabled){const key=initialIds.join(',');if(started.current!==key){started.current=key;create(initialIds);}}},[initialIds,disabled]);
- useEffect(()=>{if(!sending&&!retry)return;const warn=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[sending,retry]);
- const current=sessions.find(s=>s.id===activeId),op=current?state.operations.find(o=>o.id===current.operationIds[current.cursor]):undefined,attention=state.operations.filter(o=>o.reviewReasons.length).toSorted((a,b)=>operationDay(a.date).localeCompare(operationDay(b.date))||a.id.localeCompare(b.id)).map(o=>o.id),locked=disabled||sending||retry;
- const similar=current&&op?reviewGroupIds(state.operations,current.operationIds,op.id):[],shownGroup=group&&group.anchorId===op?.id&&group.sessionId===current?.id?group:null;
- useEffect(()=>{setGroup(null);},[current?.id,current?.cursor]);
- const remaining=current?state.operations.filter(o=>current.operationIds.includes(o.id)&&o.reviewReasons.length).map(o=>o.id):[];
- return <section className={common.panel} aria-label="Последовательная проверка"><h2>Нужно проверить</h2><p>Разберите причины внимания по одной операции. Решение применяется сразу; отмена доступна вверху страницы и в истории. Пропуск и «Не знаю» сохраняют причины проверки.</p>
- {error&&<p role="alert" className={common.error}>{error}</p>}{loading&&<p role="status">Загружаем прогресс проверки…</p>}{sending&&<p role="status">Сохраняем прогресс проверки…</p>}{retry&&<button className={common.primaryButton} disabled={disabled||sending} onClick={()=>{if(pending.current)void send(pending.current);}}>Повторить сохранение прогресса</button>}
- <div className={styles.actions}><button className={common.primaryButton} disabled={locked||!attention.length||attention.length>1000} onClick={()=>create(attention)}>Начать проверку всех требующих внимания: {attention.length}</button><button className={common.button} disabled={locked} onClick={()=>void read().catch(()=>{})}>Обновить проверку</button></div>{attention.length>1000&&<p>Для одной сессии выберите до 1000 операций на экране «Операции».</p>}
- {sessions.filter(s=>['created','in_progress','paused'].includes(s.status)).map(s=><div key={s.id} className={styles.item}><p>Проверка: пройдено {s.cursor} из {s.operationIds.length}{s.status==='paused'?' · На паузе':''}.</p><button className={common.button} disabled={locked} onClick={()=>{setActive(s.id);control(s,'resume');}}>Продолжить проверку</button></div>)}
- {current&&<section aria-label="Текущая проверка"><h3>{current.status==='completed'?'Список пройден':current.status==='abandoned'?'Проверка завершена без продолжения':`Операция ${Math.min(current.cursor+1,current.operationIds.length)} из ${current.operationIds.length}`}</h3><p>Фиксированный список: {current.operationIds.length}. Нерешённых операций в нём: {remaining.length}. Новые операции в эту сессию не добавляются.</p>
- <div className={styles.actions}><button className={common.button} disabled={locked||!current.cursor||current.status==='abandoned'} onClick={()=>control(current,'back')}>Назад</button>{current.status==='in_progress'&&<><button className={common.button} disabled={locked} onClick={()=>control(current,'skip')}>Пропустить</button><button className={common.button} disabled={locked} onClick={()=>control(current,'unknown')}>Не знаю</button><button className={common.button} disabled={locked} onClick={()=>control(current,'pause')}>Поставить проверку на паузу</button></>}{current.status==='paused'&&<button className={common.button} disabled={locked} onClick={()=>control(current,'resume')}>Продолжить эту проверку</button>}{['in_progress','paused'].includes(current.status)&&<button className={common.button} disabled={locked} onClick={()=>control(current,'abandon')}>Завершить эту сессию</button>}{current.status==='completed'&&remaining.length>0&&<button className={common.button} disabled={locked} onClick={()=>create(remaining)}>Повторить нерешённые: {remaining.length}</button>}</div>
- {op&&current.status==='in_progress'&&<><h3>{op.classification.merchant.value||kindNames[op.classification.kind.value]}</h3><p>{displayBankDate(op.date,timezone)} · {formatMoney(op.amountMinor)} · {displayRole(op.analyticsRole,op.amountMinor)} · {state.accounts.find(a=>a.id===op.accountId)?.name??'Счёт'}</p><ul>{op.reviewReasons.map(r=><li key={r}>{reviewNames[r]??'Другая причина проверки'}</li>)}</ul><p>Какое из этих полей нужно исправить или подтвердить?</p><button className={common.button} disabled={locked} onClick={()=>onOpen(op.id)}>Открыть карточку для частей, связей и дублей</button>{!shownGroup&&similar.length>1&&<button className={common.button} disabled={locked} onClick={()=>setGroup({ids:[...similar],sessionId:current.id,revision:current.revision,anchorId:op.id})}>Показать похожие покупки: {similar.length}</button>}{shownGroup?<section className={styles.item} aria-label="Группа похожих покупок"><h3>Применить решение к группе: {shownGroup.ids.length}</h3><p>Совпадают магазин, счёт, тип, финансовый смысл, категории и причины проверки. Состав зафиксирован в этой сессии; новые загрузки в него не добавляются.</p><ul>{shownGroup.ids.map(id=>{const item=state.operations.find(o=>o.id===id);return <li key={id}>{item?`${item.classification.merchant.value} · ${displayBankDate(item.date,timezone)} · ${formatMoney(item.amountMinor)}`:'Операция больше недоступна; откройте группу заново.'}</li>;})}</ul><OperationChoice key={shownGroup.sessionId+':group:'+shownGroup.anchorId} review allowRebase={false} state={state} ids={shownGroup.ids} disabled={locked} onCancel={()=>setGroup(null)} onSubmit={(intent,epoch)=>void command?.begin({...intent,reviewScope:{sessionId:shownGroup.sessionId,revision:shownGroup.revision,anchorId:shownGroup.anchorId}},'Решение при проверке группы',false,epoch)}/></section>:<OperationChoice key={current.id+':'+op.id+':'+formVersion} review state={state} ids={[op.id]} disabled={locked} onCancel={()=>setFormVersion(n=>n+1)} onSubmit={(intent,epoch)=>void command?.begin(intent,'Решение при проверке операции',false,epoch)}/>}</>}
- </section>}
- {!attention.length&&!current&&!loading&&<p>Сейчас нет операций с активными причинами проверки.</p>}
+ useEffect(()=>{if(disabled)return;const refresh=seenRefresh.current!==refreshKey;seenRefresh.current=refreshKey;void load(refresh?{refresh:true}:{});return()=>{++turn.current;onBusy(false);};},[state.generation,state.revision,refreshKey,disabled]);
+ useEffect(()=>{setApplySimilar(false);setSelected([]);},[queue?.id,queue?.anchor,queue?.financeRevision]);
+ const op=queue?.operations.find(o=>o.id===queue.anchor),similar=(queue?.similar??[]).filter(id=>id!==op?.id),items=new Map(queue?.operations.map(o=>[o.id,o])),locked=disabled||busy||queue?.financeRevision!==state.revision;
+ const name=(item:FinanceState['operations'][number])=>item.displayName?.compositeLabel||item.classification.merchant.value||kindNames[item.classification.kind.value];
+ const values=(item:FinanceState['operations'][number])=>displayBankDate(item.date,timezone)+' · '+formatMoney(item.amountMinor)+' · '+(state.accounts.find(a=>a.id===item.accountId)?.name??'Счёт');
+ const ruleHint=op?.canRememberTransfer?(BigInt(op.amountMinor)<0n?'Исходящие переводы: ':'Входящие переводы: ')+name(op)+' · '+(state.accounts.find(a=>a.id===op.accountId)?.name??'тот же счёт'):op?.classification.kind.value==='purchase'&&op.classification.merchant.value&&BigInt(op.amountMinor)<0n?'Новые покупки: '+op.classification.merchant.value+' · '+(state.accounts.find(a=>a.id===op.accountId)?.name??'тот же счёт'):undefined;
+ return <section className={styles.reviewPanel} aria-label="Нужно проверить">
+  <div className={styles.reviewHead}><h3>{queue?'Осталось разобрать: '+queue.remaining:'Нужно проверить'}</h3><button className={common.iconButton} disabled={busy||disabled} title="Обновить список проверки" aria-label="Обновить список проверки" onClick={()=>void load({refresh:true})}><RefreshCw size={18}/></button></div>
+  {error&&<p role="alert" className={common.error}>{error}</p>}
+  {queue?.remaining===0&&<p className={styles.muted}>Все операции проверены.</p>}
+  {queue&&op&&<div className={styles.settingsStack}>
+   <div className={styles.currentReview}><button className={common.linkButton} onClick={()=>onOpen(op.id)}>{name(op)}</button><p className={styles.muted}>{values(op)}</p><p>{op.reviewReasons.map(r=>reviewNames[r]??'Нужно проверить').join(' · ')}</p></div>
+   <QuickReviewFields key={queue.id+':'+op.id+':'+queue.financeRevision} op={op} state={state} similarIds={applySimilar?selected.filter(id=>similar.includes(id)):[]} requireSimilarSelection={applySimilar} similarControls={<>
+    <label><input type="checkbox" checked={applySimilar} disabled={locked||!similar.length} onChange={e=>setApplySimilar(e.target.checked)}/>Применить к похожим операциям ({similar.length})</label>
+    {applySimilar&&similar.length>0&&<section className={styles.similarReview} aria-label="Похожие операции">
+     <div className={styles.similarToolbar}>
+      <button type="button" className={common.button} disabled={locked||similar.every(id=>selected.includes(id))} onClick={()=>setSelected(similar)}>Выбрать все</button>
+      <button type="button" className={common.button} disabled={locked||!selected.length} onClick={()=>setSelected([])}>Снять выбор</button>
+      <span role="status">Выбрано: {selected.filter(id=>similar.includes(id)).length}/{similar.length}</span>
+     </div>
+     <ul className={styles.reviewList}>{similar.map(id=>{const item=items.get(id);return item&&<li key={id}><label className={styles.reviewChoice}><input type="checkbox" checked={selected.includes(id)} disabled={locked} onChange={e=>setSelected(ids=>e.target.checked?[...ids,id]:ids.filter(v=>v!==id))}/><span>{name(item)}<small>{values(item)}</small></span></label></li>;})}</ul>
+    </section>}
+   </>} disabled={locked||!command} ruleHint={ruleHint} canSkip={queue.remaining>1} onOpen={()=>onOpen(op.id)} onSkip={()=>{onBusy(true);void load({skip:op.id,revision:queue.revision});}} onApply={intent=>void command?.begin({...intent,reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:op.id}},'Решение при проверке',!!intent.rememberRule||intent.operationIds.length>1,{generation:queue.generation,revision:queue.financeRevision})}/>
+  </div>}
  </section>;
 }

@@ -1,7 +1,7 @@
 import type {Part} from './graph.ts';
 import type {Semantics} from './model.ts';
 
-export const metrics=['expenses','gross_expenses','income','difference','refunds','reimbursements','expense_reductions','own_transfers','transfers','loan_payments','loan_costs','fees','cash','operation_count','attention','budget'] as const;
+export const metrics=['expenses','gross_expenses','income','difference','refunds','reimbursements','expense_reductions','own_transfers','transfers','transfers_in','transfers_out','loan_principal','loan_payments','loan_costs','fees','cash','cash_in','cash_out','operation_count','attention','budget'] as const;
 export type Metric=typeof metrics[number];
 export type MetricRow={classification:Semantics;reviewReasons:string[];componentTypes?:Record<string,string>;allocationKinds?:Record<string,string>};
 const abs=(n:bigint)=>n<0n?-n:n;
@@ -16,6 +16,11 @@ export function metricMatches(metric:Metric,p:Part,o:MetricRow):boolean{
   // Count debit portions once, including partial own-transfer allocations.
   case 'own_transfers':return amount<0n&&p.role==='neutral'&&(kind==='own_transfer'||links.includes('own_transfer'));
   case 'transfers':return ['transfer_in','transfer_out','own_transfer'].includes(kind);
+  case 'transfers_in':return ['transfer_in','transfer_out','own_transfer'].includes(kind)&&amount>0n;
+  case 'transfers_out':return ['transfer_in','transfer_out','own_transfer'].includes(kind)&&amount<0n;
+  case 'loan_principal':return kind==='loan_payment'&&amount<0n&&o.componentTypes?.[p.componentId??'']==='principal';
+  case 'cash_in':return kind==='cash_deposit';
+  case 'cash_out':return kind==='cash_withdrawal';
   case 'loan_payments':return kind==='loan_payment'&&amount<0n;
   case 'loan_costs':return amount<0n&&p.role==='expense'&&(['interest','fee','insurance'].includes(kind)||kind==='loan_payment'&&['interest','fee','insurance'].includes(o.componentTypes?.[p.componentId??'']??''));
   case 'fees':return amount<0n&&p.role==='expense'&&(kind==='fee'||o.componentTypes?.[p.componentId??'']==='fee');
@@ -28,7 +33,7 @@ export function metricMatches(metric:Metric,p:Part,o:MetricRow):boolean{
 export function metricAmount(metric:Metric,p:Part,o:MetricRow):bigint{
  if(!metricMatches(metric,p,o))return 0n;
  const n=BigInt(p.amountMinor);
- if(['own_transfers','loan_payments','loan_costs','fees'].includes(metric))return abs(n);
+ if(['own_transfers','transfers_in','transfers_out','cash_in','cash_out','loan_principal','loan_payments','loan_costs','fees'].includes(metric))return abs(n);
  if(metric==='expenses'||metric==='gross_expenses')return -n;
  return n;
 }

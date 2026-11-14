@@ -52,7 +52,7 @@ describe('first staging owner: real operator/queue/email proof and existing TOTP
     assert.equal((await deliverBatch(mail, sandboxTransport(mail))).processed, 1);
     const inbox = (await fixture.owner.query('SELECT sealed_message FROM mail.sandbox_inbox WHERE id=$1', [row.id])).rows[0];
     const message = JSON.parse(seal.open(inbox.sealed_message));
-    assert.equal(message.to, address); assert.ok(message.text.includes(code)); assert.match(message.subject, /первого администратора Staging/);
+    assert.equal(message.to, address); assert.ok(message.text.includes(code)); assert.match(message.subject, /создание администратора/);
   });
   test('wrong code attempts survive rollback and five attempts lock even the correct code', async () => {
     const { code } = await begin();

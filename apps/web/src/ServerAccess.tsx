@@ -1,26 +1,159 @@
-import {useEffect,useState} from 'react';
-import {api,readLink} from './server-client';
+import {Signup} from './Signup';
+import {TrialStart} from './TrialOnboarding';
+import {SignOutConfirmation} from './SignOutConfirmation';
+import {useNewPasswordFields} from './NewPasswordFields';
+import {LandingDemoPreview} from './LandingDemoPreview';
+import {SelectField} from './SelectField';
+import {useMailCooldown,mailAddressKey} from './use-mail-cooldown';
+import type {MailSend} from './use-mail-cooldown';
+import {useCallback,useEffect,useRef,useState} from 'react';
+import {ArrowRight,CalendarDays,CheckCircle2,CreditCard,LockKeyhole,Mail,ShieldCheck,X} from 'lucide-react';
+import {OperationDialog,OperationField} from './OperationDialog';
+import {LegalFooter,LegalUpdate,usePublicTariffs} from './LegalPages';
+import {legalDocuments} from '../../../packages/access/src/legal';
+import {Brand} from './Brand';
+import {SupportLink} from './SupportDialog';
+import {api,ApiError,readLink} from './server-client';
 import type {Session} from './server-client';
+import {deviceZone} from './InterfaceSettings';
+import {ServerAccount} from './ServerAccount';
 import {ServerRenewal} from './ServerRenewal';
+import {FirstAccessBilling} from './AccessBilling';
 import {ServerAuth} from './ServerAuth';
 import {ServerFinance} from './ServerFinance';
-import {durationLabel,moneyLabel,dateLabel,statusLabel} from '../../../packages/access/src/model';
-import type {AccessRequest,Tariff} from '../../../packages/access/src/model';
+import {durationLabel,moneyLabel,statusLabel} from '../../../packages/access/src/model';
+import type {AccessRequest} from '../../../packages/access/src/model';
 import styles from './ServerAccess.module.css';
+
 const initialLink=readLink();
+const getRoute=()=>location.hash.slice(1).split('?')[0]??'';
+const isPublic=(route:string)=>['account','access','checkout','invite','reset','verify','login','payment-return'].includes(route);
+const hasCode=(e:unknown,...codes:string[])=>e instanceof ApiError&&codes.includes(e.code);
+function setRouteHash(route:string,replace=false,state:object|null=null){if(replace){history.replaceState(state,'',route?'#'+route:'/');window.dispatchEvent(new Event('hashchange'));}else location.hash='#'+route;}
+function AccessCard({icon:Icon,title,children}:{icon:typeof Mail;title:string;children:React.ReactNode}){
+ return <section className={styles.card+' '+styles.entryCard}><div className={styles.entryIcon}><Icon size={22}/></div><h1>{title}</h1>{children}</section>;
+}
+
 export function ServerAccess(){
-  const [link,setLink]=useState(initialLink),[tab,setTab]=useState(initialLink.kind==='invite'?'invite':initialLink.kind==='reset'?'reset':initialLink.kind==='login'?'login':'access');
-  const [session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[inside,setInside]=useState(false),[tariffs,setTariffs]=useState<Tariff[]>([]),[row,setRow]=useState<AccessRequest|null>(null),[error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false);
-  async function refresh(){const s=await api<Session>('/session');setSession(s);}
-  useEffect(()=>{let live=true;api<Session>('/session').then(s=>{if(live)setSession(s);}).catch(()=>{}).finally(()=>{if(live)setLoaded(true);});api<{tariffs:Tariff[]}>('/access/tariffs').then(r=>{if(live)setTariffs(r.tariffs);}).catch(e=>{if(live)setError(e.message);});api<{request:AccessRequest}>('/access/request').then(r=>{if(live)setRow(r.request);}).catch(()=>{});const change=()=>{const next=readLink();setLink(next);setTab(next.kind==='invite'?'invite':next.kind==='reset'?'reset':next.kind==='login'?'login':'access');setMessage('');setError('');};window.addEventListener('hashchange',change);return()=>{live=false;window.removeEventListener('hashchange',change);};},[]);
-  useEffect(()=>{if(!session)return;const timer=setInterval(()=>{void refresh().catch(()=>{});},60000);return()=>clearInterval(timer);},[!!session]);
-  async function run(work:()=>Promise<void>){if(busy)return;setBusy(true);setError('');setMessage('');try{await work();}catch(e){setError(e instanceof Error?e.message:'Не удалось выполнить действие.');}finally{setBusy(false);}}
-  if(inside&&session?.scope==='active')return <>{session.accessWarning&&<div role="status" className={styles.notice}>{session.accessWarning} <button className={styles.secondary} onClick={()=>setInside(false)}>Продлить доступ</button></div>}<ServerFinance session={session} onAccount={()=>setInside(false)} onAccessLost={()=>{setInside(false);setSession(s=>s?{...s,scope:'restricted'}:null);void refresh().catch(()=>setSession(null));}}/></>;
-  return <div className={styles.page}><header className={styles.header}><strong className={styles.brand}>Финансовый анализатор</strong><span>Доступ по приглашению</span></header><div className={styles.notice}>Тестовая версия с серверной проверкой доступа. Настоящие оплаты и отправка писем не подключены; используйте только искусственные данные.</div>
-  {error&&<p role="alert" className={styles.error}>{error}</p>}{message&&<p role="status" className={styles.success}>{message}</p>}
-  {session?<><section className={styles.card}><h1>Аккаунт: {session.name}</h1><p>{session.scope==='active'?'Доступ активен.':'Доступ ограничен. Аккаунт, безопасность и поддержка остаются доступны.'}</p>{session.accessWarning&&<p role="status" className={styles.notice}>{session.accessWarning}</p>}{session.blocked&&<p>Аккаунт заблокирован. Подтверждение оплаты не снимает блокировку; обратитесь в поддержку.</p>}<p>{session.indefinite?'Доступ бессрочный.':session.accessEnd?`Доступ до ${dateLabel(session.accessEnd)}.`:'Срок доступа не задан.'}</p><p>Загружайте поддерживаемые PDF и открывайте сохранённые операции в приложении.</p><div className={styles.actions}><button className={styles.secondary} disabled={busy} onClick={()=>run(refresh)}>Обновить доступ</button>{session.scope==='active'&&<button className={styles.primary} onClick={()=>setInside(true)}>Открыть экраны приложения</button>}<button className={styles.secondary} disabled={busy} onClick={()=>run(async()=>{await api('/auth/sign-out',{});setSession(null);setInside(false);})}>Выйти</button></div></section><ServerRenewal key={session.indefinite?'indefinite':session.accessEnd??'none'} onRefresh={refresh}/></>:<><nav className={styles.tabs} aria-label="Получение доступа"><button className={styles.secondary} aria-pressed={tab==='access'} onClick={()=>setTab('access')}>Получить доступ</button><button className={styles.secondary} aria-pressed={tab==='login'} onClick={()=>setTab('login')}>Войти</button>{link.kind==='invite'&&<button className={styles.secondary} aria-pressed={tab==='invite'} onClick={()=>setTab('invite')}>Регистрация</button>}</nav>
-  {tab==='login'?<ServerAuth onAuthenticated={async()=>{await refresh();setMessage('Вход выполнен.');}}/>:tab==='invite'?<section className={styles.card}><h1>Регистрация по приглашению</h1><p>Сначала подтвердите почту, на которую выдано приглашение. Ссылка сама по себе не подтверждает владение адресом.</p>{!link.token?<p>Откройте действующую ссылку приглашения из письма. Если срок истёк, обратитесь в поддержку.</p>:<><button className={styles.secondary} disabled={busy} onClick={()=>run(async()=>{await api('/access/registration-proof',{invitationToken:link.token});setMessage('Письмо с отдельным подтверждением поставлено в очередь.');})}>Запросить подтверждение почты</button><form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);void run(async()=>{await api('/access/register',{invitationToken:link.token,proofToken:String(data.get('proof')),name:String(data.get('name')),password:String(data.get('password'))});setLink({...link,token:''});setTab('login');setMessage('Регистрация завершена. Оплаченный период начался. Войдите с выбранным паролем.');});}}><label>Код подтверждения из отдельного письма<input name="proof" required autoComplete="off" maxLength={100}/></label><label>Имя<input name="name" autoComplete="name" required maxLength={100}/></label><label>Новый пароль<input name="password" type="password" required autoComplete="new-password" minLength={12} maxLength={128}/></label><button className={styles.primary} disabled={busy}>Зарегистрироваться</button></form></>}</section>:tab==='reset'?<section className={styles.card}><h1>Новый пароль</h1><form onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);void run(async()=>{await api('/security/reset',{token:link.token,newPassword:String(d.get('password'))});setLink({...link,token:''});setTab('login');setMessage('Пароль изменён, старые сессии завершены. Войдите заново.');});}}><label>Пароль<input name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128}/></label><button className={styles.primary} disabled={busy||!link.token}>Сохранить пароль</button></form></section>:<div className={styles.layout}><section className={styles.card}><h1>{row?'Ваша заявка':'Получить первый доступ'}</h1>
-  {link.kind==='verify'&&link.token&&<div className={styles.preview}><p>Подтвердите почту по полученной ссылке.</p><button className={styles.primary} disabled={busy} onClick={()=>run(async()=>{await api('/access/verify',{token:link.token});setLink({...link,token:''});setRow((await api<{request:AccessRequest}>('/access/request')).request);setMessage('Почта подтверждена.');})}>Подтвердить почту</button></div>}
-  {row?<><p><strong>{statusLabel[row.status]}</strong></p><p>{row.email} · {row.tariff.name} · {moneyLabel(row.tariff.priceMinor)}</p><p>{durationLabel(row.tariff.duration)}. Цена сохранена при создании заявки.</p>{['awaiting_payment','needs_topup'].includes(row.status)?<>{row.status==='needs_topup'&&row.remainingMinor&&<p>Нужна доплата: {moneyLabel(row.remainingMinor)}.</p>}<p>Тестовые реквизиты пока отсутствуют. Реальный перевод делать не нужно.</p><form onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);void run(async()=>{setRow((await api<{request:AccessRequest}>('/access/payment-claim',{senderName:String(d.get('sender')),senderBank:String(d.get('bank'))})).request);setMessage('Отметка оплаты отправлена на ручную проверку.');});}}><label>Имя отправителя<input name="sender" required maxLength={100}/></label><label>Банк отправителя<input name="bank" required maxLength={100}/></label><button className={styles.primary} disabled={busy}>Отметить тестовую оплату</button></form></>:<p>{row.status==='paid_not_activated'?'Оплата подтверждена. Дождитесь приглашения для регистрации. Срок доступа ещё не начался.':row.status==='rejected'?row.decisionNote:'Заявка на проверке. Отметка оплаты сама по себе не даёт доступ.'}</p>}<button className={styles.secondary} disabled={busy} onClick={()=>run(async()=>setRow((await api<{request:AccessRequest}>('/access/request')).request))}>Обновить состояние заявки</button></>:<form onSubmit={e=>{e.preventDefault();const d=new FormData(e.currentTarget);void run(async()=>{await api('/access/requests',{name:String(d.get('name')),email:String(d.get('email')),tariffId:String(d.get('tariff'))});setMessage('Если заявку можно продолжить, письмо с подтверждением поставлено в очередь.');});}}><label>Период<select name="tariff" required>{tariffs.map(t=><option key={t.id} value={t.id}>{t.name} — {moneyLabel(t.priceMinor)}</option>)}</select></label>{!tariffs.length&&<p>Доступных тарифов пока нет.</p>}<label>Имя<input name="name" required autoComplete="name" maxLength={100}/></label><label>Почта<input name="email" type="email" required autoComplete="email" maxLength={254}/></label><button className={styles.primary} disabled={busy||!tariffs.length}>Создать тестовую заявку</button></form>}</section>
-  <aside className={styles.card}><h2>Порядок доступа</h2><p>Заявка → подтверждение почты → ручная сверка оплаты → приглашение → регистрация.</p><p>Оплаченный период начнётся при регистрации. Истечение ссылки не сокращает его.</p>{row&&<p>Заявка создана {dateLabel(row.createdAt)}.</p>}<p>Если ссылка не работает или нужна помощь, обратитесь к владельцу проекта. Контакт поддержки добавим перед запуском.</p></aside></div>}</>}{!loaded&&<p role="status">Проверяем сессию…</p>}</div>;
+ const newPassword=useNewPasswordFields();
+ const [trialFailure,setTrialFailure]=useState(false),trialFailureSeen=useRef(false),initialLoad=useRef(true),fromPayment=useRef(getRoute()==='payment-return');
+ const [trialOpen,setTrialOpen]=useState(false),[route,setRoute]=useState(getRoute),[link,setLink]=useState(initialLink),[session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[sessionError,setSessionError]=useState('');
+ const [row,setRow]=useState<AccessRequest|null>(null),[applicationLoaded,setApplicationLoaded]=useState(false),[applicationError,setApplicationError]=useState('');
+ const [error,setError]=useState(''),[message,setMessage]=useState(''),[busy,setBusy]=useState(false),[submittedEmail,setSubmittedEmail]=useState(''),[linkInvalid,setLinkInvalid]=useState(false);
+ const [accountOpen,setAccountOpen]=useState(false),[renewalOpen,setRenewalOpen]=useState(false),[dismissed,setDismissed]=useState<string|null>(null),[registrationCodeSent,setRegistrationCodeSent]=useState(false);
+ const [applicationEmail,setApplicationEmail]=useState('');
+ const registrationMail=useMailCooldown(link.token),applicationMail=useMailCooldown(mailAddressKey(applicationEmail));
+ useEffect(()=>{if(!loaded)return;const denied=session?.trialResult==='denied';if(initialLoad.current){initialLoad.current=false;trialFailureSeen.current=denied;if(denied&&fromPayment.current)setTrialFailure(true);}else if(denied&&!trialFailureSeen.current)setTrialFailure(true);trialFailureSeen.current=denied;},[loaded,session,route]);
+ async function sendRegistrationCode(){
+  try{registrationMail.remember(await api<MailSend>('/access/registration-proof',{invitationToken:link.token}));}
+  catch(e){registrationMail.remember(e);throw e;}
+ }
+ const publicCatalog=usePublicTariffs(),tariffs=publicCatalog.tariffs??[];
+ const [tariffId,setTariffId]=useState(()=>new URLSearchParams(location.hash.split('?')[1]).get('tariff')??'');
+ const selected=tariffs.find(t=>t.id===tariffId)??tariffs[0];
+ const paymentReturn=new URLSearchParams(location.hash.split('?')[1]).get('payment');
+ const returning=(route==='checkout'||route==='access')&&paymentReturn!==null;
+ const verifiedApplication=route==='checkout'&&typeof history.state?.verifiedApplication==='string'?history.state.verifiedApplication as string:null;
+ const checkoutRoute=!!verifiedApplication||returning;
+ const renewalTariff=route==='access'&&!returning?new URLSearchParams(location.hash.split('?')[1]).get('tariff')??'':'';
+ const refresh=useCallback(async()=>{try{
+  const next=await api<Session>('/session',undefined,AbortSignal.timeout(10000)),zone=deviceZone();
+  if(next.scope==='active'&&(next.followsDevice||!next.timezone)&&next.timezone!==zone){
+   try{Object.assign(next,await api<Pick<Session,'timezone'|'followsDevice'>>('/access/profile/timezone',{timezone:zone,syncDevice:true},AbortSignal.timeout(6000)));}catch{/* Keep the last server calendar and retry on the next refresh. */}
+  }
+  setSession(next);setSessionError('');
+ }catch(e){if(hasCode(e,'AUTH_REQUIRED')){setSession(null);setSessionError('');}else{setSessionError('Не удалось проверить доступ. Проверьте соединение и повторите.');throw e;}}finally{setLoaded(true);}},[]);
+ const reloadApplication=useCallback(async(signal?:AbortSignal)=>{
+  try{
+   const next=(await api<{request:AccessRequest}>('/access/request',undefined,signal)).request;
+   if(verifiedApplication&&next.id!==verifiedApplication){if(!signal?.aborted)setRow(null);return;}
+   if(returning){
+    const {order}=await api<{order:{id:string}|null}>('/access/first-checkout',undefined,signal);
+    if(!order||(paymentReturn!=='return'&&order.id!==paymentReturn)){if(!signal?.aborted)setRow(null);return;}
+   }
+   if(!signal?.aborted){setRow(next);setApplicationError('');}
+  }catch(e){
+   if(signal?.aborted)return;
+   if(hasCode(e,'APPLICATION_SESSION_REQUIRED')){setRow(null);setApplicationError('');}
+   else setApplicationError('Не удалось загрузить заявку. Повторите проверку.');
+  }finally{if(!signal?.aborted)setApplicationLoaded(true);}
+ },[verifiedApplication,returning,paymentReturn]);
+ useEffect(()=>{
+  void refresh().catch(()=>{});
+  const change=()=>{setRoute(getRoute());setTariffId(new URLSearchParams(location.hash.split('?')[1]).get('tariff')??'');setLink(readLink());setError('');setMessage('');setLinkInvalid(false);setRegistrationCodeSent(false);setSubmittedEmail('');setApplicationEmail('');
+
+  };
+
+  window.addEventListener('hashchange',change);return()=>window.removeEventListener('hashchange',change);
+ },[refresh]);
+ useEffect(()=>{
+  const controller=new AbortController();
+  setApplicationLoaded(false);setApplicationError('');setRow(null);
+  if(!checkoutRoute||session)return;
+  void reloadApplication(controller.signal);
+  return()=>controller.abort();
+ },[checkoutRoute,!!session,reloadApplication]);
+ useEffect(()=>{if(!session||(route!=='payment-return'&&!(route==='account'&&paymentReturn)))return;
+  let stopped=false;setRenewalOpen(false);setTrialOpen(false);
+  void api('/access/billing').then(()=>refresh()).catch(()=>{}).finally(()=>{if(!stopped){window.dispatchEvent(new Event('cashneuro-billing'));setRouteHash('',true);}});
+  return()=>{stopped=true;};
+ },[!!session,route,paymentReturn,refresh]);
+ useEffect(()=>{if(!session)return;const tick=()=>{if(document.visibilityState!=='hidden')void refresh().catch(()=>{});};const t=window.setInterval(tick,60000);window.addEventListener('focus',tick);return()=>{window.clearInterval(t);window.removeEventListener('focus',tick);};},[!!session,refresh]);
+ useEffect(()=>{if(!row||!['under_review','needs_topup','paid_not_activated','awaiting_payment'].includes(row.status)||!checkoutRoute)return;
+  const controller=new AbortController();
+  const tick=()=>{if(document.visibilityState!=='hidden')void reloadApplication(controller.signal);};
+  const t=window.setInterval(tick,15000);window.addEventListener('focus',tick);return()=>{controller.abort();window.clearInterval(t);window.removeEventListener('focus',tick);};
+ },[row?.id,row?.status,checkoutRoute,reloadApplication]);
+ async function run(work:()=>Promise<void>){if(busy)return;setBusy(true);setError('');setMessage('');try{await work();}catch(e){if(hasCode(e,'INVALID_TOKEN','INVALID_INVITATION'))setLinkInvalid(true);else setError(e instanceof Error?e.message:'Не удалось выполнить действие.');}finally{setBusy(false);}}
+ const [exitOpen,setExitOpen]=useState(false);
+ function signOut(){void run(async()=>{await api('/auth/sign-out',{});setAccountOpen(false);setRenewalOpen(false);setSession(null);setDismissed(null);setRouteHash('login');});}
+ const showFinance=loaded&&session?.scope==='active'&&!session.blocked;
+ const closeRenewal=()=>{setRenewalOpen(false);if(renewalTariff)setRouteHash(session?.scope==='active'?'overview':'account',true);else if(getRoute()==='account'&&location.hash.includes('payment='))setRouteHash('account',true);void refresh().catch(()=>{});};
+ const renewal=(renewalOpen||!!renewalTariff)&&session&&!session.blocked&&<OperationDialog compact footer={null} title="Продление доступа" onClose={closeRenewal}><ServerRenewal embedded onRefresh={refresh} initialTariffId={renewalTariff}/></OperationDialog>;
+ if(showFinance&&session)return <><LegalUpdate signedIn/>{session.accessWarning&&dismissed!==session.accessWarning&&<div className={styles.warningBar}><span role="status">{session.accessWarning}</span><button className={styles.secondary} onClick={()=>setRenewalOpen(true)}>Продлить доступ</button><button className={styles.dismissWarning} aria-label="Скрыть уведомление" onClick={()=>setDismissed(session.accessWarning??null)}><X size={17}/></button></div>}<ServerFinance session={session} onAccount={()=>{setError('');setAccountOpen(true);}} onAccessLost={()=>{setAccountOpen(false);setSession(s=>s?{...s,scope:'restricted'}:null);setRouteHash('account');void refresh().catch(()=>{});}}/>{accountOpen&&<ServerAccount asDialog session={session} accountError={error} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>;
+ const restartApplication=()=>{setRow(null);setSubmittedEmail('');setLinkInvalid(false);setRouteHash('access',true);};
+
+ const notices=<>{trialFailure&&<p role="alert" className={styles.error}>Не удалось оформить пробный период. Повторите попытку или попробуйте позже.</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{message&&<p role="status" className={styles.success}>{message}</p>}</>;
+ return <div className={styles.page+' '+styles.entryPage}><header className={styles.header}><a className={styles.brand} href="/" aria-label="CashNeuro" onClick={()=>{setAccountOpen(false);setRenewalOpen(false);}}><Brand/></a><nav className={styles.entryNav} aria-label="Доступ">{session?<><SupportLink className={styles.secondary}/><button className={styles.secondary} disabled={busy} onClick={()=>setExitOpen(true)}>Выйти</button></>:<a className={styles.secondary} href="#login">Войти</a>}</nav></header>
+ <div className={styles.entryContent}>{!loaded?<AccessCard icon={ShieldCheck} title="Проверяем вход"><p role="status">Открываем CashNeuro…</p></AccessCard>:
+ sessionError&&!session?<AccessCard icon={ShieldCheck} title="CashNeuro недоступен"><p role="alert">{sessionError}</p><div className={styles.actions}><button className={styles.primary} onClick={()=>void refresh().catch(()=>{})}>Повторить</button><a className={styles.secondary} href="/demo">Попробовать демо</a></div></AccessCard>:
+ session?<><LegalUpdate signedIn/>{notices}<AccessCard icon={LockKeyhole} title={session.blocked?'Доступ приостановлен':session.isNew?'Начните пользоваться CashNeuro':session.accessEnd?'Срок доступа закончился':'Доступ ещё не активен'}>
+  <p>{session.blocked?'Операции, отчёты и Анализатор временно недоступны. Чтобы уточнить причину и восстановить доступ, напишите в поддержку.':session.isNew?'Выберите тариф или попробуйте 7 дней бесплатно.':session.accessEnd?'Продлите доступ, чтобы снова открыть операции, отчёты и Анализатор. Финансовые данные сохранены.':'Финансовые разделы откроются после подтверждения доступа.'}</p>
+  <div className={styles.actions}>{session.blocked?<SupportLink className={styles.primary}>Написать в поддержку</SupportLink>:<button className={styles.primary} onClick={()=>setRenewalOpen(true)}>{session.isNew?'Выбрать тариф':'Продлить доступ'}</button>}{!session.blocked&&session.trialAvailable&&<button className={styles.secondary} onClick={()=>{setTrialFailure(false);trialFailureSeen.current=false;setTrialOpen(true);}}>Попробовать бесплатно</button>}<button className={styles.secondary} onClick={()=>setAccountOpen(true)}>Открыть аккаунт</button></div>
+ </AccessCard>{trialOpen&&<OperationDialog title="Пробная неделя" footer={null} compact onClose={()=>setTrialOpen(false)}><TrialStart onRefresh={async()=>{await refresh();setTrialOpen(false);}}/></OperationDialog>}{accountOpen&&<ServerAccount asDialog session={session} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>:
+ route==='login'||route==='account'||(!isPublic(route)&&!!route)?<div className={styles.authWrap}>{notices}<ServerAuth onAuthenticated={async()=>{await refresh();if(route==='login'||route==='account')setRouteHash('',true);}}/><p className={styles.entryFootnote}>Ещё нет аккаунта? <a href="#access">Получить доступ</a> · <a href="/demo">Попробовать демо</a></p></div>:
+ route==='access'?<Signup onRegistered={async()=>{await refresh();setRouteHash('',true);}}/>:
+ route==='invite'?<AccessCard icon={ShieldCheck} title={linkInvalid||!link.token?'Приглашение недоступно':'Создайте аккаунт'}>
+  {notices}{linkInvalid||!link.token?<><p>Ссылка могла истечь или уже использоваться. Если вы оплатили доступ, попросите новую ссылку в поддержке.</p><div className={styles.actions}><SupportLink className={styles.primary}>Написать в поддержку</SupportLink><a className={styles.secondary} href="#login">Войти</a></div></>:<>
+  <ol className={styles.registrationSteps}><li aria-current={registrationCodeSent?undefined:'step'}>1. Получить код</li><li aria-current={registrationCodeSent?'step':undefined}>2. Создать аккаунт</li></ol>
+  {!registrationCodeSent?<><p>Отправим код на почту, на которую пришло приглашение.</p><div className={styles.actions}><button className={styles.primary} disabled={busy||registrationMail.seconds>0} onClick={()=>run(async()=>{await sendRegistrationCode();setRegistrationCodeSent(true);})}>{registrationMail.label??'Отправить код'}</button><button className={styles.secondary} disabled={busy} onClick={()=>{setError('');setRegistrationCodeSent(true);}}>У меня уже есть код</button></div></>:<form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget),password=newPassword.read(data);if(password===null)return;void run(async()=>{await api('/access/register',{invitationToken:link.token,proofToken:String(data.get('proof')).trim(),name:String(data.get('name')).trim(),password,termsVersion:legalDocuments.terms.version});setRouteHash('login',true);setMessage('Аккаунт создан. Войдите с новым паролем.');});}}>
+   <OperationField label="Код из письма"><input key={link.token} name="proof" type="text" required autoComplete="off" maxLength={100}/></OperationField><OperationField label="Имя"><input name="name" autoComplete="name" required maxLength={100}/></OperationField>{newPassword.fields}
+   <div className={styles.legalChoice}><input type="checkbox" name="terms" required id="registration-terms"/><label htmlFor="registration-terms">Принимаю <a href="/terms" target="_blank" rel="noreferrer">условия использования</a>.</label></div><p className={styles.legalLink}><a href="/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p><div className={styles.actions}><button type="button" className={styles.secondary} disabled={busy||registrationMail.seconds>0} onClick={()=>run(async()=>{await sendRegistrationCode();setMessage('Запрошен новый код.');})}>{registrationMail.label??'Отправить код повторно'}</button><button className={styles.primary} disabled={busy}>Создать аккаунт</button></div>
+  </form>}</>}
+ </AccessCard>:
+ route==='reset'?<AccessCard icon={LockKeyhole} title={linkInvalid||!link.token?'Ссылка на сброс недоступна':'Задайте новый пароль'}>{notices}
+  {linkInvalid||!link.token?<><p>Запросите новую ссылку на странице входа.</p><a className={styles.primary} href="#login">На страницу входа</a></>:<form onSubmit={e=>{e.preventDefault();const password=newPassword.read(new FormData(e.currentTarget));if(password===null)return;void run(async()=>{await api('/security/reset',{token:link.token,newPassword:password});setRouteHash('login',true);setMessage('Пароль изменён. Войдите с новым паролем.');});}}>{newPassword.fields}<p className={styles.muted}>Прежние сеансы завершатся.</p><button className={styles.primary} disabled={busy}>Сохранить пароль</button></form>}
+ </AccessCard>:
+ route==='verify'?<AccessCard icon={Mail} title={linkInvalid||!link.token?'Ссылка подтверждения недоступна':'Подтвердите почту'}>{notices}{linkInvalid||!link.token?<><p>Запросите новое письмо на тот же адрес, чтобы продолжить заявку.</p><button className={styles.primary} onClick={restartApplication}>Запросить новое письмо</button></>:<><p>Подтвердите адрес, чтобы открыть свою заявку и перейти к оплате.</p><button className={styles.primary} disabled={busy} onClick={()=>run(async()=>{const {requestId}=await api<{requestId:string}>('/access/verify',{token:link.token});setRouteHash('checkout',true,{verifiedApplication:requestId});})}>Подтвердить почту</button></>}</AccessCard>:
+ (route==='access'||route==='checkout')?<>{notices}{checkoutRoute&&!applicationLoaded?<AccessCard icon={CreditCard} title="Открываем заявку"><p role="status">Проверяем состояние доступа…</p></AccessCard>:
+ checkoutRoute&&applicationError?<AccessCard icon={CreditCard} title="Не удалось открыть заявку"><p role="alert">{applicationError}</p><button className={styles.primary} onClick={()=>void reloadApplication().catch(()=>{})}>Повторить</button></AccessCard>:
+ checkoutRoute&&row?<AccessCard icon={row.status==='paid_not_activated'?CheckCircle2:CreditCard} title={row.status==='awaiting_payment'?'Оплатите доступ':row.status==='paid_not_activated'?'Оплата подтверждена':statusLabel[row.status]}>
+   <dl className={styles.checkoutFacts}><div><dt>Почта</dt><dd>{row.email}</dd></div><div><dt>Тариф</dt><dd>{row.tariff.name} · {durationLabel(row.tariff.duration)}</dd></div><div><dt>Стоимость</dt><dd>{moneyLabel(row.tariff.priceMinor)}</dd></div></dl>
+   {['awaiting_payment','needs_topup'].includes(row.status)?<FirstAccessBilling row={row} onPaid={()=>reloadApplication()} onRestart={restartApplication} fallback={<>{row.remainingMinor&&<p>Осталось доплатить: {moneyLabel(row.remainingMinor)}.</p>}<p>Оплата через сайт сейчас недоступна.</p><SupportLink className={styles.secondary}>Связаться с поддержкой</SupportLink></>}/>:
+   row.status==='paid_not_activated'?<><p>Откройте письмо с приглашением и создайте аккаунт. Оплаченный период начнётся после регистрации.</p><div className={styles.actions}><a href="#login" className={styles.primary}>Уже создали аккаунт? Войти</a><SupportLink className={styles.secondary}>Письмо не пришло</SupportLink></div></>:
+   row.status==='rejected'?<><p>{row.decisionNote==='Оплата возвращена. Приглашение закрыто.'?row.decisionNote:'Платёж не подтверждён. Если деньги списались, обратитесь в поддержку.'}</p><SupportLink className={styles.primary}>Написать в поддержку</SupportLink></>:<p role="status">Проверяем платёж. После подтверждения пришлём приглашение. Повторно платить пока не нужно.</p>}
+ </AccessCard>:
+ submittedEmail?<AccessCard icon={Mail} title="Проверьте почту"><p>Если заявку можно продолжить, письмо придёт на <strong>{submittedEmail}</strong>. Откройте его и следуйте инструкции.</p><p>Проверьте также папку «Спам».</p><button className={styles.secondary} onClick={()=>setSubmittedEmail('')}>Изменить адрес или запросить снова</button></AccessCard>:
+ <AccessCard icon={CalendarDays} title={returning?'Восстановите доступ к заявке':'Получить доступ'}>
+  <p>{returning?'Не удалось открыть заявку после возврата с оплаты. Укажите ту же почту: пришлём ссылку для проверки заявки.':'Выберите период и подтвердите почту. После подтверждения оплаты пришлём приглашение для регистрации.'}</p>
+  <form onSubmit={e=>{e.preventDefault();if(!selected||applicationMail.seconds)return;const d=new FormData(e.currentTarget),email=String(d.get('email')).trim();void run(async()=>{try{applicationMail.remember(await api<MailSend>('/access/requests',{email,tariffId:selected.id,priceMinor:selected.priceMinor,catalogVersion:selected.catalogVersion??0,consentVersion:legalDocuments.consent.version}));setSubmittedEmail(email);}catch(e){applicationMail.remember(e);throw e;}});}}>
+   <label>Период доступа<SelectField name="tariff" value={selected?.id??''} onChange={e=>setTariffId(e.target.value)} required disabled={!tariffs.length}>{!tariffs.length&&<option value="">Нет доступных тарифов</option>}{tariffs.map(t=><option key={t.id} value={t.id}>{t.name} — {moneyLabel(t.priceMinor)}</option>)}</SelectField></label>
+   {publicCatalog.failed&&<p role="alert" className={styles.error}>Не удалось загрузить тарифы. <a href="/price">Открыть страницу тарифов</a></p>}{selected&&<p className={styles.muted}>{selected.aiQuota.toLocaleString('ru-RU')} единиц Анализатора {selected.duration.kind==='days'?'за период':'в месяц'}.</p>}
+   <label>Почта<input name="email" type="email" required autoComplete="email" maxLength={254} value={applicationEmail} onChange={e=>setApplicationEmail(e.target.value)}/></label><div className={styles.legalChoice}><input type="checkbox" name="consent" required id="application-consent"/><label htmlFor="application-consent">Даю <a href="/data-consent" target="_blank" rel="noreferrer">согласие на обработку персональных данных</a>.</label></div><p className={styles.legalLink}><a href="/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p><button className={styles.primary} disabled={busy||!tariffs.length||applicationMail.seconds>0}>{applicationMail.label??'Получить ссылку на почту'}</button>
+  </form>
+ </AccessCard>}</>:
+ <main className={styles.landing}><div><p className={styles.eyebrow}>Финансовый анализатор</p><h1>Поймите, куда уходят деньги</h1><p>Попробуйте 7 дней бесплатно. Операции из разных банков — в одном месте. Спросите Анализатор с ИИ, почему этот месяц обошёлся дороже прошлого, и увидите, какие покупки и платежи изменили итог.</p><div className={styles.actions}><a className={styles.primary} href="#access">Начать пользоваться <ArrowRight size={17}/></a><a className={styles.secondary} href="/price">Посмотреть тарифы</a></div></div>
+ <LandingDemoPreview/>
+ </main>}</div>
+ <LegalFooter/>{exitOpen&&<SignOutConfirmation busy={busy} onClose={()=>setExitOpen(false)} onConfirm={()=>{setExitOpen(false);signOut();}}/>}</div>;
 }

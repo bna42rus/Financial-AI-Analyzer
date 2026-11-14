@@ -1,0 +1,1350 @@
+{
+  "schema": "cashneuro-catalog-consolidation/2",
+  "date": "2026-10-27",
+  "baseline_commit": "d23fe6f27c58644db4acfe19f7af02f30e529bdc",
+  "scope": "documentary inventory and traceability; no runtime/model tests",
+  "source_pdf_sha256": "5255d758534e74c9329cb8437e8a862f4bf989999172903a862462294b4ce9c8",
+  "input_files": [
+    {
+      "path": "AGENTS.md",
+      "bytes": 2296,
+      "sha256": "ac6e7291a672d199e515480650c9888c885cbd86bd79822dbdc720f49b6dc5aa",
+      "git_blob_sha1": "ab7b8038cea0cdbdd4bfaa807cf115caf5ee07a2"
+    },
+    {
+      "path": "docs/architecture/categorization-owner-review-20261024.md",
+      "bytes": 14665,
+      "sha256": "872969369e776df4698aa8cf22b5d99c22a536dbfbb30327cb7c42b474237c07",
+      "git_blob_sha1": "165b9c60ffc87795a077662824d01387a2b876cb"
+    },
+    {
+      "path": "docs/architecture/category-counterparty-structure.md",
+      "bytes": 12460,
+      "sha256": "1fdb90f5fd46640d3af66969fb9da0dbb1abcdf0e04ca27a0c640af61779f634",
+      "git_blob_sha1": "f75d5385a1676b001eae2fc54b2b296fb82db2ae"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-animals-20261027.md",
+      "bytes": 161502,
+      "sha256": "82c6a36853fcadc34e077a1aaad6ccb669d1ad28ac3dda02223e82e5791635c7",
+      "git_blob_sha1": "d37c34491d97e62df279cf31f5793bbc08ee617e"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-beauty-categories-20261026.md",
+      "bytes": 60574,
+      "sha256": "add0d9e2a2a3b8746e92720c9718e7d5460348725b3f4840f2ed07c80e4a24d0",
+      "git_blob_sha1": "89d865c4a526d2858bfde9dc8edf9c0e4fafb03c"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-categories-20261026.md",
+      "bytes": 27093,
+      "sha256": "a5bb2814aba429fefe561cf9ebe7474795f183e962cb826d93740c2ff5d4e38e",
+      "git_blob_sha1": "ea81dda7fd4c6cbe8d1fbbdacd34cd4858093c94"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-checks-20261026.md",
+      "bytes": 34043,
+      "sha256": "84c32e8be5ffd1b5fcf50147e63a17d3f88f932f36d2637d312a77842d888e75",
+      "git_blob_sha1": "4a9b59fb902ad4724cc52d08facf9b997a175485"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-list-20261026.md",
+      "bytes": 70358,
+      "sha256": "1f256dc048f47e95e6f58cd9362f63fb24c60a88cfbafe70382bb96755c9f9ec",
+      "git_blob_sha1": "8e37d88807851d3588197ee093892c9676bc5618"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-connectivity-spellings-20261026.md",
+      "bytes": 23446,
+      "sha256": "a66bded470f74e8d2c18ac0170c98d5bdf8e6dd194347620f9e6d664bc4e9390",
+      "git_blob_sha1": "b15081e049a26d26c076ce0abbca706261c5bb09"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-categories-20261027.md",
+      "bytes": 57152,
+      "sha256": "0376fc96e21494d4b6a67f1ffbdf04f4d9183376b42f32fde2c8f4cda7827124",
+      "git_blob_sha1": "a4a51ec824cdee5b734096b05ed0f61f84d08880"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-checks-20261027.md",
+      "bytes": 51874,
+      "sha256": "099eab82b1be0fb7d7d0ce65af56cc19e4c23864195f24650c87e7cfde5fef25",
+      "git_blob_sha1": "ee90f49a16dce2230a35d2d5aee2ffa4ef05bca9"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-list-20261026.md",
+      "bytes": 32652,
+      "sha256": "31915a86c69ef9185811bfd26f7275ea2274e4159c7e961f8a0effd00fe16d9e",
+      "git_blob_sha1": "f41568bf6daf6010dc2859ee6ffdc38e2de3d45a"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-digital-spellings-20261027.md",
+      "bytes": 45664,
+      "sha256": "540fd7046c2fcb953aca11a82148997d16408595f4833e4da29d3eb952caa4ca",
+      "git_blob_sha1": "cd0cdb98c6483aa77b85c81679cd93396a9dca68"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-education-family-20261027.md",
+      "bytes": 157467,
+      "sha256": "d3ad9761b603b8c0140641af4faae7767d46db27b789fc24359f2bcbd0d0a4f9",
+      "git_blob_sha1": "47c546efb3cfea8eb3ce13f987454b223c9aa37b"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-entertainment-20261027.md",
+      "bytes": 181337,
+      "sha256": "55db4bfc07436ee75757002df463d64910280a0a7854526817d95215c518ba84",
+      "git_blob_sha1": "a3ee707541317a98610d197a80ab7bf1d9f7ea60"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-financial-events-20261027.md",
+      "bytes": 120892,
+      "sha256": "b4ba7558e573418265392a00c7f7f2dd7cde9beb370641c1d6f7249998fecb68",
+      "git_blob_sha1": "c76bed3099d000eac47a9d1388853d097afae6b4"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-gifts-charity-20261027.md",
+      "bytes": 152054,
+      "sha256": "f683f18ec9fbebfc611779b70a342c37641c9befdc2e73696075c8a6f8a5f6cb",
+      "git_blob_sha1": "5ad695fc863e589337b0a83f3f3abf81d5b1340b"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-marketplaces-20261027.md",
+      "bytes": 167269,
+      "sha256": "c3d86518da4d366af6f384176a27d29362714cb584a756ee2d53c46f867e88e5",
+      "git_blob_sha1": "350fded1f10d787d2e1ed44fc4813a698c6c59c6"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-master-20261025.md",
+      "bytes": 1095918,
+      "sha256": "161167d05d8ad84c4c3aa07ec2836214ee35d83b0d8e4fe8f3f1e655f0c9c9ee",
+      "git_blob_sha1": "c9ac80a1e7c7e83f2f75aadd2cbb608598e8e9c9"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-telecom-20261026.md",
+      "bytes": 23827,
+      "sha256": "885d6bd3cef011f9807dd2ee4c657346483a2d652a15b3bae0c78aa895e583dc",
+      "git_blob_sha1": "e2810bc1a0082ae53a7171a41e0b199d1dac28f5"
+    },
+    {
+      "path": "docs/architecture/merchant-catalog-travel-20261027.md",
+      "bytes": 171483,
+      "sha256": "2be1daf01b2cb260c72bcfa6c157244ab0d55267a33bb5b7810017d14fdc79b3",
+      "git_blob_sha1": "a2ae7591b138d34e6d3553e12050f95c8efad1e5"
+    },
+    {
+      "path": "docs/architecture/merchant-recognition-20261024.md",
+      "bytes": 13372,
+      "sha256": "655bcfc2997a334d2a34b57247201a4e3519f4459e040f8145ddea8312c8c0c9",
+      "git_blob_sha1": "336eb419b2b274df8658385b527b12f56dd124a6"
+    },
+    {
+      "path": "docs/architecture/merchant-recognition-audit-20261024.md",
+      "bytes": 9332,
+      "sha256": "b1cb543546d246f7008e2a17f5737dc3977d84341c9d76e00e18d0668bf80253",
+      "git_blob_sha1": "bbbdbefd3586b6bd3995ce9334e167e7a7abc59a"
+    },
+    {
+      "path": "docs/architecture/purchase-category-split-20261024.md",
+      "bytes": 8166,
+      "sha256": "ebaf9b5993e19bc7938da83c412383f823d7cddb4a6b7b166a2b2622268013bf",
+      "git_blob_sha1": "de040b494b05d407a42c82827208d79a75219fbc"
+    },
+    {
+      "path": "docs/product/source-manifest.json",
+      "bytes": 1391,
+      "sha256": "cdc7b6725210bc29390d9d360539e9811590b89ef15fe555457d7a0b750b990d",
+      "git_blob_sha1": "017e4b9e6b3ecf3e5690c9050ce7c2567b3fdc9c"
+    },
+    {
+      "path": "packages/finance-core/src/graph.ts",
+      "bytes": 15521,
+      "sha256": "05095bc6588c175c2680fcd9e874d2424f4fe9116a6326657a8f600321fde62e",
+      "git_blob_sha1": "eacad3fb6cfdf2fabe422105cc94c6538bb3c8d5"
+    },
+    {
+      "path": "packages/finance-core/src/model.ts",
+      "bytes": 5692,
+      "sha256": "eb8c65106e3001fc7ea88b3dc5940abbb98daf618ac6defa9a61e673da12ce76",
+      "git_blob_sha1": "221a2b3dce4ce863b8be07e0f5b26662ad167c11"
+    },
+    {
+      "path": "packages/finance-core/src/starter.ts",
+      "bytes": 4239,
+      "sha256": "72e2e76cab7348cc1b52e9453a6667770168c0381086bfb1a33eb192f819cbd9",
+      "git_blob_sha1": "f67d375dd00854fe2126d399a00673402f479019"
+    }
+  ],
+  "coverage": [
+    {
+      "section": "GROCERY",
+      "name": "Продуктовые магазины",
+      "inventory": "50 записей",
+      "record_status": "APPROVED_BASELINE",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Полный список вариантов",
+      "note": "Исключение: прежняя реализация/программные проверки описаны в master; повтор здесь не выполнялся."
+    },
+    {
+      "section": "DELIVERY",
+      "name": "Доставка продуктов и универсальные агрегаторы",
+      "inventory": "10 явно перечисленных сервисов + доставка известных магазинов",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Доставка продуктов и универсальные агрегаторы",
+      "note": "D01–D28: ID семейств проверок, не 28 продавцов; бренд/способ получения различимы."
+    },
+    {
+      "section": "FOOD",
+      "name": "Еда вне дома",
+      "inventory": "F01–F61",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Еда вне дома",
+      "note": "P01–P14; T01–T40; generic T обязательно с идентификатором секции."
+    },
+    {
+      "section": "TRANSPORT",
+      "name": "Транспорт и автомобиль",
+      "inventory": "R01–R67",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Транспорт и автомобиль",
+      "note": "U01–U22; TR01–TR48; специальные предварительные профили сохраняются."
+    },
+    {
+      "section": "POWERBANK",
+      "name": "Аренда пауэрбанков",
+      "inventory": "PB01–PB07",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Аренда пауэрбанков",
+      "note": "PB-U01–U12; PT01–PT28. Новая подкатегория выбрана, но добавление/rollout отдельно."
+    },
+    {
+      "section": "HEALTH",
+      "name": "Здоровье",
+      "inventory": "H001–H088; 1536 форм",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Здоровье",
+      "note": "HU01–HU20; HT01–HT48. Не выводить диагноз/пользователя услуги."
+    },
+    {
+      "section": "SPORT",
+      "name": "Фитнес, спорт и спортивные товары",
+      "inventory": "FS001–FS083; 832 формы",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Фитнес, спорт",
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
+    },
+    {
+      "section": "FREELANCE",
+      "name": "Биржи фриланса и площадки исполнителей",
+      "inventory": "FR01–FR10",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Межраздельный реестр бирж фриланса",
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
+    },
+    {
+      "section": "HOME",
+      "name": "Жильё, ремонт и домашние услуги",
+      "inventory": "HOME001–HOME061",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Жильё, ремонт",
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
+    },
+    {
+      "section": "FASHION",
+      "name": "Одежда, обувь, аксессуары",
+      "inventory": "FASH001–FASH097",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
+      "document": "merchant-catalog-master-20261025.md",
+      "locator": "Одежда, обувь",
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
+    },
+    {
+      "section": "BEAUTY",
+      "name": "Красота, косметика и уход",
+      "inventory": "BEA001–BEA056",
+      "record_status": "RESOLVED_BY_OWNER_INSTRUCTION",
+      "document": "merchant-catalog-beauty-categories-20261026.md",
+      "locator": "Предлагаемые категории по всем 56 записям",
+      "note": "Текущим поручением закрыть вопросы зафиксирован подготовленный полный пакет; исторические согласования не выдуманы. Конечные источники/условия по release-decisions и source-dispositions. Продуктовые случаи NOT_RUN.",
+      "record_resolution_date": "2026-10-27"
+    },
+    {
+      "section": "CONNECTIVITY",
+      "name": "Связь и интернет",
+      "inventory": "56 профилей / 481 форма",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-connectivity-checks-20261026.md",
+      "locator": "NET-C01–C24",
+      "note": "45 основных NET +11 дополнений TEL; NET025–027 ссылки на NET001–003. Не сумма 48+44."
+    },
+    {
+      "section": "DIGITAL",
+      "name": "Подписки, цифровые и рабочие сервисы",
+      "inventory": "DIG001–DIG097 / 762 формы",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-digital-checks-20261027.md",
+      "locator": "Матрица будущих проверок",
+      "note": "28 U/32 C/64 T. INT/PEND не снимаются; пригодность оплаты из РФ не доказана одним именем."
+    },
+    {
+      "section": "MARKETPLACES",
+      "name": "Маркетплейсы и многопрофильные продавцы",
+      "inventory": "MP001–MP071 / 662 формы",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-marketplaces-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "32 U/36 C/72 T; REF не новая компания. Техника и электроника — будущая выбранная категория."
+    },
+    {
+      "section": "ENTERTAINMENT",
+      "name": "Развлечения, книги и хобби",
+      "inventory": "ENT001–ENT091 / 761 форма",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-entertainment-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "32 U/40 C/80 T; содержание покупки/цель семьи не выдумываются."
+    },
+    {
+      "section": "EDUCATION",
+      "name": "Образование, семья и дети",
+      "inventory": "EDU001–EDU081 / 659 форм",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-education-family-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "32 U/40 C/80 T; порталы/частная школа/выплата не одинаковый смысл."
+    },
+    {
+      "section": "TRAVEL",
+      "name": "Путешествия",
+      "inventory": "TRV001–TRV089 / 714 форм",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-travel-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "36 U/44 C/88 T; carrier/агент/гостиница/возврат отдельно, HIST/REF сохраняются."
+    },
+    {
+      "section": "PETS",
+      "name": "Питомцы",
+      "inventory": "PET001–PET072 / 731 форма",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-animals-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "36 U/40 C/80 T; марки кормов и магазин не автоматически один merchant."
+    },
+    {
+      "section": "GIFTS",
+      "name": "Подарки и благотворительность",
+      "inventory": "GFT001–GFT064 / 596 форм",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-gifts-charity-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "36 U/40 C/80 T; цель подарка/платформа/донат/возврат/помощь разделены."
+    },
+    {
+      "section": "FINANCIAL",
+      "name": "Банки, кредиты, налоги, обязательные платежи",
+      "inventory": "FIN001–FIN061 / 489 форм",
+      "record_status": "APPROVED",
+      "document": "merchant-catalog-financial-events-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "24 E/42 U/44 C/96 T/14 P; 4 OPEN интеграции, 2 PEND. Принят «Ок дальше» 27.10.2026."
+    },
+    {
+      "section": "LOG",
+      "name": "Почта, курьерские службы и грузоперевозки",
+      "inventory": "LOG001–LOG022; 136 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-logistics-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    },
+    {
+      "section": "SVC",
+      "name": "Бытовые мастерские, химчистки и ремонт техники",
+      "inventory": "SVC001–SVC016; 90 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-household-services-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    },
+    {
+      "section": "PRF",
+      "name": "Юридические, бухгалтерские и документальные услуги",
+      "inventory": "PRF001–PRF016; 97 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-professional-services-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    },
+    {
+      "section": "OFF",
+      "name": "Офис, полиграфия, коворкинги и реклама",
+      "inventory": "OFF001–OFF027; 168 форм",
+      "record_status": "SPEC_COMPLETE_UNDER_OWNER_DIRECTIVE",
+      "document": "merchant-catalog-office-advertising-20261027.md",
+      "locator": "Все четыре пункта",
+      "note": "4 блока прямо поручены 27.10.2026; 20 U/12 C/32 T/8 P; новый пакет не выдан за внедрение/прошедший прогон."
+    }
+  ],
+  "approvals_recorded_now": [
+    {
+      "namespace": "FIN",
+      "answer": "Ок дальше",
+      "date": "2026-10-27",
+      "scope": "61 profiles;489 forms;24 E;42 U;44 C;96 T;14 P;4 OPEN and 2 PEND preserved"
+    }
+  ],
+  "home_related_families": [
+    {
+      "supplement": "HT-HOME01",
+      "related": [
+        "HOME-T16"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Покупка «Лемана ПРО», без чека",
+      "supplement_expected": "Ремонт без category Review, если профиль продавца подтверждён"
+    },
+    {
+      "supplement": "HT-HOME02",
+      "related": [
+        "HOME-T05"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Историческое российское «Леруа Мерлен» с валидным контекстом",
+      "supplement_expected": "Тот же допустимый строительный профиль без замены банковского имени"
+    },
+    {
+      "supplement": "HT-HOME03",
+      "related": [
+        "HOME-T06",
+        "HOME-T07"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«DOM Лента»/исторический российский OBI; отдельно «Лента» продукты",
+      "supplement_expected": "Домашний строительный профиль только у DOM/релевантного OBI, продуктовая Лента не HOME"
+    },
+    {
+      "supplement": "HT-HOME04",
+      "related": [
+        "HOME-T08",
+        "HOME-T16"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Петрович» как строительная сеть; отдельно перевод лицу Петровичу",
+      "supplement_expected": "Стройпокупка → Ремонт; личный перевод не получает категорию магазина"
+    },
+    {
+      "supplement": "HT-HOME05",
+      "related": [
+        "HOME-T09",
+        "HOME-T10"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Сатурн»/«Аксон» без торговых признаков, отдельно подтверждённая стройсеть",
+      "supplement_expected": "Голое имя не достаточная сеть; доказанная сеть → Ремонт"
+    },
+    {
+      "supplement": "HT-HOME06",
+      "related": [
+        "HOME-T16"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Покупка в специализированном магазине стройматериалов с неизвестным чеком",
+      "supplement_expected": "Ремонт без автоматического требования детального состава"
+    },
+    {
+      "supplement": "HT-HOME07",
+      "related": [
+        "HOME-T17"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Установлено, что в Лемана ПРО куплена мебель либо садовые товары",
+      "supplement_expected": "Приоритет доказанного назначения/личной категории над обычным профилем строймагазина"
+    },
+    {
+      "supplement": "HT-HOME08",
+      "related": [
+        "HOME-T01",
+        "HOME-T17"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Керама Марацци» фигурирует как марка плитки другого продавца",
+      "supplement_expected": "Сохранить фактического продавца; не создавать фиктивного контрагента"
+    },
+    {
+      "supplement": "HT-HOME09",
+      "related": [
+        "HOME-T18"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Оплата Hoff / Askona как известной сети",
+      "supplement_expected": "Товары для дома без category Review, конкретный предмет не выдумывается"
+    },
+    {
+      "supplement": "HT-HOME10",
+      "related": [
+        "HOME-T11"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Мария — имя получателя частного перевода; отдельно «Кухни Мария»",
+      "supplement_expected": "Только доказанный мебельный бренд даёт профиль товаров для дома"
+    },
+    {
+      "supplement": "HT-HOME11",
+      "related": [
+        "HOME-T10",
+        "HOME-T12"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Шатура» как география или «Ангстрем» как термин",
+      "supplement_expected": "Без достаточной идентичности не назначать мебель"
+    },
+    {
+      "supplement": "HT-HOME12",
+      "related": [
+        "HOME-T12"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«E1» в другом коде/транспорте; отдельно установлен мебельный продавец",
+      "supplement_expected": "Короткое E1 не безусловный мебельный alias"
+    },
+    {
+      "supplement": "HT-HOME13",
+      "related": [
+        "HOME-T20"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Галамарт/Кюхенланд/Посуда Центр обычная покупка",
+      "supplement_expected": "Товары для дома без Review из-за отсутствия чека"
+    },
+    {
+      "supplement": "HT-HOME14",
+      "related": [
+        "HOME-T13"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Порядок»/«Домовой» как обычное слово и как доказанная домашняя торговая сеть",
+      "supplement_expected": "Только установленный торговый контекст → Товары для дома"
+    },
+    {
+      "supplement": "HT-HOME15",
+      "related": [
+        "HOME-T22"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Мосэнергосбыт как коммунальная оплата",
+      "supplement_expected": "Коммунальные услуги без Review категории"
+    },
+    {
+      "supplement": "HT-HOME16",
+      "related": [
+        "HOME-T23"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "МосОблЕИРЦ как суммарное ЖКУ без детализации ресурсов",
+      "supplement_expected": "Коммунальные услуги, без выдуманного распределения между водой/отоплением/электричеством"
+    },
+    {
+      "supplement": "HT-HOME17",
+      "related": [
+        "HOME-T25"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "МОСГАЗ для жилья, отдельно АЗС для автомобиля",
+      "supplement_expected": "Коммунальные услуги против Транспорт → Топливо, без пересечения"
+    },
+    {
+      "supplement": "HT-HOME18",
+      "related": [
+        "HOME-T24"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Фонд капремонта подтверждённый обязательный взнос, отдельно частный ремонт",
+      "supplement_expected": "Коммунальные услуги против Ремонт; short ФКР требует identity"
+    },
+    {
+      "supplement": "HT-HOME19",
+      "related": [
+        "HOME-T24",
+        "HOME-T26"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Т Плюс/ПСК/ФКР в описании без подтверждения организации",
+      "supplement_expected": "Не выбирать произвольно одного коммунального получателя по сокращению"
+    },
+    {
+      "supplement": "HT-HOME20",
+      "related": [
+        "HOME-T27"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Qlean заказ уборки квартиры без деталей",
+      "supplement_expected": "Бытовые услуги без category Review"
+    },
+    {
+      "supplement": "HT-HOME21",
+      "related": [
+        "HOME-T13",
+        "HOME-T15"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Клин как город и Домовёнок как название книги",
+      "supplement_expected": "Не классифицировать автоматически как клининг"
+    },
+    {
+      "supplement": "HT-HOME22",
+      "related": [
+        "HOME-T28"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Любая межраздельная площадка FR01–FR10 без установленной услуги, роли и вида платежа",
+      "supplement_expected": "Не назначать автоматически ремонт или бытовые услуги; запросить основание. Дополнительно проверить комиссию/отклик на бирже и доход исполнителя против расхода заказчика"
+    },
+    {
+      "supplement": "HT-HOME23",
+      "related": [
+        "HOME-T28"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Через Профи.ру подтверждён ремонт квартиры; отдельно преподаватель",
+      "supplement_expected": "Ремонт против Образования; платформа не подменяет вид услуги"
+    },
+    {
+      "supplement": "HT-HOME24",
+      "related": [
+        "HOME-T14",
+        "HOME-T30"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Руки» как доказанный сервис без вида домашней работы; отдельно бытовое слово",
+      "supplement_expected": "Сервис → предложенные Бытовые услуги + Стоит проверить; обычное слово не разрешает профиль"
+    },
+    {
+      "supplement": "HT-HOME25",
+      "related": [
+        "HOME-T31"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "«Яндекс Аренда» подтверждённый платёж аренды квартиры",
+      "supplement_expected": "Аренда без Review категории"
+    },
+    {
+      "supplement": "HT-HOME26",
+      "related": [
+        "HOME-T32"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Платёж Циан/Домклик/Этажи без вида услуги",
+      "supplement_expected": "Не приписывать аренду, ипотеку или комиссию произвольно"
+    },
+    {
+      "supplement": "HT-HOME27",
+      "related": [
+        "HOME-T32"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Циан: подтверждена платная реклама; Домклик: подтверждена ипотечная услуга",
+      "supplement_expected": "Классифицировать по известному смыслу, не по слову «дом»"
+    },
+    {
+      "supplement": "HT-HOME28",
+      "related": [
+        "HOME-T33"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Аренда квартиры у физлица; отдельно перевод тому же человеку без назначения",
+      "supplement_expected": "Доказанная аренда → Аренда; сходство ФИО/псевдонима не делает другой перевод арендой"
+    },
+    {
+      "supplement": "HT-HOME29",
+      "related": [
+        "HOME-T34",
+        "HOME-T38",
+        "HOME-T39",
+        "HOME-T40"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Оплата мебели разбита пользователем на подтверждённые части, отдельно новый платёж тому же магазину",
+      "supplement_expected": "Части заменяют parent в итогах; новая покупка не наследует суммы/части старой"
+    },
+    {
+      "supplement": "HT-HOME30",
+      "related": [
+        "HOME-T34",
+        "HOME-T36",
+        "HOME-T40"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Повтор импорта, ручная подтверждённая категория и личное правило против нового каталога",
+      "supplement_expected": "Прежнее решение/identity/HMAC/provenance сохраняются, нет двойного расхода или массовой переклассификации"
+    },
+    {
+      "supplement": "HT-HOME31",
+      "related": [
+        "HOME-T37",
+        "HOME-T41",
+        "HOME-T42"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Сомнение только в категории, отдельно независимый duplicate/link/role/reversal",
+      "supplement_expected": "Review категории не снимает остальные причины; подтверждение только категории не подтверждает дубль/связь; суммы не удваиваются"
+    },
+    {
+      "supplement": "HT-HOME32",
+      "related": [
+        "HOME-T43",
+        "HOME-T44"
+      ],
+      "relation": "RELATED_NOT_EQUIVALENT",
+      "supplement_input": "Идентичные тестовые операции/периоды на вкладках Обзор/Операции/Бюджеты/Анализатор и ответ модели с высоким confidence",
+      "supplement_expected": "Совпадающие суммы, периоды и категории по действующей финансовой модели; уверенность модели не преодолевает омоним/identity guard и старый cache"
+    }
+  ],
+  "home_primary_oracles": {
+    "HOME-T01": {
+      "input": "Каждая из HOME001–HOME061 под своим полным каноническим именем, источник и деятельность искусственные, без реальных выписок",
+      "expected": "Установить ровно допустимый профиль записи; универсальным площадкам HOME054–HOME056/HOME059–HOME061 не приписывать несуществующую услугу; различать identity и category."
+    },
+    "HOME-T02": {
+      "input": "Явные падежи, кириллица/латиница, ё/е, регистр для каждой доступной формы HOME",
+      "expected": "Тот же кандидат только для разрешённых форм; банк-строка, регистр и исходный алфавит в source не меняются."
+    },
+    "HOME-T03": {
+      "input": "Пробелы/дефисы/слитность/точки/домен: Лемана Про, LemanaPro, ВсеИнструменты.ру, Divan.ru, Mr.Doors, Профи.ру",
+      "expected": "Ровно перечисленные формы допускаются с границами, не свободная подстановка, не смешение соседних токенов."
+    },
+    "HOME-T04": {
+      "input": "Похожая приставка/суффикс или вложенное слово: «НеЛемана», «максидомик», «профиль», «руководитель»",
+      "expected": "Нет ложного совпадения по подстроке; важные цифры/знаки сохраняются, общий fuzzy отсутствует."
+    },
+    "HOME-T05": {
+      "input": "Лемана ПРО и историческое Леруа Мерлен (для относящегося к РФ торгового контура)",
+      "expected": "Допустим профиль строительного магазина; не переписывать имя в исходной операции и не связывать автоматически разные банковские наблюдения."
+    },
+    "HOME-T06": {
+      "input": "DOM Лента / Дом Лента и продуктовая Лента: четыре раздельных синтетических оплаты",
+      "expected": "DOM/установленный российский OBI → домашний/строительный профиль; голое «Лента» → существующий продуктовый профиль; DOM или дом без связи — не сеть."
+    },
+    "HOME-T07": {
+      "input": "OBI/ОБИ в подходящем российском историческом периоде и чужая/международная OBI",
+      "expected": "Историческое имя условно по географии/периоду, не глобальное приравнивание; не подменять банк-факты."
+    },
+    "HOME-T08": {
+      "input": "«Петрович» как получатель-персона; отдельно точный строительный торговый профиль",
+      "expected": "Физлицо без подтверждения магазина не «Ремонт»; магазин с доказанным профилем — «Ремонт» без Review категории."
+    },
+    "HOME-T09": {
+      "input": "Сатурн / Saturn как планета, банк, название и как подтверждённый строительный продавец",
+      "expected": "Голое слово не определяет продавца; при обоснованной identity строительный профиль применяется."
+    },
+    "HOME-T10": {
+      "input": "Аксон/Axon, Лазурит/Lazurit, Ангстрем/Angstrem как медицина/геология/электроника и как домашний магазин",
+      "expected": "Нет первого совпавшего профиля и нет ложного «Товары для дома»; установленная сеть → соответствующая категория."
+    },
+    "HOME-T11": {
+      "input": "«Мария» как имя получателя и «Кухни Мария» как подтверждённый продавец",
+      "expected": "Лицо/обычное имя не становится покупкой кухни; установленный продавец → «Товары для дома»."
+    },
+    "HOME-T12": {
+      "input": "«Шатура» как город; «Е1/E1» как маршрут/сокращение; «MOON» как обычное слово/другой бренд",
+      "expected": "Короткий/географический/общий фрагмент недостаточен; требуются торговые признаки."
+    },
+    "HOME-T13": {
+      "input": "«Домовой», «Порядок», «Твой Дом» как обычная речь/название другого сервиса и как установленный магазин",
+      "expected": "Только доказанный магазин получает «Товары для дома», слово само по себе — нет."
+    },
+    "HOME-T14": {
+      "input": "«Руки» в обычном предложении и подтверждённая оплата сервиса Руки",
+      "expected": "Обычное слово не идентифицирует сервис; точный сервис без вида работы → «Бытовые услуги» предварительно + Review категории."
+    },
+    "HOME-T15": {
+      "input": "«Клин» как город/обычное слово и Qlean как идентифицированный клининг",
+      "expected": "Не подменять городской перевод клинингом; Qlean с профилем уборки → «Бытовые услуги» без Review."
+    },
+    "HOME-T16": {
+      "input": "Однозначный строительный магазин Лемана ПРО, Петрович, Максидом, Бауцентр; подробного чека нет",
+      "expected": "Предложенный согласованный дефолт «Ремонт» без Review категории: отсутствие болтов/краски/назначения само по себе не сомнение."
+    },
+    "HOME-T17": {
+      "input": "Тот же строительный магазин, но достоверно известна посуда/декор/мебель или иной конкретный предмет",
+      "expected": "Установленный предмет/личное решение корректируют категорию; без доказанных сумм не дробить корзину."
+    },
+    "HOME-T18": {
+      "input": "Hoff, Askona, Орматек, Столплит, Divan.ru; обычная покупка без чека",
+      "expected": "«Товары для дома», без лишнего Review; не считать матрас лекарством или диван финансовой инвестицией."
+    },
+    "HOME-T19": {
+      "input": "Кухонный торговый бренд, но явно оплачены установка/ремонт или услуга проектирования",
+      "expected": "Назначить по доказанной услуге (при ремонте — «Ремонт»), а не навязывать покупку мебели; неизвестный пакет не делить произвольно."
+    },
+    "HOME-T20": {
+      "input": "Галамарт, KuchenLand, Cozy Home, Твой Дом; обычная оплата и затем установленный иной товар",
+      "expected": "Обычное «Товары для дома» без Review; при подтверждённом ином товаре — подходящая категория, без двойного назначения."
+    },
+    "HOME-T21": {
+      "input": "Одна продажа детских игрушек/товаров для питомца/спортодежды в многопрофильном магазине",
+      "expected": "Конкретная установленная категория Семья/Питомцы/Одежда или личная; общий домашний магазин не перекрывает факты."
+    },
+    "HOME-T22": {
+      "input": "Мосэнергосбыт, Мосводоканал, МОСГАЗ; регулярные коммунальные платежи, состав квитанции не раскрыт",
+      "expected": "«Коммунальные услуги» без Review именно категории; неопределённый ресурс не создаёт вымышленную детализацию."
+    },
+    "HOME-T23": {
+      "input": "МосОблЕИРЦ собирает одну квитанцию за несколько ресурсов; отдельно обычный «ЕИРЦ» другой области",
+      "expected": "Первый платёж — «Коммунальные услуги» как одна операция; не придумывать частичные суммы/поставщиков. Короткий ЕИРЦ не доказывает организацию."
+    },
+    "HOME-T24": {
+      "input": "Фонд капитального ремонта Москвы как подтверждённый жилищный взнос; отдельно договор частного ремонта",
+      "expected": "Взнос → «Коммунальные услуги»; частный ремонт → «Ремонт». Не путать два назначения."
+    },
+    "HOME-T25": {
+      "input": "Газпром межрегионгаз / МОСГАЗ против АЗС Газпром / Газпромнефть",
+      "expected": "Установленный коммунальный газ → «Коммунальные услуги»; заправка → «Транспорт → Топливо». Один Газпром не решает автоматически."
+    },
+    "HOME-T26": {
+      "input": "T Plus/Т Плюс/Т+ и ПСК в коммунальном контексте и как посторонние краткие совпадения",
+      "expected": "Краткие записи требуют identity; чужой оператор/другой регион не приравнивается к выбранной сети."
+    },
+    "HOME-T27": {
+      "input": "Qlean/Домовёнок как обычная уборка, без указания комнаты/времени",
+      "expected": "«Бытовые услуги», без Review категории; не требовать раскрытия домашних деталей."
+    },
+    "HOME-T28": {
+      "input": "FR01–FR10: многопрофильная площадка без задания/роли/вида оплаты, затем с установленным ремонтом, уборкой, уроком, консультацией либо выплатой исполнителю",
+      "expected": "Без задания не изобретать «Ремонт»/«Бытовые услуги» и не выбирать «Прочие расходы» наугад; при известной услуге применять «Ремонт», «Бытовые услуги», «Образование» или доступную подходящую категорию."
+    },
+    "HOME-T29": {
+      "input": "Яндекс Услуги, Яндекс Аренда, Яндекс Go, Яндекс Заправки, Яндекс Маркет при одинаковом корне «Яндекс»",
+      "expected": "Не переносить категории между сервисами; общий «Яндекс» не доказывает ни домашнюю услугу, ни аренду."
+    },
+    "HOME-T30": {
+      "input": "Руки — сервис достоверно установлен, работа неизвестна; отдельно известны сантехнический ремонт или уборка",
+      "expected": "Без деталей только предварительное «Бытовые услуги» + понятная причина Review; ремонт → «Ремонт» без этого Review, уборка → «Бытовые услуги» без него."
+    },
+    "HOME-T31": {
+      "input": "Яндекс Аренда и документированная арендная плата; отдельно оплата платформе без назначения",
+      "expected": "Установленная аренда → «Аренда» без Review; лишь бренд платформы не доказывает аренду. Депозит/комиссию не записывать автоматически как аренду."
+    },
+    "HOME-T32": {
+      "input": "Циан/Домклик/Этажи: отдельно реклама объявления, банковская ипотека, страхование, агентская комиссия и аренда",
+      "expected": "Выбирать категорию только по фактам и роли платежа, не «Аренда» по бренду; ипотеку/страхование/комиссии не превращать в аренду или ремонт."
+    },
+    "HOME-T33": {
+      "input": "Перевод конкретному арендодателю-физлицу при явно пользовательски подтверждённой аренде; отдельно другой перевод тому же человеку",
+      "expected": "Подтверждённое правило пользователя и доказанное назначение → «Аренда»; совпадение адресата или HMAC не доказывает назначение каждой новой операции без охвата правила."
+    },
+    "HOME-T34": {
+      "input": "Личный verified category/подкатегория, подтверждённый компонент и новое модельное предложение",
+      "expected": "Защитить ручное/verified; не применять новую политику массово к истории и не перезаписывать связанные части."
+    },
+    "HOME-T35": {
+      "input": "Пользователь переименовал/скрыл/удалил категорию «Ремонт»; другая роль categoryId, чужой ID",
+      "expected": "Не создавать/возвращать недоступную категорию, не подменять её по строковому имени и не записывать чужой ID; предложение только на разрешённые узлы пользователя."
+    },
+    "HOME-T36": {
+      "input": "Два личных правила с одинаковым приоритетом противоречат новому профилю; отдельно одно применимое правило",
+      "expected": "Применимое личное правило приоритетнее каталога; конфликт личных правил — отдельная причина Review, не тайное решение модели."
+    },
+    "HOME-T37": {
+      "input": "Пользователь подтвердил именно категорию для спорной HOME операции; одновременно остался возможный дубль/ссылка/роль",
+      "expected": "Убирается только причина категории, независимое внимание к другим facets остаётся; пользовательское подтверждение не размножает массовые правила само собой."
+    },
+    "HOME-T38": {
+      "input": "Одна покупка на 8000 рублей разделена вручную на 5000 ремонта и 3000 товаров для дома",
+      "expected": "В аналитике учитывается ровно 8000, части в сумме равны родителю; не 16000, не скрытое массовое распространение пропорций."
+    },
+    "HOME-T39": {
+      "input": "Части больше/меньше общей суммы, чужой componentId или несовместимая роль",
+      "expected": "Сервер отклоняет изменение атомарно; существующее подтверждённое распределение сохраняется, банковская сумма не подгоняется."
+    },
+    "HOME-T40": {
+      "input": "Две настоящие одинаковые покупки Hoff по 2000; отдельно повтор того же файла/референса",
+      "expected": "Две независимые оплаты сохраняются; настоящий дубль определяется существующей provenance/dedupe, а не одним совпавшим продавцом/суммой."
+    },
+    "HOME-T41": {
+      "input": "Возврат 1200 рублей по покупке мебели, в том числе без достоверной ссылки на оригинал",
+      "expected": "Возврат не новый доход, первоначальная покупка не переписывается; при неизвестной связи не создавать вымышленную пару и не удалять независимую причину Review."
+    },
+    "HOME-T42": {
+      "input": "Перевод между собственными счетами, депозит за аренду, банковская комиссия, ипотечный платёж, предавторизация/холд",
+      "expected": "Не менять финансовое событие/роль на расход покупки только из-за домашнего бренда; соблюдать уже принятую финансовую семантику, не выдумывать часть/срок кредита."
+    },
+    "HOME-T43": {
+      "input": "В банковском исходнике персональные ФИО, телефоны, адреса, HMAC, псевдонимы; одинаковый синтетический вход и модельный результат confidence 99",
+      "expected": "Никакого восстановления защищённого текста ради распознавания; модель не видит секрет/HMAC/raw. Разрешённые незащищённые слова не удалять бесконтрольно. Confidence сам по себе не доказательство сети/платежа."
+    },
+    "HOME-T44": {
+      "input": "Старый модельный кэш; новая версия словаря; stale revision/чужой ID; один расход во всех четырёх экранах в разном часовом поясе",
+      "expected": "Повторный replay не новый модельный тест, старый кэш не под новым статусом; сервер проверяет user/access/revision/Registry. Операции/Обзор/Бюджеты/Анализатор дают одинаковые итоги, периоды учитывают настройку пользователя, исходные сумма/дата/source не меняются."
+    }
+  },
+  "cross_section_families": [
+    {
+      "id": "CAT-X01",
+      "subject": "Яндекс",
+      "sections": "R/PB/DELIVERY/FOOD/NET/DIG/MP/HOME/FIN",
+      "constraint": "Go без уточнения → Такси + Review; конкретные аренда пауэрбанка/самокат/еда/Драйв/Заправки/Сплит/банк сохраняют свой профиль. Корень Яндекс не merchant услуги."
+    },
+    {
+      "id": "CAT-X02",
+      "subject": "МТС / Сбер / Газпром / Альфа",
+      "sections": "NET/DIG/FIN/TRANSPORT",
+      "constraint": "Оператор связи, банк, страховщик/АЗС/подписка — разные предметы; бренд группы не равен получателю."
+    },
+    {
+      "id": "CAT-X03",
+      "subject": "Ozon / Wildberries",
+      "sections": "DELIVERY/MP/FIN/FASHION",
+      "constraint": "Fresh/банк/marketplace/финансовый продукт различимы; состав покупки не выдумывать, ручные parts не переносятся на новую покупку."
+    },
+    {
+      "id": "CAT-X04",
+      "subject": "Лемана ПРО / Леруа / OBI / DOM Лента",
+      "sections": "HOME/MP/GROCERY",
+      "constraint": "Исторические связи с периодом; не глобальная продуктовая Лента и не автоматическое переименование source."
+    },
+    {
+      "id": "CAT-X05",
+      "subject": "Familia / Стокманн / ЦУМ / ГУМ",
+      "sections": "FASH/MP/EDU/GFT",
+      "constraint": "Согласованный MP сохраняет условность fashion, ГУМ как место не конечный продавец; не угадывать корзину/подарок."
+    },
+    {
+      "id": "CAT-X06",
+      "subject": "Спортивные сети и одежда",
+      "sections": "FS/FASH/MP/EDU",
+      "constraint": "Demix/Forward не новые дубликаты; известный товар/детская секция выше широкого sport; форма XFit/World Class из FS не теряется."
+    },
+    {
+      "id": "CAT-X07",
+      "subject": "Профи.ру / YouDo / Яндекс Исполнители / Авито Услуги",
+      "sections": "FR/HOME/EDU/BEA/MP/DIG",
+      "constraint": "Задание заказчика, заработок исполнителя, комиссия/продвижение, баланс/возврат — разные события. Не «все биржи = ремонт»."
+    },
+    {
+      "id": "CAT-X08",
+      "subject": "DIKIDI / YCLIENTS / Fitmost",
+      "sections": "BEA/FS/DIG/EDU",
+      "constraint": "Платформа записи/CRM/агрегатор не сама услуга; установленная услуга не требует Review лишь из-за посредника."
+    },
+    {
+      "id": "CAT-X09",
+      "subject": "Госуслуги / mos.ru / УФК",
+      "sections": "EDU/FIN/HOME/TRANSPORT",
+      "constraint": "Канал не назначение: образование, коммунальные, штраф, налог, возврат различимы."
+    },
+    {
+      "id": "CAT-X10",
+      "subject": "ФКР / фонд / пожертвование",
+      "sections": "HOME/FIN/GFT",
+      "constraint": "Жилищный взнос не благотворительность; источник конкретной identity и ясное назначение независимы."
+    },
+    {
+      "id": "CAT-X11",
+      "subject": "Аптека / optika / аптека со смешанными буквами",
+      "sections": "H/BEA/ACT будущий",
+      "constraint": "Optika не аптека; косметический товар не диагноз; общий словарь деятельности не готов из одного примера."
+    },
+    {
+      "id": "CAT-X12",
+      "subject": "Магнит / Подружка / Чистая линия",
+      "sections": "GROCERY/H/BEA/FOOD",
+      "constraint": "Формат магазина/клиника/марка/обычное слово различимы; не общий стемминг по корню."
+    },
+    {
+      "id": "CAT-X13",
+      "subject": "Издательство / бренд товара / маркетплейс",
+      "sections": "ENT/EDU/PET/MP/GFT",
+      "constraint": "Марка на товаре не получатель денег; один платёж не размножается по разделам."
+    },
+    {
+      "id": "CAT-X14",
+      "subject": "Парковка / штраф / эвакуация / доставка",
+      "sections": "TRANSPORT/FIN/TRV/HOME",
+      "constraint": "Очевидная парковка без чека допустима; установленная иная услуга выше профиля, не вся АМПП сумма parking."
+    },
+    {
+      "id": "CAT-X15",
+      "subject": "Вендинг / заряд / пауэрбанк",
+      "sections": "FOOD/PB/ACT будущий",
+      "constraint": "Vending без товара не всегда продукты; зарядка устройства/аренда/покупка/автомобильная зарядка различны. Личное правило не общеглобальное."
+    },
+    {
+      "id": "CAT-X16",
+      "subject": "Возврат / компенсация / кредит / перевод",
+      "sections": "FIN и все разделы",
+      "constraint": "Категория продавца не меняет kind/role/link. Category confidence не доказывает владение, состав или экономический смысл."
+    }
+  ],
+  "pending_extraction_scope": "Исторический снимок, не текущий backlog. Все явные PEND и HOME источники имеют конечные состояния в source-dispositions.",
+  "runtime_changes": false,
+  "paid_calls": 0,
+  "product_test_status": "NOT_RUN",
+  "external_personal_context": "Ранее недоступен; дополнительный поиск не нужен для нового решения по прямому поручению 27.10.2026.",
+  "compiled_corpus": {
+    "path": "docs/architecture/merchant-catalog-complete-20261027.md",
+    "source_count": 28,
+    "bytes": 2979585,
+    "sha256": "45cf1fb6626037375a10760bfb3e76a11f639bb160818b0dabf739b2a75197af",
+    "sources": [
+      {
+        "number": 1,
+        "path": "docs/architecture/merchant-catalog-master-20261025.md",
+        "bytes": 1101790,
+        "sha256": "7b1c42ba4e0a6a5429545b4aff26615f92f84474a6e540ad1898c6b28aff2350"
+      },
+      {
+        "number": 2,
+        "path": "docs/architecture/merchant-catalog-beauty-categories-20261026.md",
+        "bytes": 62016,
+        "sha256": "740423ce969d9cf85e85986b30ea9387dc6c4fe6d4e05924d98704b358aaf095"
+      },
+      {
+        "number": 3,
+        "path": "docs/architecture/merchant-catalog-telecom-20261026.md",
+        "bytes": 25099,
+        "sha256": "1e60429aafed997223810b1a2015b2d62606cda7c598db9e2b8c5af52e263049"
+      },
+      {
+        "number": 4,
+        "path": "docs/architecture/merchant-catalog-connectivity-list-20261026.md",
+        "bytes": 71792,
+        "sha256": "97ff69c25819885832dd06fc674cc653a03511e249c7ecab77175d2a4f6efdfd"
+      },
+      {
+        "number": 5,
+        "path": "docs/architecture/merchant-catalog-connectivity-spellings-20261026.md",
+        "bytes": 24204,
+        "sha256": "8e95fdf5a60d971d04dd60b747ec9ae39769446a03453c009847ea165c01a5b6"
+      },
+      {
+        "number": 6,
+        "path": "docs/architecture/merchant-catalog-connectivity-categories-20261026.md",
+        "bytes": 27851,
+        "sha256": "a7b00b1075665786e2caea7887dbb4534b2844d534ef77251f04d0c943df3a4a"
+      },
+      {
+        "number": 7,
+        "path": "docs/architecture/merchant-catalog-connectivity-checks-20261026.md",
+        "bytes": 34801,
+        "sha256": "c426678fc45dfc24f002695147ceefb7c01e9719d4b105a0a60a1d9274de7d87"
+      },
+      {
+        "number": 8,
+        "path": "docs/architecture/merchant-catalog-digital-list-20261026.md",
+        "bytes": 33410,
+        "sha256": "4c4a151289f8e89d720c821daf16bcc867bbd4fddffbf5a017d9ee489a1def80"
+      },
+      {
+        "number": 9,
+        "path": "docs/architecture/merchant-catalog-digital-spellings-20261027.md",
+        "bytes": 46422,
+        "sha256": "8a2330cdb77db6d7be316c0f2a86d0c57c0dd89367e816535e4086459f63c45d"
+      },
+      {
+        "number": 10,
+        "path": "docs/architecture/merchant-catalog-digital-categories-20261027.md",
+        "bytes": 57910,
+        "sha256": "ff2ee90ce90e0c0810aa6954d0bc5094977b5893cc14a74c56527b328527aec8"
+      },
+      {
+        "number": 11,
+        "path": "docs/architecture/merchant-catalog-digital-checks-20261027.md",
+        "bytes": 52632,
+        "sha256": "cffa6fe003bb254fc6844827d57e24a78fcfe905cbae771d4502a885756ed55c"
+      },
+      {
+        "number": 12,
+        "path": "docs/architecture/merchant-catalog-marketplaces-20261027.md",
+        "bytes": 168188,
+        "sha256": "f4f4f9489cc73d3db4f32f91e6489df9c8451f317d11a8f350c683f96fb3e369"
+      },
+      {
+        "number": 13,
+        "path": "docs/architecture/merchant-catalog-entertainment-20261027.md",
+        "bytes": 182256,
+        "sha256": "4bef0dbfbf5e2de2987b247bd172a001cc782d2f635d0e50ba1b123a9ae4d44c"
+      },
+      {
+        "number": 14,
+        "path": "docs/architecture/merchant-catalog-education-family-20261027.md",
+        "bytes": 158386,
+        "sha256": "421abef5b68f10cdcdafb14ea3a10fb609d02994d72c15cc282b395b3ce09d99"
+      },
+      {
+        "number": 15,
+        "path": "docs/architecture/merchant-catalog-travel-20261027.md",
+        "bytes": 172402,
+        "sha256": "c6539074bd63e012e34f5bdac3adf46457050b7653b72c45697e0b68b372f562"
+      },
+      {
+        "number": 16,
+        "path": "docs/architecture/merchant-catalog-animals-20261027.md",
+        "bytes": 162421,
+        "sha256": "7e878d7bed74083b970627d23227049d25b7482107725b3df11142a2ed6735f0"
+      },
+      {
+        "number": 17,
+        "path": "docs/architecture/merchant-catalog-gifts-charity-20261027.md",
+        "bytes": 152973,
+        "sha256": "7e3655429b248bbd3d39b65fe7f9e66f3bb22645a8453c32fea8d11402bb1361"
+      },
+      {
+        "number": 18,
+        "path": "docs/architecture/merchant-catalog-financial-events-20261027.md",
+        "bytes": 121983,
+        "sha256": "4b2b089ba6f20171adf8abfc0e6dd2c45b74627f5cc03fcf2e8cb82311632501"
+      },
+      {
+        "number": 19,
+        "path": "docs/architecture/categorization-owner-review-20261024.md",
+        "bytes": 15423,
+        "sha256": "8a4200eea87b5516a7bdad5a255c1cde96f7f320ae59f06c2ae21ff5a2a3eef8"
+      },
+      {
+        "number": 20,
+        "path": "docs/architecture/purchase-category-split-20261024.md",
+        "bytes": 8924,
+        "sha256": "2585e61957aa23177cc0872bc1866611334ac083874fdcd2095fb2ec7239a012"
+      },
+      {
+        "number": 21,
+        "path": "docs/architecture/merchant-recognition-20261024.md",
+        "bytes": 14130,
+        "sha256": "984af77b99f2191afb1d53f6a0e358211bab0b1aa7ee3d2f580d4f390dea2515"
+      },
+      {
+        "number": 22,
+        "path": "docs/architecture/merchant-recognition-audit-20261024.md",
+        "bytes": 10090,
+        "sha256": "f39877cba97e11edf80ee5aede2c77f1c6e3cb3277e3c85f6d98d3d450f3c626"
+      },
+      {
+        "number": 23,
+        "path": "docs/architecture/category-counterparty-structure.md",
+        "bytes": 13218,
+        "sha256": "d07fccb04aeeb6e681d214f580ff5a833c2f2daabc09540f23ae6100b02909de"
+      },
+      {
+        "number": 24,
+        "path": "docs/architecture/merchant-catalog-logistics-20261027.md",
+        "bytes": 42985,
+        "sha256": "c86bc1360481e1ea9b3f4c1187c6f4157b27ecbaac45ade93111d96a2b098a4a"
+      },
+      {
+        "number": 25,
+        "path": "docs/architecture/merchant-catalog-household-services-20261027.md",
+        "bytes": 38846,
+        "sha256": "f5973dfa9de2ba5f8301c35931f42b007e8e709f708e0f816d584e71918e6575"
+      },
+      {
+        "number": 26,
+        "path": "docs/architecture/merchant-catalog-professional-services-20261027.md",
+        "bytes": 40979,
+        "sha256": "9f445557e4d4590c8976412b280b32f890a0b07a1256afcade1f8eb08f522ab2"
+      },
+      {
+        "number": 27,
+        "path": "docs/architecture/merchant-catalog-office-advertising-20261027.md",
+        "bytes": 46457,
+        "sha256": "907002b4dcda56a9b4e84a94584f8a464ca85889ea47c63ce7ed336ab2f95dd8"
+      },
+      {
+        "number": 28,
+        "path": "docs/architecture/merchant-catalog-release-decisions-20261027.md",
+        "bytes": 66830,
+        "sha256": "6be598246a1b94a5d89b3ba603d5c75e8892223a181630dac8719c8a2c5e3d24"
+      }
+    ],
+    "status": "DOCUMENT_ONLY_NOT_RUNTIME",
+    "product_tests": "NOT_RUN"
+  },
+  "release_parent_commit": "a76d8c762a4b5c2bbeb4f98acd020e2bf14e9d2c",
+  "previous_record_statuses": {
+    "GROCERY": "APPROVED_BASELINE",
+    "DELIVERY": "APPROVED",
+    "FOOD": "APPROVED",
+    "TRANSPORT": "APPROVED",
+    "POWERBANK": "APPROVED",
+    "HEALTH": "APPROVED",
+    "SPORT": "PARTIAL_RECORD",
+    "FREELANCE": "PARTIAL_RECORD",
+    "HOME": "PARTIAL_RECORD",
+    "FASHION": "PARTIAL_RECORD",
+    "BEAUTY": "PARTIAL_RECORD",
+    "CONNECTIVITY": "APPROVED",
+    "DIGITAL": "APPROVED",
+    "MARKETPLACES": "APPROVED",
+    "ENTERTAINMENT": "APPROVED",
+    "EDUCATION": "APPROVED",
+    "TRAVEL": "APPROVED",
+    "PETS": "APPROVED",
+    "GIFTS": "APPROVED",
+    "FINANCIAL": "APPROVED"
+  },
+  "historical_pending_profiles_scoped": [
+    {
+      "profile": "MP033",
+      "name": "Корпорация Центр",
+      "source_doc": "merchant-catalog-marketplaces-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "MP034",
+      "name": "НОРД — кандидат сети nord24",
+      "source_doc": "merchant-catalog-marketplaces-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "MP036",
+      "name": "Техносклад — кандидат tehnosklad.ru",
+      "source_doc": "merchant-catalog-marketplaces-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "MP038",
+      "name": "Фотосклад.ру",
+      "source_doc": "merchant-catalog-marketplaces-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "MP054",
+      "name": "Дочки-Сыночки",
+      "source_doc": "merchant-catalog-marketplaces-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "EDU025",
+      "name": "Умназия",
+      "source_doc": "merchant-catalog-education-family-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "EDU056",
+      "name": "Дочки-Сыночки",
+      "source_doc": "merchant-catalog-education-family-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "EDU059",
+      "name": "Кораблик",
+      "source_doc": "merchant-catalog-education-family-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "EDU061",
+      "name": "TOY.RU",
+      "source_doc": "merchant-catalog-education-family-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "GFT009",
+      "name": "Цветы.ру — кандидат",
+      "source_doc": "merchant-catalog-gifts-charity-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "GFT010",
+      "name": "Красный Куб — кандидат",
+      "source_doc": "merchant-catalog-gifts-charity-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "GFT011",
+      "name": "Экспетро — кандидат",
+      "source_doc": "merchant-catalog-gifts-charity-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "GFT014",
+      "name": "Другие подарки — кандидат",
+      "source_doc": "merchant-catalog-gifts-charity-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "GFT056",
+      "name": "Нужна помощь — кандидат истории",
+      "source_doc": "merchant-catalog-gifts-charity-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "FIN046",
+      "name": "Госавтоинспекция / ГИБДД",
+      "source_doc": "merchant-catalog-financial-events-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    },
+    {
+      "profile": "FIN051",
+      "name": "Фонд капитального ремонта Москвы",
+      "source_doc": "merchant-catalog-financial-events-20261027.md",
+      "status": "PEND",
+      "activation": "BLOCKED"
+    }
+  ],
+  "source_dispositions": {
+    "path": "docs/architecture/merchant-catalog-source-dispositions-20261027.json",
+    "records": 129,
+    "counts": {
+      "GENERIC_ACTIVITY_ONLY": 1,
+      "PROFILE_CONTEXT_ONLY": 33,
+      "PROFILE_CONFIRMED": 59,
+      "HISTORICAL_CONTEXT_ONLY": 6,
+      "EXCLUDED_FROM_ACTIVE_V1": 27,
+      "REF_PROFILE": 3
+    },
+    "decision_status": "ALL_ENUMERATED_RECORDS_RESOLVED",
+    "new_block_profiles": 81,
+    "sha256": "ed406829461c7b17411572e493f76c6a08a3250d5da8afcc1db1ab89983250c6"
+  },
+  "owner_scope_exclusions": [
+    {
+      "scope": "new_broker_and_investment_organization_catalog",
+      "status": "OUT_OF_SCOPE_BY_OWNER",
+      "date": "2026-10-27"
+    },
+    {
+      "scope": "expansion_of_existing_insurer_catalog",
+      "status": "OUT_OF_SCOPE_BY_OWNER",
+      "date": "2026-10-27"
+    }
+  ],
+  "record_resolution": {
+    "date": "2026-10-27",
+    "answer": "Нужно все закрыть не должно быть никаких пробелов, закрой.",
+    "sections": [
+      "SPORT",
+      "FREELANCE",
+      "HOME",
+      "FASHION",
+      "BEAUTY"
+    ],
+    "state": "RESOLVED_BY_OWNER_INSTRUCTION",
+    "historical_approval_not_invented": true
+  }
+}

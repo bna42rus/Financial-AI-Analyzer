@@ -1,3 +1,4 @@
+import {SelectField} from './SelectField';
 import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -11,8 +12,8 @@ function Modal({ open, onClose, title, description, children, focusSelector }: {
   const content = useRef<HTMLDivElement>(null);
   const sourceHash = useRef('');
   return <Dialog.Root open={open} onOpenChange={next => !next && onClose()}><Dialog.Portal>
-    <Dialog.Overlay className={common.overlay} />
-    <Dialog.Content ref={content} className={`${common.dialog} ${styles.modal}`} onOpenAutoFocus={event => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; sourceHash.current = window.location.hash; if (focusSelector) { event.preventDefault(); content.current?.querySelector<HTMLElement>(focusSelector)?.focus(); } }} onCloseAutoFocus={event => { if (sourceHash.current !== window.location.hash) { event.preventDefault(); return; } if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }); } }}>
+    <Dialog.Overlay data-cashneuro-dialog="overlay" className={common.overlay} />
+    <Dialog.Content data-cashneuro-dialog="content" ref={content} className={`${common.dialog} ${styles.modal}`} onOpenAutoFocus={event => { opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null; sourceHash.current = window.location.hash; if (focusSelector) { event.preventDefault(); content.current?.querySelector<HTMLElement>(focusSelector)?.focus(); } }} onCloseAutoFocus={event => { if (sourceHash.current !== window.location.hash) { event.preventDefault(); return; } if (opener.current?.isConnected) { event.preventDefault(); opener.current.focus({ preventScroll: true }); } }}>
       <div className={common.dialogHead}><Dialog.Title>{title}</Dialog.Title><Dialog.Close className={common.iconButton} aria-label={`Закрыть: ${title}`}><X size={20} aria-hidden="true" /></Dialog.Close></div>
       <Dialog.Description>{description}</Dialog.Description>
       {children}
@@ -82,7 +83,7 @@ export function ProfileDialog({ open, onClose, appearance, onAppearanceChange, d
       {section === 'access' && <><h3>Доступ</h3><dl className={styles.info}>{info('Статус', 'Оплаченный доступ не проверяется')}{info('Окончание доступа', 'Дата пока не определена')}{info('Использование AI', 'AI не подключён')}</dl><p className={styles.secondary}>Оплату подтверждает администратор. Нажатие «Я оплатил» само по себе не открывает и не продлевает доступ. Тарифы и продление появятся на этапе подключения доступа.</p></>}
       {section === 'support' && <><h3>Поддержка</h3><p className={styles.secondary}>Можно подготовить черновик обращения. Отправка, адрес поддержки и вложения ещё не подключены.</p><label className={styles.field}>Тема обращения<input value={subject} onChange={event => setSubject(event.target.value)} /></label><label className={styles.field}>Сообщение<textarea rows={4} value={message} onChange={event => setMessage(event.target.value)} /></label><p className={styles.footnote}>Черновик остаётся в памяти до закрытия окна. Операции, диалоги, выписки и диагностика автоматически не прикладываются.</p><button className={common.button} disabled={!subject && !message} onClick={() => { setSubject(''); setMessage(''); }}>Очистить черновик</button></>}
     </section>
-    <label className={styles.field}>Тема оформления<select value={appearance.theme} onChange={event => onAppearanceChange({ ...appearance, theme: event.target.value as Appearance['theme'] })}><option value="system">Как на устройстве</option><option value="light">Светлая</option><option value="dark">Тёмная</option></select></label>
+    <label className={styles.field}>Тема оформления<SelectField value={appearance.theme} onChange={event => onAppearanceChange({ ...appearance, theme: event.target.value as Appearance['theme'] })}><option value="system">Как на устройстве</option><option value="light">Светлая</option><option value="dark">Тёмная</option></SelectField></label>
     <div className={styles.actions}><button className={common.button} onClick={onOpenPrivacy}>Конфиденциальность</button>{demo && <button className={common.button} onClick={onCloseDemo}>Закрыть пример</button>}<Dialog.Close className={common.button}>Закрыть</Dialog.Close></div>
     <p className={styles.footnote}>Оформление сохраняется на этом устройстве. Вход и выход из аккаунта появятся после подключения авторизации.</p>
   </Modal>;

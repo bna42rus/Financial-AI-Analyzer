@@ -2,7 +2,7 @@ import { assertPersistableMinor, parsePersistedMinor } from '../../finance-core/
 
 /** Deterministic domain transitions. Not an authentication, database or delivery adapter. */
 export type Duration = { kind: 'calendar_months' | 'days'; count: number };
-export type Tariff = { id: string; name: string; duration: Duration; priceMinor: string; aiQuota: number; publicVisible: boolean; availableForNew: boolean; availableForRenewal?: boolean; active: boolean };
+export type Tariff = { catalogVersion?:number; id: string; name: string; duration: Duration; priceMinor: string; aiQuota: number; publicVisible: boolean; availableForNew: boolean; availableForRenewal?: boolean; active: boolean };
 export type RequestStatus = 'awaiting_email' | 'awaiting_payment' | 'under_review' | 'needs_topup' | 'paid_not_activated' | 'rejected';
 export type AccessRequest = {
   id: string; revision: number; name: string; email: string; tariff: Tariff; status: RequestStatus; kind?: 'renewal';
@@ -31,7 +31,16 @@ export function moneyFromRubles(value: string): string {
 }
 export function rublesFromMinor(value: string): string { const n = parsePersistedMinor(value); if (n < 0n) fail('Сумма не может быть отрицательной'); return `${n / 100n},${(n % 100n).toString().padStart(2, '0')}`; }
 export function moneyLabel(value: string): string { const n = parsePersistedMinor(value), a = n < 0n ? -n : n; return `${n < 0n ? '−' : ''}${new Intl.NumberFormat('ru-RU').format(a / 100n)}${a % 100n ? ',' + (a % 100n).toString().padStart(2, '0') : ''} ₽`; }
-export function durationLabel(value: Duration): string { return value.kind === 'calendar_months' ? value.count === 1 ? '1 календарный месяц' : value.count === 3 ? '3 календарных месяца' : `${value.count} календарных месяцев` : `${value.count} дней`; }
+function durationNoun(count:number,forms:Record<string,string>){return forms[new Intl.PluralRules('ru-RU').select(count)]??forms.many;}
+export function durationLabel(value:Duration):string {
+ return value.count+' '+(value.kind==='calendar_months'?durationNoun(value.count,{one:'календарный месяц',few:'календарных месяца',many:'календарных месяцев'}):durationNoun(value.count,{one:'день',few:'дня',many:'дней'}));
+}
+export function catalogDurationLabel(value:Duration):string {
+ if(value.kind==='calendar_months')return value.count+' '+durationNoun(value.count,{one:'месяц',few:'месяца',many:'месяцев'});
+ if(value.count===7)return '1 неделя';
+ if(value.count===14)return '2 недели';
+ return durationLabel(value);
+}
 export function dateLabel(value: string | null): string { return value ? new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(value)) : '—'; }
 export function requestStatus(request: AccessRequest, now: string): RequestStatus | 'expired' { return request.kind !== 'renewal' && ['awaiting_email', 'awaiting_payment'].includes(request.status) && time(now) >= time(request.expiresAt) ? 'expired' : request.status; }
 export function invitationStatus(invite: Invitation, now: string): Invitation['state'] { return invite.state === 'active' && time(now) >= time(invite.expiresAt) ? 'expired' : invite.state; }
@@ -72,7 +81,7 @@ export function reviewRequest(store: AccessStore, cmd: ReviewCommand, now: strin
   if (cmd.decision === 'confirm' && mismatch) fail('Полученная сумма отличается от тарифа. Выберите отдельное решение');
   if (cmd.decision === 'topup' && total >= expected) fail('Доплата не требуется');
   if (!['confirm', 'accept_full', 'topup', 'reject', 'custom'].includes(cmd.decision)) fail('Выберите решение');
-  if (cmd.decision !== 'confirm') text(cmd.reason, 1000);
+  if (typeof cmd.reason !== 'string' || cmd.reason.length > 1000) fail('Проверьте заметку');
   const reason = cmd.reason.trim(); if (reason.length > 1000) fail('Сократите причину до 1000 символов');
   const receivedAt = cmd.receivedAt; if (time(receivedAt) > time(now) || time(receivedAt) < time(r.createdAt)) fail('Проверьте дату получения платежа');
   const selectedDuration = cmd.decision === 'custom' ? duration({ kind: 'days', count: cmd.customDays ?? 0 }) : duration(r.tariff.duration);
@@ -93,7 +102,7 @@ export function reviewRequest(store: AccessStore, cmd: ReviewCommand, now: strin
 export function changeInvitation(store: AccessStore, cmd: { actionId: string; invitationId: string; decision: 'cancel' | 'reissue'; actorId: string; reason: string }, now: string): AccessStore {
   if (replay(store, cmd.actionId, cmd)) return store;
   id(cmd.actorId); const invite = store.invitations.find(i => i.id === cmd.invitationId) ?? fail('Приглашение не найдено');
-  const current = invitationStatus(invite, now); text(cmd.reason, 1000);
+  const current = invitationStatus(invite, now); if (typeof cmd.reason !== 'string' || cmd.reason.length > 1000) fail('Проверьте заметку');
   const latest = store.invitations.filter(i => i.purchaseId === invite.purchaseId).at(-1);
   if (latest?.id !== invite.id || current === 'superseded' || (cmd.decision === 'cancel' && current !== 'active')) fail('Откройте последнее приглашение');
   if (!['cancel', 'reissue'].includes(cmd.decision)) fail('Неизвестное действие');

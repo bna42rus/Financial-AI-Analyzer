@@ -10,9 +10,21 @@
       "path": "docs/product/context_handoff.docx",
       "role": "decision_context",
       "sha256": "50fb15bf485d7c5a570e6195833af8c167b811a2355fa7cfdc829b5cce8a7b26"
+    },
+    {
+      "path": "docs/product/approved-onboarding-20261111.md",
+      "role": "approved_amendment",
+      "sha256": "96a7605b4c86775a939c14d744b59a511e6c74ff7fd8f6bd7fcea4111224f2a0"
+    },
+    {
+      "path": "docs/product/approved-billing-periods-20261112.md",
+      "role": "approved_amendment",
+      "sha256": "43e5f6ed99921c268b22cd087e72931d9fe13a162792b9e7a333e1cffe61c273"
     }
   ],
   "precedence": [
+    "Approved billing-periods amendment 2026-11-12 overrides trial eligibility, verification amount, queued periods, manual allowances, suspension, cards and Staging outer login in its stated scope",
+    "Approved onboarding amendment 2026-11-11 overrides first-access registration, trial, renewal and allowance clauses in its stated scope",
     "Approved E-04 replaces mandatory admin SMS recovery; other access/security requirements remain active",
     "Approved amendments A-01..A-11 and B-01..B-10 override the specifically named clauses",
     "Other original PDF requirements remain active in full",

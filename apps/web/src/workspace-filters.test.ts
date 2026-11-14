@@ -1,0 +1,3 @@
+import {test,expect} from 'vitest';
+import {allHistory,financialFilter,workspaceAccountFilter} from './workspace';
+test('multi-account selections and explicit empty selections keep the same scope in summary and screen filters',()=>{for(const accountIds of [['one','two'],[]]){const f={...allHistory,bankId:'legacy-bank',accountId:'legacy-account',accountIds};expect(workspaceAccountFilter(f)).toEqual({accountIds});expect(financialFilter(f,[]).accountIds).toEqual(accountIds);}expect(workspaceAccountFilter(allHistory)).toEqual({});expect(workspaceAccountFilter({...allHistory,accountId:'one'})).toEqual({accountIds:['one']});});

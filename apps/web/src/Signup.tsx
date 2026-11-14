@@ -1,0 +1,19 @@
+import {useEffect,useState} from 'react';
+import {api} from './server-client';
+import {useNewPasswordFields} from './NewPasswordFields';
+import {OperationField} from './OperationDialog';
+import {legalDocuments} from '../../../packages/access/src/legal';
+import styles from './ServerAccess.module.css';
+export function Signup({onRegistered}:{onRegistered:()=>Promise<void>}){
+ const pw=useNewPasswordFields({label:'Пароль',showHint:false}),[pending,setPending]=useState<{id:string;email:string;password:string}|null>(null),[resendAt,setResendAt]=useState(0),[seconds,setSeconds]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState('');
+ useEffect(()=>{const tick=()=>setSeconds(Math.max(0,Math.ceil((resendAt-Date.now())/1000)));tick();const timer=setInterval(tick,1000);return()=>clearInterval(timer);},[resendAt]);
+ async function resend(){if(!pending||busy||seconds)return;setBusy(true);setError('');try{const r=await api<{retryAfterSeconds:number}>('/access/signup-resend',{id:pending.id});setResendAt(Date.now()+r.retryAfterSeconds*1000);}catch(e){const wait=(e as {retryAfterSeconds?:number}).retryAfterSeconds;if(wait)setResendAt(Date.now()+wait*1000);setError(e instanceof Error?e.message:'Не удалось отправить код.');}finally{setBusy(false);}}
+ async function submit(e:React.FormEvent<HTMLFormElement>){e.preventDefault();if(busy)return;const data=new FormData(e.currentTarget);setError('');setBusy(true);
+ try{if(pending){await api('/access/signup-complete',{id:pending.id,code:String(data.get('code'))});await api('/auth/sign-in/email',{email:pending.email,password:pending.password});setPending(null);await onRegistered();}
+ else{const password=pw.read(data);if(!password)return;const email=String(data.get('email')).trim();const r=await api<{id:string;retryAfterSeconds:number}>('/access/signup-start',{email,name:String(data.get('name')).trim(),password,confirmPassword:String(data.get('passwordConfirmation')),termsVersion:legalDocuments.terms.version,consentVersion:legalDocuments.consent.version});setPending({id:r.id,email,password});setResendAt(Date.now()+r.retryAfterSeconds*1000);}}
+ catch(e){setError(e instanceof Error?e.message:'Не удалось создать аккаунт.');}finally{setBusy(false);}}
+ return <section className={styles.card+' '+styles.entryCard}><h1>{pending?'Подтвердите почту':'Создайте аккаунт'}</h1><form onSubmit={e=>void submit(e)}>{pending?<><p>Введите шестизначный код из письма на {pending.email}. Код действует 15 минут.</p><OperationField label="Код из письма"><input key={pending.id} name="code" type="text" inputMode="numeric" autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} required/></OperationField></>:<>
+ <OperationField label="Почта"><input name="email" type="email" autoComplete="email" maxLength={254} required/></OperationField>{pw.fields}<OperationField label="Имя в профиле"><input name="name" autoComplete="name" maxLength={100} required/></OperationField>
+ <div className={styles.legalChoice}><input type="checkbox" id="signup-consent" required/><label htmlFor="signup-consent">Принимаю <a href="/terms" target="_blank" rel="noreferrer">условия использования</a> и даю <a href="/data-consent" target="_blank" rel="noreferrer">согласие на обработку данных</a>.</label></div><p><a href="/privacy" target="_blank" rel="noreferrer">Политика обработки персональных данных</a></p></>}
+ {error&&<p role="alert" className={styles.error}>{error}</p>}{pending&&seconds>0&&<p className={styles.muted}>Повторный запрос через {seconds} с</p>}<div className={styles.actions}><button className={styles.primary} disabled={busy}>{pending?'Зарегистрироваться':'Продолжить'}</button>{pending&&<button type="button" className={styles.secondary} disabled={busy||seconds>0} onClick={()=>void resend()}>Запросить снова</button>}</div></form></section>;
+}

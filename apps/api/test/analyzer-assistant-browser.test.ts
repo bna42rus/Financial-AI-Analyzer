@@ -8,6 +8,7 @@ import { chromium, expect as playwrightExpect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 import type { PoolClient } from 'pg';
 import { postgresFixture } from './postgres.ts';
+import {chooseOption} from '../../web/e2e/choice-picker.ts';
 import { syntheticOperations } from './operations-fixture.ts';
 import { createServer } from '../src/server.ts';
 import { createTestAssistantProvider } from '../src/analyzer-assistant-provider.ts';
@@ -18,18 +19,23 @@ import type { Config } from '../src/types.ts';
 import { syntheticCsv, syntheticXlsx } from '../../../packages/imports/test/tabular-fixtures.ts';
 import { syntheticPdf } from '../../../packages/imports/test/synthetic-pdf.ts';
 import { syntheticLayout } from '../../../packages/imports/test/synthetic-layout.ts';
+import {runClassificationStage} from '../src/classification-store.ts';
+import type {AssistantProvider} from '../src/analyzer-assistant-provider.ts';
+import {initialSemantics} from '../../../packages/finance-core/src/model.ts';
 import { runImportStage } from '../src/import-ingestion.ts';
 
 const expect = playwrightExpect.configure({ timeout: 20000 });
 const web = 'http://127.0.0.1:5185', api = 'http://127.0.0.1:3035', password = 'Synthetic task browser password 123!';
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, child: ChildProcess;
 let calls = 0, blockNext = false;
+let categoryProvider:AssistantProvider;
 function deferred() { let resolve!: () => void; const promise = new Promise<void>(r => { resolve = r; }); return { promise, resolve }; }
 let barrier = deferred(), reached = deferred();
 const fetcher = (async (_url, options) => {
   const request = JSON.parse(String(options?.body)), input = JSON.parse(request.messages[1].content);
   calls++;
   if (blockNext) { blockNext = false; reached.resolve(); await barrier.promise; }
+  if(input.operations){const cat=input.catalog.find((c:any)=>c.name==='Продукты'&&c.parent===null).ref;return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:500,completion_tokens:50,total_tokens:550},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify({decisions:input.operations.map((o:any)=>({ref:o.ref,category:cat,subcategory:null,confidence:96}))})}}]}));}
   const plan = input.candidate ?? { version: assistantVersion, topic: 'personal_finance', action: 'read',
     context: { mode: input.question.includes('сентябрь 2026') ? 'new' : 'continue' },
     changes: input.question.includes('сентябрь 2026') ? [{ field: 'metric', op: 'set', value: 'expenses' }, { field: 'period', op: 'set', value: 'сентябрь 2026' }] : [] };
@@ -41,6 +47,7 @@ before(async () => {
   pg = await postgresFixture();
   const config: Config = { profile: 'finance', pool: pg.finance, baseURL: api, origin: web, authSecret: token(), wrappingKey: randomBytes(32), environment: 'test',
     assistantProvider: createTestAssistantProvider(pg.finance, fetcher, { projectId: 'test/task-browser', projectPeriodStart: '2020-01-01T00:00:00Z', projectPeriodEnd: '2100-01-01T00:00:00Z', projectLimitRub: '45' }) };
+  config.classificationEnabled=true;categoryProvider=config.assistantProvider!;
   server = await createServer(config); await server.app.listen(3035, '127.0.0.1');
   const cwd = new URL('../../../', import.meta.url), env = { ...process.env, VITE_API_ORIGIN: api };
   if(process.env.ASSISTANT_UI_ASSET_MODE==='built') {
@@ -57,7 +64,7 @@ async function within<T>(fn: (db: PoolClient) => Promise<T>) {
   catch (error) { await db.query('ROLLBACK'); throw error; } finally { db.release(); }
 }
 async function screen(page: Page, name: string) {
-  const opener = page.getByRole('button', { name: 'Открыть экраны приложения' }), link = page.getByRole('link', { name, exact: true });
+  const opener = page.getByRole('button', { name: 'Вернуться к финансам' }), link = page.getByRole('link', { name, exact: true });
   await expect(opener.or(link).first()).toBeVisible();
   if (await opener.isVisible()) await opener.click();
   await link.click();
@@ -68,7 +75,7 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
   await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('task-browser','Synthetic task browser','task-browser@example.test',true,now(),now())");
   await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('task-browser',true)");
   await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('task-browser-account','task-browser','task-browser','credential',$1,now(),now())", [await hashPassword(password)]);
-  await within(async db => { const state = await financeView(db, 'task-browser'), account = randomUUID(); await acceptAccount(db, 'task-browser', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic task UI account', type: 'bank_account' }); await syntheticOperations(db, 'task-browser', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id); });
+  await within(async db => { const state = await financeView(db, 'task-browser'), account = randomUUID(); await acceptAccount(db, 'task-browser', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic task UI account', type: 'bank_account' }); const ids=await syntheticOperations(db, 'task-browser', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id,'Пятёрочка');await db.query('UPDATE finance.transaction SET semantics=$3 WHERE user_id=$1 AND id=$2',['task-browser',ids[0],JSON.stringify(initialSemantics('purchase','Пятёрочка'))]); });
   await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('task-browser',clock_timestamp()-interval '1 day','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":20}')");
   const browser = await chromium.launch({ ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH } : {}), args: ['--disable-dev-shm-usage'] });
   const context = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1440, height: 1000 }, locale: 'ru-RU', timezoneId: 'Pacific/Honolulu' }), page = await context.newPage();
@@ -76,13 +83,21 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
   const messages = () => pg.owner.query("SELECT id,answer FROM finance.analyzer_message WHERE user_id='task-browser' ORDER BY created_at,id").then(r => r.rows);
   async function send(text: string) { const field = page.getByLabel('Ваш финансовый вопрос', { exact: true }); await field.fill(text); await page.getByRole('button', { name: 'Отправить вопрос', exact: true }).click(); }
   async function count(n: number) { await expect.poll(async () => (await messages()).length).toBe(n); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeDisabled(); }
-  async function idle() { await expect(page.getByRole('button', { name: 'Фильтры', exact: true })).toBeEnabled(); }
+  async function idle() { await expect(page.getByRole('group', { name: 'Общие фильтры' }).getByLabel('С даты', { exact: true })).toBeEnabled(); }
   try {
-    await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Продолжить', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
-    await expect(page.getByText('Часовой пояс анализа: Pacific/Honolulu', { exact: true })).toBeVisible();
+    await page.goto(web + '/#login'); await page.getByLabel('Почта', { exact: true }).fill('task-browser@example.test'); await page.getByLabel('Пароль', { exact: true }).fill(password); await page.getByRole('button', { name: 'Войти', exact: true }).click(); await screen(page, 'Анализатор'); await idle();
     assert.equal((await pg.owner.query("SELECT timezone FROM finance.assistant_profile WHERE user_id='task-browser'")).rows[0].timezone, 'Pacific/Honolulu');
-    await page.getByRole('button', { name: 'Фильтры', exact: true }).click(); const filters = page.getByRole('dialog', { name: 'Фильтры Анализатора' });
-    await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await filters.getByRole('button', { name: 'Готово', exact: true }).click(); await idle();
+    await screen(page,'Операции');
+    await page.getByRole('button',{name:'Категории с помощью ИИ',exact:true}).click();const categoryPanel=page.getByRole('region',{name:'Распределение категорий'});
+    const classificationStarted=page.waitForResponse(response=>new URL(response.url()).pathname==='/finance/classification'&&response.request().postDataJSON()?.start===true&&response.status()===200);
+    await categoryPanel.getByRole('button',{name:'Распределить категории',exact:true}).click();
+    await expect(categoryPanel.getByText('Определяем категории…')).toBeVisible();await classificationStarted;
+    assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
+    assert.equal(await runClassificationStage(pg.finance,categoryProvider),true);
+    await expect(categoryPanel.getByRole('region',{name:'Последняя обработка категорий'})).toBeVisible();await expect(categoryPanel.locator('dl>div').filter({has:page.getByText('Всего с категорией',{exact:true})}).locator('dd')).toHaveText('1');await page.keyboard.press('Escape');
+    assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.analyzer_usage')).rows[0].n,0);calls=0;await screen(page,'Анализатор');await idle();
+    const filters = page.getByRole('group', { name: 'Общие фильтры' });
+    await filters.getByLabel('С даты', { exact: true }).fill('2026-10-01'); await filters.getByLabel('По дату', { exact: true }).fill('2026-10-31'); await idle();
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();
     assert.equal((await messages())[0]!.answer.result.totals.expenses, '24690');
     await expect(page.getByRole('log', { name: 'Сообщения диалога' })).toContainText('246,90 ₽'); assert.equal(calls, 2);
@@ -139,9 +154,12 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
       {name:'Private.xlsx',mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',buffer:Buffer.from(syntheticXlsx())},
       {name:'Private.pdf',mimeType:'application/pdf',buffer:Buffer.from(syntheticPdf(syntheticLayout('tbank')))}
     ]);
-    await expect(page.getByText('Загрузка принята сервером. Результат сохранён в истории загрузок.')).toBeVisible({timeout:30000});
+    assert.equal(prepared.length,0);await page.getByRole('button',{name:'Загрузить',exact:true}).click();await expect(page.getByRole('button',{name:'Открыть загрузку',exact:true})).toBeVisible({timeout:30000});
     assert.equal(prepared.length,1);
-    for(const secret of ['Private','%PDF','00000000000000000001','filename'])assert.equal(prepared[0]!.includes(secret),false);
+    // The approved profile retains ordinary names in bank descriptions, while
+    // filenames, raw files and actual identifiers remain forbidden.
+    assert.equal(prepared[0]!.includes('Private Person'),true);
+    for(const secret of ['Private.csv','Private.xlsx','Private.pdf','Private-Identifier','%PDF','00000000000000000001','filename'])assert.equal(prepared[0]!.includes(secret),false);
     assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_batch WHERE user_id='task-browser'")).rows[0].n,'1');
     for(let i=0;i<15;i++) {
       if(!(await pg.owner.query("SELECT 1 FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rowCount)break;
@@ -149,8 +167,26 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     }
     assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.ingestion_dispatch WHERE user_id='task-browser'")).rows[0].n,'0');
     assert.ok(Number((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE user_id='task-browser'")).rows[0].n)>2);
-    await page.getByRole('button',{name:'Закрыть',exact:true}).click();
+    await expect(page.getByRole('dialog',{name:'Загрузка выписок',exact:true})).toHaveCount(0);
+    await page.getByRole('button',{name:'Смотреть результат',exact:true}).click();await expect(page.getByRole('region',{name:'История загрузок',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Результат загрузки'}).getByRole('status')).not.toHaveText('Принята сервером');
     assert.deepEqual(errors,[]);
 
   } finally { barrier.resolve(); await context.close(); await browser.close(); }
+});
+
+for(const mobile of [false,true])test(`purchase split UI keeps one Ozon row, shows the remainder, saves categories and survives reload (${mobile?'mobile':'desktop'})`,{timeout:90000},async()=>{
+ await pg.owner.query('TRUNCATE identity.auth_user,identity.rate_limit,finance.workspace,commerce.access_cycle,commerce.ai_project_budget CASCADE');
+ await pg.owner.query("INSERT INTO identity.auth_user(id,name,email,email_verified,created_at,updated_at) VALUES('task-browser','Synthetic purchase UI','task-browser@example.test',true,now(),now())");await pg.owner.query("INSERT INTO identity.security_state(user_id,indefinite) VALUES('task-browser',true)");await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('task-browser-account','task-browser','task-browser','credential',$1,now(),now())",[await hashPassword(password)]);
+ let id='',food='',clothes='';await within(async db=>{const state=await financeView(db,'task-browser'),account=randomUUID();await acceptAccount(db,'task-browser',importEpoch(state),{id:account,bankId:'tbank',systemName:'Synthetic split account',type:'bank_account'});const market=state.categories.find(c=>c.name==='Маркетплейсы')!.id;food=state.categories.find(c=>c.name==='Продукты'&&!c.parentId)!.id;clothes=state.categories.find(c=>c.name==='Одежда и аксессуары'&&!c.parentId)!.id;id=(await syntheticOperations(db,'task-browser',1,account,market,'Ozon'))[0]!;});
+ const browser=await chromium.launch({...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH?{executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH}:{}),args:['--disable-dev-shm-usage']}),context=await browser.newContext({viewport:mobile?{width:390,height:844}:{width:1440,height:1000},locale:'ru-RU'}),page=await context.newPage();page.setDefaultTimeout(20000);
+ try{
+  await page.clock.setFixedTime(new Date('2026-09-20T12:00:00Z'));await page.goto(web+'/#login');await page.getByLabel('Почта',{exact:true}).fill('task-browser@example.test');await page.getByLabel('Пароль',{exact:true}).fill(password);await page.getByRole('button',{name:'Войти',exact:true}).click();await screen(page,'Операции');
+  const list=page.getByRole('list',{name:'Сохранённые операции'});await list.getByRole('button').filter({hasText:'Ozon'}).click();await page.getByRole('button',{name:'Разделить покупку по категориям',exact:true}).click();
+  await expect(page.getByLabel('Тип части 1',{exact:true})).toHaveCount(0);await page.getByLabel('Сумма части 1, ₽',{exact:true}).fill('60');await chooseOption(page.getByLabel('Категория части 1',{exact:true}),food);await page.getByRole('button',{name:'Добавить часть',exact:true}).click();await chooseOption(page.getByLabel('Категория части 2',{exact:true}),clothes);await page.getByRole('button',{name:'Заполнить остатком часть 2',exact:true}).click();
+  await expect(page.getByLabel('Остаток распределения',{exact:true})).toContainText('Осталось: 0');await expect(page.getByLabel('Сумма части 2, ₽',{exact:true})).not.toHaveValue('');
+  await page.getByRole('button',{name:'Применить',exact:true}).click();await page.getByRole('button',{name:'Сохранить',exact:true}).click();await expect(page.getByRole('region',{name:'Последствия изменения'})).toBeVisible();assert.equal((await pg.owner.query('SELECT decomposition FROM finance.transaction WHERE id=$1',[id])).rows[0].decomposition,false);
+  await page.getByRole('button',{name:'Сохранить изменения',exact:true}).click();await expect(page.getByRole('button',{name:'Разделить покупку по категориям',exact:true})).toBeVisible();await expect(page.getByRole('region',{name:'Учёт частей операции'})).toContainText('Продукты');await expect(page.getByRole('region',{name:'Учёт частей операции'})).toContainText('Одежда и аксессуары');
+  await page.getByRole('button',{name:'Закрыть операцию',exact:true}).click();await page.reload();await screen(page,'Операции');await list.getByRole('button').filter({hasText:'Ozon'}).click();await expect(page.getByRole('button',{name:'Разделить покупку по категориям',exact:true})).toBeVisible();
+  const state=await within(db=>financeView(db,'task-browser'));assert.equal(state.operations.length,1);assert.equal(state.operations[0]!.classification.merchant.value,'Ozon');assert.equal(state.operations[0]!.parts.length,2);assert.equal(state.summary.netExpensesMinor,state.operations[0]!.amountMinor.slice(1));assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+ }finally{await context.close();await browser.close();}
 });

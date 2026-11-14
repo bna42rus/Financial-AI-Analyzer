@@ -1,3 +1,4 @@
+import {chooseOption} from '../../web/e2e/choice-picker';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 async function openExample(page:Page,section='requests') { await page.goto('/#'+section);await page.getByRole('button',{name:'Открыть пример',exact:true}).click(); }
@@ -8,9 +9,9 @@ test('admin data is empty until opt-in, queue filters and browser navigation pre
   await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(0);
   await page.getByRole('button',{name:'Открыть пример',exact:true}).click();await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(5);
   await page.getByRole('textbox',{name:'Поиск заявки'}).fill('банк б');await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(1);
-  await page.getByRole('textbox',{name:'Поиск заявки'}).fill('');await page.getByRole('combobox',{name:'Статус',exact:true}).selectOption('under_review');await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(2);
+  await page.getByRole('textbox',{name:'Поиск заявки'}).fill('');await chooseOption(page.getByRole('combobox',{name:'Статус',exact:true}),'under_review');await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(2);
   await page.getByRole('link',{name:'Продления',exact:true}).click();await expect(page.getByRole('heading',{name:'Продления подключим следующим блоком'})).toBeVisible();
-  await page.goBack();await expect(page.getByRole('combobox',{name:'Статус',exact:true})).toHaveValue('under_review');
+  await page.goBack();await expect(page.getByRole('combobox',{name:'Статус',exact:true})).toHaveAttribute('value','under_review');
   await page.getByRole('button',{name:'Закрыть пример',exact:true}).click();await expect(page.getByRole('button',{name:'Открыть пример',exact:true})).toBeVisible();
   await page.reload();await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(0);
 });
