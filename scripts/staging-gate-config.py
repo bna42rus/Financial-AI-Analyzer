@@ -51,7 +51,9 @@ def install(release, write, run, replace):
 Description=CashNeuro Staging outer login
 After=network.target
 [Service]
+Type=exec
 DynamicUser=yes
+SupplementaryGroups=cashneuro-staging-code
 LoadCredential=gate-key:/etc/cashneuro/staging/gate.key
 ExecStart=/usr/bin/node ''' + str(release / 'scripts/staging-gate.mjs') + '''
 Restart=on-failure
@@ -66,3 +68,17 @@ WantedBy=multi-user.target
     run(['systemctl','daemon-reload'])
     run(['systemctl','enable','cashneuro-staging-gate.service'])
     run(['systemctl','restart','cashneuro-staging-gate.service'])
+
+    # Do not activate a frontend that depends on an unavailable outer login.
+    import time
+    import urllib.request
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    for attempt in range(10):
+        try:
+            with opener.open('http://127.0.0.1:18182/__staging/health', timeout=2) as response:
+                if response.status == 200 and response.read(32) == b'ok':
+                    return
+        except OSError:
+            pass
+        time.sleep(0.5)
+    raise RuntimeError('STAGING_GATE_NOT_HEALTHY')
