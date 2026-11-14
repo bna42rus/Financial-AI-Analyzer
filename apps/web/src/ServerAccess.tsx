@@ -1,3 +1,4 @@
+import {usePaymentResult} from './PaymentResult';
 import {Signup} from './Signup';
 import {TrialStart} from './TrialOnboarding';
 import {SignOutConfirmation} from './SignOutConfirmation';
@@ -63,6 +64,7 @@ export function ServerAccess(){
   }
   setSession(next);setSessionError('');
  }catch(e){if(hasCode(e,'AUTH_REQUIRED')){setSession(null);setSessionError('');}else{setSessionError('Не удалось проверить доступ. Проверьте соединение и повторите.');throw e;}}finally{setLoaded(true);}},[]);
+ const paymentResult=usePaymentResult(!!session,refresh,session?.timezone??'Europe/Moscow');
  const reloadApplication=useCallback(async(signal?:AbortSignal)=>{
   try{
    const next=(await api<{request:AccessRequest}>('/access/request',undefined,signal)).request;
@@ -108,9 +110,10 @@ export function ServerAccess(){
  const [exitOpen,setExitOpen]=useState(false);
  function signOut(){void run(async()=>{await api('/auth/sign-out',{});setAccountOpen(false);setRenewalOpen(false);setSession(null);setDismissed(null);setRouteHash('login');});}
  const showFinance=loaded&&session?.scope==='active'&&!session.blocked;
- const closeRenewal=()=>{setRenewalOpen(false);if(renewalTariff)setRouteHash(session?.scope==='active'?'overview':'account',true);else if(getRoute()==='account'&&location.hash.includes('payment='))setRouteHash('account',true);void refresh().catch(()=>{});};
- const renewal=(renewalOpen||!!renewalTariff)&&session&&!session.blocked&&<OperationDialog compact footer={null} title="Продление доступа" onClose={closeRenewal}><ServerRenewal embedded onRefresh={refresh} initialTariffId={renewalTariff}/></OperationDialog>;
- if(showFinance&&session)return <><LegalUpdate signedIn/>{session.accessWarning&&dismissed!==session.accessWarning&&<div className={styles.warningBar}><span role="status">{session.accessWarning}</span><button className={styles.secondary} onClick={()=>setRenewalOpen(true)}>Продлить доступ</button><button className={styles.dismissWarning} aria-label="Скрыть уведомление" onClick={()=>setDismissed(session.accessWarning??null)}><X size={17}/></button></div>}<ServerFinance session={session} onAccount={()=>{setError('');setAccountOpen(true);}} onAccessLost={()=>{setAccountOpen(false);setSession(s=>s?{...s,scope:'restricted'}:null);setRouteHash('account');void refresh().catch(()=>{});}}/>{accountOpen&&<ServerAccount asDialog session={session} accountError={error} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}</>;
+ const dismissRenewal=()=>{setRenewalOpen(false);if(renewalTariff)setRouteHash(session?.scope==='active'?'overview':'account',true);else if(getRoute()==='account'&&location.hash.includes('payment='))setRouteHash('account',true);};
+ const closeRenewal=()=>{dismissRenewal();void refresh().catch(()=>{});};
+ const renewal=(renewalOpen||!!renewalTariff)&&session&&!session.blocked&&<OperationDialog compact footer={null} title="Продление доступа" onClose={closeRenewal}><ServerRenewal embedded onRefresh={refresh} onPaid={dismissRenewal} initialTariffId={renewalTariff}/></OperationDialog>;
+ if(showFinance&&session)return <><LegalUpdate signedIn/>{session.accessWarning&&dismissed!==session.accessWarning&&<div className={styles.warningBar}><span role="status">{session.accessWarning}</span><button className={styles.secondary} onClick={()=>setRenewalOpen(true)}>Продлить доступ</button><button className={styles.dismissWarning} aria-label="Скрыть уведомление" onClick={()=>setDismissed(session.accessWarning??null)}><X size={17}/></button></div>}<ServerFinance session={session} onAccount={()=>{setError('');setAccountOpen(true);}} onAccessLost={()=>{setAccountOpen(false);setSession(s=>s?{...s,scope:'restricted'}:null);setRouteHash('account');void refresh().catch(()=>{});}}/>{accountOpen&&<ServerAccount asDialog session={session} accountError={error} busy={busy} refresh={refresh} signOut={signOut} back={()=>setAccountOpen(false)}/>} {renewal}{paymentResult}</>;
  const restartApplication=()=>{setRow(null);setSubmittedEmail('');setLinkInvalid(false);setRouteHash('access',true);};
 
  const notices=<>{trialFailure&&<p role="alert" className={styles.error}>Не удалось оформить пробный период. Повторите попытку или попробуйте позже.</p>}{error&&<p role="alert" className={styles.error}>{error}</p>}{message&&<p role="status" className={styles.success}>{message}</p>}</>;
@@ -155,5 +158,5 @@ export function ServerAccess(){
  <main className={styles.landing}><div><p className={styles.eyebrow}>Финансовый анализатор</p><h1>Поймите, куда уходят деньги</h1><p>Попробуйте 7 дней бесплатно. Операции из разных банков — в одном месте. Спросите Анализатор с ИИ, почему этот месяц обошёлся дороже прошлого, и увидите, какие покупки и платежи изменили итог.</p><div className={styles.actions}><a className={styles.primary} href="#access">Начать пользоваться <ArrowRight size={17}/></a><a className={styles.secondary} href="/price">Посмотреть тарифы</a></div></div>
  <LandingDemoPreview/>
  </main>}</div>
- <LegalFooter/>{exitOpen&&<SignOutConfirmation busy={busy} onClose={()=>setExitOpen(false)} onConfirm={()=>{setExitOpen(false);signOut();}}/>}</div>;
+ <LegalFooter/>{paymentResult}{exitOpen&&<SignOutConfirmation busy={busy} onClose={()=>setExitOpen(false)} onConfirm={()=>{setExitOpen(false);signOut();}}/>}</div>;
 }

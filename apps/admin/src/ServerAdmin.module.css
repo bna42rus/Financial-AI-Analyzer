@@ -85,3 +85,9 @@
  .paymentFilters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
  .paymentFilters>:first-child{grid-column:1/-1}
 }
+
+/* Keep the native date picker while matching adjacent controls on iOS too. */
+:global(body:has([data-admin-shell])) input.accessDate{appearance:none;-webkit-appearance:none;display:block;width:100%;min-width:0;max-width:100%;min-inline-size:0;box-sizing:border-box;font:inherit;line-height:1.4;text-align:start}
+.accessDate::-webkit-date-and-time-value{min-height:1.4em;text-align:left}
+.accessDate::-webkit-datetime-edit{padding:0}
+@media(max-width:760px){:global(body:has([data-admin-shell])) input.accessDate{font-size:16px}}

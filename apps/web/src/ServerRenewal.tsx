@@ -7,12 +7,12 @@ import {moneyLabel} from '../../../packages/access/src/model';
 import type {OwnRenewal} from '../../../packages/access/src/renewal';
 import styles from './ServerAccess.module.css';
 
-export function ServerRenewal({onRefresh,embedded=false,initialTariffId=''}:{onRefresh:()=>Promise<void>;embedded?:boolean;initialTariffId?:string}){
+export function ServerRenewal({onRefresh,onPaid,embedded=false,initialTariffId=''}:{onRefresh:()=>Promise<void>;onPaid?:()=>void;embedded?:boolean;initialTariffId?:string}){
  const {state,loaded,error,reload}=useAccessBilling();
  if(!loaded)return <p role="status">Проверяем продление…</p>;
  if(error&&!state)return <div className={styles.renewalBody}><p role="alert" className={styles.error}>Не удалось проверить продление.</p><button className={styles.secondary} onClick={()=>void reload().catch(()=>{})}>Повторить</button></div>;
  return state?.enabled||state?.order&&['created','pending','reconcile'].includes(state.order.state)
-  ?<OnlineRenewal state={state} refresh={reload} onRefresh={onRefresh} initialTariffId={initialTariffId}/>
+  ?<OnlineRenewal state={state} refresh={reload} onRefresh={onRefresh} onPaid={onPaid} initialTariffId={initialTariffId}/>
   :<RenewalPreview embedded={embedded} initialTariffId={initialTariffId}/>;
 }
 

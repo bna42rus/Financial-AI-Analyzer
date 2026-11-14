@@ -43,7 +43,7 @@ export function ServerAccount({session,refresh,signOut,back,busy,accountError,as
   {asDialog&&back?<OperationDialog title="Аккаунт" onClose={back} footer={<>{exit}<button className={common.button} onClick={back}>Готово</button></>}>{content}</OperationDialog>:<section className={styles.accountPage}><h1>Аккаунт</h1><div className={styles.accountPageBody}>{content}</div><div className={styles.accountPageFooter}>{back&&<button className={common.primaryButton} onClick={back}><ArrowLeft size={16}/>К финансам</button>}{exit}</div></section>}
   {profile&&<AccountProfileEditor field={profile} session={session} onClose={()=>setProfile(null)} onSaved={refresh}/>}
   {exitOpen&&<SignOutConfirmation busy={busy} onClose={()=>setExitOpen(false)} onConfirm={()=>{setExitOpen(false);signOut();}}/>}
-  {panel==='renew'&&<OperationDialog compact footer={null} title="Продление доступа" onClose={()=>{open(null);void refresh();}}><ServerRenewal embedded onRefresh={refresh}/></OperationDialog>}
+  {panel==='renew'&&<OperationDialog compact footer={null} title="Продление доступа" onClose={()=>{open(null);void refresh();}}><ServerRenewal embedded onRefresh={refresh} onPaid={()=>open(null)}/></OperationDialog>}
   {panel==='sessions'&&<OperationDialog compact title="Активные сеансы" onClose={()=>{if(!pending)open(null);}} footer={<button className={common.button} disabled={pending} onClick={()=>open(null)}>Закрыть</button>}>
    {error&&!target&&<div role="alert"><p className={styles.error}>{error}</p><button className={common.button} onClick={()=>setReload(v=>v+1)}>Повторить</button></div>}
    {!sessions&&!error&&<p role="status">Загружаем сеансы…</p>}
