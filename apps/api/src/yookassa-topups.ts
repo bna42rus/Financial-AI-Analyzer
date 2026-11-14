@@ -1,3 +1,5 @@
+import {createAccessPaymentProvider,verifiedPayment} from './access-payment-provider.ts';
+import {createHash} from 'node:crypto';
 import {saveCard,savedCard,paymentCards,cardLock} from './payment-cards.ts';
 import type {PoolClient} from 'pg';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
@@ -5,18 +7,12 @@ import {HttpError,outbox} from './types.ts';
 import type {Sealer} from './types.ts';
 
 import type {AccessPayment as Payment,AccessPaymentProvider} from './access-payment-provider.ts';
-export type TestPayments={readRefund?:AccessPaymentProvider['readRefund'];read(id:string):Promise<Payment>;create(input:{id:string;value:string;units:number;method?:string;save?:boolean}):Promise<Payment>};
+export type TestPayments={readRefund?:AccessPaymentProvider['readRefund'];cancel?:AccessPaymentProvider['cancel'];capture?:AccessPaymentProvider['capture'];createRefund?:AccessPaymentProvider['createRefund'];read(id:string):Promise<Payment>;create(input:{id:string;value:string;units:number;method?:string;save?:boolean}):Promise<Payment>};
 export function testYooKassa(shopId:string,key:string,origin:string,call=fetch):TestPayments{
- if(!/^\d{3,16}$/.test(shopId)||!/^test_[A-Za-z0-9_-]{12,200}$/.test(key)||new URL(origin).origin!==origin||!origin.startsWith('https://'))throw new Error('YOOKASSA_TEST_CONFIGURATION_REQUIRED');
- const auth='Basic '+Buffer.from(shopId+':'+key).toString('base64');
- async function send(path:string,body?:object,id?:string){
-  let response:Response;try{response=await call('https://api.yookassa.ru/v3/payments'+path,{method:body?'POST':'GET',headers:{Authorization:auth,...(body?{'Content-Type':'application/json','Idempotence-Key':id!}:{})},...(body?{body:JSON.stringify(body)}:{}),redirect:'error',signal:AbortSignal.timeout(7000)});}catch{throw new HttpError(503,'PAYMENT_UNAVAILABLE');}
-  if(!response.ok)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
-  try{const payment=await response.json() as Payment;if(payment.test!==true||uuid(payment.id)!==payment.id)throw Error();return payment;}catch{throw new HttpError(502,'PAYMENT_UNVERIFIED');}
- }
- return {read:id=>send('/'+uuid(id)),create:({id,value,units,method,save})=>send('',{amount:{value,currency:'RUB'},capture:true,confirmation:{type:'redirect',return_url:origin+'/#payment-return'},...(method?{payment_method_id:method}:{payment_method_data:{type:'bank_card'},save_payment_method:save!==false}),description:'CashNeuro: '+units+' единиц Анализатора',metadata:{orderId:id}},id)};
+ const provider=createAccessPaymentProvider({shopId,secret:key,origin,test:true},call);
+ return {read:provider.read,cancel:provider.cancel,capture:provider.capture,createRefund:provider.createRefund,readRefund:provider.readRefund,create:({id,value,units,method,save})=>provider.create({id,value,title:units+' единиц Анализатора',authorize:true,cardOnly:!method,...(method?{method}:{save:save!==false})})};
 }
-type Order={card_id?:string|null;id:string;units:number;price_minor:number;status:string;provider_id:string|null;redirect_url:string|null;paid_at:Date|null;created_at:Date};
+type Order={cancellation_reason?:string|null;card_id?:string|null;id:string;units:number;price_minor:number;status:string;provider_id:string|null;redirect_url:string|null;paid_at:Date|null;created_at:Date};
 const value=(minor:number)=>Math.floor(minor/100)+'.'+String(minor%100).padStart(2,'0');
 const projection=(order:Order)=>({reason:(order as Order&{cancellation_reason?:string}).cancellation_reason??null,id:order.id,units:order.units,status:order.status,redirect:order.redirect_url});
 export async function aiPackCatalog(db:PoolClient,userId:string,provider?:TestPayments,seal?:Sealer){return {
@@ -26,8 +22,9 @@ export async function aiPackCatalog(db:PoolClient,userId:string,provider?:TestPa
 export async function aiTopup(db:PoolClient,owner:{id:string;email:string},input:unknown,provider:TestPayments|undefined,seal:Sealer){
  if(!provider)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
  await cardLock(db,owner.id);
- const r=object(input,['id','units','packId','priceMinor','cardId']),id=uuid(r.id),read=async()=>(await db.query<Order>('SELECT * FROM commerce.ai_topup_order WHERE user_id=$1 AND id=$2 FOR UPDATE',[owner.id,id])).rows[0];
+ const r=object(input,['id','units','packId','priceMinor','cardId','cancel']),id=uuid(r.id),read=async()=>(await db.query<Order>('SELECT * FROM commerce.ai_topup_order WHERE user_id=$1 AND id=$2 FOR UPDATE',[owner.id,id])).rows[0];
  let order=await read();
+ if(r.cancel!==undefined&&(r.cancel!==true||r.units!==undefined||r.cardId!==undefined||r.packId!==undefined||r.priceMinor!==undefined))throw new HttpError(400,'INVALID_INPUT');
  if(r.units!==undefined){
   if(typeof r.units!=='number'||!Number.isSafeInteger(r.units)||r.units<1||r.units>1000000||r.packId!==undefined&&typeof r.packId!=='string'||r.priceMinor!==undefined&&(!Number.isSafeInteger(r.priceMinor)||Number(r.priceMinor)<100))throw new HttpError(400,'INVALID_INPUT');
   if(order&&(order.units!==r.units||r.priceMinor!==undefined&&order.price_minor!==r.priceMinor||(order.card_id??null)!==(r.cardId??null)))throw new HttpError(409,'ACTION_REUSED');
@@ -39,14 +36,35 @@ export async function aiTopup(db:PoolClient,owner:{id:string;email:string},input
   }
  }
  if(!order)throw new HttpError(404,'NOT_FOUND');
- if(r.units!==undefined||['paid','cancelled'].includes(order.status))return projection(order);
- if(!order.provider_id&&Date.now()-order.created_at.getTime()>23*3600_000)throw new HttpError(409,'PAYMENT_RETRY_REQUIRED');
+ if(r.units!==undefined||order.status==='paid'||order.status==='cancelled'&&order.cancellation_reason!=='user_canceled')return projection(order);
+ const cancelling=r.cancel===true||order.cancellation_reason==='user_canceled';
+ async function cancelled(){const row=(await db.query<Order>("UPDATE commerce.ai_topup_order SET status='cancelled',cancellation_reason='user_canceled',redirect_url=NULL WHERE user_id=$1 AND id=$2 RETURNING *",[owner.id,id])).rows[0]!;return projection(row);}
+ if(!order.provider_id&&(cancelling||Date.now()-order.created_at.getTime()>23*3600_000))return cancelled();
  const card=order.card_id&&!order.provider_id?await savedCard(db,owner.id,order.card_id):null;
- const payment=order.provider_id?await provider.read(order.provider_id):await provider.create({id,value:value(order.price_minor),units:order.units,...(card?{method:seal.open(card.method_id)}:{save:true})});
- if(payment.test!==true||payment.amount?.value!==value(order.price_minor)||payment.amount?.currency!=='RUB'||payment.metadata?.orderId!==id||order.provider_id&&payment.id!==order.provider_id||!['pending','waiting_for_capture','succeeded','canceled'].includes(payment.status)||payment.status==='succeeded'&&payment.paid!==true)throw new HttpError(502,'PAYMENT_UNVERIFIED');
- let redirect:string|null=order.redirect_url;
- if(payment.confirmation?.confirmation_url){const url=new URL(payment.confirmation.confirmation_url);if(url.protocol!=='https:'||!['yookassa.ru','yoomoney.ru'].some(domain=>url.hostname===domain||url.hostname.endsWith('.'+domain))||url.username||url.password)throw new HttpError(502,'PAYMENT_UNVERIFIED');redirect=url.href;}
- if(payment.status==='waiting_for_capture')throw new HttpError(502,'PAYMENT_UNVERIFIED');
+ let payment=order.provider_id?await provider.read(order.provider_id):await provider.create({id,value:value(order.price_minor),units:order.units,...(card?{method:seal.open(card.method_id)}:{save:true})});
+ const verify=(p:Payment)=>verifiedPayment(p,{id,providerId:order!.provider_id,value:value(order!.price_minor),test:true});
+ let redirect=verify(payment);order.provider_id=payment.id;
+ // A completed payment wins a simultaneous user cancellation. Later results of
+ // an already cancelled link are voided/refunded and never grant units.
+ if(cancelling&&!(r.cancel===true&&order.status!=='cancelled'&&payment.status==='succeeded')){
+  if(payment.status==='waiting_for_capture'){
+   if(!provider.cancel)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
+   payment=await provider.cancel(payment.id,id);verify(payment);
+   if(payment.status!=='canceled')throw new HttpError(503,'PAYMENT_UNAVAILABLE');
+  }
+  if(payment.status==='succeeded'){
+   if(!provider.createRefund)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
+   const hash=createHash('sha256').update('ai-topup-cancel:'+id).digest('hex'),refundId=[hash.slice(0,8),hash.slice(8,12),'5'+hash.slice(13,16),'a'+hash.slice(17,20),hash.slice(20,32)].join('-');
+   const refund=await provider.createRefund({id:refundId,paymentId:payment.id,value:value(order.price_minor)});
+   if(refund.payment_id!==payment.id||refund.amount?.currency!=='RUB'||refund.amount.value!==value(order.price_minor)||!['pending','succeeded'].includes(refund.status))throw new HttpError(502,'PAYMENT_UNVERIFIED');
+  }
+  return cancelled();
+ }
+ if(payment.status==='waiting_for_capture'){
+  if(!provider.capture)throw new HttpError(503,'PAYMENT_UNAVAILABLE');
+  payment=await provider.capture(payment.id,id,value(order.price_minor));redirect=verify(payment);
+  if(payment.status==='waiting_for_capture')throw new HttpError(503,'PAYMENT_UNAVAILABLE');
+ }
  const status=payment.status==='succeeded'&&payment.paid===true?'paid':payment.status==='canceled'?'cancelled':'pending';
  if(status==='paid')await db.query("SELECT pg_advisory_xact_lock(hashtextextended($1,0))",['customer-ai-budget:'+owner.id]);
  await db.query('UPDATE commerce.ai_topup_order SET cancellation_reason=$3 WHERE user_id=$1 AND id=$2',[owner.id,id,status==='cancelled'?payment.cancellation_details?.reason??'canceled':null]);

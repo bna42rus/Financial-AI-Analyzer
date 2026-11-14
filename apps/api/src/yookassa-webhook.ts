@@ -42,7 +42,7 @@ export async function handleYooKassaNotification(db:PoolClient,body:unknown,acce
   return;
  }
  // The notification only identifies a known payment. The provider API supplies its result.
- if(target.state!=='pending')return;
+ if(target.state!=='pending'&&!(target.kind==='topup'&&target.state==='cancelled'))return;
  const provider=target.kind==='access'?access:topups;
  if(!provider)return;
  const payment=await provider.read(paymentId);

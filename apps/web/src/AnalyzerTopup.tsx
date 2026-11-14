@@ -67,8 +67,15 @@ export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>
   }catch(e){setError(e instanceof Error?e.message:'Не удалось открыть оплату.');}
   finally{setBusy(false);}
  }
+ async function cancel(){
+  if(busy||!order)return;
+  setBusy(true);setError('');
+  try{const next=await api<Order>('/finance/ai-topup',{id:order.id,cancel:true},AbortSignal.timeout(15000));setOrder(next);attempt.current=null;if(next.status==='paid')credit.current();else setChosen(null);}
+  catch(e){setError(e instanceof Error?e.message:'Не удалось отменить оплату.');}
+  finally{setBusy(false);}
+ }
  return <OperationDialog compact title="Пополнить лимит Анализатора" onClose={()=>{if(!busy)onClose();}} footer={<>
-  <button className={common.button} disabled={busy} onClick={onClose}>Закрыть</button>
+  <button className={common.button} disabled={busy} onClick={()=>{if(waiting(order))void cancel();else onClose();}}>{waiting(order)?'Отменить оплату':'Закрыть'}</button>
   {waiting(order)?order?.redirect&&<a className={common.primaryButton} href={order.redirect}>Продолжить оплату</a>:
    order?.status==='paid'?<button className={common.button} onClick={()=>{setOrder(null);setChosen(null);}}>Купить ещё</button>:!!data?.packages.length&&<button className={common.primaryButton} disabled={busy||!data.enabled||!selected} onClick={()=>void start()}>{selected?'Перейти к оплате · '+moneyLabel(String(selected.priceMinor)):'Перейти к оплате'}</button>}
  </>}>
@@ -77,8 +84,8 @@ export function AnalyzerTopup({onClose,onCredit}:{onClose:()=>void;onCredit:()=>
   {!data&&error&&<button className={common.button} onClick={()=>void load()}>Повторить</button>}
   {data&&!data.packages.length&&<p>Нет доступных пакетов.</p>}
   {order?.status==='paid'&&<p role="status">Добавлено {number(order.units)} единиц.</p>}
-  {order?.status==='cancelled'&&<p role="status">{paymentFailure(order.reason)}</p>}
-  {waiting(order)&&<p role="status">Ждём подтверждения оплаты за {number(order!.units)} единиц.</p>}
+  {order?.status==='cancelled'&&order.reason!=='user_canceled'&&<p role="status">{paymentFailure(order.reason)}</p>}
+  {waiting(order)&&<p role="status">{order?.redirect?'Вы начали оплату '+number(order.units)+' единиц. Можете продолжить или отменить её.':'Платёж обрабатывается. Результат обновится автоматически.'}</p>}
   {!!data?.packages.length&&!waiting(order)&&<fieldset className={styles.topupPackages} disabled={busy}>
    <legend>Выберите пакет</legend>
    {data.packages.map(pack=><label key={pack.id} className={styles.topupPackage}>

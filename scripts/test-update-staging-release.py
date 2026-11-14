@@ -192,7 +192,7 @@ class UpdateTests(unittest.TestCase):
                 cfg.write_text(json.dumps(old));cfg.chmod(0o600)
                 old_dropin=('[Service]\nWorkingDirectory='+str(current/'apps/api')+'\nExecStart=\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=0 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\nEnvironment=CLASSIFICATION_ENABLED=0\n').encode();dropin.write_bytes(old_dropin)
                 if mode=='preserved':old_dropin=m.activate_ai(old_dropin);dropin.write_bytes(old_dropin)
-                old_root=str(current/'web');old_caddy=old_root+'\ntest.cashneuro.ru {\n basic_auth {\n owner synthetic_hash\n }\n}\n';caddy.write_text(old_caddy);worker.write_text('old worker');worker_env.write_text('old scoped env')
+                old_root=str(current/'web');old_caddy=old_root+'\ntest.cashneuro.ru {\n basic_auth {\n owner synthetic_hash\n }\n}\nadmin.test.cashneuro.ru {\n basic_auth {\n admin synthetic_admin_hash\n }\n}\n';caddy.write_text(old_caddy);worker.write_text('old worker');worker_env.write_text('old scoped env')
                 calls=[];sql_calls=[]
                 def run(args,**kw):
                     args=list(map(str,args));calls.append(args)

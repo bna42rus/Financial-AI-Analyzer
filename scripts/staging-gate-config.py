@@ -4,7 +4,12 @@ from pathlib import Path
 START = b'# BEGIN CASHNEURO STAGING GATE'
 END = b'# END CASHNEURO STAGING GATE'
 def configure(data):
-    matches = list(re.finditer(rb'(?m)^test\.cashneuro\.ru\s*\{', data))
+    for host in (b'test.cashneuro.ru', b'admin.test.cashneuro.ru'):
+        data = configure_site(data, host)
+    return data
+
+def configure_site(data, host):
+    matches = list(re.finditer(rb'(?m)^' + re.escape(host) + rb'\s*\{', data))
     if len(matches) != 1:
         raise ValueError('STAGING_GATE_SITE_NOT_UNIQUE')
     a = matches[0].end(); level = 1; b = a
