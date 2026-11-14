@@ -5,7 +5,7 @@ export class ApiError extends Error {readonly code:string;constructor(code:strin
 let publicDemoRequest:((path:string,body?:Record<string,unknown>)=>unknown)|undefined;
 export function registerDemoApi(handler:NonNullable<typeof publicDemoRequest>){publicDemoRequest=handler;}
 export async function api<T>(path:string,body?:Record<string,unknown>,signal?:AbortSignal):Promise<T> {
-  if(path!=='/public/maintenance'&&typeof location!=='undefined'&&/^\/demo\/?$/.test(location.pathname)){
+  if(!['/public/maintenance','/access/maintenance'].includes(path)&&typeof location!=='undefined'&&/^\/demo\/?$/.test(location.pathname)){
     if(signal?.aborted)throw signal.reason;
     if(!publicDemoRequest)throw new ApiError('DEMO_UNAVAILABLE','Демо ещё загружается.');
     return structuredClone(publicDemoRequest(path,body)) as T;

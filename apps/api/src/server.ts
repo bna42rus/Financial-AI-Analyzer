@@ -136,7 +136,7 @@ export async function createServer(config: Config) {
     if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile, ...(config.assistantProvider?{assistant:assistantWorkflowVersion}:{}) };
     let db: PoolClient | undefined;
     try {
-      if(config.profile==='finance'&&path==='/public/maintenance'&&request.method==='GET')return reply.send(await maintenanceStatus(config.pool));
+      if(config.profile==='finance'&&['/public/maintenance','/access/maintenance'].includes(path)&&request.method==='GET')return reply.send(await maintenanceStatus(config.pool));
       if(config.profile==='finance'&&maintenanceBlocks(path,request.method)){
         const maintenance=await maintenanceStatus(config.pool);
         if(maintenance.phase==='active')return reply.header('retry-after','60').code(503).send({code:'MAINTENANCE',maintenance});

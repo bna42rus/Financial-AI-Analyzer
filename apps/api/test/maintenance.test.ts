@@ -14,7 +14,7 @@ test('24/3/1-hour warnings also cover late scheduling',()=>{
 });
 test('finance reads and purchases are closed; status/session/sign-out remain reachable',()=>{
  for(const [p,m] of [['/finance/overview','POST'],['/access/billing-create','POST'],['/access/billing','GET'],['/auth/sign-in/email','POST']] as const)assert.equal(maintenanceBlocks(p,m),true);
- for(const [p,m] of [['/session','GET'],['/public/maintenance','GET'],['/health','GET'],['/auth/sign-out','POST']] as const)assert.equal(maintenanceBlocks(p,m),false);
+ for(const [p,m] of [['/session','GET'],['/public/maintenance','GET'],['/access/maintenance','GET'],['/health','GET'],['/auth/sign-out','POST']] as const)assert.equal(maintenanceBlocks(p,m),false);
 });
 function fixture(){
  const row={revision:0,state:'none',title:'Обновляем CashNeuro',message:'',starts_at:null as Date|null,ends_at:null as Date|null,updated_at:new Date(now),now:new Date(now)},events=new Map<string,any>(),actions:any[]=[];
