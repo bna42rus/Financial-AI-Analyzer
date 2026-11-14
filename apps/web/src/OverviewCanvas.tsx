@@ -5,7 +5,7 @@ import type {LayoutItem} from '../../../packages/finance-core/src/overview';
 import {layoutLimits,packOverview,pinLayout} from './overview-layout';
 import type {Placement} from './overview-layout';
 import styles from './Overview.module.css';
-type Gesture={id:string;kind:'move'|'resize';x:number;y:number;scrollY:number;base:Placement;candidate:Placement;items:LayoutItem[]};
+type Gesture={id:string;kind:'move'|'resize';x:number;y:number;scrollY:number;base:Placement;candidate:Placement;items:LayoutItem[];next?:LayoutItem[]};
 export function OverviewCanvas({items,device,disabled,names,onChange,children}:{items:LayoutItem[];device:'desktop'|'mobile';disabled:boolean;names:Map<string,string>;onChange:(items:LayoutItem[])=>void;children:(item:LayoutItem)=>ReactNode}){
  const root=useRef<HTMLDivElement>(null),[container,setContainer]=useState(1),[heights,setHeights]=useState<Record<string,number>>({}),[preview,setPreview]=useState<LayoutItem[]|null>(null),[drag,setDrag]=useState<{id:string;p:Placement}|null>(null),[message,setMessage]=useState('');
  const gesture=useRef<Gesture|null>(null),current=useRef({disabled,onChange});current.current={disabled,onChange};
@@ -28,9 +28,9 @@ export function OverviewCanvas({items,device,disabled,names,onChange,children}:{
    if(target){const a=next.findIndex(i=>i.id===g.id),b=next.findIndex(i=>i.id===target.id);[next[a],next[b]]=[next[b]!,next[a]!];}
    setDrag({id:g.id,p:g.candidate});
   }
-  setPreview(next);
+  g.next=next;setPreview(next);
  }
- function finish(cancel=false){const g=gesture.current;gesture.current=null;setDrag(null);setPreview(null);if(!g||cancel||current.current.disabled)return;if(preview&&JSON.stringify(preview)!==JSON.stringify(items))onChange(preview);setMessage((g.kind==='move'?'Виджет перемещён: ':'Размер изменён: ')+names.get(g.id));}
+ function finish(cancel=false){const g=gesture.current;gesture.current=null;setDrag(null);setPreview(null);if(!g||cancel||current.current.disabled)return;if(g.next&&JSON.stringify(g.next)!==JSON.stringify(g.items))current.current.onChange(g.next);setMessage((g.kind==='move'?'Виджет перемещён: ':'Размер изменён: ')+names.get(g.id));}
  function keyboard(e:React.KeyboardEvent<HTMLButtonElement>,item:LayoutItem,kind:'move'|'resize'){
   if(e.key==='Escape'){finish(true);return;}if(!e.key.startsWith('Arrow'))return;e.preventDefault();const next=device==='mobile'?items.map(i=>({...i,width:1 as const,widthPercent:100})):pinLayout(items,placements,container),index=next.findIndex(i=>i.id===item.id);
   if(kind==='move'){const to=index+(['ArrowUp','ArrowLeft'].includes(e.key)?-1:1);if(to<0||to>=next.length)return;[next[index],next[to]]=[next[to]!,next[index]!];}

@@ -63,3 +63,10 @@
 
 .destructive{color:var(--color-danger)}
 .destructive:hover:not(:disabled){border-color:var(--color-danger)}
+
+@media(max-width:760px){
+ .paymentHead,.catalogRow{flex-wrap:nowrap}
+ .paymentHead>:first-child,.catalogRow>:first-child{min-width:0;overflow-wrap:anywhere;flex:1 1 0}
+ .paymentHead>button,.paymentHead>.rowActions,.catalogRow>button,.catalogRow>.rowActions{flex:none}
+ .rowActions{flex-wrap:nowrap}
+}

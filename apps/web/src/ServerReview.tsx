@@ -24,7 +24,6 @@ export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,
  const op=queue?.operations.find(o=>o.id===queue.anchor),similar=(queue?.similar??[]).filter(id=>id!==op?.id),items=new Map(queue?.operations.map(o=>[o.id,o])),locked=disabled||busy||queue?.financeRevision!==state.revision;
  const name=(item:FinanceState['operations'][number])=>item.displayName?.compositeLabel||item.classification.merchant.value||kindNames[item.classification.kind.value];
  const values=(item:FinanceState['operations'][number])=>displayBankDate(item.date,timezone)+' · '+formatMoney(item.amountMinor)+' · '+(state.accounts.find(a=>a.id===item.accountId)?.name??'Счёт');
- const ruleHint=op?.canRememberTransfer?(BigInt(op.amountMinor)<0n?'Исходящие переводы: ':'Входящие переводы: ')+name(op)+' · '+(state.accounts.find(a=>a.id===op.accountId)?.name??'тот же счёт'):op?.classification.kind.value==='purchase'&&op.classification.merchant.value&&BigInt(op.amountMinor)<0n?'Новые покупки: '+op.classification.merchant.value+' · '+(state.accounts.find(a=>a.id===op.accountId)?.name??'тот же счёт'):undefined;
  return <section className={styles.reviewPanel} aria-label="Нужно проверить">
   <div className={styles.reviewHead}><h3>{queue?'Осталось разобрать: '+queue.remaining:'Нужно проверить'}</h3><button className={common.iconButton} disabled={busy||disabled} title="Обновить список проверки" aria-label="Обновить список проверки" onClick={()=>void load({refresh:true})}><RefreshCw size={18}/></button></div>
   {error&&<p role="alert" className={common.error}>{error}</p>}
@@ -41,7 +40,7 @@ export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,
      </div>
      <ul className={styles.reviewList}>{similar.map(id=>{const item=items.get(id);return item&&<li key={id}><label className={styles.reviewChoice}><input type="checkbox" checked={selected.includes(id)} disabled={locked} onChange={e=>setSelected(ids=>e.target.checked?[...ids,id]:ids.filter(v=>v!==id))}/><span>{name(item)}<small>{values(item)}</small></span></label></li>;})}</ul>
     </section>}
-   </>} disabled={locked||!command} ruleHint={ruleHint} canSkip={queue.remaining>1} onOpen={()=>onOpen(op.id)} onSkip={()=>{onBusy(true);void load({skip:op.id,revision:queue.revision});}} onApply={intent=>void command?.begin({...intent,reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:op.id}},'Решение при проверке',!!intent.rememberRule||intent.operationIds.length>1,{generation:queue.generation,revision:queue.financeRevision})}/>
+   </>} disabled={locked||!command} canSkip={queue.remaining>1} onOpen={()=>onOpen(op.id)} onSkip={()=>{onBusy(true);void load({skip:op.id,revision:queue.revision});}} onApply={intent=>void command?.begin({...intent,reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:op.id}},'Решение при проверке',!!intent.rememberRule||intent.operationIds.length>1,{generation:queue.generation,revision:queue.financeRevision})}/>
   </div>}
  </section>;
 }

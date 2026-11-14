@@ -49,3 +49,5 @@
 .aiBudget small,.privacyHint{color:var(--color-secondary-text)}
 .privacyHint{display:block;max-width:52rem;margin:6px auto 0;font-size:.8rem}
 .moreExamples{margin-top:12px}.moreExamples summary{cursor:pointer;color:var(--color-primary);margin-bottom:10px}
+
+@media(max-width:700px){.layout{height:150svh;max-height:200svh;min-height:0;flex:none;grid-template-rows:minmax(0,1fr)}}

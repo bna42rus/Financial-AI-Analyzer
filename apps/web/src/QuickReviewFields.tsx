@@ -1,6 +1,7 @@
-import {useState} from 'react';
+import {useEffect,useState} from 'react';
 import type {ReactNode} from 'react';
 import {SearchFilter} from './SearchFilter';
+import {reviewRuleSource} from '../../../packages/finance-core/src/rules';
 import {allowedOperationRoles,kinds} from '../../../packages/finance-core/src/model';
 import type {Kind,Role} from '../../../packages/finance-core/src/model';
 import {safeText,sanitizeText} from '../../../packages/privacy/src/text';
@@ -11,7 +12,7 @@ import common from './App.module.css';
 import layout from './Settings.module.css';
 import fields from './ServerOperation.module.css';
 
-export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,similarControls,disabled,ruleHint,onApply,onSkip,canSkip,onOpen}:{op:FinanceState['operations'][number];state:FinanceState;similarIds:string[];requireSimilarSelection:boolean;similarControls:ReactNode;disabled:boolean;ruleHint?:string;onApply:(draft:BulkIntent)=>void;onSkip:()=>void;canSkip:boolean;onOpen:()=>void}){
+export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,similarControls,disabled,onApply,onSkip,canSkip,onOpen}:{op:FinanceState['operations'][number];state:FinanceState;similarIds:string[];requireSimilarSelection:boolean;similarControls:ReactNode;disabled:boolean;onApply:(draft:BulkIntent)=>void;onSkip:()=>void;canSkip:boolean;onOpen:()=>void}){
  const s=op.classification,reasons=op.reviewReasons,has=(...names:string[])=>names.some(n=>reasons.includes(n));
  const needKind=has('low_kind_confidence'),needRole=has('low_role_confidence','unresolved_role','unresolved_transfer')||s.role.value==='unresolved';
  const needCategory=has('low_category_confidence','category_not_defined','category_conflict')||(!s.category.value&&['expense','income'].includes(s.role.value));
@@ -29,7 +30,11 @@ export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,s
  if(merchant!==s.merchant.value)patch.merchant=safeText(sanitizeText(merchant),160);
  if(comment!==op.comment)patch.comment=safeText(sanitizeText(comment),1000);
  const roleConflict=patch.kind!==undefined&&!allowedOperationRoles(kind,op.amountMinor).includes(role);
- const repeatable=!!ruleHint&&Object.keys(patch).some(k=>['kind','role','categoryId','subcategoryId'].includes(k))&&Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId'].includes(k));
+ const source=reviewRuleSource(kind,op.amountMinor,merchant,op.hasBankCounterparty??op.canRememberTransfer??false);
+ const accountName=state.accounts.find(a=>a.id===op.accountId)?.name??'тот же счёт';
+ const ruleHint=source==='transfer'?(BigInt(op.amountMinor)<0n?'Исходящие переводы: ':'Входящие переводы: ')+(op.displayName?.compositeLabel||merchant||'Контрагент')+' · '+accountName:source==='purchase'?'Новые покупки: '+merchant.trim()+' · '+accountName:undefined;
+ const repeatable=!!ruleHint&&Object.keys(patch).some(k=>['kind','role','categoryId','subcategoryId'].includes(k))&&Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId','merchant'].includes(k));
+ useEffect(()=>{if(!repeatable)setRemember(false);},[repeatable]);
  const ready=Object.keys(patch).length>0&&!roleError&&!roleConflict&&(!remember||repeatable)&&(!requireSimilarSelection||similarIds.length>0)&&!disabled;
  const showCategories=wantsCategory&&(needCategory||!s.category.value||needRole&&role!==s.role.value);
  const categoryFields=<>
@@ -52,8 +57,8 @@ export function QuickReviewFields({op,state,similarIds,requireSimilarSelection,s
   </div></details>
   <div className={layout.reviewOptions}>
    <div className={layout.reviewOption}>
-    <label><input type="checkbox" checked={remember} disabled={!ruleHint} onChange={e=>setRemember(e.target.checked)}/>Запомнить для будущих операций</label>
-    {remember&&<p>{repeatable?ruleHint+'. Перед сохранением покажем правило.':'Выберите категорию, тип или финансовый смысл для правила.'}</p>}
+    <label><input type="checkbox" checked={remember} disabled={!repeatable} onChange={e=>setRemember(e.target.checked)}/>Запомнить для будущих операций</label>
+    {remember&&<p>{ruleHint+'. Перед сохранением покажем правило.'}</p>}
    </div>
    <div className={layout.reviewOption}>{similarControls}</div>
   </div>

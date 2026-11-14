@@ -44,7 +44,7 @@ function snapshot(data=sample,filter:OperationsFilter={}):FinanceState{
  const {graph,parties,rules}=data,projection=reconcile(graph);
  return {generation,revision,accounts:graph.accounts,mergedAccounts:[],categories:graph.categories,counterparties:parties,rules,
   loanMode:graph.loanMode,operationCount:graph.operations.length,summary:aggregate(projection.operations,filter),
-  operations:projection.operations.map((row,i)=>{const op=graph.operations[i]!;return {...row,displayName:operationDisplayName(op,{counterparties:parties}),classification:op.semantics,canRememberTransfer:!!reviewRuleConditions(op)?.bankCounterpartyId,comment:op.comment,description:op.source.description,postedDate:op.source.postedDate,bankCategory:op.source.bankCategory};})};
+  operations:projection.operations.map((row,i)=>{const op=graph.operations[i]!;return {...row,displayName:operationDisplayName(op,{counterparties:parties}),classification:op.semantics,canRememberTransfer:!!reviewRuleConditions(op)?.bankCounterpartyId,hasBankCounterparty:!!op.bankCounterpartyId,comment:op.comment,description:op.source.description,postedDate:op.source.postedDate,bankCategory:op.source.bankCategory};})};
 }
 function changeOperation(op:Operation,patch:OperationPatch,verify:unknown){
  const keys={kind:'kind',role:'role',categoryId:'category',subcategoryId:'subcategory',merchant:'merchant',counterpartyId:'counterparty'} as const;
@@ -92,11 +92,11 @@ function makePreview(body:Record<string,unknown>){
   case 'operation':case 'bulk_operations':{
    const scope=intent.reviewScope as {anchorId?:string}|undefined;
    const anchor=scope?.anchorId?find(graph.operations,scope.anchorId):undefined;
-   const conditions=anchor&&intent.rememberRule?reviewRuleConditions(anchor):undefined;
+   const conditions=anchor&&intent.rememberRule?reviewRuleConditions(anchor,patch as Parameters<typeof reviewRuleConditions>[1]):undefined;
    let ruleName:string|undefined;
    if(intent.rememberRule&&(!anchor||!conditions))fail('REVIEW_GROUP_CHANGED','Для операции больше нельзя создать это правило.');
    if(anchor&&conditions){
-    const assignments=patch as Rule['assignments'];
+    const {merchant:_merchant,...assignments}=patch as Rule['assignments'];
     const same=(a:unknown,b:unknown)=>JSON.stringify(a)===JSON.stringify(b);
     const matches=data.rules.filter(rule=>rule.enabled&&same(rule.conditions,conditions));
     if(matches.some(rule=>Object.entries(assignments).some(([key,value])=>key in rule.assignments&&!same(rule.assignments[key as keyof Rule['assignments']],value))))fail('REVIEW_RULE_CONFLICT','Для этих операций уже действует правило с другими условиями назначения.');

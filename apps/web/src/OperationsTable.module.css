@@ -67,3 +67,8 @@
 .columnLegend{margin:5px 0 8px}
 .visibleColumns+.columnLegend{margin-top:12px}
 .hiddenColumn{display:flex;align-items:center;gap:8px;border:1px solid var(--color-border);border-radius:7px;padding:7px;font-size:.82rem}
+
+/* Shared by operation filters and budget conditions. */
+.advanced{align-items:end}
+.advanced>label,.advanced>.multiField{align-content:end}
+.advanced input,.advanced :global([data-select-trigger]),.advanced .filterPick{box-sizing:border-box;height:40px;min-height:40px}

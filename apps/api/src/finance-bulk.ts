@@ -27,7 +27,7 @@ export function parseBulkIntent(value:unknown):BulkIntent {
  if('subcategoryId'in patch&&!('categoryId'in patch))throw new TypeError('CATEGORY_REQUIRED');
  if('categoryId'in patch&&!('subcategoryId'in patch))patch.subcategoryId=null;
  let reviewScope:ReviewScope|undefined;if(r.reviewScope!==undefined){const s=object(r.reviewScope,['sessionId','revision','anchorId']);if(Object.keys(s).length!==3||typeof s.revision!=='string'||!/^\d{1,20}$/.test(s.revision))throw new TypeError('INVALID_REVIEW_SCOPE');reviewScope={sessionId:uuid(s.sessionId),revision:s.revision,anchorId:uuid(s.anchorId)};}
- if(r.rememberRule!==undefined&&(r.rememberRule!==true||!reviewScope||!Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId'].includes(k))||!Object.keys(patch).length))throw new TypeError('INVALID_BULK_ACTION');
+ if(r.rememberRule!==undefined&&(r.rememberRule!==true||!reviewScope||!Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId','merchant'].includes(k))||!Object.keys(patch).some(k=>['kind','role','categoryId','subcategoryId'].includes(k))))throw new TypeError('INVALID_BULK_ACTION');
  return {kind:'bulk_operations',id:randomUUID(),operationIds:selectionIds(r.operationIds),patch,verify,...(reviewScope?{reviewScope}:{}),...(r.rememberRule?{rememberRule:true}:{})};
 }
 export function bulkPatches(intent:BulkIntent,graph:Graph){

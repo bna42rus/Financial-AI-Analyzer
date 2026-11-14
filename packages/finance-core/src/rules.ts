@@ -21,14 +21,20 @@ export function validateRule(value:unknown):Omit<Rule,'id'> {
  return {name:safeText(r.name,160),enabled:r.enabled,priority:r.priority,conditions,assignments};
 }
 /** Review decisions use the bank's stable, tenant-scoped identity for transfers. */
-export function reviewRuleConditions(operation:Operation):Rule['conditions']|undefined{
- const fact=effective(operation),kind=operation.semantics.kind.value,amount=BigInt(fact.amountMinor);
+export function reviewRuleSource(kind:Kind,amountMinor:string,merchant:string,hasBankCounterparty:boolean):'transfer'|'purchase'|undefined{
+ const amount=BigInt(amountMinor);
+ if(amount===0n)return;
+ if((kind==='transfer_in'||kind==='transfer_out')&&hasBankCounterparty)return 'transfer';
+ if(kind==='purchase'&&amount<0n&&merchant.trim())return 'purchase';
+}
+export function reviewRuleConditions(operation:Operation,draft:{kind?:Kind;merchant?:string}={}):Rule['conditions']|undefined{
+ const fact=effective(operation),kind=draft.kind??operation.semantics.kind.value,amount=BigInt(fact.amountMinor),merchant=(draft.merchant??operation.semantics.merchant.value).trim();
  if(amount===0n)return;
  const direction=amount<0n?'out':'in';
  const accountId=fact.accountId;
- if((kind==='transfer_in'||kind==='transfer_out')&&operation.bankCounterpartyId)return {bankCounterpartyId:operation.bankCounterpartyId,accountId,direction,kind};
- const merchant=operation.semantics.merchant.value.trim();
- if(kind==='purchase'&&amount<0n&&merchant)return {merchantEquals:merchant,accountId,direction,kind};
+ const source=reviewRuleSource(kind,fact.amountMinor,merchant,!!operation.bankCounterpartyId);
+ if(source==='transfer')return {bankCounterpartyId:operation.bankCounterpartyId,accountId,direction,kind};
+ if(source==='purchase')return {merchantEquals:merchant,accountId,direction,kind};
 }
 /** The same closed predicate is used for future imports and explicit historical selection. */
 export function ruleMatches(operation:Operation,account:Account,rule:Rule):boolean {
