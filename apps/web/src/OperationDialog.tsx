@@ -1,3 +1,5 @@
+import {maintenanceActive} from './maintenance-state';
+import {useEffect,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {X} from 'lucide-react';
 import {useId,useRef} from 'react';
@@ -6,9 +8,11 @@ import {cloneElement} from 'react';
 import common from './App.module.css';
 import styles from './ServerOperation.module.css';
 
-export function OperationDialog({title,onClose,children,footer,compact=false,narrow=false}:{title:string;onClose:()=>void;children:ReactNode;footer:ReactNode;compact?:boolean;narrow?:boolean}){
+export function OperationDialog({title,onClose,children,footer,compact=false,narrow=false,duringMaintenance=false}:{title:string;onClose:()=>void;children:ReactNode;footer:ReactNode;compact?:boolean;narrow?:boolean;duringMaintenance?:boolean}){
  const opener=useRef<HTMLElement|null>(null);
- return <Dialog.Root open onOpenChange={open=>{if(!open)onClose();}}><Dialog.Portal>
+ const [suspended,setSuspended]=useState(maintenanceActive);
+ useEffect(()=>{const update=(e:Event)=>setSuspended((e as CustomEvent<boolean>).detail);window.addEventListener('cashneuro-maintenance-active',update);return()=>window.removeEventListener('cashneuro-maintenance-active',update);},[]);
+ return <Dialog.Root open={duringMaintenance||!suspended} onOpenChange={open=>{if(!open)onClose();}}><Dialog.Portal>
   <Dialog.Overlay data-cashneuro-dialog="overlay" className={common.overlay}/>
   <Dialog.Content data-cashneuro-dialog="content" aria-describedby={undefined} data-notifications-inline="true" className={common.dialog+' '+styles.operationDialog+(narrow?' '+styles.narrowDialog:compact?' '+styles.subDialog:'')} onInteractOutside={e=>e.preventDefault()} onOpenAutoFocus={()=>{opener.current=document.activeElement as HTMLElement;}} onCloseAutoFocus={e=>{e.preventDefault();if(opener.current?.isConnected)opener.current.focus({preventScroll:true});}}>
    <header className={common.dialogHead+' '+styles.operationHead}><Dialog.Title>{title}</Dialog.Title><Dialog.Close asChild><button type="button" className={common.iconButton} aria-label={'Закрыть: '+title}><X size={20}/></button></Dialog.Close></header>

@@ -25,9 +25,15 @@
       "path": "docs/product/approved-mobile-interface-20261114.md",
       "role": "approved_amendment",
       "sha256": "a48383ff682b44f9ad45d35322c31d8c0a263fc923c2d0921596d8d1ba083c0e"
+    },
+    {
+      "path": "docs/product/approved-maintenance-20261114.md",
+      "role": "approved_amendment",
+      "sha256": "d2e7683394eda18105d17943cccf1da46e1ee16ad0013cb9c4f6595ea4bb208b"
     }
   ],
   "precedence": [
+    "Approved maintenance amendment 2026-11-14 defines the scheduled maintenance UI, API gate, operator control and manual reopening in its stated scope",
     "Approved mobile-interface amendment 2026-11-14 overrides mobile widget layout, compact spacing, form alignment, Analyzer sizing/Enter behavior and review-rule availability in its stated scope",
     "Approved billing-periods amendment 2026-11-12 overrides trial eligibility, verification amount, queued periods, manual allowances, suspension, cards and Staging outer login in its stated scope",
     "Approved onboarding amendment 2026-11-11 overrides first-access registration, trial, renewal and allowance clauses in its stated scope",

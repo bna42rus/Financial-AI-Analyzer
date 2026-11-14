@@ -1,3 +1,4 @@
+import {maintenanceStatus} from './maintenance.ts';
 import {recognizeImportedCounterparty} from './counterparty-proposals.ts';
 import {sameCalendar} from '../../../packages/finance-core/src/bank-calendar.ts';
 import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
@@ -199,6 +200,7 @@ export async function invalidatePendingImports(db:PoolClient,userId:string){
 
 /** Durable scheduler stores tenant IDs only. Every financial read/write re-enters server authorization. */
 export async function runImportStage(pool:Pool){
+ if((await maintenanceStatus(pool)).phase==='active')return false;
  const job=(await pool.query('SELECT user_id,batch_id FROM finance.ingestion_dispatch WHERE next_attempt_at<=clock_timestamp() ORDER BY next_attempt_at,user_id LIMIT 1')).rows[0];
  if(!job)return false;
  const db=await pool.connect();

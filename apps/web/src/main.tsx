@@ -1,3 +1,4 @@
+import {MaintenanceBoundary} from './Maintenance';
 import {AppBoundary,StatusPage} from './StatusPage';
 import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -17,9 +18,9 @@ function Root() {
   const path=window.location.pathname;
   if(isLegalPath(path))return <LegalPage path={path}/>;
   const publicDemo=path==='/demo'||path==='/demo/';
-  if(publicDemo)return <Suspense fallback={<p role="status">Открываем демо…</p>}><PublicDemo/></Suspense>;
+  if(publicDemo){const demo=<Suspense fallback={<p role="status">Открываем демо…</p>}><PublicDemo/></Suspense>;return apiOrigin?<MaintenanceBoundary>{demo}</MaintenanceBoundary>:demo;}
   if(path!=='/'&&path!=='/index.html')return <StatusPage kind="404"/>;
   if(!apiOrigin&&hash!=='#access')return <Suspense fallback={<p role="status">Открываем пример…</p>}><DemoApp/></Suspense>;
-  return apiOrigin?<ServerAccess/>:<AccessRequestPage/>;
+  return apiOrigin?<MaintenanceBoundary><ServerAccess/></MaintenanceBoundary>:<AccessRequestPage/>;
 }
 createRoot(root).render(<StrictMode><AppBoundary><Root /></AppBoundary></StrictMode>);

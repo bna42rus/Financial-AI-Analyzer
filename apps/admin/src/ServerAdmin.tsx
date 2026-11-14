@@ -1,5 +1,6 @@
+import {ServerMaintenance} from './ServerMaintenance';
 import {useEffect,useRef,useState} from 'react';
-import {Users,ClipboardList,CreditCard,Tag,MailPlus,Mail,History,RefreshCw,UserRound} from 'lucide-react';
+import {Users,ClipboardList,CreditCard,Tag,MailPlus,Mail,History,RefreshCw,UserRound,Wrench} from 'lucide-react';
 import {OperationDialog} from '../../web/src/OperationDialog';
 import {Notifications} from '../../web/src/Notifications';
 import {LegalFooter} from '../../web/src/LegalPages';
@@ -26,7 +27,7 @@ const initialLink=readLink();
 const sections=[
  {id:'users',name:'Пользователи и доступ',Icon:Users},{id:'requests',name:'Заявки',Icon:ClipboardList},
  {id:'payments',name:'Платежи',Icon:CreditCard},{id:'invitations',name:'Приглашения',Icon:MailPlus},
- {id:'tariffs',name:'Тарифы',Icon:Tag},{id:'deliveries',name:'Письма',Icon:Mail},{id:'history',name:'История',Icon:History}
+ {id:'tariffs',name:'Тарифы',Icon:Tag},{id:'deliveries',name:'Письма',Icon:Mail},{id:'history',name:'История',Icon:History},{id:'maintenance',name:'Техработы',Icon:Wrench}
 ];
 export function ServerAdmin(){return <Notifications><AdminWorkspace/></Notifications>;}
 function AdminWorkspace(){
@@ -86,6 +87,7 @@ function AdminWorkspace(){
   {tab==='tariffs'&&<ServerCommerceCatalog refresh={refresh}/>}
   {tab==='invitations'&&<ServerInvitations refresh={refresh} target={route.id}/>}
   {tab==='deliveries'&&<ServerDeliveries refresh={refresh} target={route.id}/>}
+  {tab==='maintenance'&&<ServerMaintenance refresh={refresh}/>}
   {tab==='history'&&<ServerAdminHistory refresh={refresh} initialSearch={route.search}/>}
  </main>
  {accountOpen&&<OperationDialog title="Аккаунт" onClose={()=>setAccountOpen(false)} footer={<><button className={common.button} disabled={busy} onClick={()=>{setAccountOpen(false);setExit(true);}}>Выйти</button><button className={common.button} onClick={()=>setAccountOpen(false)}>Готово</button></>}><ServerAdminAccount email={session.email??''} timezone={timezone} onTimezone={setTimezone}/></OperationDialog>}

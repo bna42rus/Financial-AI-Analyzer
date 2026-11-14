@@ -5,7 +5,7 @@ export class ApiError extends Error {readonly code:string;constructor(code:strin
 let publicDemoRequest:((path:string,body?:Record<string,unknown>)=>unknown)|undefined;
 export function registerDemoApi(handler:NonNullable<typeof publicDemoRequest>){publicDemoRequest=handler;}
 export async function api<T>(path:string,body?:Record<string,unknown>,signal?:AbortSignal):Promise<T> {
-  if(typeof location!=='undefined'&&/^\/demo\/?$/.test(location.pathname)){
+  if(path!=='/public/maintenance'&&typeof location!=='undefined'&&/^\/demo\/?$/.test(location.pathname)){
     if(signal?.aborted)throw signal.reason;
     if(!publicDemoRequest)throw new ApiError('DEMO_UNAVAILABLE','Демо ещё загружается.');
     return structuredClone(publicDemoRequest(path,body)) as T;
@@ -14,7 +14,7 @@ export async function api<T>(path:string,body?:Record<string,unknown>,signal?:Ab
   const origin=new URL(apiOrigin);if(origin.origin!==apiOrigin)throw new Error('Неверный адрес API.');
   let response:Response;
   try{response=await fetch(apiOrigin+path,{method:body?'POST':'GET',credentials:'include',cache:'no-store',signal,headers:body?{'Content-Type':'application/json'}:{},...(body?{body:JSON.stringify(body)}:{})});}catch{throw new ApiError('NETWORK_ERROR','Не удалось соединиться с сервером. Повторите позже.');}
-  let result;try{result=await response.json();}catch{throw new ApiError('NETWORK_ERROR','Сервер не подтвердил результат. Повторите запрос.');}if(!response.ok)throw new ApiError(result.code??'REQUEST_FAILED',messages[result.code]??'Не удалось выполнить действие. Повторите позже.',Number.isInteger(result.linkIndex)&&result.linkIndex>=0?result.linkIndex:undefined,Number.isSafeInteger(result.retryAfterSeconds)&&result.retryAfterSeconds>0?result.retryAfterSeconds:undefined);return result as T;
+  let result;try{result=await response.json();}catch{throw new ApiError('NETWORK_ERROR','Сервер не подтвердил результат. Повторите запрос.');}if(!response.ok&&result.code==='MAINTENANCE'){window.dispatchEvent(new CustomEvent('cashneuro-maintenance',{detail:result.maintenance}));throw new ApiError('MAINTENANCE','Идут технические работы. Повторите после их окончания.');}if(!response.ok)throw new ApiError(result.code??'REQUEST_FAILED',messages[result.code]??'Не удалось выполнить действие. Повторите позже.',Number.isInteger(result.linkIndex)&&result.linkIndex>=0?result.linkIndex:undefined,Number.isSafeInteger(result.retryAfterSeconds)&&result.retryAfterSeconds>0?result.retryAfterSeconds:undefined);return result as T;
 }
 export function readLink():{kind:string;token:string} {
   const raw=window.location.hash.slice(1),parts=raw.split('?'),query=new URLSearchParams(parts[1]);

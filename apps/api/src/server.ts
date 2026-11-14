@@ -1,3 +1,5 @@
+import {maintenanceStatus,changeMaintenance} from './maintenance.ts';
+import {maintenanceBlocks} from '../../../packages/access/src/maintenance.ts';
 import {analyzerAccess} from './analyzer-access.ts';
 import {paymentCards,removePaymentCard} from './payment-cards.ts';
 import {signupStart,signupComplete,signupResend} from './signup.ts';
@@ -134,6 +136,11 @@ export async function createServer(config: Config) {
     if (path === '/health' && request.method === 'GET') return { status: 'ok', profile: config.profile, ...(config.assistantProvider?{assistant:assistantWorkflowVersion}:{}) };
     let db: PoolClient | undefined;
     try {
+      if(config.profile==='finance'&&path==='/public/maintenance'&&request.method==='GET')return reply.send(await maintenanceStatus(config.pool));
+      if(config.profile==='finance'&&maintenanceBlocks(path,request.method)){
+        const maintenance=await maintenanceStatus(config.pool);
+        if(maintenance.phase==='active')return reply.header('retry-after','60').code(503).send({code:'MAINTENANCE',maintenance});
+      }
       await rate(request);
       const resetPasswordProof=config.profile==='finance'&&path==='/finance/commit'&&typeof request.body==='object'&&request.body!==null&&'password'in request.body;
       const profileEmailProof=config.profile==='finance'&&path.startsWith('/account/email-')&&request.method==='POST';
@@ -152,7 +159,10 @@ export async function createServer(config: Config) {
       await db.query('SELECT pg_advisory_xact_lock($1)', [config.profile === 'control' ? 92041 : 92042]);
       const auth = makeAuth(config, db, seal);
       let result: unknown, cookies: string[] = [], status = 200;
-      if (path.startsWith('/auth/')) {
+      if(config.profile==='control'&&path==='/control/maintenance'&&['GET','POST'].includes(request.method)){
+        const s=await requireAdmin(auth,db,request);
+        result=request.method==='GET'?await maintenanceStatus(db):await changeMaintenance(db,s.user.id,request.body);
+      } else if (path.startsWith('/auth/')) {
         const allowed = ['/auth/sign-in/email', '/auth/sign-out', ...(config.profile === 'control' ? ['/auth/two-factor/enable', '/auth/two-factor/verify-totp'] : [])];
         if (request.method !== 'POST' || !allowed.includes(path)) throw new HttpError(404, 'NOT_FOUND');
         let enrollment = false;

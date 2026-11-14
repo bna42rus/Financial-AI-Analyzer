@@ -21,7 +21,7 @@ export function SupportLink({className=common.button,children='Поддержк�
  const [open,setOpen]=useState(false);
  return <>
   <button type="button" className={className} aria-label={showIcon?children:undefined} onClick={()=>setOpen(true)}>{showIcon?<><LifeBuoy size={17} aria-hidden="true"/><span>{children}</span></>:children}</button>
-  {open&&<OperationDialog compact title="Поддержка CashNeuro" onClose={()=>setOpen(false)} footer={<CopySupportAddress/>}>
+  {open&&<OperationDialog duringMaintenance compact title="Поддержка CashNeuro" onClose={()=>setOpen(false)} footer={<CopySupportAddress/>}>
    <p>Напишите нам — поможем разобраться.</p>
    <strong>{supportEmail}</strong>
   </OperationDialog>}

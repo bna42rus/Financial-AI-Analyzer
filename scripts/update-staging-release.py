@@ -442,6 +442,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regprocedure('commerce.interactive_checkouts_due()') IS NOT NULL", '0053_checkout_lifecycle.sql'),
         ("SELECT to_regclass('commerce.payment_card') IS NOT NULL", '0054_payment_cards.sql'),
         ("SELECT to_regclass('commerce.account_trial_activation') IS NOT NULL", '0055_periods_cards_trials.sql'),
+        ("SELECT to_regclass('commerce.maintenance') IS NOT NULL", '0056_maintenance.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')

@@ -4,7 +4,7 @@ import {api} from '../../web/src/server-client';
 import {deviceZone,timezoneLabel} from '../../web/src/InterfaceSettings';
 
 export type AdminLocation={tab:string;id?:string;search?:string};
-export const adminTabs=['users','requests','payments','tariffs','invitations','deliveries','history','account'];
+export const adminTabs=['users','requests','payments','tariffs','invitations','deliveries','history','maintenance','account'];
 export function readAdminLocation():AdminLocation{
  const [raw,query]=location.hash.slice(1).split('?'),params=new URLSearchParams(query);
  const tab=raw==='manual'?'users':raw==='renewals'?'requests':adminTabs.includes(raw??'')?raw!:'users';
