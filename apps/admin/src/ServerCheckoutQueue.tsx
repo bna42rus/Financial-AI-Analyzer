@@ -28,7 +28,7 @@ export function ServerCheckoutQueue({refresh,target,initialSearch}:{refresh:numb
  useEffect(()=>{if(initialSearch!==undefined)setSearch(initialSearch);},[initialSearch]);
  const waiting=data?.orders.some(o=>['checking','applying'].includes(o.reconciliation?.state??''));
  useEffect(()=>{if(!waiting)return;const timer=setInterval(reload,3500);return()=>clearInterval(timer);},[waiting]);
- return <section className={styles.card}><div className={shell.filters}>
+ return <section className={styles.card}><div className={shell.filters+' '+shell.paymentFilters}>
   <SearchField aria-label="Поиск платежей" placeholder="Почта, тариф или номер платежа" value={search} onValueChange={setSearch}/>
   <SelectField aria-label="Тип платежа" value={kind} onChange={e=>setKind(e.target.value)}><option value="">Все типы</option>{Object.entries(kinds).map(([id,label])=><option key={id} value={id}>{label}</option>)}</SelectField>
   <SelectField aria-label="Статус платежа" value={filter} onChange={e=>setFilter(e.target.value)}><option value="all">Все статусы</option>{Object.entries(labels).map(([key,title])=><option key={key} value={key}>{title}</option>)}<option value="refund">С возвратами</option></SelectField>

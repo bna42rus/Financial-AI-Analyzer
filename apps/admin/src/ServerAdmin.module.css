@@ -70,3 +70,18 @@
  .paymentHead>button,.paymentHead>.rowActions,.catalogRow>button,.catalogRow>.rowActions{flex:none}
  .rowActions{flex-wrap:nowrap}
 }
+
+/* Uniform inputs and search wrappers, including portalled admin dialogs. */
+:global(body:has([data-admin-shell])){--admin-control-height:42px;--select-height:42px}
+:global(body:has([data-admin-shell])) :global(input:not([type=checkbox]):not([type=radio]):not([type=hidden])),
+:global(body:has([data-admin-shell])) :global([data-select-trigger]),
+:global(body:has([data-admin-shell])) :global([data-search-field]){box-sizing:border-box;height:var(--admin-control-height);min-height:var(--admin-control-height)}
+:global(body:has([data-admin-shell])) :global([data-search-field] input[type=search]){height:100%;min-height:0;padding-block:0}
+@media(max-width:760px){
+ .page[data-admin-shell=workspace] .headerBar{flex-wrap:nowrap;gap:8px}
+ .headerActions{flex-wrap:nowrap;flex:none;gap:6px}
+ .headerActions>button{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;min-width:44px;padding:0}
+ .accountLabel{display:none}
+ .paymentFilters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+ .paymentFilters>:first-child{grid-column:1/-1}
+}

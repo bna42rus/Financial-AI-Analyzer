@@ -71,4 +71,7 @@
 /* Shared by operation filters and budget conditions. */
 .advanced{align-items:end}
 .advanced>label,.advanced>.multiField{align-content:end}
-.advanced input,.advanced :global([data-select-trigger]),.advanced .filterPick{box-sizing:border-box;height:40px;min-height:40px}
+.advanced input:not([type=checkbox]):not([type=radio]),.advanced :global([data-select-trigger]),.advanced .filterPick{box-sizing:border-box;height:40px;min-height:40px}
+
+.columnSettings input[type=checkbox]{width:16px;height:16px;min-height:16px;padding:0;flex:none}
+@media(max-width:700px){.columnChoice,.hiddenColumn{box-sizing:border-box;min-height:46px}.hiddenColumn{padding:3px 6px}}

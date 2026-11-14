@@ -82,3 +82,5 @@
 .chatHead,.composer{flex-shrink:0}
 .transcript{flex:1 1 0;min-height:0;overflow-y:auto}
 @media(max-width:700px){.layout{height:150svh;max-height:200svh;min-height:0;flex:none}}
+
+@media(max-width:700px){.transcript{overscroll-behavior:auto;touch-action:pan-y}}

@@ -65,8 +65,7 @@ function AdminWorkspace(){
   <div className={shell.headerBar}><Brand/>
    {signedIn&&<div className={shell.headerActions}>
     <button className={common.iconButton} aria-label="Обновить данные" title="Обновить данные" onClick={()=>setRefresh(n=>n+1)}><RefreshCw size={18}/></button>
-    <button className={common.button} type="button" onClick={()=>setAccountOpen(true)}><UserRound size={17}/>Аккаунт</button>
-    <button className={common.button} disabled={busy} onClick={()=>setExit(true)}>Выйти</button>
+    <button className={common.button} type="button" aria-label="Аккаунт" title="Аккаунт" onClick={()=>setAccountOpen(true)}><UserRound size={17}/><span className={shell.accountLabel}>Аккаунт</span></button>
    </div>}
   </div>
   {signedIn&&<nav className={shell.nav} aria-label="Разделы админки">{sections.map(({id,name,Icon})=><a key={id} href={adminLink(id)} aria-current={tab===id?'page':undefined}><Icon size={17}/>{name}</a>)}</nav>}
@@ -88,7 +87,7 @@ function AdminWorkspace(){
   {tab==='deliveries'&&<ServerDeliveries refresh={refresh} target={route.id}/>}
   {tab==='history'&&<ServerAdminHistory refresh={refresh} initialSearch={route.search}/>}
  </main>
- {accountOpen&&<OperationDialog title="Аккаунт" onClose={()=>setAccountOpen(false)} footer={<button className={common.button} onClick={()=>setAccountOpen(false)}>Готово</button>}><ServerAdminAccount email={session.email??''} timezone={timezone} onTimezone={setTimezone}/></OperationDialog>}
+ {accountOpen&&<OperationDialog title="Аккаунт" onClose={()=>setAccountOpen(false)} footer={<><button className={common.button} disabled={busy} onClick={()=>{setAccountOpen(false);setExit(true);}}>Выйти</button><button className={common.button} onClick={()=>setAccountOpen(false)}>Готово</button></>}><ServerAdminAccount email={session.email??''} timezone={timezone} onTimezone={setTimezone}/></OperationDialog>}
  </>}
  {exit&&<SignOutConfirmation busy={busy} onClose={()=>setExit(false)} onConfirm={()=>{setExit(false);void run(async()=>{await api('/auth/sign-out',{});setSession(null);setAccountOpen(false);setCodes([]);setRequestFilters(initialRequestFilters);});}}/>}
  <LegalFooter origin={import.meta.env.VITE_FINANCE_ORIGIN}/></div></AdminTimezoneProvider>;
