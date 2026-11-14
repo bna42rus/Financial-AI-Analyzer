@@ -32,6 +32,7 @@ export function ServerAdmin(){return <Notifications><AdminWorkspace/></Notificat
 function AdminWorkspace(){
  const newPassword=useNewPasswordFields();
  const [session,setSession]=useState<Session|null>(null),[loaded,setLoaded]=useState(false),[route,setRoute]=useState(readAdminLocation);
+ const [sessionFailure,setSessionFailure]=useState(''),[sessionAttempt,setSessionAttempt]=useState(0);
  const [refresh,setRefresh]=useState(0),[timezone,setTimezone]=useState('device'),[codes,setCodes]=useState<string[]>([]);
  const [error,setError]=useState(''),[busy,setBusy]=useState(false),[resetDone,setResetDone]=useState(false),[exit,setExit]=useState(false),[accountOpen,setAccountOpen]=useState(location.hash==='#account');
  const main=useRef<HTMLElement>(null);
@@ -46,11 +47,11 @@ function AdminWorkspace(){
  },[route.id,tab,signedIn]);
  useEffect(()=>{
   const controller=new AbortController();
-  void api<Session>('/session',undefined,controller.signal).then(s=>{if(!controller.signal.aborted)setSession(s);})
-   .catch(e=>{if(!controller.signal.aborted&&(!(e instanceof ApiError)||!['AUTH_REQUIRED','TOTP_REQUIRED'].includes(e.code)))setError(e.message);})
+  void api<Session>('/session',undefined,controller.signal).then(s=>{if(!controller.signal.aborted){setSession(s);setSessionFailure('');}})
+   .catch(e=>{if(!controller.signal.aborted&&(!(e instanceof ApiError)||!['AUTH_REQUIRED','TOTP_REQUIRED'].includes(e.code)))setSessionFailure(e instanceof Error?e.message:'Не удалось проверить вход.');})
    .finally(()=>{if(!controller.signal.aborted)setLoaded(true);});
   return()=>controller.abort();
- },[]);
+ },[sessionAttempt]);
  useEffect(()=>{const update=()=>setRoute(readAdminLocation());window.addEventListener('hashchange',update);return()=>window.removeEventListener('hashchange',update);},[]);
  useEffect(()=>{if(!signedIn)return;const controller=new AbortController();
   void api<{timezone:string}>('/control/admin-preferences',undefined,controller.signal).then(r=>{if(!controller.signal.aborted)setTimezone(r.timezone);}).catch(e=>{if(!controller.signal.aborted)setError(e.message);});
@@ -71,7 +72,7 @@ function AdminWorkspace(){
   {signedIn&&<nav className={shell.nav} aria-label="Разделы админки">{sections.map(({id,name,Icon})=><a key={id} href={adminLink(id)} aria-current={tab===id?'page':undefined}><Icon size={17}/>{name}</a>)}</nav>}
  </header>
  {error&&<p role="alert" className={styles.error}>{error}</p>}
- {!signedIn&&<div className={styles.entryContent}>{!loaded?<p role="status">Проверяем сессию…</p>:initialLink.kind==='reset'&&!resetDone?<section className={styles.card}><h1>Новый пароль администратора</h1>
+ {!signedIn&&<div className={styles.entryContent}>{!loaded?<p role="status">Проверяем сессию…</p>:sessionFailure?<section className={styles.card}><h1>Не удалось проверить вход</h1><p role="alert">{sessionFailure}</p><button className={styles.primary} onClick={()=>{setLoaded(false);setSessionFailure('');setSessionAttempt(n=>n+1);}}>Повторить проверку</button></section>:initialLink.kind==='reset'&&!resetDone?<section className={styles.card}><h1>Новый пароль администратора</h1>
  <form onSubmit={e=>{e.preventDefault();const password=newPassword.read(new FormData(e.currentTarget));if(password===null)return;void run(async()=>{await api('/security/reset',{token:initialLink.token,newPassword:password});setResetDone(true);setSession(null);});}}>
  {newPassword.fields}<button className={styles.primary} disabled={busy||!initialLink.token}>Сохранить пароль</button></form></section>:!session?
  <main className={styles.landing+' '+shell.entry}><div><p className={styles.eyebrow}>Для администраторов</p><h1>Панель управления CashNeuro</h1><p>Управляйте доступом пользователей, заявками и платежами.</p></div><ServerAuth control onAuthenticated={authenticated}/></main>:
