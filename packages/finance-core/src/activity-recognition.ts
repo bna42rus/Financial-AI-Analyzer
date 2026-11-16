@@ -1,5 +1,6 @@
 import type {Operation,Category} from './model.ts';
 import {installmentPaymentEvidence} from './installment-contract.ts';
+import {bankMerchantProjection} from './bank-merchant.ts';
 import {facet} from './model.ts';
 import {activityDefinitions,activityGuards,activitySpecificSenses,activityContainments,fulfillmentLexicon,activityDataSha256} from './catalog/generated/activity-v1.ts';
 import type {ActivityDefinition} from './catalog/generated/activity-v1.ts';
@@ -8,7 +9,7 @@ import type {LiteralHit} from './catalog-lexical.ts';
 import {resolveOwnCategory,privateCategoryTarget} from './category-resolution.ts';
 import type {CategoryResolution,CategoryBindings} from './category-resolution.ts';
 import {recognizeCatalogEvidence,serviceProfileDefault} from './catalog-evidence.ts';
-export const activityEngineVersion='cashneuro-activity-catalog/3';
+export const activityEngineVersion='cashneuro-activity-catalog/4';
 export {activityDataSha256};
 export type ActivityInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null;kind:string;role:string};
 export type ActivityRecognition={status:'recognized'|'unrecognized'|'needs_context'|'conflict'|'delegate_fin';activityIds:string[];targetKey:string|null;confidence:number;provisional:boolean;parentOnly:boolean;fulfillment:'delivery'|'pickup'|'unspecified'|'conflict';reason:string;profileKey:string|null;privateLabels?:readonly string[]};
@@ -169,7 +170,7 @@ export function activityDecision(operation:Operation,categories:readonly Categor
  if(s.versions.sourceSanitizer!=='bank-source/5')return null;
  if(s.versions.sourceTextEvidence!=='intact')return {evidence:null,resolution:{status:'missing',reason:'UNTRUSTED_LITERAL_BOUNDARIES'} as CategoryResolution};
  if(installmentPaymentEvidence(s))return {evidence:null,resolution:{status:'missing',reason:'INSTALLMENT_REQUIRES_FINANCIAL_MODEL'} as CategoryResolution};
- const evidence=recognizeActivity({merchantText:s.merchantText,description:s.description,bankCategory:s.bankCategory,mcc:s.sourceMcc,kind:operation.semantics.kind.value,role:operation.semantics.role.value});
+ const evidence=recognizeActivity({merchantText:bankMerchantProjection(s)??s.merchantText,description:s.description,bankCategory:s.bankCategory,mcc:s.sourceMcc,kind:operation.semantics.kind.value,role:operation.semantics.role.value});
  return {evidence,resolution:resolveActivityCategory(evidence,categories,bindings)};
 }
 /** Only category facets of eligible whole operations. Source, money, merchant,

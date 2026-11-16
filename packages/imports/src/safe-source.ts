@@ -5,6 +5,7 @@ export type {MerchantCode};
 import {bankDescription,parseBankDescription,merchantBankDescription,parseMerchantBankDescription,financialTransferText} from './bank-description.ts';
 import type {BankDescription,MerchantBankDescription} from './bank-description.ts';
 import type {Kind} from '../../finance-core/src/model.ts';
+import {statementEvent} from './bank-event.ts';
 
 /** Legacy finite profiles remain unchanged. /4 adds locally sanitized bank text. */
 export const legacySourceSanitizer='bank-source/1' as const;
@@ -38,6 +39,10 @@ export function extractSafeSource(text:unknown,amountMinor:unknown,profile:typeo
  if(hasBankDescription(profile)){
   const details=profile===merchantSourceSanitizer?merchantBankDescription(text):bankDescription(text);
   let base=extractSafeSource(text,amountMinor,localSourceSanitizer);
+  if(!base&&profile===merchantSourceSanitizer&&'textEvidence' in details&&details.textEvidence==='intact'&&typeof amountMinor==='string'){
+   const event=statementEvent(details.description,amountMinor);
+   if(event&&['purchase','refund','fee','cash_withdrawal','cash_deposit','cashback','transfer_in','transfer_out'].includes(event))base={event:event as SafeSource['event'],merchant:null};
+  }
   // /1../4 retain their frozen finite templates. /5 can keep a commercial
   // payment that contains перевод without manufacturing a money transfer.
   if(!base&&profile===merchantSourceSanitizer&&'textEvidence' in details&&details.textEvidence==='intact'&&!financialTransferText(details.description)){

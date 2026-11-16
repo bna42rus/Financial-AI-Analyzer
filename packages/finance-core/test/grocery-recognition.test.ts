@@ -13,10 +13,10 @@ const categories:Category[]=[{id:'food',name:'Продукты',parentId:null,ro
 const op=(merchant:string,description='Покупка '+merchant):Operation=>({id:'synthetic',source:{accountId:'synthetic-account',operationDate:{precision:'day',date:'2026-10-01'},postedDate:null,amountMinor:'-12345',currency:'RUB',merchantText:merchant,description,bankCategory:'',bankRefHmac:null,versions:{sourceSanitizer:'bank-source/4'}},corrections:{},semantics:initialSemantics('purchase',merchant),comment:'',analyticsOverride:'default',decomposition:false,reviewReasons:['possible_duplicate']});
 const classify=(merchant:string,description='')=>merchantCategory(recognizeMerchant(merchant,description),categories);
 
-test('all 50 approved food-store records have public provenance and disjoint normalized aliases',()=>{
- assert.equal(groceryCatalog.length,50);assert.equal(merchantCatalogVersion,'merchant-catalog/2');
+test('all 51 approved food-store records have public provenance and disjoint normalized aliases',()=>{
+ assert.equal(groceryCatalog.length,51);assert.equal(merchantCatalogVersion,'merchant-catalog/2');
  const owners=new Map<string,string>();
- for(const entry of merchantCatalog){assert.match(entry.source,/^https:\/\//);if(groceryCatalog.includes(entry))assert.equal(entry.checkedAt,'2026-10-25');for(const alias of entry.aliases){for(const key of brandKeys(alias)){const prior=owners.get(key);assert.ok(!prior||prior===entry.name,`${key}: ${prior} / ${entry.name}`);owners.set(key,entry.name);}}}
+ for(const entry of merchantCatalog){assert.match(entry.source,/^https:\/\//);if(groceryCatalog.includes(entry))assert.equal(entry.checkedAt,entry.name==='Бристоль'?'2026-11-16':'2026-10-25');for(const alias of entry.aliases){for(const key of brandKeys(alias)){const prior=owners.get(key);assert.ok(!prior||prior===entry.name,`${key}: ${prior} / ${entry.name}`);owners.set(key,entry.name);}}}
 });
 
 test('every declared Russian form, transliteration and joined form resolves to its own shop with retail evidence',()=>{

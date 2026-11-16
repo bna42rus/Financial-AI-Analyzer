@@ -1,10 +1,11 @@
 import {brandForms} from './merchant-aliases.ts';
 import type {MerchantEntry} from './merchant-catalog.ts';
-const grocery=(name:string,forms:string[],source:string,options:Partial<Pick<MerchantEntry,'parentBrand'|'requireGroceryContext'>>={}):MerchantEntry=>({name,aliases:brandForms(forms),service:'grocery',groceryStore:true,source,checkedAt:'2026-10-25',...options});
+const grocery=(name:string,forms:string[],source:string,options:Partial<Pick<MerchantEntry,'parentBrand'|'requireGroceryContext'|'checkedAt'>>={}):MerchantEntry=>({name,aliases:brandForms(forms),service:'grocery',groceryStore:true,source,checkedAt:'2026-10-25',...options});
 /** Owner-approved food-store scope. Forms are matching candidates, never alleged bank samples.
  * Every Russian case is explicit; Latin forms use three bounded transliteration conventions.
  * Separators are normalized at matching time. No arbitrary suffixes or fuzzy brand matching. */
 export const groceryCatalog:readonly MerchantEntry[]=[
+ grocery('Бристоль',['бристоль','bristol'],'https://bristol.ru/',{checkedAt:'2026-11-16'}),
  grocery('Пятёрочка',['пятёрочка','пятёрочки','пятёрочке','пятёрочку','пятёрочкой','пятёрочкою','пятёрочках','pyaterochka','piaterochka','5ka'],'https://www.x5.ru/ru/consumer/'),
  grocery('Перекрёсток',['перекрёсток','перекрёстка','перекрёстку','перекрёстком','перекрёстке','перекрёстках','perekrestok'],'https://www.x5.ru/ru/consumer/'),
  grocery('Чижик',['чижик','чижика','чижику','чижиком','чижике','чижиках'],'https://www.x5.ru/ru/consumer/'),

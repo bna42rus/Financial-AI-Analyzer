@@ -47,15 +47,15 @@ for(const [text,amount] of [
  ['Выплата процентов по вкладу и погашение кредита','450000'],
  ['Проценты','450000'],['Т-Банк','450000'],['Перевод от Иванов Иван Иванович проценты','450000'],
 ] as const)test('FIN-P02/P06: insufficient or conflicting cash evidence '+text+' '+amount,()=>{
- const fact=bankFact(text,amount);assert.equal(bankInterestEvidence(fact),null);assert.equal(initialBankSemantics(fact).kind.value,'other');assert.equal(initialBankSemantics(fact).role.value,'unresolved');
+ const fact=bankFact(text,amount);assert.equal(bankInterestEvidence(fact),null);assert.equal(initialBankSemantics(fact).kind.value,text.startsWith('Перевод от ')?'transfer_in':'other');assert.equal(initialBankSemantics(fact).role.value,'unresolved');
 });
 test('FIN-P02/P11: legacy, incomplete boundaries, positive purchase and comments cannot supply interest authority',()=>{
  for(const patch of [{versions:{sourceSanitizer:'bank-source/4'}},{versions:{sourceSanitizer:'bank-source/5',sourceTextEvidence:'unknown'}},{sourceKind:'purchase' as const}])assert.equal(bankInterestEvidence({...bankFact('Проценты по вкладу'),...patch}),null);
- const o=operation(bankFact('Перевод'));o.comment='Начисление процентов по вкладу';assert.equal(initialBankSemantics(o.source).kind.value,'other');
+ const o=operation(bankFact('Перевод'));o.comment='Начисление процентов по вкладу';assert.equal(initialBankSemantics(o.source).kind.value,'transfer_in');assert.equal(initialBankSemantics(o.source).role.value,'unresolved');
 });
 test('FIN-T50: reimport refreshes only eligible facets and removes a prior inferred meaning when actual evidence is lost',()=>{
  const source=bankFact('Проценты по вкладу'),first=initialBankSemantics(source);assert.equal(refreshBankSemantics(first,source).role.value,'income');
- const lost=refreshBankSemantics(first,bankFact('Перевод'));assert.equal(lost.kind.value,'other');assert.equal(lost.role.value,'unresolved');assert.equal(lost.kind.confidence,0);
+ const lost=refreshBankSemantics(first,bankFact('Перевод'));assert.equal(lost.kind.value,'transfer_in');assert.equal(lost.role.value,'unresolved');assert.equal(lost.kind.confidence,100);
  for(const priority of ['user','personal_rule','global_rule','ai'] as const){const own=structuredClone(first);own.role=facet('neutral',priority,priority==='user');own.merchant=facet('Мои проценты',priority,priority==='user');const next=refreshBankSemantics(own,source);assert.deepEqual(next.role,own.role);assert.deepEqual(next.merchant,own.merchant);}
  const explicit=structuredClone(first);explicit.kind=facet('transfer_in','user',true);assert.deepEqual(refreshBankSemantics(explicit,source).kind,explicit.kind);
 });

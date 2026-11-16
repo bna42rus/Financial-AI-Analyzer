@@ -2,6 +2,7 @@ import {parseCounterpartyRuleConditions,parseProposalOperations,saveCounterparty
 import {parseCategoryBinding,applyCategoryBinding} from './category-bindings.ts';
 import type {CategoryBindingIntent} from './category-bindings.ts';
 import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
+import {bankEventRepairs} from './bank-event-repair.ts';
 import {parseSelectedCategories,applySelectedCategories} from './selected-categories.ts';
 import type {SelectedCategoryIntent} from './selected-categories.ts';
 import {operationDisplayName} from '../../../packages/finance-core/src/operation-name.ts';
@@ -77,6 +78,11 @@ export async function prepareFinance(db:PoolClient,userId:string){
   const missing=!categories.some(c=>isMarketplaceName(c.name));
   if(missing)await db.query("INSERT INTO finance.category(user_id,id,name,role) VALUES($1,$2,'Маркетплейсы','expense')",[userId,randomUUID()]);
   workspace=(await db.query('UPDATE finance.workspace SET marketplace_catalog_initialized=true,revision=revision+$2 WHERE user_id=$1 RETURNING *',[userId,missing?1:0])).rows[0];
+ }
+ if(!workspace.bank_events_repaired){
+  const {graph,rules}=await loadFinance(db,userId),repairs=bankEventRepairs(graph,rules);
+  for(const op of repairs)await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,op.id,JSON.stringify(op.semantics),JSON.stringify(op.reviewReasons)]);
+  workspace=(await db.query('UPDATE finance.workspace SET bank_events_repaired=true,revision=revision+$2 WHERE user_id=$1 RETURNING *',[userId,repairs.length?1:0])).rows[0];
  }
  return workspace as {generation:string;revision:string;loan_mode:'cashflow'|'economic';key_version:string;interface_epoch:string;config_revision:string};
 }

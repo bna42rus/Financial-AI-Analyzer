@@ -1,4 +1,5 @@
 import type {Operation} from './model.ts';
+import {bankMerchantProjection} from './bank-merchant.ts';
 import {cleanBankText} from '../../imports/src/bank-description.ts';
 import {recognizeCatalogEvidence} from './catalog-evidence.ts';
 import {recognizeActivity} from './activity-recognition.ts';
@@ -33,7 +34,7 @@ function composite(fields:Pick<OperationDisplayName,'title'|'eventLabel'|'servic
  * network, grouping, rule matching or writes of any bank/semantic field. */
 export function operationDisplayName(op:Operation,context:NameContext={}):OperationDisplayName{
  const source=op.source,name=op.semantics.merchant,kind=op.semantics.kind.value,protectedName=name.userVerified||['user','personal_rule','global_rule'].includes(name.source);
- const raw=cleanBankText(source.merchantText,160),description=cleanBankText(source.description),intact=source.versions.sourceSanitizer==='bank-source/5'&&source.versions.sourceTextEvidence==='intact';
+ const raw=cleanBankText(bankMerchantProjection(source)??source.merchantText,160),description=cleanBankText(source.description),intact=source.versions.sourceSanitizer==='bank-source/5'&&source.versions.sourceTextEvidence==='intact';
  let title=protectedName?cleanBankText(name.value,160):intact?(raw||cleanBankText(name.value,160)):(cleanBankText(name.value,160)||raw),explanationCode=protectedName?'NAME-R02':'NAME-R11';
  let serviceQualifier:string|null=null,fulfillmentQualifier:string|null=null;
  if(!protectedName&&intact&&raw){

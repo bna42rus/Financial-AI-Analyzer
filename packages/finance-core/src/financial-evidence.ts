@@ -3,9 +3,12 @@ import type {BankFact,Category,Operation,Semantics} from './model.ts';
 import {parsePersistedMinor} from './money.ts';
 import {resolveOwnCategory} from './category-resolution.ts';
 import {catalogFold} from './catalog-lexical.ts';
+import {statementEvent} from '../../imports/src/bank-event.ts';
+import {bankMerchantProjection} from './bank-merchant.ts';
 
 export const financialEvidenceVersion='cashneuro-financial-evidence/1' as const;
 const interestRule=financialEvidenceVersion+':bank-interest';
+export const bankEventRule='cashneuro-bank-events/1';
 type FinancialSource=Pick<BankFact,'sourceKind'|'merchantText'|'amountMinor'|'description'|'versions'>;
 type InterestEvidence={role:'income'|'expense';subject:'deposit'|'loan'};
 /** Whole, explicit cash event headings, never a bank/brand/category/comment match.
@@ -15,6 +18,7 @@ export function bankInterestEvidence(source:FinancialSource):InterestEvidence|nu
  const text=catalogFold(source.description),amount=parsePersistedMinor(source.amountMinor);
  if(!amount||/[\p{Cf}]/u.test(source.description)||/(?:^|[^\p{L}\p{N}])(?:не|без|возврат\p{L}*|отмен\p{L}*|прогноз\p{L}*|ожида\p{L}*|планов\p{L}*|расчет\p{L}*|предварительн\p{L}*|компенсац\p{L}*|корректиров\p{L}*|бонус\p{L}*)(?=$|[^\p{L}\p{N}])/u.test(text))return null;
  const deposit='(?:по (?:вкладу|депозиту|накопительному счету|счету)|на остаток(?: по счету)?)',loan='(?:по (?:кредиту|займу|кредитной карте))';
+ if(amount<0n&&/^погашение процентов\.?$/u.test(text))return {role:'expense',subject:'loan'};
  // A technical tail may identify a period/reference; another monetary event
  // cannot silently become a single interest payment.
  const tail='(?:$|[\\s:;,.—–-].*)';
@@ -32,19 +36,25 @@ export function initialBankSemantics(source:FinancialSource,merchant=source.merc
   semantics.kind=facet('other','bank',false,0);
   const interest=bankInterestEvidence(source);
   if(interest){semantics.kind={...facet('interest'),ruleId:interestRule};semantics.role={...facet(interest.role),ruleId:interestRule};}
+  else if(source.versions.sourceSanitizer==='bank-source/5'&&source.versions.sourceTextEvidence==='intact'){
+   const kind=statementEvent(source.description,source.amountMinor);
+   if(kind){semantics.kind={...facet(kind),ruleId:bankEventRule};semantics.role={...facet(kind==='loan_payment'&&BigInt(source.amountMinor)>0n?'neutral':defaultRole(kind,source.amountMinor)),ruleId:bankEventRule};}
+  }
  }
+ const projected=bankMerchantProjection(source);
+ if(projected&&merchant===source.merchantText)semantics.merchant=facet(projected,'bank');
  return semantics;
 }
-const automaticKind=(s:Semantics)=>!s.kind.userVerified&&(s.kind.source==='bank'||s.kind.source==='deterministic_system_rule'&&s.kind.ruleId===interestRule);
+const automaticKind=(s:Semantics)=>!s.kind.userVerified&&(s.kind.source==='bank'||s.kind.source==='deterministic_system_rule'&&[interestRule,bankEventRule].includes(s.kind.ruleId??''));
 /** Refresh only the bank initializer/current policy. Private, global, AI and
  * verified decisions survive reimports; lost evidence does not linger. */
 export function refreshBankSemantics(previous:Semantics,source:FinancialSource):Semantics{
  const out=structuredClone(previous),fresh=initialBankSemantics(source);
  if(automaticKind(previous)){
   out.kind=fresh.kind;
-  if(!previous.role.userVerified&&previous.role.source==='deterministic_system_rule'&&(previous.kind.value!==fresh.kind.value||fresh.kind.value==='interest'||previous.kind.value==='interest'))out.role=fresh.role;
+  if(!previous.role.userVerified&&['bank','deterministic_system_rule'].includes(previous.role.source)&&(previous.kind.value!==fresh.kind.value||fresh.kind.value==='interest'||previous.kind.value==='interest'))out.role=fresh.role;
  }
- if(!previous.merchant.userVerified&&previous.merchant.source==='bank'&&(source.merchantText||previous.kind.value!==fresh.kind.value))out.merchant=fresh.merchant;
+ if(!previous.merchant.userVerified&&previous.merchant.source==='bank'&&(source.merchantText||fresh.merchant.value||previous.kind.value!==fresh.kind.value))out.merchant=fresh.merchant;
  return out;
 }
 /** Read-only effective direction, including amount correction and its reset.

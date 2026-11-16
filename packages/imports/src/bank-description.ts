@@ -1,4 +1,5 @@
 import {sanitizeText,safeText} from '../../privacy/src/text.ts';
+import {statementPayment} from './bank-event.ts';
 
 export type BankDescription={description:string;merchantText:string;bankCategory:string;mcc:string|null};
 export type MerchantBankDescription=BankDescription&{textEvidence:'intact'|'unknown'};
@@ -49,13 +50,15 @@ export function financialTransferText(text:string):boolean{
  * No raw text/identifier or secret is added to the wire. */
 export function merchantBankDescription(description:unknown,merchant:unknown='',bankCategory:unknown='',mcc:unknown=null):MerchantBankDescription{
  const details=bankDescription(description,merchant,bankCategory,mcc);
+ const payment=statementPayment(details.description);
  let name=cleanBankText(merchant,160);
  if(!name){
   const match=/^(?:оплата товаров и услуг|оплата покупки|покупка(?: в)?|оплата услуг|оплата в|оплата по карте|оплата картой|purchase|card payment|возврат покупки|возврат средств за покупку|возврат оплаты|purchase refund|refund)\s*[:.-]?\s+(.+)$/iu.exec(details.description);
   name=match?.[1]?.slice(0,160).trim()??'';
  }
  if(financialTransferText(details.description)||name.includes(hidden)&&!/[\p{L}]{2,}/u.test(name.replaceAll(hidden,'')))name='';
- return {...details,merchantText:name,textEvidence:[description,merchant,bankCategory].some(v=>typeof v==='string'&&/\p{Cf}/u.test(v))?'unknown':'intact'};
+ if(!name&&payment&&!financialTransferText(details.description))name=payment.merchantText.slice(0,160);
+ return {...details,merchantText:name,bankCategory:details.bankCategory||payment?.bankCategory||'',textEvidence:[description,merchant,bankCategory].some(v=>typeof v==='string'&&/\p{Cf}/u.test(v))?'unknown':'intact'};
 }
 
 export function parseMerchantBankDescription(value:unknown):MerchantBankDescription{

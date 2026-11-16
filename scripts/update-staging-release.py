@@ -443,6 +443,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regclass('commerce.payment_card') IS NOT NULL", '0054_payment_cards.sql'),
         ("SELECT to_regclass('commerce.account_trial_activation') IS NOT NULL", '0055_periods_cards_trials.sql'),
         ("SELECT to_regclass('commerce.maintenance') IS NOT NULL", '0056_maintenance.sql'),
+        ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='bank_events_repaired')", '0057_bank_event_repair.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')
