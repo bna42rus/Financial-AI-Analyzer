@@ -20,9 +20,9 @@ test('/5 private merchant predicates have the same truth table as frozen /4 for 
   assert.deepEqual(next,before);assert.equal(next.source.merchantText,merchant+' MOSCOW RUS');
  }assert.equal(checked,1612);
 });
-test('a private Cyrillic contains rule applies to Latin /5 source without a source/name/category rewrite',()=>{
+test('a private Cyrillic contains rule applies to Latin /5 source preserving source and private category with canonical bank name',()=>{
  const next=op('Покупка PYATEROCHKA MOSCOW RUS',merchantSourceSanitizer),before=structuredClone(next),after=applyMerchantRecognition(applyRules(next,account,[rule({merchantContains:'Пятёрочка'})]),[]);
- assert.equal(after.semantics.category.value,'private-category');assert.equal(after.semantics.category.source,'personal_rule');assert.deepEqual(after.source,before.source);assert.deepEqual(after.semantics.merchant,before.semantics.merchant);assert.deepEqual(next,before);
+ assert.equal(after.semantics.category.value,'private-category');assert.equal(after.semantics.category.source,'personal_rule');assert.deepEqual(after.source,before.source);assert.deepEqual(after.semantics.merchant,facet('Пятёрочка','bank',false,96));assert.deepEqual(next,before);
 });
 test('manual, private, verified and AI merchant names use their current value; no compatibility override',()=>{
  for(const source of ['user','personal_rule','global_rule','ai']as const){const changed=op('Покупка PYATEROCHKA MOSCOW RUS',merchantSourceSanitizer);changed.semantics.merchant=facet('Личный24',source);

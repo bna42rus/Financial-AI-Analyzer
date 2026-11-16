@@ -14,7 +14,8 @@ export const supersededLegacy:Readonly<Record<string,readonly string[]>>={HOME00
 function eligible(p:FullCatalogProfile,i:CatalogInput,literals:readonly string[]){
  const text=i.merchantText+' '+i.description,has=(forms:readonly string[])=>hasLiteral(text,forms),context=has(clues[p.guard]??[])||hasLiteral(i.bankCategory??'',clues[p.guard]??[])||(codes[p.target??'']??[]).includes(i.mcc??'');
  if(locals[p.id]&&!has(locals[p.id]!))return false;
- if(p.requiresContext&&!context)return false;
+ const mobileOperator=p.guard==='telecom'&&['NET001','NET002','NET003','NET017','NET018','NET020','NET021','NET022','NET035'].includes(p.id);
+ if(p.requiresContext&&!context&&!mobileOperator)return false;
  // Product manufacturers are not an independently established retailer/payee.
  if(p.guard==='subject'&&!context&&!has(['оплата услуги','покупка товара','подписка','обучение','аренда автомобиля','аренда жилья','пожертвование','ветеринарная услуга']))return false;
  // Don't treat only the single-letter historical restaurant brand as identity.
@@ -35,7 +36,7 @@ function targetFor(p:FullCatalogProfile,i:CatalogInput){
   if(has(['мобильная связь','мобильный тариф','мобильный интернет']))return 'mobile';
   if(has(['домашний интернет','доступ в интернет','абонплата за интернет']))return 'internet';
   // Multi-service operators retain the broad agreed parent without claiming a product.
-  if(['NET001','NET002','NET003','NET017','NET018','NET020','NET021','NET022','NET035'].includes(p.id))return 'telecom_root';
+  if(['NET001','NET002','NET003','NET017','NET018','NET020','NET021','NET022','NET035'].includes(p.id))return 'mobile';
  }
  if(p.id==='R01'&&has(['такси','taxi']))return 'taxi';
  if(p.id==='GFT001'&&has(['подарок','подарочный букет','подарочная композиция']))return 'gifts';

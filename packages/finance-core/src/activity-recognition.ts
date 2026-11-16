@@ -1,6 +1,7 @@
 import type {Operation,Category} from './model.ts';
 import {installmentPaymentEvidence} from './installment-contract.ts';
 import {bankMerchantProjection} from './bank-merchant.ts';
+import {merchantDictionaryRevision} from './merchant-dictionary.ts';
 import {facet} from './model.ts';
 import {activityDefinitions,activityGuards,activitySpecificSenses,activityContainments,fulfillmentLexicon,activityDataSha256} from './catalog/generated/activity-v1.ts';
 import type {ActivityDefinition} from './catalog/generated/activity-v1.ts';
@@ -9,7 +10,8 @@ import type {LiteralHit} from './catalog-lexical.ts';
 import {resolveOwnCategory,privateCategoryTarget} from './category-resolution.ts';
 import type {CategoryResolution,CategoryBindings} from './category-resolution.ts';
 import {recognizeCatalogEvidence,serviceProfileDefault} from './catalog-evidence.ts';
-export const activityEngineVersion='cashneuro-activity-catalog/4';
+export const activityEngineVersion='cashneuro-activity-catalog/5';
+export {merchantDictionaryRevision};
 export {activityDataSha256};
 export type ActivityInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null;kind:string;role:string};
 export type ActivityRecognition={status:'recognized'|'unrecognized'|'needs_context'|'conflict'|'delegate_fin';activityIds:string[];targetKey:string|null;confidence:number;provisional:boolean;parentOnly:boolean;fulfillment:'delivery'|'pickup'|'unspecified'|'conflict';reason:string;profileKey:string|null;privateLabels?:readonly string[]};
@@ -65,7 +67,7 @@ export function activityLiteralHits(text:string){return find(text);}
 function fulfillment(c:Context):ActivityRecognition['fulfillment']{
  const negativeDelivery=/(?:без|не нужна|нужна|нужна ли|нужна будет|возможна ли)\s+доставк|доставк[а-я]*\s+(?:отменен|отменён|нет|недоступн|не нужна)|(?:no|without|cancelled)\s+delivery|delivery\s+(?:cancelled|unavailable)/u.test(c.f);
  const negativePickup=/(?:без|нужен ли)\s+самовывоз|самовывоз[а-я]*\s+(?:отменен|отменён|недоступен)|(?:no|without|cancelled)\s+pickup/u.test(c.f);
- const delivery=!negativeDelivery&&c.has(fulfillmentLexicon.affirmative_delivery_candidates??[]),pickup=!negativePickup&&c.has(fulfillmentLexicon.pickup_candidates??[]);
+ const delivery=!negativeDelivery&&c.has([...(fulfillmentLexicon.affirmative_delivery_candidates??[]),'dostavka','dostavki','dostavkoy']),pickup=!negativePickup&&c.has(fulfillmentLexicon.pickup_candidates??[]);
  return delivery&&pickup?'conflict':delivery?'delivery':pickup?'pickup':'unspecified';
 }
 type Routed={key:string;privateLabels?:readonly string[];parentOnly?:boolean}|{block:'needs_context'|'delegate_fin'}|null;
@@ -108,6 +110,11 @@ export function recognizeActivity(i:ActivityInput):ActivityRecognition{
  if(i.role!=='expense'||['refund','reversal','transfer_in','transfer_out','own_transfer','credit_card_repayment','loan_payment','loan_disbursement','interest'].includes(i.kind))return result('delegate_fin','FINANCIAL_CONTEXT_REQUIRED');
  const catalog=recognizeCatalogEvidence({...i,merchantText:subjectText(i.merchantText),description:subjectText(i.description)}),profile=catalog.status==='recognized'?catalog:null,profileKey=profile?(profile.profileId?'catalog-v1:'+profile.profileId:'legacy-catalog:'+profile.entry.name):null;
  if(catalog.status==='conflict')return result('conflict',catalog.reason);
+ if(profile?.profileId?.startsWith('owner-')&&profile.target&&!/(?:отдельная оплата|отдельно оплаченная|плата за|оплата услуг|услуга:)\s*(?:курьер|доставк)|separate courier fee/u.test(c.f)&&!c.has(['подарочный сертификат','подарочная карта','gift card','покупка телефона','покупка смартфона','покупка оборудования','учебник','книга','лекарство','лекарства'])){
+  let key=profile.target;if(key==='grocery'&&method==='delivery')key='grocery_delivery';if(key==='grocery_delivery'&&method==='pickup')key='grocery';if(c.work&&['cloud','software','ai','vpn'].includes(key))key='business_services';
+  return result('recognized','OWNER_APPROVED_MERCHANT',[],key,profile.provisional,profile.parentOnly||method==='conflict',profileKey);
+ }
+ if(/vending|вендинг/iu.test(i.merchantText)&&!c.has(['цветы','flowers','аптека','pharmacy','электроника','electronics']))return result('recognized','VENDING_REQUIRES_REVIEW',[],'grocery',true);
  const primary=find(subjectText(i.merchantText)),body=find(subjectText(i.description));
  const positive=(h:LiteralHit<ActivityDefinition>,text:string)=>{
   const chars=[...catalogFold(text)],before=chars.slice(0,h.from).join(''),after=chars.slice(h.through).join('');
@@ -158,7 +165,7 @@ export function recognizeActivity(i:ActivityInput):ActivityRecognition{
  if(profile||primary.length||body.length||find(i.merchantText).length||find(i.description).length||catalog.status==='needs_context')return result('needs_context','LITERAL_REQUIRES_CONTEXT');
  return result('unrecognized','NO_ACTIVITY_EVIDENCE');
 }
-const specialTargets={telecom_root:{key:'telecom_root',path:['Связь и интернет'],labels:['Связь и интернет','Связь']},telecom_other:{key:'telecom_other',path:['Связь и интернет','Прочая связь'],labels:['Прочая связь','Телефония']},education:{key:'education',path:['Образование','Обучение'],labels:['Обучение']},subscription_other:{key:'subscription_other',path:['Подписки и цифровые сервисы','Прочие подписки'],labels:['Прочие подписки']}};
+const specialTargets={scooter:{key:'scooter',path:['Транспорт','Аренда самокатов'],labels:['Аренда самокатов','Самокаты','Кикшеринг']},telecom_root:{key:'telecom_root',path:['Связь и интернет'],labels:['Связь и интернет','Связь']},telecom_other:{key:'telecom_other',path:['Связь и интернет','Прочая связь'],labels:['Прочая связь','Телефония']},education:{key:'education',path:['Образование','Обучение'],labels:['Обучение']},subscription_other:{key:'subscription_other',path:['Подписки и цифровые сервисы','Прочие подписки'],labels:['Прочие подписки']}};
 export function resolveActivityCategory(e:ActivityRecognition,categories:readonly Category[],bindings?:CategoryBindings):CategoryResolution{
  if(e.status!=='recognized'||!e.targetKey)return {status:'missing',reason:e.reason};
  const target=e.privateLabels?privateCategoryTarget(e.targetKey,e.privateLabels):specialTargets[e.targetKey as keyof typeof specialTargets];
@@ -170,7 +177,7 @@ export function activityDecision(operation:Operation,categories:readonly Categor
  if(s.versions.sourceSanitizer!=='bank-source/5')return null;
  if(s.versions.sourceTextEvidence!=='intact')return {evidence:null,resolution:{status:'missing',reason:'UNTRUSTED_LITERAL_BOUNDARIES'} as CategoryResolution};
  if(installmentPaymentEvidence(s))return {evidence:null,resolution:{status:'missing',reason:'INSTALLMENT_REQUIRES_FINANCIAL_MODEL'} as CategoryResolution};
- const evidence=recognizeActivity({merchantText:bankMerchantProjection(s)??s.merchantText,description:s.description,bankCategory:s.bankCategory,mcc:s.sourceMcc,kind:operation.semantics.kind.value,role:operation.semantics.role.value});
+ const evidence=recognizeActivity({merchantText:s.merchantText||bankMerchantProjection(s)||'',description:s.description,bankCategory:s.bankCategory,mcc:s.sourceMcc,kind:operation.semantics.kind.value,role:operation.semantics.role.value});
  return {evidence,resolution:resolveActivityCategory(evidence,categories,bindings)};
 }
 /** Only category facets of eligible whole operations. Source, money, merchant,

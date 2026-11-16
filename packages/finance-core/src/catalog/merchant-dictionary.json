@@ -1,0 +1,475 @@
+{
+  "schema": "cashneuro-merchant-dictionary/1",
+  "revision": "2026-11-16.1",
+  "entries": [
+    {
+      "id": "owner-restopay",
+      "name": "Restopay",
+      "forms": [
+        "restopay",
+        "resto pay",
+        "ресто пей",
+        "рестопей"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-zdraste",
+      "name": "Здрасте",
+      "forms": [
+        "здрасте",
+        "здрасьте",
+        "zdraste",
+        "zdrastye",
+        "zdras te"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-magnolia",
+      "name": "Магнолия",
+      "forms": [
+        "магнолия",
+        "магнолии",
+        "магнолию",
+        "magnolia",
+        "magnoliya",
+        "magnolija",
+        "магнолией"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-bristol",
+      "name": "Бристоль",
+      "forms": [
+        "бристоль",
+        "бристоля",
+        "бристоле",
+        "bristol",
+        "бристолю",
+        "бристолем"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-vkusvill",
+      "name": "ВкусВилл",
+      "forms": [
+        "вкусвилл",
+        "вкус вилл",
+        "вкуссвилл",
+        "vkusvill",
+        "vkusvil",
+        "vkus vill",
+        "вкусвилла",
+        "вкусвиллу",
+        "вкусвилле",
+        "вкусвиллом"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-dixy",
+      "name": "Дикси",
+      "forms": [
+        "дикси",
+        "dixy",
+        "diksi",
+        "dixi"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-krasnoe-beloe",
+      "name": "Красное & Белое",
+      "forms": [
+        "красное белое",
+        "красное и белое",
+        "krasnoe beloe",
+        "krasnoe i beloe",
+        "krasnoye beloye",
+        "krasnoe belye"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-pyaterochka",
+      "name": "Пятёрочка",
+      "forms": [
+        "пятерочка",
+        "пятерочки",
+        "пятерочке",
+        "пятерочку",
+        "pyaterochka",
+        "pyaterochk",
+        "piaterochka",
+        "pyaterocka",
+        "5ka"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-samokat",
+      "name": "Самокат",
+      "forms": [
+        "самокат",
+        "samokat"
+      ],
+      "target": "grocery_delivery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-morem",
+      "name": "Моремания",
+      "forms": [
+        "моремания",
+        "моремании",
+        "мореманию",
+        "moremaniya",
+        "moremanija",
+        "moremania",
+        "мореманией"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-fish-manufactory",
+      "name": "Рыбная мануфактура",
+      "forms": [
+        "рыбная мануфактура",
+        "рыбной мануфактуры",
+        "рыбной мануфактуре",
+        "rybnaya manufaktura",
+        "rybnaja manufaktura",
+        "rybnaya manufactory",
+        "рыбную мануфактуру",
+        "рыбной мануфактурой",
+        "ribnaya manufaktura"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-koala",
+      "name": "Коала",
+      "forms": [
+        "коала",
+        "koala",
+        "1koala",
+        "koala picca",
+        "koala pizza",
+        "коалы",
+        "коале",
+        "коалу",
+        "коалой"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-kinokassa",
+      "name": "Кинокасса",
+      "forms": [
+        "кинокасса",
+        "кинокассы",
+        "кинокассе",
+        "kinokassa",
+        "kino kassa",
+        "кинокассу",
+        "кинокассой"
+      ],
+      "target": "events",
+      "confidence": 96
+    },
+    {
+      "id": "owner-kinokvartal",
+      "name": "Киноквартал",
+      "forms": [
+        "киноквартал",
+        "киноквартала",
+        "киноквартале",
+        "kinokvartal",
+        "kino kvartal",
+        "кинокварталу",
+        "кинокварталом"
+      ],
+      "target": "events",
+      "confidence": 96
+    },
+    {
+      "id": "owner-shoko",
+      "name": "Шоколадница",
+      "forms": [
+        "шоколадница",
+        "шоколадницы",
+        "шоколаднице",
+        "шоко",
+        "shoko",
+        "shokoladnitsa",
+        "shokoladnica",
+        "шоколадницу",
+        "шоколадницей",
+        "shokoladnitca"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-mini-line",
+      "name": "Mini-Line",
+      "forms": [
+        "mini line",
+        "miniline",
+        "мини лайн",
+        "минилайн",
+        "mini-line.ru",
+        "мини лайн ру"
+      ],
+      "target": "clothes",
+      "confidence": 96
+    },
+    {
+      "id": "owner-dale-cups",
+      "name": "Dale Cups",
+      "forms": [
+        "dale cups",
+        "dalecups",
+        "дейл капс",
+        "дэйл капс"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-coffee-buro",
+      "name": "Coffee Buro",
+      "forms": [
+        "coffee buro",
+        "coffee bureau",
+        "кофе бюро",
+        "кофебюро"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-beloque",
+      "name": "Beloque",
+      "forms": [
+        "beloque",
+        "белокэ",
+        "белоке"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-winestyle",
+      "name": "WineStyle",
+      "forms": [
+        "winestyle",
+        "wine style",
+        "вайнстайл",
+        "вайн стайл",
+        "винстайл",
+        "вайнстайла",
+        "вайнстайле"
+      ],
+      "target": "grocery",
+      "confidence": 96
+    },
+    {
+      "id": "owner-ultima",
+      "name": "UltimaVPS",
+      "forms": [
+        "ultimavpsbot",
+        "ultimavps",
+        "ultima vps",
+        "ультима впс"
+      ],
+      "target": "vpn",
+      "confidence": 96
+    },
+    {
+      "id": "owner-energo",
+      "name": "Energo",
+      "forms": [
+        "energo",
+        "энерго",
+        "energo.ru"
+      ],
+      "target": "powerbank",
+      "confidence": 96
+    },
+    {
+      "id": "owner-yandex-cloud",
+      "name": "Yandex Cloud",
+      "forms": [
+        "yandex cloud",
+        "yandex oblako",
+        "яндекс облако",
+        "яндекс клауд",
+        "яндекс облака",
+        "яндекс облаке",
+        "yandex claud",
+        "yandeks oblako",
+        "yandeks cloud"
+      ],
+      "target": "cloud",
+      "confidence": 96,
+      "tokens": [
+        [
+          "yandex",
+          "oblako"
+        ],
+        [
+          "yandex",
+          "cloud"
+        ],
+        [
+          "яндекс",
+          "облако"
+        ],
+        [
+          "яндекс",
+          "клауд"
+        ]
+      ]
+    },
+    {
+      "id": "owner-yandex-go",
+      "name": "Яндекс Go",
+      "forms": [
+        "яндекс го",
+        "яндекс go",
+        "yandex go"
+      ],
+      "target": "taxi",
+      "confidence": 80,
+      "tokens": [
+        [
+          "yandex",
+          "go"
+        ],
+        [
+          "яндекс",
+          "go"
+        ],
+        [
+          "яндекс",
+          "го"
+        ]
+      ]
+    },
+    {
+      "id": "owner-yandex-charge",
+      "name": "Бери заряд",
+      "forms": [
+        "бери заряд",
+        "berizaryad",
+        "beri zaryad",
+        "runcharg",
+        "runcharge",
+        "yandex runcharg"
+      ],
+      "target": "powerbank",
+      "confidence": 96
+    },
+    {
+      "id": "owner-yandex-scooter",
+      "name": "Яндекс Самокаты",
+      "forms": [
+        "яндекс самокаты",
+        "yandex scooters"
+      ],
+      "target": "scooter",
+      "confidence": 96,
+      "tokens": [
+        [
+          "yandex",
+          "scooters"
+        ],
+        [
+          "yandex",
+          "scooter"
+        ],
+        [
+          "яндекс",
+          "самокаты"
+        ]
+      ]
+    },
+    {
+      "id": "owner-megafon",
+      "name": "МегаФон",
+      "forms": [
+        "мегафон",
+        "мегафона",
+        "megafon",
+        "mega fon",
+        "мегафону",
+        "мегафоне",
+        "мегафоном"
+      ],
+      "target": "mobile",
+      "confidence": 80
+    },
+    {
+      "id": "owner-telegram",
+      "name": "Telegram",
+      "forms": [
+        "oto telegram",
+        "ото телеграм"
+      ],
+      "target": "subscription_other",
+      "confidence": 96,
+      "tokens": [
+        [
+          "oto",
+          "telegram"
+        ]
+      ]
+    },
+    {
+      "id": "owner-telegram-premium",
+      "name": "Telegram Premium",
+      "forms": [
+        "telegram premium",
+        "телеграм премиум",
+        "sg premium hong kong"
+      ],
+      "target": "subscription_other",
+      "confidence": 96,
+      "tokens": [
+        [
+          "sg",
+          "premium",
+          "hong",
+          "kong"
+        ]
+      ]
+    },
+    {
+      "id": "owner-vipvending",
+      "name": "VIPVENDING",
+      "forms": [
+        "vipvending",
+        "vip vending",
+        "випвендинг",
+        "вип вендинг"
+      ],
+      "target": "grocery",
+      "confidence": 80
+    }
+  ]
+}

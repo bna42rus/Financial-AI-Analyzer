@@ -15,6 +15,7 @@ export function classificationTargets(graph:Graph,rules:Rule[]){return graph.ope
 });}
 export function knownMerchantChanges(graph:Graph,rules:Rule[]){return graph.operations.filter(op=>['bank-source/4','bank-source/5'].includes(op.source.versions.sourceSanitizer??'')&&!graph.components.some(c=>c.transactionId===op.id)).map(op=>{
  const account=graph.accounts.find(a=>a.id===(op.corrections.accountId??op.accountAssignmentId??op.source.accountId)),ruled=account?applyRules(op,account,rules,undefined,graph.categories):op;
+ for(const key of ['category','subcategory'] as const)if(ruled.semantics[key].source==='global_rule'&&!ruled.semantics[key].userVerified&&!ruled.semantics[key].ruleId)ruled.semantics[key]={value:null,source:'deterministic_system_rule',confidence:0,userVerified:false};
  for(const key of ['kind','role','merchant','category','subcategory','counterparty'] as const)if(['kind','role','counterparty'].includes(key)||op.semantics[key].source==='user'||op.semantics[key].userVerified)(ruled.semantics as Record<string,unknown>)[key]=op.semantics[key];
  return {op,next:applyMerchantRecognition(ruled,graph.categories,graph.categoryBindings)};
 }).filter(({op,next})=>!isDeepStrictEqual(op.semantics,next.semantics)||!isDeepStrictEqual(op.reviewReasons,next.reviewReasons));}

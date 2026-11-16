@@ -39,7 +39,7 @@ export function parseBankDescription(value:unknown):BankDescription{
  * SBP can also be a payment channel; an explicit purchase heading is distinct
  * from a transfer heading. Neither case establishes a merchant identity. */
 export function financialTransferText(text:string):boolean{
- const payment=/^(?:оплата|покупка|возврат покупки|возврат оплаты|purchase|card payment|purchase refund|refund)(?=$|[^\p{L}\p{N}])/iu.test(text);
+ const payment=!!statementPayment(text)||/^(?:оплата|покупка|возврат покупки|возврат оплаты|purchase|card payment|purchase refund|refund)(?=$|[^\p{L}\p{N}])/iu.test(text);
  return /^(?:(?:входящий|исходящий|внутренний|денежный|банковский)\s+)?перевод(?=$|[^\p{L}\p{N}])|^(?:(?:incoming|outgoing|bank|money|internal)\s+)?transfer(?=$|[^\p{L}\p{N}])/iu.test(text)||
   /(?<![\p{L}\p{N}])(?:денежный перевод|перевод (?:денежных средств|средств|на карту|по номеру телефона))(?=$|[^\p{L}\p{N}])/iu.test(text)||
   !payment&&/(?<![\p{L}\p{N}])(?:СБП|SBP)(?![\p{L}\p{N}])/iu.test(text);

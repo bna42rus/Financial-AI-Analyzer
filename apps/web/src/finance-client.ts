@@ -26,9 +26,9 @@ export const reviewNames:Record<string,string>={posted_timezone_unknown:'Час�
 // Current supported bank adapters and the financial kernel use Moscow for exact bank facts.
 // Profile timezone affects system/history timestamps, never the date of a bank movement.
 export function displayBankDate(date:BankDate,_timezone:string){
- if(date.precision==='day')return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date.date+'T00:00:00Z'));
- const offset=date.sourceOffsetMinutes,known=typeof offset==='number',shift=known?offset:0,clock=new Date(Date.parse(date.instant)+shift*60000),zone=known?'UTC'+(shift>=0?'+':'−')+String(Math.floor(Math.abs(shift)/60)).padStart(2,'0')+':'+String(Math.abs(shift)%60).padStart(2,'0'):'UTC · часовой пояс банка не указан';
- return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(clock)+' '+zone;
+ if(date.precision==='day')return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeZone:'UTC'}).format(new Date(date.date+'T00:00:00Z'))+(date.time?', '+date.time.slice(0,5):'');
+ const shift=typeof date.sourceOffsetMinutes==='number'?date.sourceOffsetMinutes:0,clock=new Date(Date.parse(date.instant)+shift*60000);
+ return new Intl.DateTimeFormat('ru-RU',{dateStyle:'medium',timeStyle:'short',timeZone:'UTC'}).format(clock);
 }
 export function displayRole(role:string,amountMinor:string){return role==='expense'&&BigInt(amountMinor)>0n?'Уменьшает расходы':role==='income'&&BigInt(amountMinor)<0n?'Уменьшает доходы':roleNames[role]??'Смысл не определён';}
 export function safeOperationPatch(patch:OperationPatch){const copy=structuredClone(patch);for(const key of ['merchant','comment'] as const)if(copy[key]!==undefined)copy[key]=safeText(sanitizeText(copy[key]!),key==='comment'?1000:160);return copy;}

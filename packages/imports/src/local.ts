@@ -1,4 +1,4 @@
-import {counterpartyEvidenceKinds,counterpartyNameHint,fullCounterpartyIdentifier,ownTransferEvidence} from './counterparty-evidence.ts';
+import {counterpartyEvidenceKinds,counterpartyNameHint,fullCounterpartyIdentifier,ownTransferEvidence,transferIdentifiers} from './counterparty-evidence.ts';
 import type {CounterpartyEvidenceKind} from './counterparty-evidence.ts';
 import {bankDescription,merchantBankDescription,financialTransferText} from './bank-description.ts';
 import {localBankAdapter} from './bank-table.ts';
@@ -38,8 +38,8 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
  if(!adapterVersions.includes(adapter))throw new LocalPreparationError('INVALID_ADAPTER');
  if(signal?.aborted)throw new LocalPreparationError('PREPARATION_CLOSED');
  if(!globalThis.crypto?.subtle)throw new LocalPreparationError('LOCAL_CRYPTO_UNAVAILABLE');
- const normalizer=input.normalizers?.includes('strict-source/2')?'strict-source/2':'strict-source/1';
- const normalizeDate=(value:unknown)=>{const d=dateFact(value);return d.precision==='day'?d:normalizer==='strict-source/2'?{...d,sourceOffsetMinutes:d.sourceOffsetMinutes??null}:{precision:'instant' as const,instant:d.instant};};
+ const normalizer=input.normalizers?.includes('strict-source/3')?'strict-source/3':input.normalizers?.includes('strict-source/2')?'strict-source/2':'strict-source/1';
+ const normalizeDate=(value:unknown)=>{const d=dateFact(value);return d.precision==='day'?(normalizer==='strict-source/3'?d:{precision:'day' as const,date:d.date}):normalizer!=='strict-source/1'?{...d,sourceOffsetMinutes:d.sourceOffsetMinutes??null}:{precision:'instant' as const,instant:d.instant};};
  const context=parseContext({contextId:input.contextId,generation:input.generation,keyVersion:input.keyVersion}),expiresAt=Date.parse(input.expiresAt);
  if(!Number.isFinite(expiresAt)||expiresAt<=Date.now())throw new LocalPreparationError('PREPARATION_EXPIRED');
  const decoded=bytesFromKey(input.key);let key:CryptoKey|null;
@@ -79,8 +79,12 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
      const safeSource=sanitizer==='text-free/1'?null:parseSafeSource(source,amountMinor,sanitizer);
      let counterpartyEvidence:PreparedRow['counterpartyEvidence'];
      const descriptionForEvidence=typeof row.localDescription==='string'?row.localDescription:'';
-     if(adapter===localBankAdapter&&sanitizer===merchantSourceSanitizer&&typeof row.parser==='string'&&row.parser.endsWith('-table/1')&&direction!=='unknown'&&!!safeSource&&['transfer_in','transfer_out'].includes(safeSource.event)&&financialTransferText(descriptionForEvidence)&&!ownTransferEvidence(descriptionForEvidence)&&Array.isArray(row.localCounterpartyEvidence)){
-      const values=row.localCounterpartyEvidence.flatMap(entry=>{
+     const extractedTransfers=normalizer==='strict-source/3'?transferIdentifiers(descriptionForEvidence):[];
+     const transferAccounts:NonNullable<PreparedRow['transferAccounts']>=[];
+     for(const entry of extractedTransfers)if(entry.kind!=='phone')for(const bank of ['tbank','ozon','sber'] as const)transferAccounts.push({bank,kind:entry.kind,hmac:await identifier(bank,entry.kind,entry.value)});
+     const transferEvidence=Array.isArray(row.localCounterpartyEvidence)?row.localCounterpartyEvidence:extractedTransfers;
+     if(adapter===localBankAdapter&&sanitizer===merchantSourceSanitizer&&typeof row.parser==='string'&&(row.parser.endsWith('-table/1')||normalizer==='strict-source/3'&&row.parser.endsWith('-pdf/3'))&&direction!=='unknown'&&!!safeSource&&['transfer_in','transfer_out'].includes(safeSource.event)&&financialTransferText(descriptionForEvidence)&&(normalizer==='strict-source/3'||!ownTransferEvidence(descriptionForEvidence))&&Array.isArray(transferEvidence)){
+      const values=transferEvidence.flatMap(entry=>{
        if(!entry||!counterpartyEvidenceKinds.includes(entry.kind))return [];
        const kind=entry.kind as CounterpartyEvidenceKind,value=fullCounterpartyIdentifier(kind,entry.value);
        return value?[{kind,value}]:[];
@@ -91,7 +95,7 @@ export async function createLocalPreparation(input:LocalContext,signal?:AbortSig
        counterpartyEvidence={kind:match.kind,hmac,...(name?{name}:{})};
       }
      }
-     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(counterpartyEvidence?{counterpartyEvidence}:{}),...(sanitizer!=='text-free/1'?{safeSource}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
+     result.rows.push({ordinal,operationDate,postedDate,amountMinor,currency:'RUB',direction:direction as PreparedRow['direction'],account,bankRefHmac,...(counterpartyEvidence?{counterpartyEvidence}:{}),...(transferAccounts.length?{transferAccounts}:{}),...(sanitizer!=='text-free/1'?{safeSource}:{}),...((sanitizer===sourceSanitizer||sanitizer===localSourceSanitizer||hasBankDescription(sanitizer))?{descriptionHmac}:{}),...(adapter===localBankAdapter?{parser:row.parser as PreparedRow['parser']}:{})});
     }catch(error){if(!(error instanceof RowFailure))throw error;result.issues.push({ordinal,code:error.code});}
    }
    prepared.push(result);

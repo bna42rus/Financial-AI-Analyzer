@@ -10,7 +10,7 @@ export type TextItem={text:string;x:number;y:number;width:number};
 export type PdfLayout=TextItem[][];
 export const bankPdfAdapter='bank-pdf/2' as const;
 export const legacyPdfParserVersions={tbank:'tbank-movement-pdf/1',ozon:'ozon-movement-pdf/1',sber:'sber-card-pdf/1'} as const;
-export const pdfParserVersions={tbank:'tbank-movement-pdf/2',ozon:'ozon-movement-pdf/2',sber:'sber-card-pdf/2'} as const;
+export const pdfParserVersions={tbank:'tbank-movement-pdf/3',ozon:'ozon-movement-pdf/3',sber:'sber-card-pdf/3'} as const;
 export type PdfFailure='UNKNOWN_FORMAT'|'AMBIGUOUS_FORMAT'|'UNSUPPORTED_LAYOUT'|'LOCAL_LIMIT'|'LOCAL_READ_FAILED'|'PASSWORD_REQUIRED'|'WRONG_PASSWORD'|'OCR_REQUIRED'|'OCR_UNCERTAIN'|'PREPARATION_CLOSED';
 export class BankPdfError extends Error {readonly code:PdfFailure;constructor(code:PdfFailure){super(code);this.code=code;}}
 export const MAX_PDF_BYTES=20*1024*1024,MAX_PDF_PAGES=100,MAX_PDF_ITEMS=100000,MAX_PDF_TEXT=2000000;
@@ -35,7 +35,7 @@ function sourceDate(value:string,moscow:boolean):BankDate{
  const m=/^(\d{2}\.\d{2}\.\d{4})(?:\s+(\d{2}:\d{2}(?::\d{2})?))?$/.exec(value.trim());if(!m)throw new TypeError('INVALID_DATE');
  const date=calendar(m[1]!);if(!m[2])return {precision:'day',date};
  const time=m[2].length===5?m[2]+':00':m[2];if(!/^(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(time))throw new TypeError('INVALID_DATE');
- if(!moscow)return {precision:'day',date};
+ if(!moscow)return {precision:'day',date,time};
  return dateFact({precision:'instant',instant:new Date(`${date}T${time}+03:00`).toISOString(),sourceOffsetMinutes:180});
 }
 /** Exact decimal conversion. An absent amount never becomes zero. */
@@ -117,14 +117,14 @@ export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):Ex
    try{const timePart=continuationDates.find(s=>/^\d{2}:/.test(s));
     row.operationDate=sourceDate(bank==='ozon'||bank==='tbank'?[startDate,timePart].filter(Boolean).join(' '):startDate,bank==='ozon'?ozonMoscow:c.moscow);
     if(bank==='sber'){
-     const time=cell(start,c.time!,c.description);if(time)row.operationDate=sourceDate(startDate+' '+time,c.moscow);
+     const time=active.map(l=>cell(l,c!.date,c!.description)).map(v=>/(?:^|\s)((?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d)?)(?=$|\s)/u.exec(v)?.[1]).find(Boolean);if(time)row.operationDate=sourceDate(startDate+' '+time,c.moscow);
      const posted=continuationDates.filter(v=>/^\d{2}\.\d{2}\.\d{4}$/.test(v));if(posted.length>1)throw new Error();if(posted[0])row.postedDate=sourceDate(posted[0],false);
-    }else if(c.posted!==undefined)row.postedDate=sourceDate(cell(start,c.posted,c.postedEnd),false);
+    }else if(c.posted!==undefined){const postedTime=active.slice(1).map(l=>cell(l,c!.posted!,c!.postedEnd)).find(v=>/^\d{2}:\d{2}(?::\d{2})?$/.test(v));row.postedDate=sourceDate([cell(start,c.posted,c.postedEnd),postedTime].filter(Boolean).join(' '),false);}
    }catch{row.operationDate=undefined;}
    try{const amount=cell(start,c.amount,c.end);Object.assign(row,pdfMoney(amount,bank==='sber'));
     if(bank==='tbank'?!/(?:₽|руб\.?|р\.?|RUB)\s*$/iu.test(amount):bank==='ozon'?!declaredRub:!declaredRub&&!page.some(l=>/сумма в рублях/.test(norm(l.text))))row.currency='UNSUPPORTED';
    }catch{/* Preparation records INVALID_AMOUNT without raw fragments. */}
-   row.localDescription=active.map(l=>cell(l,c!.description,c!.descriptionEnd??c!.amount)).join(' ');
+   row.localDescription=active.map(l=>cell(l,c!.description,c!.descriptionEnd??c!.amount)).join(' ').trim();
    row.safeSource=extractSafeSource(row.localDescription,row.amountMinor);
    rows.push(row);if(rows.length>1000)throw new BankPdfError('LOCAL_LIMIT');active=[];
   }
@@ -132,6 +132,9 @@ export function parseBankPdf(fileId:string,bytes:Uint8Array,layout:PdfLayout):Ex
    const line=page[i]!,h=header(bank,page,i);
    if(h){flush();c=h;seenHeader=true;pageHeader=true;continue;}
    if(!c)continue;
+   // The bank sign-off is outside the statement table. It may sit inside the
+   // description column and must never be appended to the last operation.
+   if(/^с уважением(?:[,!]|$)|^представитель банка(?=$|\s)|^документ подписан/iu.test(line.text.trim())){flush();c=null;continue;}
    if(/^итого|^продолжение|^дата и время операции|^операции по/.test(norm(line.text))){flush();c=null;continue;}
    if(rowStart(line,c)){flush();active=[line];continue;}
    if(active.length)active.push(line);

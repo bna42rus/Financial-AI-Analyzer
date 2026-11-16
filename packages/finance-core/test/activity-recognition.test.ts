@@ -69,7 +69,7 @@ test('same payment seller plus actual fulfillment determines category, with pick
  assert.notEqual(match('Доставка').targetKey,'grocery_delivery');
 });
 test('conditional routers distinguish actual purpose, unknown vending, pet food and protected financial roles',()=>{
- assert.notEqual(match('Вендинг').status,'recognized');assert.equal(match('Кофейный вендинг').targetKey,'grocery');
+ assert.equal(match('Вендинг').targetKey,'grocery');assert.equal(match('Вендинг').provisional,true);assert.equal(match('Кофейный вендинг').targetKey,'grocery');
  assert.equal(match('Ветаптека','Покупка Ветаптека корм').targetKey,'pet_goods');assert.notEqual(match('Ветаптека','Покупка Ветаптека корм и лекарства').status,'recognized');
  assert.equal(match('Хостинг','Хостинг для работы').targetKey,'business_services');
  assert.equal(match('Канцелярские товары','Канцелярские товары для учёбы').targetKey,'learning_materials');
@@ -106,7 +106,7 @@ test('application changes only category facets of intact eligible /5 whole opera
 // One independently chosen outcome for every conditional activity. These are
 // synthetic semantic fixtures, separate from the exhaustive literal-index test.
 const routers:[string,string,string][]=[
- ['вендинг','needs_context',''],['заряд','needs_context',''],['биржа фриланса','needs_context',''],['услуги исполнителя','needs_context',''],
+ ['вендинг','recognized','grocery'],['заряд','needs_context',''],['биржа фриланса','needs_context',''],['услуги исполнителя','needs_context',''],
  ['ip-телефония','recognized','telecom_other'],['пакет связи','recognized','telecom_root'],['хостинг','recognized','cloud'],['регистрация домена','recognized','cloud'],['электронная подпись','recognized','private:documents'],
  ['универсальный интернет-магазин','needs_context',''],['распределение покупки','needs_context',''],['репетитор','recognized','education'],['ветаптека','recognized','vet'],['цветочный магазин','recognized','private:flowers'],
  ['подарочный сертификат','delegate_fin',''],['краудфандинг','delegate_fin',''],['донат автору','recognized','private:support'],['погашение кредита','delegate_fin',''],['проценты','delegate_fin',''],['возврат','delegate_fin',''],['перевод между своими счетами','delegate_fin',''],

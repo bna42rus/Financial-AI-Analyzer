@@ -2,7 +2,7 @@ import type {Kind} from '../../finance-core/src/model.ts';
 
 // Explicit statement wording only. A merchant mention, category or amount sign
 // alone never establishes a purchase or the economic purpose of a transfer.
-const sberCategory='Супермаркеты|Рестораны и кафе|Транспорт|Здоровье и красота|Одежда и обувь|Дом и ремонт|Развлечения|Связь и телекоммуникации';
+const sberCategory='Коммунальные платежи, связь, интернет\.|Прочие платежи, переводы, услуги\.|Супермаркеты|Рестораны и кафе|Транспорт|Здоровье и красота|Одежда и обувь|Дом и ремонт|Развлечения|Связь и телекоммуникации';
 const sberCard=new RegExp('^('+sberCategory+')\\s+(.+?)\\.?\\s+Операция по карте(?=$|[^\\p{L}\\p{N}]).*$', 'iu');
 const city='(?:MOSCOW|MOSKVA|МОСКВА|SAINT[ -]PETERSBURG|SANKT[ -]PETERBURG|САНКТ-ПЕТЕРБУРГ|INNOPOLIS|ИННОПОЛИС)';
 export const bankCityTail=new RegExp('(?:[ ,]+'+city+')+$', 'iu');
@@ -15,7 +15,9 @@ export function statementPayment(text:string):{merchantText:string;bankCategory:
  const platform=/^Оплата товаров\/услуг на (?:маркетплейсе|платформе|сайте) (Ozon)(?=$|[^\p{L}\p{N}])/iu.exec(s);
  if(platform)return {merchantText:platform[1]!,bankCategory:''};
  const card=sberCard.exec(s);
- if(card)return {merchantText:card[2]!.replace(cityHead,'').replace(/\.$/u,'').trim(),bankCategory:card[1]!};
+ if(card)return {merchantText:card[2]!.split(/\s+Покупка по СБП в /iu)[0]!.replace(cityHead,'').replace(/\.$/u,'').trim(),bankCategory:card[1]!};
+ const sbpNamed=/^([^.]+[.]?)\s+(.+?)\s+Покупка по СБП в (?:ТСТ|приложении|терминале|торговой).+?(?:Операция по карте|$)/iu.exec(s);
+ if(sbpNamed&&/платежи|связь|услуги/iu.test(sbpNamed[1]!))return {merchantText:sbpNamed[2]!.trim(),bankCategory:sbpNamed[1]!.replace(/\.$/u,'')};
  const sbp=(/^[\p{L}]+ платежи[, ]/iu.test(s)?/Покупка по СБП в (.+?)(?:\.\s*Операция по карте|$)/iu:/^Покупка по СБП в (.+?)(?:\.\s*Операция по карте|$)/iu).exec(s);
  if(sbp)return {merchantText:/приложении.*банка/iu.test(sbp[1]!)?'':sbp[1]!.replace(/\.+$/u,'').trim(),bankCategory:''};
  const payment=/^(?:Оплата товаров и услуг|Оплата покупки|Покупка(?: в)?|Оплата услуг|Оплата в|Оплата по карте|Оплата картой|Purchase|Card payment|Возврат покупки|Возврат средств за покупку|Возврат оплаты|Purchase refund|Refund)\s*[:.-]?\s+(.+)$/iu.exec(s);

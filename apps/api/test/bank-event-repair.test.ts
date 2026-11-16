@@ -36,14 +36,14 @@ test('all three PDF layouts cross local preparation and classify using the compl
    assert.equal(row.safeSource?.event,'purchase',bank);assert.ok(row.safeSource?.details?.merchantText,bank);
    const op=applyMerchantRecognition(operation(row.safeSource!.details!.description,row.amountMinor),categories);
    assert.equal(op.semantics.role.value,'expense');assert.equal(op.semantics.category.value,'food');
-   assert.equal(operationDisplayName(op).title,bank==='sber'?'BRISTOL':'VKUSVILL');
+   assert.equal(operationDisplayName(op).title,bank==='sber'?'Бристоль':'ВкусВилл');
   }finally{local.dispose();}
  }
 });
 test('already imported rows repair without a reimport and without changing amounts, sources or identity',()=>{
  const op=operation(purchase,'-32100',true),before=structuredClone(op),g=graph([op]);
  const [next]=bankEventRepairs(g,[]);assert.ok(next);assert.deepEqual(op,before);assert.deepEqual(next.source,before.source);assert.equal(next.id,op.id);assert.deepEqual(next.corrections,op.corrections);
- assert.equal(next.semantics.kind.value,'purchase');assert.equal(next.semantics.category.value,'food');assert.equal(operationDisplayName(next).title,'VKUSVILL');
+ assert.equal(next.semantics.kind.value,'purchase');assert.equal(next.semantics.category.value,'food');assert.equal(operationDisplayName(next).title,'ВкусВилл');
  assert.equal(aggregate(reconcile(graph([next])).operations).netExpensesMinor,'32100');
  assert.deepEqual(bankEventRepairs(graph([next]),[]),[]);
 });
@@ -58,7 +58,7 @@ test('transfers stay unresolved and repayments never become purchase income',()=
 });
 test('Bristol is a short merchant without inferring the actual purchased products',()=>{
  const op=applyMerchantRecognition(operation(purchase.replace('VKUSVILL_1234_KCO_1','BRISTOL 1234')),categories);
- assert.equal(operationDisplayName(op).title,'BRISTOL');assert.equal(op.semantics.category.value,'food');assert.equal(op.semantics.subcategory.value,null);
+ assert.equal(operationDisplayName(op).title,'Бристоль');assert.equal(op.semantics.category.value,'food');assert.equal(op.semantics.subcategory.value,null);
  const cafe=applyMerchantRecognition(operation('Оплата в Кафе Бристоль MOSCOW RUS'),categories);assert.equal(cafe.semantics.category.value,null);assert.equal(operationDisplayName(cafe).title,'Кафе Бристоль');
  assert.equal(operationDisplayName(operation('Оплата в Магазин 24 MOSCOW RUS')).title,'Магазин 24');
 });

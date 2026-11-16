@@ -4,7 +4,10 @@ export function calendarKnown(date:BankDate){return date.precision==='day'||type
 /** Calendar metadata is not transaction identity. Compare canonical instants
  * separately; differing observed offsets are retained as a conflict. */
 export function mergeBankCalendar(selected:BankDate,observations:readonly BankDate[]):{date:BankDate;conflict:boolean}{
- if(selected.precision==='day')return {date:selected,conflict:false};
+ if(selected.precision==='day'){
+  const clocks=new Set(observations.flatMap(d=>d.precision==='day'&&d.date===selected.date&&d.time?[d.time]:[]));
+  return {date:!selected.time&&clocks.size===1?{...selected,time:[...clocks][0]!}:selected,conflict:clocks.size>1};
+ }
  const offsets=new Set(observations.flatMap(d=>d.precision==='instant'&&Date.parse(d.instant)===Date.parse(selected.instant)&&typeof d.sourceOffsetMinutes==='number'?[d.sourceOffsetMinutes]:[]));
  if(offsets.size>1)return {date:{...selected,sourceOffsetMinutes:null},conflict:true};
  if(offsets.size===1)return {date:{...selected,sourceOffsetMinutes:[...offsets][0]!},conflict:false};
@@ -18,4 +21,4 @@ export function resolveSourceCalendar(fact:BankFact,observations:readonly {opera
  return {...fact,operationDate:operation.date,postedDate:posted?.date??null,versions};
 }
 /** Matching descriptors intentionally omit this presentation/period metadata. */
-export const sameCalendar=(a:BankDate|null,b:BankDate|null)=>a===null||b===null?a===b:a.precision==='day'?b.precision==='day'&&a.date===b.date:b.precision==='instant'&&Date.parse(a.instant)===Date.parse(b.instant)&&a.sourceOffsetMinutes===b.sourceOffsetMinutes;
+export const sameCalendar=(a:BankDate|null,b:BankDate|null)=>a===null||b===null?a===b:a.precision==='day'?b.precision==='day'&&a.date===b.date&&a.time===b.time:b.precision==='instant'&&Date.parse(a.instant)===Date.parse(b.instant)&&a.sourceOffsetMinutes===b.sourceOffsetMinutes;

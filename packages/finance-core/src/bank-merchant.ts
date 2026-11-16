@@ -1,7 +1,10 @@
 import type {BankFact} from './model.ts';
 import {statementPayment,bankCityTail} from '../../imports/src/bank-event.ts';
-import {recognizeCatalogEvidence} from './catalog-evidence.ts';
-import {catalogFold} from './catalog-lexical.ts';
+import {recognizeCatalogEvidence,canonicalCatalogName} from './catalog-evidence.ts';
+export function bankMerchantLiteral(source:Pick<BankFact,'description'|'merchantText'>):string{
+ const raw=statementPayment(source.description)?.merchantText??source.merchantText;
+ return raw.replace(/\s+(?:RU|RUS|RUSSIA|РОССИЯ)$/iu,'').replace(bankCityTail,'').trim();
+}
 
 /** A complete bank payment wrapper proves the city/channel/branch metadata.
  * Unknown trade names and manual names are never reduced to a brand substring. */
@@ -15,6 +18,6 @@ export function bankMerchantProjection(source:Pick<BankFact,'description'|'merch
  const raw=payment.merchantText.replace(/\s+(?:RU|RUS|RUSSIA|РОССИЯ)$/iu,'').replace(bankCityTail,'').trim();
  const candidate=raw.replace(/(?:_\d+(?:_[A-Z]+_\d+)?|\s+\d{3,6})$/iu,'').trim();
  const evidence=recognizeCatalogEvidence({merchantText:candidate,description:source.description,bankCategory:source.bankCategory,mcc:source.sourceMcc});
- if(evidence.status==='recognized'&&evidence.entry.aliases.some(a=>catalogFold(a)===catalogFold(candidate)))return candidate;
+ if(evidence.status==='recognized')return canonicalCatalogName(evidence.entry.name,candidate);
  return raw;
 }

@@ -1,3 +1,4 @@
+import {refreshMerchantDictionary} from './merchant-dictionary.ts';
 import {tokenCost,rubAmount} from '../../../packages/analyzer/src/cost.ts';
 import {classificationWork,ensureClassificationPass,finishClassificationPass,knownMerchantChanges,latestPass} from './classification-pass.ts';
 import {activityEngineVersion} from '../../../packages/finance-core/src/activity-recognition.ts';
@@ -95,7 +96,7 @@ async function applyCached(db:PoolClient,userId:string,plan:ClassificationPlan){
 export async function runClassificationStage(pool:Pool,provider:AssistantProvider){
  if(!isAssistantProvider(provider)||provider.pool!==pool)throw Error('CLASSIFICATION_PROVIDER_DENIED');
  const pending=(await pool.query("SELECT user_id FROM finance.classification_dispatch WHERE state='queued' ORDER BY updated_at,user_id LIMIT 1")).rows[0];
- if(!pending)return false;const userId=String(pending.user_id),lock=await pool.connect(),lockName='classification:'+userId;
+ if(!pending)return false;await refreshMerchantDictionary();const userId=String(pending.user_id),lock=await pool.connect(),lockName='classification:'+userId;
  const locked=(await lock.query('SELECT pg_try_advisory_lock(hashtextextended($1,0)) AS locked',[lockName])).rows[0].locked;
  if(!locked){lock.release();return false;}
  try{

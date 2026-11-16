@@ -3,6 +3,7 @@ import {fullCatalogEvidence,supersededLegacy} from './full-catalog.ts';
 import {merchantCatalog} from './merchant-catalog.ts';
 import type {MerchantEntry} from './merchant-catalog.ts';
 import {groceryEvidence} from './grocery-evidence.ts';
+import {dictionaryMerchant} from './merchant-dictionary.ts';
 import {literalIndex,catalogFold,hasLiteral,literalNegated} from './catalog-lexical.ts';
 export type CatalogInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null};
 export type CatalogEvidence={status:'recognized';entry:MerchantEntry;literal:string;target:string|null;parentOnly:boolean;provisional:boolean;profileId?:string}|{status:'none'|'conflict'|'needs_context';reason:string};
@@ -10,6 +11,11 @@ const aliases=literalIndex(merchantCatalog.map(entry=>({value:entry,forms:entry.
 const serviceTargets:Readonly<Record<string,string>>={grocery:'grocery',cafe:'cafe',fitness:'fitness',public_transport:'public',carsharing:'carshare',powerbank:'powerbank',marketplace:'marketplace',cloud:'cloud',pharmacy:'pharmacy',fuel:'fuel',cinema:'events',books:'books',pets:'pet_goods',home:'home_goods',clothing:'clothes',electronics:'electronics',beauty:'salon',medical:'doctors',rail:'rail',air:'air',hotel:'hotel',education:'courses',cosmetics:'cosmetics',laboratory:'diagnostics',veterinary:'vet'};
 /** Finite spelling data and typed guards; never execute restriction prose. */
 export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
+ const dictionary=dictionaryMerchant(input.merchantText,input.description);
+ if(dictionary)return {status:'recognized',entry:{name:dictionary.entry.name,aliases:[...dictionary.entry.forms],service:'unknown',source:'owner-approved:merchant-dictionary'},literal:dictionary.entry.name,target:dictionary.target,parentOnly:false,provisional:dictionary.confidence<90,profileId:dictionary.entry.id};
+ // Search projection only: bank/terminal wrappers and branch identifiers
+ // cannot change the immutable permitted source or keyed identity.
+ input={...input,merchantText:input.merchantText.replace(/^(?:SBER|СБЕР)[ *._-]*\d{4}[ *._-]*/iu,'').replace(/(?<=[\p{L}])[_-]\d+[a-z]?(?=$|[\s,.*_-])/giu,' ').replace(/[_*]+/gu,' ')};
  const text=input.merchantText.trim();if(!text)return {status:'none',reason:'NO_MERCHANT_FIELD'};
  const all=aliases(text),found=all.filter(h=>!literalNegated(text,h));
  if(all.length&&!found.length)return {status:'needs_context',reason:'NEGATED_MERCHANT_MENTION'};
@@ -39,6 +45,12 @@ export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
  if(entry.name==='Яндекс Go'){target='taxi';provisional=true;}
  if(entry.name==='Сервисы Яндекса')target=null;
  return {status:'recognized',entry,literal,target,parentOnly,provisional};
+}
+/** A single display identity per recognized profile, independent of source alphabet. */
+export function canonicalCatalogName(name:string,raw=''):string{
+ if(name==='Ozon'&&/ozon[ ._-]*fresh|озон[ ._-]*фреш/iu.test(raw))return 'Ozon Fresh';
+ const preferred:Record<string,string>={'Ворлд Класс':'World Class','Спирит Фитнес':'Spirit Fitness','Т2':'t2','585*ЗОЛОТОЙ':'585 Золотой','Икс Фит':'X-Fit','Timeweb':'TimeWeb','Timeweb Cloud':'TimeWeb','Энерго':'Energo'};
+ return preferred[name]??name.split(/\s+[\/]\s+|\s+—\s+/u)[0]!.trim();
 }
 /** Additional explicitly agreed broad service profiles. They do not identify a
  * company/payee or rename a merchant, and unknown Yandex is not Go. */

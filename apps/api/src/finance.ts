@@ -2,6 +2,8 @@ import {parseCounterpartyRuleConditions,parseProposalOperations,saveCounterparty
 import {parseCategoryBinding,applyCategoryBinding} from './category-bindings.ts';
 import type {CategoryBindingIntent} from './category-bindings.ts';
 import {initialBankSemantics,refreshBankSemantics,applyFinancialRecognition} from '../../../packages/finance-core/src/financial-evidence.ts';
+import {observationOwnAccounts} from './own-accounts.ts';
+import {refreshMerchantDictionary} from './merchant-dictionary.ts';
 import {bankEventRepairs} from './bank-event-repair.ts';
 import {parseSelectedCategories,applySelectedCategories} from './selected-categories.ts';
 import type {SelectedCategoryIntent} from './selected-categories.ts';
@@ -59,6 +61,7 @@ const ref=(v:unknown)=>v===null?null:uuid(v);
 function stable(value:unknown):string {return JSON.stringify(value,(_key,v)=>v&&typeof v==='object'&&!Array.isArray(v)?Object.fromEntries(Object.keys(v).sort().map(k=>[k,v[k]])):v);}
 function revision(v:unknown){if(typeof v!=='string'||!/^(0|[1-9]\d*)$/.test(v))throw new TypeError('INVALID_REVISION');return v;}
 export async function prepareFinance(db:PoolClient,userId:string){
+ await refreshMerchantDictionary();
  await db.query("SELECT set_config('app.user_id',$1,true)",[userId]);
  // Stable lock order shared with access mutations. No entitlement can change during this stage.
  await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['access-cycle:'+userId]);
@@ -79,10 +82,10 @@ export async function prepareFinance(db:PoolClient,userId:string){
   if(missing)await db.query("INSERT INTO finance.category(user_id,id,name,role) VALUES($1,$2,'Маркетплейсы','expense')",[userId,randomUUID()]);
   workspace=(await db.query('UPDATE finance.workspace SET marketplace_catalog_initialized=true,revision=revision+$2 WHERE user_id=$1 RETURNING *',[userId,missing?1:0])).rows[0];
  }
- if(!workspace.bank_events_repaired){
+ if(!workspace.bank_events_repaired||!workspace.classifier_dictionary_initialized){
   const {graph,rules}=await loadFinance(db,userId),repairs=bankEventRepairs(graph,rules);
   for(const op of repairs)await db.query('UPDATE finance.transaction SET semantics=$3,review_reasons=$4,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2',[userId,op.id,JSON.stringify(op.semantics),JSON.stringify(op.reviewReasons)]);
-  workspace=(await db.query('UPDATE finance.workspace SET bank_events_repaired=true,revision=revision+$2 WHERE user_id=$1 RETURNING *',[userId,repairs.length?1:0])).rows[0];
+  workspace=(await db.query('UPDATE finance.workspace SET bank_events_repaired=true,classifier_dictionary_initialized=true,revision=revision+$2 WHERE user_id=$1 RETURNING *',[userId,repairs.length?1:0])).rows[0];
  }
  return workspace as {generation:string;revision:string;loan_mode:'cashflow'|'economic';key_version:string;interface_epoch:string;config_revision:string};
 }
@@ -104,10 +107,11 @@ export async function loadFinance(db:PoolClient,userId:string){
   const ids=bankParties.get(entry.transaction_id)??new Set<string>();
   ids.add(entry.counterparty_id);bankParties.set(entry.transaction_id,ids);
  }
+ const ownAccounts=await observationOwnAccounts(db,userId);
  const graph:Graph={categoryBindings,accounts:a.map(({userId,revision,systemName,...r})=>r),categories:c.map(({userId,revision,...r})=>r),operations:t.filter(r=>!r.mergedIntoId).map(r=>{
   const source=observations.get(r.sourceObservationId!);if(!source)throw new TypeError('SOURCE_MISSING');
   const assignment=assignments.get(source.id);if(!assignment)throw new TypeError('ACCOUNT_ASSIGNMENT_MISSING');
-  const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,bankCounterpartyId:bankParties.get(r.id)?.size===1?bankParties.get(r.id)?.values().next().value:undefined,corrections:r.corrections,semantics:normalizeEmptyCategoryConfidence({...r.semantics,merchant:{...r.semantics.merchant,value:cleanBankText(r.semantics.merchant.value,160)}}),comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
+  const {userId,id,transactionId,...fact}=source;return {id:r.id,source:resolveSourceText({...fact,amountMinor:fact.amountMinor.toString(),operationAmountMinor:fact.operationAmountMinor?.toString()??null},r.id,source.id,evidenceByOperation.get(r.id)??[]),accountAssignmentId:assignment,bankOwnAccountId:ownAccounts.get(source.id),bankCounterpartyId:bankParties.get(r.id)?.size===1?bankParties.get(r.id)?.values().next().value:undefined,corrections:r.corrections,semantics:normalizeEmptyCategoryConfidence({...r.semantics,merchant:{...r.semantics.merchant,value:cleanBankText(r.semantics.merchant.value,160)}}),comment:r.comment,analyticsOverride:r.analyticsOverride,decomposition:r.decomposition,reviewReasons:r.reviewReasons};
  }),components:p.filter(r=>r.active&&!!transactionById.get(r.transactionId)&&!transactionById.get(r.transactionId)!.mergedIntoId).map(({userId,active,...r})=>({...r,amountMinor:r.amountMinor.toString()})),links:l.map(({userId,revision,...r})=>({...r,amountMinor:r.amountMinor.toString()})),loanMode:state.loan_mode};
  return {graph,state,sourceMap,categoryOperations:t.map(r=>({id:r.id,role:r.semantics.role.value,categoryId:r.semantics.category.value,subcategoryId:r.semantics.subcategory.value,merchant:cleanBankText(r.semantics.merchant.value,160),retired:!!r.mergedIntoId})),categoryComponents:p.map(c=>({id:c.id,transactionId:c.transactionId,role:c.role.value,categoryId:c.category.value,subcategoryId:c.subcategory.value,retired:!c.active||!!transactionById.get(c.transactionId)?.mergedIntoId})),aliases:(await db.query('SELECT id,account_id AS "accountId",alias_type AS type FROM finance.account_alias WHERE user_id=$1 ORDER BY id',[userId])).rows as {id:string;accountId:string;type:string}[],parties:(await orm.select().from(tables.counterparties).where(eq(tables.counterparties.userId,userId)).orderBy(tables.counterparties.id)).map(({userId,revision,...r})=>({...r,revision:revision.toString()})),rules:(await db.query('SELECT id,name,enabled,priority,conditions,assignments,revision,dependency_status AS "dependencyStatus" FROM finance.rule WHERE user_id=$1 ORDER BY id',[userId])).rows as (Rule&{revision:string;dependencyStatus:string})[]};
 }

@@ -1,4 +1,6 @@
 import {legacyRuleSourceMerchant} from './legacy-source-merchant.ts';
+import {bankMerchantLiteral} from './bank-merchant.ts';
+import {recognizeCatalogEvidence} from './catalog-evidence.ts';
 import {merchantKey,recognizeMerchant} from './merchant-recognition.ts';
 import {effective,facet,object,choice,uuid,kinds} from './model.ts';
 import type {Operation,Account,Category,Role,Kind} from './model.ts';
@@ -24,7 +26,7 @@ export function validateRule(value:unknown):Omit<Rule,'id'> {
 export function reviewRuleSource(kind:Kind,amountMinor:string,merchant:string,hasBankCounterparty:boolean):'transfer'|'purchase'|undefined{
  const amount=BigInt(amountMinor);
  if(amount===0n)return;
- if((kind==='transfer_in'||kind==='transfer_out')&&hasBankCounterparty)return 'transfer';
+ if((kind==='transfer_in'||kind==='transfer_out'||kind==='own_transfer')&&hasBankCounterparty)return 'transfer';
  if(kind==='purchase'&&amount<0n&&merchant.trim())return 'purchase';
 }
 export function reviewRuleConditions(operation:Operation,draft:{kind?:Kind;merchant?:string}={}):Rule['conditions']|undefined{
@@ -33,6 +35,7 @@ export function reviewRuleConditions(operation:Operation,draft:{kind?:Kind;merch
  const direction=amount<0n?'out':'in';
  const accountId=fact.accountId;
  const source=reviewRuleSource(kind,fact.amountMinor,merchant,!!operation.bankCounterpartyId);
+ if(source==='transfer'&&kind==='own_transfer')return {bankCounterpartyId:operation.bankCounterpartyId};
  if(source==='transfer')return {bankCounterpartyId:operation.bankCounterpartyId,accountId,direction,kind};
  if(source==='purchase')return {merchantEquals:merchant,accountId,direction,kind};
 }
@@ -46,17 +49,24 @@ export function ruleMatches(operation:Operation,account:Account,rule:Rule):boole
  const compat=operation.source.versions.sourceSanitizer==='bank-source/5'&&operation.source.versions.sourceTextEvidence==='intact'&&operation.semantics.merchant.source==='bank'&&!operation.semantics.merchant.userVerified&&operation.semantics.merchant.value===operation.source.merchantText;
  const sourceMerchant=compat?legacyRuleSourceMerchant(operation.source.description,operation.source.amountMinor,operation.source.merchantText):f.merchantText;
  const semanticMerchant=compat?recognizeMerchant(sourceMerchant,operation.source.description).name:operation.semantics.merchant.value;
- const sameMerchant=(value:string)=>{if(text(semanticMerchant)===text(value)||text(sourceMerchant)===text(value))return true;const left=recognizeMerchant(semanticMerchant),right=recognizeMerchant(value);return left.matched&&right.matched&&!left.conflict&&!right.conflict&&(text(value)===text(right.name)||right.brand==='TimeWeb'&&/^(?:таймвэб|timeweb(?:[ .]cloud)?)$/iu.test(value.trim()))&&(left.brand??left.name)===(right.brand??right.name);};
+ const automaticName=!operation.semantics.merchant.userVerified&&['bank','deterministic_system_rule'].includes(operation.semantics.merchant.source)&&operation.source.versions.sourceSanitizer==='bank-source/5'&&operation.source.versions.sourceTextEvidence==='intact';
+ const aliasEqual=(value:string)=>{
+  if(automaticName&&(text(bankMerchantLiteral(operation.source))===text(value)||text(operation.source.merchantText)===text(value)))return true;
+  const actual=recognizeCatalogEvidence({merchantText:semanticMerchant,description:operation.source.description}),expected=recognizeCatalogEvidence({merchantText:value,description:''});
+  return actual.status==='recognized'&&expected.status==='recognized'&&actual.entry.name===expected.entry.name&&[expected.entry.name,...expected.entry.aliases].some(alias=>text(alias)===text(value));
+ };
+ const sameMerchant=(value:string)=>{if(text(semanticMerchant)===text(value)||text(sourceMerchant)===text(value)||aliasEqual(value))return true;const left=recognizeMerchant(semanticMerchant),right=recognizeMerchant(value);return left.matched&&right.matched&&!left.conflict&&!right.conflict&&(text(value)===text(right.name)||right.brand==='TimeWeb'&&/^(?:таймвэб|timeweb(?:[ .]cloud)?)$/iu.test(value.trim()))&&(left.brand??left.name)===(right.brand??right.name);};
  const merchantContains=(value:string)=>{
   if(text(semanticMerchant).includes(text(value)))return true;
   const field=operation.semantics.merchant;
   if(field.userVerified||['user','personal_rule','global_rule','ai'].includes(field.source)||operation.source.versions.sourceSanitizer==='bank-source/5'&&operation.source.versions.sourceTextEvidence!=='intact')return false;
+  if(automaticName&&text(bankMerchantLiteral(operation.source)).includes(text(value)))return true;
   if(!semanticMerchant&&text(f.merchantText).includes(text(value)))return true;
   const actual=recognizeMerchant(semanticMerchant),expected=recognizeMerchant(value);
   return actual.matched&&expected.matched&&!actual.conflict&&!expected.conflict&&text(expected.name)===text(value)&&!!actual.brand&&actual.brand===expected.brand&&merchantKey(actual.name)===merchantKey(value);
  };
  const descriptionMatches=(value:string)=>text(f.description).includes(text(value))||['вендинг','vending'].includes(text(value))&&merchantKey(f.description).includes('vending');
- return (!c.merchantEquals||sameMerchant(c.merchantEquals))&&(!c.merchantContains||merchantContains(c.merchantContains)||text(c.merchantContains)==='таймвэб'&&recognizeMerchant(semanticMerchant).brand==='TimeWeb')&&(!c.descriptionContains||descriptionMatches(c.descriptionContains))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.bankCounterpartyId||c.bankCounterpartyId===operation.bankCounterpartyId)&&(!c.counterpartyBankIdentity||!!operation.bankCounterpartyId&&operation.bankCounterpartyId===rule.assignments.counterpartyId)&&(!c.kind||c.kind===operation.semantics.kind.value)&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
+ return (!c.merchantEquals||sameMerchant(c.merchantEquals))&&(!c.merchantContains||merchantContains(c.merchantContains)||text(c.merchantContains)==='таймвэб'&&recognizeMerchant(semanticMerchant).brand==='TimeWeb')&&(!c.descriptionContains||descriptionMatches(c.descriptionContains))&&(!c.accountId||c.accountId===f.accountId)&&(!c.bankId||c.bankId===account.bankId)&&(!c.counterpartyId||c.counterpartyId===operation.semantics.counterparty.value)&&(!c.bankCounterpartyId||c.bankCounterpartyId===operation.bankCounterpartyId)&&(!c.counterpartyBankIdentity||!!operation.bankCounterpartyId&&operation.bankCounterpartyId===rule.assignments.counterpartyId)&&(!c.kind||c.kind===operation.semantics.kind.value||['transfer_in','transfer_out'].includes(c.kind)&&operation.semantics.kind.value==='own_transfer'&&operation.semantics.kind.source==='deterministic_system_rule'&&c.kind===(amount<0n?'transfer_out':'transfer_in'))&&(!c.direction||c.direction==='in'&&amount>0n||c.direction==='out'&&amount<0n)&&(c.amountFromMinor===undefined||amount>=BigInt(c.amountFromMinor))&&(c.amountThroughMinor===undefined||amount<=BigInt(c.amountThroughMinor))&&(!c.currency||c.currency===f.currency);
 }
 /** Updating a rule never calls this on old operations; history needs a separate preview command. */
 export function applyRules(operation:Operation,account:Account,rules:Rule[],onlyRuleId?:string,categories?:readonly Category[]):Operation {
@@ -79,7 +89,8 @@ export function applyRules(operation:Operation,account:Account,rules:Rule[],only
  const assigned=new Set<keyof Operation['semantics']>();
  const mapping={role:'role',kind:'kind',categoryId:'category',subcategoryId:'subcategory',merchant:'merchant',counterpartyId:'counterparty'}as const;
  for(const [assignment,key]of Object.entries(mapping)as [keyof typeof mapping,typeof mapping[keyof typeof mapping]][]){
-  const current=op.semantics[key];if(current.userVerified||key==='kind'&&current.source==='bank'&&current.confidence>=90)continue;
+  const current=op.semantics[key];if(current.userVerified)continue;
+  if(key==='kind'&&current.source==='bank'&&current.confidence>=90){const proposed=matching.find(r=>r.assignments.kind!==undefined)?.assignments.kind;if(!['transfer_in','transfer_out','own_transfer'].includes(op.semantics.kind.value)||!proposed||!['transfer_in','transfer_out','own_transfer'].includes(proposed))continue;}
   const ties=contenders(assignment);if(!ties.length)continue;
   const winner=ties.find(r=>r.id===onlyRuleId)??ties[0]!;
   assigned.add(key);

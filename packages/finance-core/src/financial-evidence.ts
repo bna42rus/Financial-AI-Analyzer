@@ -4,6 +4,8 @@ import {parsePersistedMinor} from './money.ts';
 import {resolveOwnCategory} from './category-resolution.ts';
 import {catalogFold} from './catalog-lexical.ts';
 import {statementEvent} from '../../imports/src/bank-event.ts';
+import {ownTransferRule} from './own-transfer.ts';
+import {ownTransferEvidence} from '../../imports/src/counterparty-evidence.ts';
 import {bankMerchantProjection} from './bank-merchant.ts';
 
 export const financialEvidenceVersion='cashneuro-financial-evidence/1' as const;
@@ -41,16 +43,17 @@ export function initialBankSemantics(source:FinancialSource,merchant=source.merc
    if(kind){semantics.kind={...facet(kind),ruleId:bankEventRule};semantics.role={...facet(kind==='loan_payment'&&BigInt(source.amountMinor)>0n?'neutral':defaultRole(kind,source.amountMinor)),ruleId:bankEventRule};}
   }
  }
+ if(['other','transfer_in','transfer_out'].includes(semantics.kind.value)&&source.versions.sourceSanitizer==='bank-source/5'&&source.versions.sourceTextEvidence==='intact'&&ownTransferEvidence(source.description)){semantics.kind={...facet('own_transfer' as const),ruleId:bankEventRule};semantics.role={...facet('neutral' as const),ruleId:bankEventRule};}
  const projected=bankMerchantProjection(source);
  if(projected&&merchant===source.merchantText)semantics.merchant=facet(projected,'bank');
  return semantics;
 }
-const automaticKind=(s:Semantics)=>!s.kind.userVerified&&(s.kind.source==='bank'||s.kind.source==='deterministic_system_rule'&&[interestRule,bankEventRule].includes(s.kind.ruleId??''));
+const automaticKind=(s:Semantics)=>!s.kind.userVerified&&(s.kind.source==='bank'||s.kind.source==='deterministic_system_rule'&&[interestRule,bankEventRule,ownTransferRule].includes(s.kind.ruleId??''));
 /** Refresh only the bank initializer/current policy. Private, global, AI and
  * verified decisions survive reimports; lost evidence does not linger. */
 export function refreshBankSemantics(previous:Semantics,source:FinancialSource):Semantics{
  const out=structuredClone(previous),fresh=initialBankSemantics(source);
- if(automaticKind(previous)){
+ if(automaticKind(previous)&&!(fresh.kind.value==='own_transfer'&&(previous.role.userVerified||['user','personal_rule','global_rule','ai'].includes(previous.role.source)))){
   out.kind=fresh.kind;
   if(!previous.role.userVerified&&['bank','deterministic_system_rule'].includes(previous.role.source)&&(previous.kind.value!==fresh.kind.value||fresh.kind.value==='interest'||previous.kind.value==='interest'))out.role=fresh.role;
  }
@@ -66,7 +69,17 @@ export function effectiveFinancialRole(operation:Operation){
 /** Only an explicit subject and a unique visible compatible own node qualify.
  * A broad or missing private tree never causes category creation/resurrection. */
 export function applyFinancialRecognition(operation:Operation,categories:readonly Category[]):Operation{
- if(operation.decomposition||operation.semantics.kind.value!=='interest')return operation;
+ if(operation.decomposition)return operation;
+ const kind=operation.semantics.kind.value;
+ if(['fee','loan_payment'].includes(kind)){
+  const c=operation.semantics.category,sub=operation.semantics.subcategory;
+  if(operation.semantics.role.value!=='expense'||[c,sub].some(f=>f.userVerified||['user','personal_rule','global_rule','ai'].includes(f.source)||f.value!==null))return operation;
+  const text=catalogFold(operation.source.description),key=kind==='loan_payment'?'loan_repayment':/оповещени|уведомлени/u.test(text)?'bank_notifications':/обслуживани/u.test(text)?'bank_service':'bank_commission';
+  const target=kind==='loan_payment'?{key,path:['Кредиты и долги','Погашение кредита'],labels:['Погашение кредита','Платежи по кредитам','Платежи по кредиту','Платёж по кредиту']}:undefined;
+  const own=resolveOwnCategory(key,categories,'expense',target?{target}:{});if(own.status!=='resolved')return operation;
+  return {...operation,semantics:{...operation.semantics,category:{...facet(own.categoryId),ruleId:bankEventRule},subcategory:{...facet(own.subcategoryId),ruleId:bankEventRule}}};
+ }
+ if(kind!=='interest')return operation;
  const evidence=bankInterestEvidence(operation.source),role=effectiveFinancialRole(operation).value,c=operation.semantics.category,sub=operation.semantics.subcategory;
  if(!evidence||evidence.role!==role||[c,sub].some(f=>f.userVerified||f.value!==null||!['bank','deterministic_system_rule'].includes(f.source)))return operation;
  const target=evidence.subject==='deposit'?{key:'received_interest',path:['Проценты и инвестиции','Проценты по счетам и вкладам'],labels:['Проценты по счетам и вкладам','Проценты по вкладам','Проценты по депозитам']}: {key:'paid_loan_interest',path:['Кредиты и долги','Проценты'],labels:['Проценты','Проценты по кредиту','Проценты по кредитам']};

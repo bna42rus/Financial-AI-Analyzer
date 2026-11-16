@@ -1,7 +1,7 @@
 import type {Operation} from './model.ts';
 import {bankMerchantProjection} from './bank-merchant.ts';
 import {cleanBankText} from '../../imports/src/bank-description.ts';
-import {recognizeCatalogEvidence} from './catalog-evidence.ts';
+import {recognizeCatalogEvidence,canonicalCatalogName} from './catalog-evidence.ts';
 import {recognizeActivity} from './activity-recognition.ts';
 import {catalogFold} from './catalog-lexical.ts';
 import {nameStyles,nameDataSha256,extendedCatalogSha256} from './catalog/generated/name-v1.ts';
@@ -47,7 +47,7 @@ export function operationDisplayName(op:Operation,context:NameContext={}):Operat
    const ending=method==='delivery'?/(?:\s*[,;:—-]?\s+)(?:доставка(?: бесплатно)?|доставкой|delivery|home delivery|курьерская доставка)$/iu:/(?:\s*[,;:—-]?\s+)(?:самовывоз|самовывозом|pickup|pick-up|click and collect)$/iu;
    title=title.replace(ending,'').trim()||title;
   }
-  if(['legacy-catalog:Яндекс Go','catalog-v1:R01'].includes(activity.profileKey??'')&&activity.targetKey==='powerbank'){
+  if(['legacy-catalog:Яндекс Go','catalog-v1:R01','catalog-v1:owner-yandex-go'].includes(activity.profileKey??'')&&activity.targetKey==='powerbank'){
    const m=/^(.+?)(?:\s*:\s*|\s+)(аренда пауэрбанка|аренда зарядки)$/iu.exec(title);if(m){title=m[1]!;serviceQualifier='Аренда пауэрбанка';}
   }
   const evidence=recognizeCatalogEvidence({merchantText:title,description,bankCategory:source.bankCategory,mcc:source.sourceMcc});
@@ -63,7 +63,10 @@ export function operationDisplayName(op:Operation,context:NameContext={}):Operat
   // A service name is not automatically another delivery/pickup event.
   if(fulfillmentQualifier&&catalogFold(title).includes(catalogFold(fulfillmentQualifier)))fulfillmentQualifier=null;
  }
+ if(!protectedName&&intact&&raw){const evidence=recognizeCatalogEvidence({merchantText:raw,description,bankCategory:source.bankCategory,mcc:source.sourceMcc});if(evidence.status==='recognized'){title=canonicalCatalogName(evidence.entry.name,source.merchantText);explanationCode='NAME-CANONICAL';}}
  let eventLabel=kind==='purchase'?null:events[kind]??'Операция';
+ if(!protectedName&&intact&&kind==='own_transfer'){title='Перевод себе';eventLabel=null;explanationCode='NAME-OWN-TRANSFER';}
+ if(!protectedName&&intact&&kind==='loan_payment'&&/^досрочное погашение кредита(?=$|[^\p{L}])/iu.test(description)){title='Досрочное погашение кредита';eventLabel=null;explanationCode='NAME-EARLY-REPAYMENT';}
  if(!meaningful(title)){
   const party=op.semantics.counterparty.value?context.counterparties?.find(p=>p.id===op.semantics.counterparty.value&&!p.mergedIntoId):null;
   title=party?cleanBankText(party.name,160):'';

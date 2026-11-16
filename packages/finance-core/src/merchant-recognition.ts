@@ -1,4 +1,5 @@
 import {applyActivityRecognition} from './activity-recognition.ts';
+import {recognizeCatalogEvidence,canonicalCatalogName} from './catalog-evidence.ts';
 import {brandKeys,brandPattern} from './merchant-aliases.ts';
 import {groceryEvidence} from './grocery-evidence.ts';
 import {isMarketplaceName} from './starter.ts';
@@ -110,7 +111,14 @@ const protectedFacet=(f:{userVerified:boolean;source:string})=>f.userVerified||[
 /** For new imports or an explicit classification pass. Never touches bank facts,
  * manual/rule/verified facets, components, monetary roles or links. */
 export function applyMerchantRecognition(operation:Operation,categories:Category[],bindings?:Readonly<Record<string,{categoryId:string;subcategoryId:string|null}>>):Operation{
- if(operation.source.versions.sourceSanitizer==='bank-source/5')return applyActivityRecognition(operation,categories,bindings);
+ if(operation.source.versions.sourceSanitizer==='bank-source/5'){
+  const next=structuredClone(operation),source=next.source;
+  if(source.versions.sourceTextEvidence==='intact'&&!protectedFacet(next.semantics.merchant)){
+   const evidence=recognizeCatalogEvidence({merchantText:source.merchantText,description:source.description,bankCategory:source.bankCategory,mcc:source.sourceMcc});
+   if(evidence.status==='recognized')next.semantics.merchant=facet(canonicalCatalogName(evidence.entry.name,source.merchantText),'bank',false,evidence.provisional?80:96);
+  }
+  return applyActivityRecognition(next,categories,bindings);
+ }
  const next=structuredClone(operation);
  if(!['bank-source/4','bank-source/5'].includes(next.source.versions.sourceSanitizer??'')||next.source.versions.sourceSanitizer==='bank-source/5'&&next.source.versions.sourceTextEvidence!=='intact')return next;
  const recognition=recognizeMerchant(next.source.merchantText,next.source.description,{mcc:next.source.sourceMcc,bankCategory:next.source.bankCategory});
