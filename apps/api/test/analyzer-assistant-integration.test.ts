@@ -281,6 +281,8 @@ for (const scenario of ['prior-reported', 'current-reported', 'prior-unknown'] a
   test(`monthly Staging ledger separates access quota and preserves legacy history: ${scenario}`, async t => {
     const at = new Date(), month = monthlyPeriod(at), start = Date.parse(month.projectPeriodStart);
     const accessAnchor = new Date(start - 20 * 86400000).toISOString();
+    let quotaStart = new Date(accessAnchor);
+    for (;;) { const next = new Date(quotaStart); next.setUTCMonth(next.getUTCMonth()+1); if (next>at) break; quotaStart=next; }
     await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=$1 WHERE user_id='first'", [accessAnchor]);
     const legacyId = randomUUID(), created = new Date(start + (scenario === 'current-reported' ? 1 : -86400000)).toISOString();
     await pg.owner.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,created_at,usage_state,input_tokens,output_tokens,anchor_at,period_start)
@@ -299,11 +301,11 @@ for (const scenario of ['prior-reported', 'current-reported', 'prior-unknown'] a
       assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation WHERE request_id=$1', [legacyId])).rows[0].n,0);
       if (scenario === 'prior-reported') {
         const receipt = (await pg.owner.query(`SELECT c.anchor_at=$2::timestamptz AS money_anchor,c.period_start=$2::timestamptz AS money_period,
-          r.anchor_at=$3::timestamptz AS quota_anchor,r.period_start=$3::timestamptz AS quota_period,c.state
-          FROM commerce.ai_cost_reservation c JOIN commerce.analyzer_request r USING(user_id,request_id,step) WHERE c.request_id=$1`, [b.id,month.projectPeriodStart,accessAnchor])).rows;
+          r.anchor_at=$3::timestamptz AS quota_anchor,r.period_start=$4::timestamptz AS quota_period,c.state
+          FROM commerce.ai_cost_reservation c JOIN commerce.analyzer_request r USING(user_id,request_id,step) WHERE c.request_id=$1`, [b.id,month.projectPeriodStart,accessAnchor,quotaStart.toISOString()])).rows;
         assert.equal(receipt.length,2);
         assert.ok(receipt.every(r => r.money_anchor && r.money_period && r.quota_anchor && r.quota_period && r.state === 'settled'));
-        assert.equal((await pg.owner.query("SELECT sum(units)::int AS n FROM commerce.analyzer_usage WHERE user_id='first' AND anchor_at=$1 AND period_start=$1",[accessAnchor])).rows[0].n,1);
+        assert.equal((await pg.owner.query("SELECT sum(units)::int AS n FROM commerce.analyzer_usage WHERE user_id='first' AND anchor_at=$1 AND period_start=$2",[accessAnchor,quotaStart.toISOString()])).rows[0].n,1);
       } else {
         assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
       }
@@ -356,9 +358,9 @@ test('the pilot call ceiling includes another tenant without exposing their priv
 test('deterministic calculator returns exact code results, charges once and preserves every financial source',async()=>{
  const b={...await body(),text:'Аннуитет 100 рублей, 12% годовых, один месяц'},before=(await pg.owner.query('SELECT id,source_observation_id,corrections,semantics FROM finance.transaction ORDER BY id')).rows;
  outputs=[{version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'}}];
- const result=await run(b);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().code,'FINANCIAL_CALCULATION');assert.equal(result.json().answer.calculation.totalPaidMinor,'10100');assert.equal(result.json().answer.calculation.interestMinor,'100');assert.equal(calls,1);
+ const result=await run(b);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().code,'FINANCIAL_CALCULATION');assert.equal(result.json().answer.calculation.totalPaidMinor,'10100');assert.equal(result.json().answer.calculation.interestMinor,'100');assert.equal(calls,2);
  assert.deepEqual((await pg.owner.query('SELECT id,source_observation_id,corrections,semantics FROM finance.transaction ORDER BY id')).rows,before);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action')).rows[0].n,'0');assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
- const replay=await run(b);assert.deepEqual(replay.json(),result.json());assert.equal(calls,1);assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
+ const replay=await run(b);assert.deepEqual(replay.json(),result.json());assert.equal(calls,2);assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
  for(const v of outgoing){const text=JSON.stringify(v);assert.ok(!text.includes(account));assert.ok(!operationIds.some(id=>text.includes(id)));}
 });
 

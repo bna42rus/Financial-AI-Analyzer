@@ -214,7 +214,7 @@ test('test top-up fixes the price and credits a verified payment once',async()=>
  const owner={id:'first',email:'first@example.test'},id=randomUUID(),paymentId=randomUUID(),seal=envelope(fc.wrappingKey);
  const payment={id:paymentId,test:true,status:'pending',paid:false,amount:{currency:'RUB',value:'39.00'},metadata:{orderId:id},confirmation:{confirmation_url:'https://yookassa.ru/checkout'}};
  let returned={...payment,status:'succeeded',paid:true},requests=0;
- const provider={async create(input:{id:string;value:string;units:number}){assert.deepEqual(input,{id,value:'39.00',units:1000});return payment;},async read(providerId:string){assert.equal(providerId,paymentId);requests++;return returned;}};
+ const provider={async create(input:{id:string;value:string;units:number}){assert.deepEqual(input,{id,value:'39.00',units:1000,save:true});return payment;},async read(providerId:string){assert.equal(providerId,paymentId);requests++;return returned;}};
  const step=(input:{id:string;units?:number})=>within('first',db=>aiTopup(db,owner,input,provider,seal));
  assert.equal((await step({id,units:1000})).status,'created');assert.equal((await step({id})).status,'pending');
  returned={...returned,amount:{currency:'RUB',value:'1.00'}};

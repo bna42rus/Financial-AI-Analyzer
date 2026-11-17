@@ -63,6 +63,10 @@ jobs:
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-name-pattern='program ' test/analyzer-assistant-integration.test.ts
+      - name: Verify existing journal, billing and canonical merchant contracts over HTTP
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 --test-name-pattern='monthly Staging ledger|deterministic calculator|/5 activity pass|test top-up|category binding preview|/5 import applies|/5 future Latin|/5 NAME is' test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/finance-reset.test.ts test/finance.test.ts test/import-ingestion.test.ts
       - name: Verify review atomic commit, rollback and category identity over HTTP
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
