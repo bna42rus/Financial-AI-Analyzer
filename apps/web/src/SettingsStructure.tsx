@@ -1,6 +1,6 @@
 import {SelectField} from './SelectField';
 import {useId,useState} from 'react';
-import type {Category} from '../../../packages/finance-core/src/model';
+import type {Category,Role} from '../../../packages/finance-core/src/model';
 import type {CommandState} from './workspace-command';
 import type {SettingsIntent} from './settings-intents';
 import {OperationField} from './OperationDialog';
@@ -29,10 +29,19 @@ export function SettingsStructure(props:EditorProps&{editor:StructureEditor&{kin
  const parties=s.counterparties.filter(p=>p.id!==id&&p.state==='registered');
  const mergeOptions=category?s.categories.filter(c=>c.id!==id&&!c.hidden&&!!c.parentId===!!category.parentId&&covers(category.role,c.role)):parties;
  const allowedRoles=parent?parent.role==='both'?['expense','income']:[parent.role]:['expense','income','both'];
+ const [roleChoices,setRoleChoices]=useState<Record<string,Role>>({});
+ const touched=new Set([id,...s.categories.filter(c=>c.parentId===id).map(c=>c.id)]);
+ const related=(c:string|null,sub:string|null)=>touched.has(c??'')||touched.has(sub??'');
+ const operations=s.categoryOperations??s.operations.map(o=>({id:o.id,role:o.classification.role.value,categoryId:o.classification.category.value,subcategoryId:o.classification.subcategory.value,merchant:o.classification.merchant.value,retired:false}));
+ const decisions=action==='migrate'?[
+  ...operations.filter(o=>related(o.categoryId,o.subcategoryId)).map((o,i)=>({kind:'operation' as const,id:o.id,role:o.role,label:`Смысл операции ${i+1}: ${o.merchant||'Операция'}`,retired:o.retired})),
+  ...(s.categoryComponents??[]).filter(c=>related(c.categoryId,c.subcategoryId)).map((c,i)=>({kind:'component' as const,id:c.id,role:c.role,label:`Смысл части ${i+1}: операция`,retired:c.retired})),
+ ]:[];
+ const roleDecisions=decisions.flatMap(d=>{const value=roleChoices[d.kind+':'+d.id];return value?[{kind:d.kind,id:d.id,role:value}]:[];});
  const noChanges=action==='merge'&&!donors.length||action==='move'&&!target||action==='migrate'&&(!allowedRoles.includes(role)||role===category?.role)||action==='split'&&(!target||!selected.length||!ready);
  function build():SettingsIntent{
   if(category){
-   if(action==='migrate'||action==='move')return {kind:'migrate_category',id,parentId:action==='move'?target:category.parentId,role:action==='move'?category.role:role,roleDecisions:[],childRoles:[]};
+   if(action==='migrate'||action==='move')return {kind:'migrate_category',id,parentId:action==='move'?target:category.parentId,role:action==='move'?category.role:role,roleDecisions,childRoles:[]};
    if(action==='delete')return {kind:'delete_category',id,replacementId:target||null,roleDecisions:[],childRoles:[]};
    return {kind:'merge_categories',id,sourceIds:donors,roleDecisions:[],childRoles:[]};
   }
@@ -50,6 +59,7 @@ export function SettingsStructure(props:EditorProps&{editor:StructureEditor&{kin
    {action==='move'&&<><p>Перемещаем «{entity.name}».</p><OperationField label="Новая родительская категория"><SearchFilter label="Выберите категорию" options={moveTargets.map(c=>[c.id,c.name] as const)} value={target?[target]:[]} onChange={ids=>setTarget(ids[0]??'')} disabled={draft.locked||!moveTargets.length} single fullWidth/></OperationField>{!moveTargets.length&&<p>Нет другой категории с подходящим назначением.</p>}</>}
    {action==='migrate'&&<><OperationField label="Использовать для"><SelectField value={allowedRoles.includes(role)?role:''} onChange={e=>setRole(e.target.value as Category['role'])}>{!allowedRoles.includes(role)&&<option value="" disabled>Выберите назначение</option>}{allowedRoles.map(r=><option key={r} value={r}>{roles[r as Category['role']]}</option>)}</SelectField></OperationField>{parent&&parent.role!=='both'&&<p>Назначение задано родительской категорией «{parent.name}».</p>}{!parent&&role!=='both'&&s.categories.some(c=>c.parentId===id)&&<p>Подкатегории получат то же назначение.</p>}</>}
    {action==='split'&&<><p>Переносим операции от «{entity.name}».</p><OperationField label="Кому перенести"><SelectField value={target} onChange={e=>setTarget(e.target.value)} disabled={!parties.length}><option value="">Выберите контрагента</option>{parties.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</SelectField></OperationField>{!parties.length&&<p>Нет другого сохранённого контрагента.</p>}{target&&<OperationSelection state={s} timezone={props.timezone} disabled={draft.locked} selected={selected} onSelected={setSelected} onReady={setReady} counterpartyId={id} label="Какие операции перенести"/>}</>}
+   {action==='migrate'&&decisions.length>0&&<details><summary>Решения о финансовом смысле</summary><p>При изменении назначения выберите финансовый смысл зависимых операций и частей. Без выбора их смысл сохраняется; несовместимое изменение сервер отклонит.</p>{decisions.map(d=><div key={d.kind+':'+d.id}>{d.retired&&<small>Сохранённая старая версия</small>}<OperationField label={d.label}><SelectField value={roleChoices[d.kind+':'+d.id]??''} onChange={e=>setRoleChoices(v=>{const next={...v};if(e.target.value)next[d.kind+':'+d.id]=e.target.value as Role;else delete next[d.kind+':'+d.id];return next;})}><option value="">Не изменять</option>{Object.entries(roles).filter(([r])=>r!=='both'&&(role==='both'||role===r)).map(([r,label])=><option key={r} value={r}>{label}</option>)}</SelectField></OperationField></div>)}</details>}
   </fieldset></form>
  </DraftFrame>;
 }

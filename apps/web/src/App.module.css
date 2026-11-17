@@ -87,7 +87,7 @@
 .app:has(.analyzerMain) .header { flex-shrink:0; }
 .analyzerMain { display:flex; flex-direction:column; flex:1; min-height:0; width:100%; }
 .analyzerMain>div { flex-shrink:0; }
-@media(max-width:600px) { .analyzerMain { display:flex; flex-direction:column; height:auto; padding:12px 12px calc(75px + env(safe-area-inset-bottom)); } .analyzerMain .titleLine { margin-bottom:10px; } .analyzerMain .titleLine h1 { font-size:calc(21px * var(--text-scale, 1)); } .analyzerMain .titleLine p { font-size:calc(11px * var(--text-scale, 1)); } .analyzerMain .demoBanner { margin-bottom:10px; padding:7px 10px; font-size:calc(10px * var(--text-scale, 1)); gap:4px; } }
+@media(max-width:700px) { .app:has(.analyzerMain) {height:auto;min-height:100dvh;} .main.analyzerMain {flex:none;padding-bottom:calc(95px + env(safe-area-inset-bottom));} .analyzerMain { display:flex; flex-direction:column; height:auto; padding:12px 12px calc(75px + env(safe-area-inset-bottom)); } .analyzerMain .titleLine { margin-bottom:10px; } .analyzerMain .titleLine h1 { font-size:calc(21px * var(--text-scale, 1)); } .analyzerMain .titleLine p { font-size:calc(11px * var(--text-scale, 1)); } .analyzerMain .demoBanner { margin-bottom:10px; padding:7px 10px; font-size:calc(10px * var(--text-scale, 1)); gap:4px; } }
 
 :global([data-density="compact"]) .panel { padding:14px; }
 :global([data-density="compact"]) .stat { padding:12px; }

@@ -35,7 +35,7 @@
 .footerSupport { display:grid; gap:8px; justify-items:start; }
 .footerSupport p { margin:0 0 2px; color:var(--color-secondary-text); }
 .footerSupport strong { color:var(--color-primary); overflow-wrap:anywhere; }
-.footer nav { grid-column:2/-1; display:grid; grid-template-columns:auto auto; justify-content:end; align-items:end; gap:12px clamp(28px,7vw,92px); }
+.footer nav { grid-column:2/-1; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); justify-content:stretch; align-items:end; gap:12px var(--footer-column-gap); }
 .footerGroup { display:grid; gap:6px; list-style:none; margin:0; padding:0; }
 .footerGroup:first-child { justify-self:center; }
 .footerGroup:last-child { justify-self:end; }

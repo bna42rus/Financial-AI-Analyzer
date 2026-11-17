@@ -32,7 +32,7 @@ jobs:
       - name: Start disposable PostgreSQL 18 without a shared registry
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Reject known high and critical dependency advisories
-        run: pnpm audit --audit-level=high
+        run: pnpm run check:dependency-security
       - name: Verify sources, calculations, types and web build
         run: pnpm run check
       - name: Check auth, TOTP, recovery, ownership and database roles on PostgreSQL 18
@@ -74,7 +74,7 @@ jobs:
       - name: Start disposable PostgreSQL 18 without a shared registry
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Reject known high and critical dependency advisories
-        run: pnpm audit --audit-level=high
+        run: pnpm run check:dependency-security
       - name: Check API types for budget scenarios
         run: pnpm run check:api
       - name: Check budget periods, versions, tenant isolation and deletion on PostgreSQL 18
@@ -118,7 +118,7 @@ jobs:
       - name: Start disposable PostgreSQL 18 without a shared registry
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Reject known high and critical dependency advisories
-        run: pnpm audit --audit-level=high
+        run: pnpm run check:dependency-security
       - name: Check API types for overview scenarios
         run: pnpm run check:api
       - name: Check overview metrics, comparisons, saved views, tenant isolation and deletion on PostgreSQL 18
@@ -257,7 +257,7 @@ jobs:
       - name: Start disposable PostgreSQL 18 without a shared registry
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Reject known high and critical dependency advisories
-        run: pnpm audit --audit-level=high
+        run: pnpm run check:dependency-security
       - name: Check API types for analyzer scenarios
         run: pnpm run check:api
       - name: Check Analyzer gate, scope, quotas, tenant isolation and deletion on PostgreSQL 18

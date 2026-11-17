@@ -26,8 +26,8 @@ test('a guest sees the public home and an old application cookie never reopens p
  await mock(page,null);
  await page.goto(base);
  await expect(page.getByRole('heading',{name:'Поймите, куда уходят деньги'})).toBeVisible();
- await page.getByRole('link',{name:'Получить доступ'}).first().click();
- await expect(page.getByRole('heading',{name:'Получить доступ',exact:true})).toBeVisible();
+ await page.getByRole('link',{name:'Начать пользоваться'}).first().click();
+ await expect(page.getByRole('heading',{name:'Создайте аккаунт',exact:true})).toBeVisible();
  await expect(page.getByText('Оплатите доступ')).toHaveCount(0);
 });
 test('active sessions enter the finance workspace even from public hashes',async({page})=>{

@@ -23,6 +23,7 @@
     "test:security": "pnpm --filter @finance/api test:integration",
     "test:access-browser": "pnpm --filter @finance/api test:browser",
     "check:catalog": "python3 scripts/compile-merchant-catalog.py --check && python3 scripts/test-compile-merchant-catalog.py && python3 scripts/compile-activity-runtime.py --check && python3 scripts/compile-name-runtime.py --check && python3 scripts/compile-profile-runtime.py --check && python3 scripts/test-compile-profile-runtime.py",
-    "check:questions": "node scripts/analyzer-question-catalog.mjs --check"
+    "check:questions": "node scripts/analyzer-question-catalog.mjs --check",
+    "check:dependency-security": "node scripts/check-picomatch-guard.mjs && pnpm audit --audit-level=high --ignore GHSA-fc5q-39xc-vjpf"
   }
 }

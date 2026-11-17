@@ -1,0 +1,20 @@
+diff --git a/lib/parse.js b/lib/parse.js
+index 29207512c60183b4bb9bf5112be3b9b5f4a9a9fd..3ad257d9ed65213fc7bf8c0d7300e94e563e79bf 100644
+--- a/lib/parse.js
++++ b/lib/parse.js
+@@ -285,6 +285,15 @@ const repeatedExtglobRecursion = pattern => {
+ };
+ 
+ const analyzeRepeatedExtglob = (body, options) => {
++  // CashNeuro security backport for GHSA-fc5q-39xc-vjpf. Reuse the existing
++  // literal fallback for a single non-literal branch inside +(…)/(*(…)).
++  // Do this before the recursion option: disabling its limit must not disable
++  // protection against nested unbounded wildcard quantifiers.
++  const singleBranches = splitTopLevel(body).map(branch => branch.trim());
++  if (singleBranches.length === 1 && !isPlainBranch(singleBranches[0])) {
++    return { risky: true };
++  }
++
+   if (options.maxExtglobRecursion === false) {
+     return { risky: false };
+   }

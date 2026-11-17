@@ -87,14 +87,14 @@ export function ServerAnalyzer({demo=false,device,state,filter,filterQueue,filte
  }
 
  async function manageChat(patch:Record<string,unknown>){
-  if(!manage||locked)return;setManageError('');setBusy(true);
+  if(!manage||locked)return;setManageError('');setBusy(true);if(patch.delete)setCreatingChat(true);
   try{
    await api('/finance/analyzer-chat',{id:manage.id,...patch});
    if(patch.delete&&pending.current?.chatId===manage.id){pending.current=null;setRetry(false);++execution.current;}
    if(patch.delete){setDrafts(d=>{const next={...d};delete next[manage.id];return next;});if(activeRef.current===manage.id){activeRef.current=null;setActive(null);setDetails(null);}}
    setManage(null);setDeleting(false);
    await load().catch(report);
-  }catch(e){if(!onAccessError(e))setManageError(e instanceof Error?e.message:'Не удалось сохранить изменения.');}finally{if(mounted.current)setBusy(false);}
+  }catch(e){if(!onAccessError(e))setManageError(e instanceof Error?e.message:'Не удалось сохранить изменения.');}finally{if(mounted.current){setBusy(false);setCreatingChat(false);}}
  }
  async function proposeTool(tool:ActionTool,actionId?:string,restoring=false){if(locked||!command)return;const next=mutation.current??{actionId:actionId??crypto.randomUUID(),tool};if(JSON.stringify(next.tool)!==JSON.stringify(tool))return;mutation.current=next;setBusy(true);setError('');try{const p=await api<(FinancePreview|FinanceReceipt)&{generation:string;requiresConfirmation?:boolean}>('/finance/analyzer-propose',next);if(!mounted.current)return;mutation.current=null;setEditing(null);command.adoptPreview(p,p.generation,'Изменение из Анализатора',restoring||p.requiresConfirmation!==false,tool.name==='finance_action'&&['undo','restore_history'].includes(tool.intent.kind));await load();}catch(e){if(e instanceof ApiError&&e.code==='NETWORK_ERROR')setEditing(null);else mutation.current=null;report(e);}finally{if(mounted.current)setBusy(false);}}
  async function propose(m:Message,value:'include'|'exclude'){return proposeTool(m.outcome?.tool??{name:'set_inclusion',answerId:m.id,value},m.actionId??undefined,!!m.actionId);}
