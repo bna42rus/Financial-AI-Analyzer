@@ -39,6 +39,28 @@ concurrency:
   group: assistant-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 jobs:
+  review-continuity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start isolated PostgreSQL 18
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Verify category continuity and review fields offline
+        run: pnpm --filter @finance/api exec node --import tsx --test test/classification-plan.test.ts test/classification-pass.test.ts test/category-continuity.test.ts test/review-fields.test.ts test/review-remember.test.ts
+      - name: Verify review atomic commit, rollback and category identity over HTTP
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-name-pattern='one operation card|review fields, local comment|invalid staged allocation|renaming a recognized category' test/operations.test.ts
   software-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 10
