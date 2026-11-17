@@ -40,10 +40,31 @@ jobs:
       - name: Check isolated PostgreSQL, quota, rollback, role isolation and existing authentication
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-integration.test.ts test/analyzer-cost.test.ts test/yandex-integration.test.ts test/analyzer.test.ts test/security.test.ts test/mail.test.ts test/owner-bootstrap.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer.test.ts test/security.test.ts test/mail.test.ts test/owner-bootstrap.test.ts
       - name: Install pinned Chromium for browser acceptance
         run: pnpm --filter @finance/api exec playwright install --with-deps chromium
       - name: Check real Analyzer browser flows on desktop and mobile
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-task-browser.test.ts test/analyzer-browser.test.ts
+
+  legacy-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install locked dependencies
+        run: |
+          npm install --global pnpm@11.25.0 --ignore-scripts
+          pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start isolated PostgreSQL 18
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Check legacy money, retry, scope and ownership contracts without model calls
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 --test-timeout=60000 test/analyzer-task-integration.test.ts test/analyzer-cost.test.ts test/yandex-integration.test.ts

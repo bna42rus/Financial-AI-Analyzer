@@ -150,9 +150,13 @@ jobs:
 
 
   interface-checks:
-    name: interface-checks
+    name: interface-checks (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v5
         with:
@@ -166,36 +170,39 @@ jobs:
         run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install browser for interface checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
-      - name: Check interface on desktop and mobile
-        run: pnpm run test:e2e
+      - name: Check Finance interface on desktop and mobile
+        run: pnpm --filter @finance/web exec playwright test --shard=${{ matrix.shard }}/4 --workers=2 --retries=0 --reporter=dot,./e2e/ci-reporter.ts
+      - name: Check Control interface on desktop and mobile
+        if: ${{ !cancelled() && matrix.shard == 1 }}
+        run: pnpm --filter @finance/admin exec playwright test --workers=2 --retries=0 --reporter=dot,../web/e2e/ci-reporter.ts
       - name: Save financial reset desktop and mobile previews
         uses: actions/upload-artifact@v4
         with:
-          name: financial-reset-previews
+          name: financial-reset-previews-${{ matrix.shard }}
           path: apps/web/test-results/**/financial-reset-preview.png
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
       - name: Save similar-purchase Review desktop and mobile previews
         uses: actions/upload-artifact@v4
         with:
-          name: review-group-previews
+          name: review-group-previews-${{ matrix.shard }}
           path: apps/web/test-results/**/review-group-preview.png
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Save CSV XLSX OCR upload desktop and mobile previews
         uses: actions/upload-artifact@v4
         with:
-          name: local-import-previews
+          name: local-import-previews-${{ matrix.shard }}
           path: apps/web/test-results/**/local-import-preview.png
-          if-no-files-found: error
+          if-no-files-found: ignore
           retention-days: 7
 
       - name: Save synthetic interface diagnostics on failure
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: interface-failure-diagnostics
+          name: interface-failure-diagnostics-${{ matrix.shard }}
           path: |
             apps/web/test-results/
             apps/admin/test-results/

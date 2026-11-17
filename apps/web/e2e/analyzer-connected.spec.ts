@@ -150,3 +150,15 @@ test('multi-step report shows calculations, official source links and red step e
  h.chats.unshift(chat);await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await page.getByRole('link',{name:'Анализатор',exact:true}).click();
  const report=page.getByRole('region',{name:'Связанный финансовый ответ'});await expect(report).toBeVisible();await expect(report.getByRole('link',{name:'Банк России'})).toHaveAttribute('href','https://www.cbr.ru/hd_base/KeyRate/');await report.getByText('Источник и актуальность',{exact:true}).click();await expect(report).toContainText('по МСК');for(const summary of await report.locator('summary').filter({hasText:'Как рассчитано и условия'}).all())await summary.click();await expect(report).toContainText('Ставки и пороги');await expect(report).toContainText('Месяц 3: 200 ₽');const alert=report.getByRole('alert');await expect(alert).toContainText('Укажите сумму и срок');await expect(alert).toHaveCSS('color',/rgb\((181, 45, 70|255, 166, 181)\)/);expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
 });
+
+
+test('new chat waits for creation before accepting a draft and preserves the previous draft',async({page})=>{
+ const h=await setup(page);await send(page,'Мои расходы');await expect(log(page)).toContainText('300 ₽');
+ const input=page.getByLabel('Ваш финансовый вопрос',{exact:true});await input.fill('Несохранённый прежний вопрос');
+ let release!:()=>void,started!:()=>void;const gate=new Promise<void>(r=>release=r),seen=new Promise<void>(r=>started=r);
+ await page.route('http://127.0.0.1:3000/finance/analyzer-chat',async route=>{if(route.request().method()==='OPTIONS')return route.fallback();if(route.request().postDataJSON().create){started();await gate;}return route.fallback();});
+ await history(page);await page.getByRole('button',{name:'Новый диалог',exact:true}).filter({visible:true}).click();await seen;
+ try{await expect(input).toBeDisabled();}finally{release();}
+ await expect(input).toBeEditable();await expect(input).toHaveValue('');await input.fill('Вопрос нового диалога');await expect(input).toHaveValue('Вопрос нового диалога');expect(h.chats[1]!.messages).toHaveLength(1);
+ await history(page);await page.getByRole('button',{name:'Мои расходы',exact:true}).filter({visible:true}).click();await expect(input).toHaveValue('Несохранённый прежний вопрос');
+});

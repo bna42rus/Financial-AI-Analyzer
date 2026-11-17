@@ -44,6 +44,8 @@ beforeEach(async()=>{
  const login=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'first@example.test',password},headers:{origin:config.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200,login.body);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');
  account=randomUUID();await within(async db=>{const s=await financeView(db,'first');category=s.categories.find(c=>c.name==='Продукты'&&c.parentId===null)!.id;await acceptAccount(db,'first',importEpoch(s),{id:account,bankId:'tbank',systemName:'Synthetic Analyzer account',type:'bank_account'});await syntheticOperations(db,'first',2,account,category);});
  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds',NULL,'Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10}')");
+  // Monetary dispatch requires an actual active paid allowance window.
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id=$1",['first']);
 });
 
 const costPolicy={projectId:'staging/finance/http-tests',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:'1000',price:{version:'synthetic-800',currency:'RUB' as const,inputRubPerMillion:'800',outputRubPerMillion:'800'}};

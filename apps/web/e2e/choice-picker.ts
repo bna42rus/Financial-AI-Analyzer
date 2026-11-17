@@ -10,3 +10,10 @@ export async function chooseOption(trigger:Locator,value:string|RegExp){
  await expect(menu).toBeHidden();
  return selected;
 }
+
+/** Expand existing user disclosures before asserting a nested import error. */
+export async function openDisclosureAncestors(target:Locator){
+ for(const details of await target.locator('xpath=ancestor::details').all()){
+  if(await details.getAttribute('open')===null)await details.locator(':scope > summary').click();
+ }
+}

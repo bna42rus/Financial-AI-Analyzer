@@ -37,6 +37,8 @@ beforeEach(async()=>{
     await pg.owner.query('INSERT INTO identity.security_state(user_id,indefinite) VALUES($1,true)',[user]);
     await within(user,db=>prepareFinance(db,user));
     await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES($1,clock_timestamp()-interval '1 day','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10}')",[user]);
+  // Monetary dispatch requires an actual active paid allowance window.
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id=$1",[user]);
   }
 });
 async function request(user='first'){

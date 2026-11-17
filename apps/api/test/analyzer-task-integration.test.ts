@@ -66,6 +66,8 @@ beforeEach(async () => {
   account = randomUUID();
   await within(async db => { const state = await financeView(db, 'first'); generation = state.generation; await acceptAccount(db, 'first', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic task account', type: 'bank_account' }); operationIds = await syntheticOperations(db, 'first', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id); });
   await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":20}')");
+  // Monetary dispatch requires an actual active paid allowance window.
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id=$1",['first']);
 });
 async function body() {
   const created = await request('/finance/analyzer-chat', { id: randomUUID(), create: true }); assert.equal(created.statusCode, 200, created.body);
