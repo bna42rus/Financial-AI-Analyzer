@@ -7,11 +7,11 @@ import { createHash } from 'node:crypto';
 import { withAssistantJournal } from '../src/assistant-journal.ts';
 import { withAssistantBudget, assistantBudgetVersion, remainingAssistantTrialBudget, checkAssistantPermit } from '../src/assistant-budget.ts';
 import type { AssistantPermit } from '../src/assistant-budget.ts';
-import { createCloudAssistantModel } from '../src/assistant-transport.ts';
+import { createCloudAssistantModel, compactAssistantSchema } from '../src/assistant-transport.ts';
 import { runAssistant } from '../src/assistant-workflow.ts';
 import type { AssistantRequest, AssistantServices } from '../src/assistant-workflow.ts';
 import { emptyConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
-import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
+import { assistantVersion, assistantPlanSchema } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { checkedTransportDiagnostic } from '../src/benchmark-transport.ts';
 import { checkedAssistantReceipt } from '../src/assistant-journal.ts';
 import { assistantWorkflowVersion } from '../src/assistant-workflow.ts';
@@ -19,7 +19,7 @@ const id = (n: number) => '60000000-0000-4000-8000-' + String(n).padStart(12, '0
 const scope = { ownerId: 'independent-synthetic-owner', chatId: id(1), generation: id(2), chatEpoch: id(3) };
 const request = (): AssistantRequest => ({ requestId: id(4), scope, conversation: emptyConversation(scope), global: { revision: 0, filter: {}, touched: {} },
   dataRevision: '1', question: 'Объясни смысл инфляции', now: new Date('2026-10-16T10:00:00Z'), timezone: 'Asia/Tokyo' });
-const bound = { inputTokens: 131072, outputTokens: 1200, modelVersion: 'openai/gpt-oss-120b' };
+const bound = { inputTokens: 131072, outputTokens: 2400, modelVersion: 'openai/gpt-oss-120b' };
 const usage = { inputTokens: 100, outputTokens: 50, modelVersion: bound.modelVersion };
 const plan = { version: assistantVersion, topic: 'general_finance', action: 'explain' };
 const price = { version: 'synthetic-test', currency: 'RUB' as const, inputRubPerMillion: '15.86', outputRubPerMillion: '61' };
@@ -64,7 +64,7 @@ test('HTTP adapter writes sent receipt and reserve BEFORE POST; known usage prec
     const saved = JSON.parse(await readFile(join(directory, r.requestId + '.json'), 'utf8'));
     assert.equal(saved.receipt.calls.at(-1).state, 'sent');
     const b = JSON.parse(await readFile(join(root, 'budget.json'), 'utf8')); assert.equal(b.entries.length, calls + 1);
-    const body = JSON.parse(String(init?.body)); assert.equal(body.response_format.type, 'json_object'); assert.equal(body.max_completion_tokens, 1200);
+    const body = JSON.parse(String(init?.body)); assert.equal(body.response_format.type, 'json_object'); assert.equal(body.max_completion_tokens, 2400);
     assert.equal(JSON.stringify(body).includes('synthetic-key'), false); assert.equal(JSON.stringify(body).includes(scope.chatId), false);
     return wire(calls++ === 0 ? plan : { text: 'Инфляция означает общий рост цен.' });
   });
@@ -101,7 +101,7 @@ test('unknown HTTP delivery retains its full durable hold, blocks new requests a
   const model = createCloudAssistantModel({ apiKey: 'synthetic-key-1234567890123' }, async () => { calls++; throw Error('synthetic timeout'); });
   await withAssistantBudget(root, permit(), async (a, totals) => {
     const failed = await withAssistantJournal(directory, r, a, j => runAssistant(r, model, j, services().s));
-    assert.equal(failed.code, 'ASSISTANT_DELIVERY_UNKNOWN'); assert.equal(totals().heldAtoms, '2152001920'); assert.equal(totals().blocked, true);
+    assert.equal(failed.code, 'ASSISTANT_DELIVERY_UNKNOWN'); assert.equal(totals().heldAtoms, '2225201920'); assert.equal(totals().blocked, true);
   }, now);
   await withAssistantBudget(root, permit(), async a => {
     await assert.rejects(a.reserve(id(6), 0, bound), /ASSISTANT_RECONCILIATION_REQUIRED/);
@@ -143,7 +143,7 @@ test('runtime waits up to 90 seconds for one completion without increasing its t
   try{
     const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async()=>wire(plan));
     let reserves=0;await model.complete({phase:'understand',prompt:'synthetic',input:{},schema:{}},async()=>{reserves++;});
-    assert.deepEqual(deadlines,[90000]);assert.equal(reserves,1);assert.equal(model.bound.outputTokens,1200);
+    assert.deepEqual(deadlines,[90000]);assert.equal(reserves,1);assert.equal(model.bound.outputTokens,2400);
   }finally{AbortSignal.timeout=original;}
 });
 
@@ -188,4 +188,18 @@ test('explicit authorization extends cumulative ceilings without resetting old s
   assert.throws(() => checkAssistantPermit({ ...expanded, version: legacy.version }), /PERMIT_INVALID/);
   assert.throws(() => checkAssistantPermit({ ...expanded, authorization: { ...authorization, capAtoms: '11000000000' } }), /PERMIT_INVALID/);
   assert.throws(() => remainingAssistantTrialBudget(snapshot(legacy, [{ requestId: id(4), index: 0, bound, unknown: true } as any])), /RECONCILIATION_REQUIRED/);
+});
+
+
+test('wire schema references preserve the closed validator exactly and leave the source untouched', () => {
+  const before = JSON.stringify(assistantPlanSchema), compact = compactAssistantSchema(assistantPlanSchema) as any;
+  const expand = (value: any): any => {
+    if (!value || typeof value !== 'object') return value;
+    if (Array.isArray(value)) return value.map(expand);
+    if (value.$ref) return expand(compact.properties[value.$ref.replace('#/properties/', '')]);
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, expand(v)]));
+  };
+  assert.deepEqual(expand(compact), assistantPlanSchema);
+  assert.equal(JSON.stringify(assistantPlanSchema), before);
+  assert.ok(Buffer.byteLength(JSON.stringify(compact)) < Buffer.byteLength(before) * 0.6);
 });

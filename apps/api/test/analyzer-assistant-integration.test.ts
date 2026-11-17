@@ -400,3 +400,45 @@ test('program new budget keeps profile timezone and requires confirmed commit',a
  const b=await body();b.text='Создай месячный бюджет Продукты 5000 рублей за вычетом возвратов';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_budget',name:'Продукты на месяц',amountRubles:'5000',period:'month',basis:'net',categoryName:'Продукты'}}];
  const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'CHANGE_PROPOSED');const p=reply.json().answer.proposal;assert.equal(p.intent.definition.timezone,'Asia/Vladivostok');const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:p.intent}});assert.equal(preview.statusCode,200,preview.body);const saved=await request('/finance/commit',{actionId});assert.equal(saved.statusCode,200,saved.body);assert.equal((await pg.owner.query('SELECT definition FROM finance.budget WHERE user_id=$1 AND id=$2',['first',b.id])).rows[0].definition.timezone,'Asia/Vladivostok');
 });
+
+test('program report preserves separate evidence, atomically creates and assigns a counterparty, and Undo restores both',async()=>{
+ const b=await body();b.text='Покажи расходы по магазинам, посчитай десять процентов и создай контрагента для этих операций';
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[
+  {kind:'read',label:'Расходы',context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','merchant')]},
+  {kind:'calculate',label:'Десять процентов',calculation:{kind:'percentage',baseRubles:'0',percent:'10'},bindings:[{field:'baseRubles',ref:'s1.total'}]},
+  {kind:'change',label:'Создать получателя',change:{kind:'create_counterparty',name:'Получатель из отчёта'}},
+  {kind:'change',label:'Назначить получателя',fromStep:1,change:{kind:'answer_operations',patch:{counterpartyName:'Получатель из отчёта',comment:'Связанное изменение'}}}
+ ]}},{blocks:[{kind:'conclusion',template:'Расходы {{s1.total}}.'}]}];
+ const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'FINANCIAL_REPORT',reply.body);
+ const a=reply.json().answer;assert.equal(a.report.sections[0].answer.result.totals.expenses,'24690');assert.equal(a.report.sections[1].calculation.metrics[0].value,'2469');assert.equal(calls,3);assert.equal(a.proposal.intent.kind,'compound');
+ const cpId=a.proposal.intent.items[0].id;assert.deepEqual(new Set(a.proposal.intent.items[1].operationIds),new Set(operationIds));
+ assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');
+ const rows=await request('/finance/analyzer-answer-rows',{answerId:b.id,offset:0,section:1});assert.equal(rows.statusCode,200,rows.body);assert.ok(rows.json().points.length);
+ const dependencyIds=(await pg.owner.query('SELECT transaction_id FROM finance.analyzer_dependency WHERE user_id=$1 AND message_id=$2',['first',b.id])).rows.map(r=>r.transaction_id);assert.deepEqual(new Set(dependencyIds),new Set(operationIds));
+ const tool={name:'finance_action',answerId:b.id,intent:a.proposal.intent},actionId=randomUUID();
+ const altered=structuredClone(tool);altered.intent.items[0].patch.name='Подмена';assert.equal((await request('/finance/analyzer-propose',{actionId:randomUUID(),tool:altered})).json().code,'ANALYZER_PROPOSAL_CHANGED');
+ const preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');
+ const saved=await request('/finance/commit',{actionId});assert.equal(saved.statusCode,200,saved.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'1');assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE comment='Связанное изменение'")).rows[0].n,'2');
+ const state=await within(db=>financeView(db,'first')),undoId=randomUUID();const undo=await request('/finance/preview',{actionId:undoId,generation:state.generation,revision:state.revision,intent:{kind:'undo',id:randomUUID(),value:actionId}});assert.equal(undo.statusCode,200,undo.body);const undone=await request('/finance/commit',{actionId:undoId});assert.equal(undone.statusCode,200,undone.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE comment='Связанное изменение'")).rows[0].n,'0');
+});
+
+test('program compound preview rolls back an earlier child if a later child is invalid',async()=>{
+ const state=await within(db=>financeView(db,'first')),cpId=randomUUID(),actionId=randomUUID();
+ const result=await request('/finance/preview',{actionId,generation:state.generation,revision:state.revision,intent:{kind:'compound',id:randomUUID(),items:[{kind:'counterparty',id:cpId,create:true,patch:{name:'Откатить',isSelf:false}},{kind:'operation',id:randomUUID(),patch:{comment:'Не существует'}}]}});
+ assert.ok(result.statusCode>=400,result.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action WHERE id=$1',[actionId])).rows[0].n,'0');
+});
+
+test('program remember derives future rule conditions from owned operations and never passes private IDs to the model',async()=>{
+ const b=await body();b.text='Покажи расходы';outputs=[plan([set('metric','expenses')])];assert.equal((await run(b)).statusCode,200);
+ const id=randomUUID();outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'remember_answer',name:'Запомнить магазин',assignments:{categoryName:'Продукты',role:'expense'}}}];
+ const reply=await run({...b,id,text:'Запомни для следующих таких покупок продукты'});assert.equal(reply.json().code,'CHANGE_PROPOSED',reply.body);const proposal=reply.json().answer.proposal;assert.equal(proposal.intent.kind,'rule');assert.ok(Object.keys(proposal.intent.patch.conditions).length);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.rule WHERE id=$1',[id])).rows[0].n,'0');
+ const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:id,intent:proposal.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal((await request('/finance/commit',{actionId})).statusCode,200);
+ for(const input of outgoing)for(const operationId of operationIds)assert.equal(JSON.stringify(input).includes(operationId),false);
+});
+
+test('program next-period budget is distinguishable from current actual and report refuses future actual',async()=>{
+ const b=await body();b.text='Создай бюджет на продукты со следующего месяца';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_budget',name:'Со следующего месяца',amountRubles:'1000',period:'month',basis:'net',applyFrom:'next'}}];
+ const reply=await run(b);assert.equal(reply.json().code,'CHANGE_PROPOSED',reply.body);const actionId=randomUUID(),p=reply.json().answer.proposal;const preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:p.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal((await request('/finance/commit',{actionId})).statusCode,200);
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'budgets',label:'Бюджеты',request:{names:['Со следующего месяца']}}]}}];const result=await run({...b,id:randomUUID(),text:'Какой факт по этому бюджету?'});assert.equal(result.json().code,'FINANCIAL_REPORT',result.body);const item=result.json().answer.report.sections[0].budgets.items[0];assert.equal(item.indicator,null);assert.equal(item.upcomingLimit.limitMinor,'100000');
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'budgets',label:'Будущий факт',request:{names:['Со следующего месяца'],date:'2099-01-01'}}]}}];const future=await run({...b,id:randomUUID(),text:'Покажи фактические расходы по бюджету в будущем'});assert.ok(future.json().answer.report.sections[0].error,future.body);
+});

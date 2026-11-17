@@ -5,7 +5,7 @@ import { safeText } from '../../privacy/src/text.ts';
 import type { Catalog } from './yandex-contract.ts';
 import { conditionFields, parseTaskBinding, resolveTaskDecision } from './task-context.ts';
 import type { TaskBook, TaskScope, TaskDecision, ScalarEdit, Condition, GlobalSnapshot, ConditionEdit } from './task-context.ts';
-import type { Query, Relevance } from './registry.ts';
+import type { Relevance } from './registry.ts';
 // Historical task-protocol/1 is frozen independently of newer action tools.
 export const taskRegistryVersion='analyzer/3';
 import { periodLiteral, amountLiteral, questionQuote } from './task-literals.ts';

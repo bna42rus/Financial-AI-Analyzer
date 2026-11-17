@@ -8,9 +8,9 @@ import {api} from './server-client';
 import common from './App.module.css';
 import styles from './ServerAnalyzer.module.css';
 
-export function AnalyzerAnswerRows({id,query,result,onOpen}:{id:string;query:Query;result:WidgetResult;onOpen:(filter:OperationsFilter,name:string)=>void}){
+export function AnalyzerAnswerRows({id,section,query,result,onOpen}:{id:string;section?:number;query:Query;result:WidgetResult;onOpen:(filter:OperationsFilter,name:string)=>void}){
  const [points,setPoints]=useState(result.points),[next,setNext]=useState<number|null>(result.points.length<result.groupCount?result.points.length:null),[busy,setBusy]=useState(false),[error,setError]=useState('');
- async function more(){if(next===null||busy)return;setBusy(true);setError('');try{const data=await api<{points:OverviewPoint[];nextOffset:number|null}>('/finance/analyzer-answer-rows',{answerId:id,offset:next});setPoints(old=>[...old,...data.points]);setNext(data.nextOffset);}catch(e){setError(e instanceof Error?e.message:'Не удалось показать остальные строки.');}finally{setBusy(false);}}
+ async function more(){if(next===null||busy)return;setBusy(true);setError('');try{const data=await api<{points:OverviewPoint[];nextOffset:number|null}>('/finance/analyzer-answer-rows',{answerId:id,offset:next,...(section!==undefined?{section}:{})});setPoints(old=>[...old,...data.points]);setNext(data.nextOffset);}catch(e){setError(e instanceof Error?e.message:'Не удалось показать остальные строки.');}finally{setBusy(false);}}
  const display=(value:string|undefined)=>countMetric(query.metric)?(value??'0'):formatMoney(value??'0');
  return <div className={styles.tableWrap} tabIndex={0} role="region" aria-label="Значения ответа">
   <table><thead><tr><th>{({operation:'Операция',category:'Категория',subcategory:'Подкатегория',merchant:'Магазин',account:'Счёт',bank:'Банк',counterparty:'Контрагент',time:'Период',kind:'Тип',role:'Финансовый смысл',none:'Итого'})[query.grouping]}</th><th>Значение</th>{result.comparisonFilter&&<th>Прошлый период</th>}</tr></thead>

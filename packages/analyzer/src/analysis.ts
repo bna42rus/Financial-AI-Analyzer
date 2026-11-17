@@ -1,6 +1,6 @@
 import {assertClosedSchema} from './closed-schema.ts';
 import {dateFact,operationDay} from '../../finance-core/src/model.ts';
-import {queryOperations,operationPartMatches} from '../../finance-core/src/operations.ts';
+import {queryOperations,operationPartMatches,temporalInformationKnown} from '../../finance-core/src/operations.ts';
 import type {OperationRow,OperationsCatalog} from '../../finance-core/src/operations.ts';
 import {metricAmount,metricMatches} from '../../finance-core/src/metrics.ts';
 import type {Metric} from '../../finance-core/src/metrics.ts';
@@ -9,18 +9,19 @@ import type {WidgetResult} from '../../finance-core/src/overview.ts';
 const closed=(properties:Record<string,unknown>,required:string[]=[])=>({type:'object',additionalProperties:false,properties,required});
 const enumeration=(values:readonly string[])=>({type:'string',enum:values});
 export const analysisOptionsSchema=closed({
+ weekdays:{type:'array',maxItems:7,uniqueItems:true,items:{type:'integer',minimum:0,maximum:6}},clock:{anyOf:[closed({from:{type:'string',pattern:'^(?:[01]\\d|2[0-3]):[0-5]\\d$'},through:{type:'string',pattern:'^(?:[01]\\d|2[0-3]):[0-5]\\d$'}}),{type:'null'}]},dateBasis:enumeration(['operation','posted']),
  statistic:enumeration(['sum','mean','median','min','max']),purpose:enumeration(['summary','savings','recurring','cashflow']),
  topN:{type:'integer',minimum:1,maximum:50},direction:enumeration(['asc','desc']),granularity:enumeration(['auto','day','week','month','quarter','year']),chart:enumeration(['table','bar','line']),
  reductionPercent:{type:'integer',minimum:1,maximum:100},
  comparisonPeriod:closed({from:{type:'string',pattern:'^\\d{4}-\\d{2}-\\d{2}$'},through:{type:'string',pattern:'^\\d{4}-\\d{2}-\\d{2}$'}},['from','through']),
 });
-export type AnalysisOptions={statistic?:'sum'|'mean'|'median'|'min'|'max';purpose?:'summary'|'savings'|'recurring'|'cashflow';topN?:number;direction?:'asc'|'desc';granularity?:'auto'|'day'|'week'|'month'|'quarter'|'year';chart?:'table'|'bar'|'line';reductionPercent?:number;comparisonPeriod?:{from:string;through:string}};
+export type AnalysisOptions={weekdays?:number[];clock?:{from?:string;through?:string}|null;dateBasis?:'operation'|'posted';statistic?:'sum'|'mean'|'median'|'min'|'max';purpose?:'summary'|'savings'|'recurring'|'cashflow';topN?:number;direction?:'asc'|'desc';granularity?:'auto'|'day'|'week'|'month'|'quarter'|'year';chart?:'table'|'bar'|'line';reductionPercent?:number;comparisonPeriod?:{from:string;through:string}};
 export function parseAnalysisOptions(raw:unknown):AnalysisOptions{
  assertClosedSchema(raw,analysisOptionsSchema);const r=structuredClone(raw) as AnalysisOptions;
  if(r.comparisonPeriod){for(const date of Object.values(r.comparisonPeriod))dateFact({precision:'day',date});if(r.comparisonPeriod.from>r.comparisonPeriod.through)throw new TypeError('ANALYSIS_PERIOD_INVALID');}
  return r;
 }
-export type AnalysisResult={version:'cashneuro-analysis/1';statistic:NonNullable<AnalysisOptions['statistic']>;unit:'money'|'count';value:string|null;sum:string;count:number;mean:string|null;median:string|null;minimum:string|null;maximum:string|null;notes:string[];previousValue?:string|null;savings?:{label:string;baseMinor:string;reductionPercent:number;savingMinor:string;filter:Query['filter']}[];recurring?:{merchant:string;count:number;totalMinor:string;typicalMinor:string;firstDate:string;lastDate:string;intervalDays:number|null;regular:boolean;filter:Query['filter']}[]};
+export type AnalysisResult={version:'cashneuro-analysis/1';statistic:NonNullable<AnalysisOptions['statistic']>;unit:'money'|'count';value:string|null;sum:string;count:number;mean:string|null;median:string|null;minimum:string|null;maximum:string|null;notes:string[];missingTemporalCount?:number;previousValue?:string|null;savings?:{label:string;baseMinor:string;reductionPercent:number;savingMinor:string;filter:Query['filter']}[];recurring?:{merchant:string;count:number;totalMinor:string;typicalMinor:string;firstDate:string;lastDate:string;intervalDays:number|null;regular:boolean;filter:Query['filter']}[]};
 const rounded=(n:bigint,d:bigint)=>n<0n?-((-n+d/2n)/d):(n+d/2n)/d;
 const median=(a:bigint[])=>a.length%2?a[(a.length-1)/2]!:rounded(a[a.length/2-1]!+a[a.length/2]!,2n);
 export const countMetric=(m:Metric)=>m==='attention'||m==='operation_count';
@@ -39,6 +40,7 @@ export function analyzeFinancialRows(query:Query,rows:OperationRow[],catalog:Ope
  const value=statistic==='sum'?stats.sum:statistic==='min'?stats.minimum:statistic==='max'?stats.maximum:stats[statistic];
  const answer:AnalysisResult={version:'cashneuro-analysis/1',statistic,unit:countMetric(metric)?'count':'money',value,...stats,notes:[]};
  if(result.comparisonFilter&&statistic!=='sum')answer.previousValue=analyzeFinancialRows({...query,comparison:'none',options:{statistic}},rows,catalog,{...result,filter:result.comparisonFilter,comparisonFilter:null,totals:result.previousTotals}).value;
+ if(filter.weekdays?.length||filter.timeFrom||filter.timeThrough){const relaxed={...filter,metric:query.metric};delete relaxed.weekdays;delete relaxed.timeFrom;delete relaxed.timeThrough;answer.missingTemporalCount=queryOperations(rows,catalog,{filter:relaxed,sort:'date',direction:'asc',group:'none'}).operations.filter(o=>!temporalInformationKnown(o,filter)).length;if(answer.missingTemporalCount)answer.notes.push('У '+answer.missingTemporalCount+' подходящих операций нет достаточных данных о времени/часовом поясе: они не назначены произвольно времени суток или дню недели. Использовано время, указанное банком.');}
  if(statistic!=='sum')answer.notes.push('Статистика считается по значениям выбранного показателя на операцию, после распределения частей. Среднее = сумма / число подходящих операций; чётная медиана — среднее двух центральных значений. Округление до ближайшей копейки.');
  if(metric==='difference'||options.purpose==='cashflow')answer.notes.push('Разница доходов и расходов не является остатком на счёте. Для доступных денег нужны начальный остаток, полная история движений и будущие обязательства.');
  const uncertain=selected.filter(o=>o.parts.some(p=>p.role==='unresolved'&&operationPartMatches(p,o,filter)));

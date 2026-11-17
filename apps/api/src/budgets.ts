@@ -13,7 +13,7 @@ export function parseBudgetIntent(value:unknown):BudgetIntent{
  if(kind==='delete_budget'){object(value,['kind','id']);if(r.id===undefined)throw new TypeError('MISSING_ID');return {kind,id};}
  if(kind==='set_budget_limit'){object(value,['kind','id','limitMinor','applyFrom']);if(r.id===undefined)throw new TypeError('MISSING_ID');return {kind,id,limitMinor:limitMinor(r.limitMinor),applyFrom:choice(r.applyFrom,['current','next'])};}
  object(value,['kind','id','name','definition','enabled','create','limitMinor','applyFrom']);
- if(typeof r.create!=='boolean'||typeof r.enabled!=='boolean'||!r.create&&r.id===undefined||r.create&&r.applyFrom!==undefined||!r.create&&((r.limitMinor===undefined)!==(r.applyFrom===undefined)))throw new TypeError('INVALID_BUDGET');
+ if(typeof r.create!=='boolean'||typeof r.enabled!=='boolean'||!r.create&&r.id===undefined||!r.create&&((r.limitMinor===undefined)!==(r.applyFrom===undefined)))throw new TypeError('INVALID_BUDGET');
  const name=safeText(r.name,160).trim();if(!name)throw new TypeError('EMPTY_NAME');
  return {kind,id,name,definition:parseBudgetDefinition(r.definition),enabled:r.enabled,create:r.create,...(r.create||r.limitMinor!==undefined?{limitMinor:limitMinor(r.limitMinor)}:{}),...(r.applyFrom!==undefined?{applyFrom:choice(r.applyFrom,['current','next'])}:{})};
 }
@@ -28,7 +28,7 @@ export async function applyBudgetIntent(db:PoolClient,userId:string,intent:Budge
   await assertReferences(db,userId,intent.definition.filter);
   if(old&&(stableJSON(old.definition.period)!==stableJSON(intent.definition.period)||old.definition.timezone!==intent.definition.timezone))throw new HttpError(409,'BUDGET_ANCHOR_IMMUTABLE');
   let limits=old?.limits;
-  if(intent.create){const from=budgetWindow(intent.definition.period,await today(db,intent.definition.timezone)).from;if(intent.effectiveFrom&&intent.effectiveFrom!==from)throw new HttpError(409,'BUDGET_PERIOD_CHANGED');intent.effectiveFrom=from;limits=[{from,limitMinor:intent.limitMinor!}];}
+  if(intent.create){const window=budgetWindow(intent.definition.period,await today(db,intent.definition.timezone)),from=intent.applyFrom==='next'?window.next:window.from;if(!from)throw new HttpError(409,'BUDGET_HAS_NO_NEXT_PERIOD');if(intent.effectiveFrom&&intent.effectiveFrom!==from)throw new HttpError(409,'BUDGET_PERIOD_CHANGED');intent.effectiveFrom=from;limits=[{from,limitMinor:intent.limitMinor!}];}
   if(old&&intent.limitMinor!==undefined){
    const day=await today(db,old.definition.timezone),window=budgetWindow(old.definition.period,day),from=intent.applyFrom==='next'?window.next:window.from;
    if(!from)throw new HttpError(409,'BUDGET_HAS_NO_NEXT_PERIOD');

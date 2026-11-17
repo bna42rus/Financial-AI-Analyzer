@@ -39,7 +39,7 @@ const monthlyDenominator=120_000n;
 const signedPercent=(s:string)=>{const n=(s.startsWith('-')?-1n:1n)*hundredths(s.replace(/^-/u,''));if(n< -10_000n||n>100_000n)fail();return n;};
 export function parseCalculatorInput(raw:unknown):CalculatorInput{
  try{assertClosedSchema(raw,calculatorSchema);}catch{fail();}
- if(!['loan','deposit','real_return'].includes((raw as {kind:string}).kind)){const v=parseScenarioInput(raw);for(const [key,value]of Object.entries(v))if(typeof value==='string'&&key!=='kind'){if(/RatePercent$|^percent$/u.test(key))rate(value);else amount(value);}return v;}
+ if(!['loan','deposit','real_return'].includes((raw as {kind:string}).kind)){const v=parseScenarioInput(raw);for(const [key,value]of Object.entries(v))if(typeof value==='string'&&key!=='kind'){if(key==='changePercent')signedPercent(value);else if(/RatePercent$|^percent$/u.test(key))rate(value);else if(/Rubles$/u.test(key))amount(value);}return v;}
  const v=structuredClone(raw) as BasicCalculatorInput;
  if(v.kind==='real_return'){signedPercent(v.netReturnPercent);if(signedPercent(v.inflationPercent)<=-10_000n)fail();return v;}
  amount(v.principalRubles,true);rate(v.annualRatePercent);
@@ -108,7 +108,7 @@ export function calculateFinancial(raw:unknown):CalculatorResult{
 }
 function rubles(s:string){const n=BigInt(s),a=n<0n?-n:n;return (n<0n?'-':'')+(a/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ')+','+(a%100n).toString().padStart(2,'0')+' ₽';}
 export function calculatorText(r:CalculatorResult){
- if('metrics'in r)return r.title+': '+r.metrics.map(m=>m.label+' — '+(m.unit==='money'?rubles(m.value):m.value)).join('; ')+'.';
+ if('metrics'in r)return r.title+': '+r.metrics.map(m=>m.label+' — '+(m.unit==='money'?rubles(m.value):m.unit==='percent'?((BigInt(m.value)<0n?'-':'')+(BigInt(m.value)<0n?-BigInt(m.value):BigInt(m.value))/100n+'.'+((BigInt(m.value)<0n?-BigInt(m.value):BigInt(m.value))%100n).toString().padStart(2,'0')+'%'):m.value)).join('; ')+'.';
  if(r.kind==='real_return')return `Реальная доходность по введённым условиям: ${r.realReturnPercent.replace('.',',')}%. Это расчётная модель, а не прогноз.`;
  if(r.kind==='deposit')return `По введённым условиям за ${r.input.months} мес.: внесено ${rubles(r.contributedMinor)}, проценты ${rubles(r.interestMinor)}, всего ${rubles(r.endingMinor)}. Расчётная модель без налогов и комиссий.`;
  return `Расчётная модель кредита: первый платёж ${rubles(r.regularPaymentMinor)}, срок ${r.months} мес., проценты ${rubles(r.interestMinor)}, всего ${rubles(r.totalPaidMinor)}. Экономия процентов относительно варианта без досрочных платежей: ${rubles(r.interestSavedMinor)}. Это не официальный график банка.`;

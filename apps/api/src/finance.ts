@@ -157,12 +157,14 @@ type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'coun
 type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[];review?:BulkIntent};
 type CreateHistoricalRuleIntent={kind:'create_rule_with_history';id:string;patch:Omit<Rule,'id'>};
 type AccountSettingsIntent={kind:'account_settings';id:string;accounts:BaseIntent[]};
-type Intent={kind:'reset_categories';id:string}|AccountSettingsIntent|OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
+type CompoundIntent={kind:'compound';id:string;items:Intent[]};
+type Intent=CompoundIntent|{kind:'reset_categories';id:string}|AccountSettingsIntent|OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
 export function parseIntent(value:unknown):Intent {
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='set_category_binding')return parseCategoryBinding(value);
  if(value&&typeof value==='object'&&(value as {kind?:unknown}).kind==='add_catalog_categories')return parseSelectedCategories(value);
  if(value&&typeof value==='object'&&!Array.isArray(value)){
   if((value as Record<string,unknown>).kind==='reset_categories'){const r=object(value,['kind','id']);return {kind:'reset_categories',id:uuid(r.id)};}
+  const compound=(value as Record<string,unknown>);if(compound.kind==='compound'){const r=object(value,['kind','id','items']);if(!Array.isArray(r.items)||!r.items.length||r.items.length>5||r.items.some(i=>!i||!['operation','bulk_operations','rule','category','counterparty','save_budget','set_budget_limit','analytics','set_category_binding','components','link','merge_categories','delete_category','migrate_category','merge_counterparties','delete_counterparty','delete_rule','delete_budget'].includes(i.kind)))throw new TypeError('INVALID_COMPOUND');return {kind:'compound',id:uuid(r.id),items:r.items.map(parseIntent)};}
   const k=(value as Record<string,unknown>).kind;if(['save_overview_view','delete_overview_view','reorder_overview_views'].includes(k as string))return parseOverviewIntent(value);if(k==='save_budget'||k==='set_budget_limit'||k==='delete_budget')return parseBudgetIntent(value);if(k==='save_operations_view'||k==='delete_operations_view'||k==='reorder_operations_views')return parseViewIntent(value);if(k==='delete_rule'||k==='apply_rules')return parseRuleIntent(value);if(k==='bulk_operations')return parseBulkIntent(value);if(k==='cancel_import')return parseCancelImport(value);
   if(k==='account_settings'){
    const r=object(value,['kind','id','accounts']);
@@ -239,6 +241,7 @@ function categoryCompatible(graph:Graph,role:string,categoryId:string|null,subca
  if(category&&(category.parentId!==null||!allows(category.role))||sub&&(sub.parentId!==category?.id||!allows(sub.role)))throw new HttpError(409,'CATEGORY_ROLE_CONFLICT');
 }
 async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:string,actionId:string):Promise<Undo>{
+ if(intent.kind==='compound'){const items:unknown[]=[];for(const item of intent.items){items.push(await apply(db,userId,item,currentRevision,actionId));await repairOperationsViews(db,userId,item);}return {table:'batch',id:intent.id,before:null,details:{kind:'compound',atomic:true,items}};}
  if(intent.kind==='account_settings'){
   const loaded=await loadFinance(db,userId);
   for(const edit of intent.accounts)await applyBase(db,userId,edit,currentRevision,loaded);
@@ -435,7 +438,7 @@ async function restore(db:PoolClient,userId:string,undo:Undo){
  if(undo.before)await update(db,userId,undo.table,undo.id,undo.before as Record<string,unknown>);else await db.query(`DELETE FROM finance.${undo.table} WHERE user_id=$1 AND id=$2`,[userId,undo.id]);
 }
 function impact(before:Awaited<ReturnType<typeof financeView>>,after:Awaited<ReturnType<typeof financeView>>,undo?:Undo,journal:Change[]=[]){
- const cardEdit=undo&&'details'in undo&&['operation_card','bulk_operations','create_rule_with_history'].includes(String(undo.details.kind));
+ const cardEdit=undo&&'details'in undo&&['operation_card','bulk_operations','create_rule_with_history','compound'].includes(String(undo.details.kind));
  const beforeLinkReasons=cardEdit?new Map(before.links.map(l=>[l.id,l.reason])):undefined;
  const beforeOperations=new Map(before.operations.map(o=>[o.id,o])),afterIds=new Set(after.operations.map(o=>o.id));
  const removedOperationIds=before.operations.filter(o=>!afterIds.has(o.id)).map(o=>o.id);

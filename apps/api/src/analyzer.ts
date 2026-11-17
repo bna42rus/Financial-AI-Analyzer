@@ -157,7 +157,7 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  if(intent.kind==='delete_financial'&&intent.scope.kind!=='operations')throw new HttpError(400,'DESTRUCTIVE_FLOW_REQUIRED');
  }
  const intent=parseIntent(raw);
- if(intent.kind==='operation_card'||intent.kind==='create_rule_with_history')throw new HttpError(400,'UNSUPPORTED_ACTION');
+ if(intent.kind==='operation_card'||intent.kind==='create_rule_with_history'||intent.kind==='compound'&&!proposal)throw new HttpError(400,'UNSUPPORTED_ACTION');
  const confirmation=!!proposal||actionConfirmation(intent),preview=await previewFinance(db,userId,{actionId,generation:state.generation,revision:state.revision,intent:raw});
  await db.query("UPDATE finance.action SET intent=jsonb_set(intent,'{analyzer}',$3::jsonb) WHERE user_id=$1 AND id=$2",[userId,actionId,JSON.stringify({tool,confirmation,registryVersion})]);
  // New dependencies include linked operations affected outside the original question period.
@@ -167,8 +167,8 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
 }
 
 /** Shared exact financial execution for both HTTP contracts. No model arithmetic. */
-export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;timezone?:string;provider?:Answer['provider']}){
- await assertReferences(db,userId,query.filter);const {state,operations}=await operationsDataset(db,userId);
+export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;timezone?:string;provider?:Answer['provider']},dataset?:Awaited<ReturnType<typeof operationsDataset>>){
+ await assertReferences(db,userId,query.filter);const {state,operations}=dataset??await operationsDataset(db,userId);
   const widget=parseWidget({id:randomUUID(),name:metricNames[query.metric],metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:query.comparison==='custom'?{kind:'custom',...query.options?.comparisonPeriod}:{kind:query.comparison},chart:query.options?.chart??(query.grouping==='time'?'line':query.grouping==='none'?'table':'bar'),topN:query.options?.topN??10,granularity:query.options?.granularity??'auto',direction:query.options?.direction??'desc'});
   const result=calculateWidget(widget,operations,state,{},now,options.timezone??await financialTimezone(db,userId)??'Etc/UTC');
   const selected=queryOperations(operations,state,{filter:query.filter,sort:'date',direction:'asc',group:'none'}).operations;
@@ -185,9 +185,10 @@ export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Q
 /** Open only the saved answer's exact authorized filter. A changed data revision
  * requires a new calculation, so expanded rows cannot contradict a saved total. */
 export async function analyzerAnswerRows(db:PoolClient,userId:string,input:unknown){
- const r=object(input,['answerId','offset']),id=uuid(r.answerId);
+ const r=object(input,['answerId','offset','section']),id=uuid(r.answerId);if(r.section!==undefined&&(!Number.isInteger(r.section)||Number(r.section)<1||Number(r.section)>5))throw new HttpError(400,'INVALID_INPUT');
  if(!Number.isSafeInteger(r.offset)||Number(r.offset)<0)throw new HttpError(400,'INVALID_INPUT');
- const a=(await db.query('SELECT answer FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,id])).rows[0]?.answer as Answer|undefined;
+ const parent=(await db.query('SELECT answer FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,id])).rows[0]?.answer as Answer|undefined;
+ const a=r.section===undefined?parent:parent?.report?.sections.find(s=>s.index===r.section)?.answer;
  if(!a?.query||!a.widget||!a.result||a.query.grouping==='none')throw new HttpError(404,'NOT_FOUND');
  const {state,operations}=await operationsDataset(db,userId);
  if(a.generation!==state.generation||a.revision!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');

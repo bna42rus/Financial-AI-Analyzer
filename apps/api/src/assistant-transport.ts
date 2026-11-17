@@ -9,13 +9,13 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
   const transport = createBenchmarkTransport('cloud-oss', credentials, fetcher, 'empty-tools', (_candidate, bound, prompt, input, schema) => {
     if (!expected || prompt !== expected.prompt || input !== expected.input || schema !== expected.schema) throw Error('ASSISTANT_TRANSPORT_CHANGED');
     return JSON.stringify({ model: bound.modelVersion, messages: [
-      { role: 'system', content: 'Protocol ' + (expected.protocol??assistantVersion) + '\n' + prompt + '\nJSON Schema:\n' + JSON.stringify(schema) },
+      { role: 'system', content: 'Protocol ' + (expected.protocol??assistantVersion) + '\n' + prompt + '\nJSON Schema:\n' + JSON.stringify(compactAssistantSchema(schema)) },
       { role: 'user', content: JSON.stringify(input) },
     ], temperature: 0, stream: false, n: 1, max_completion_tokens: bound.outputTokens, response_format: { type: 'json_object' } });
-  }, 90000);
+  }, 90000, purpose === 'assistant' ? 98304 : 65536);
   // Reserve exactly the same output ceiling sent to HTTP. Classification
-  // batches need more space than the single assistant plan.
-  if(purpose==='classification')transport.bound.outputTokens=4096;
+  // batches need more space than the bounded multi-step assistant plan.
+  transport.bound.outputTokens=purpose==='classification'?4096:2400;
   Object.freeze(transport.bound);
   let running = false;
   return { bound: transport.bound, async complete(input, beforeDispatch) {
@@ -25,4 +25,16 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
     try { const r = await transport.complete(input.prompt, input.input, input.schema, beforeDispatch); return { value: r.value, usage: r.usage }; }
     finally { expected = undefined; running = false; }
   } };
+}
+
+/** Lossless local references share the exact same closed schemas between a
+ * direct action and report steps. Server validation uses the original schema. */
+export function compactAssistantSchema(schema: unknown): unknown {
+  const root = structuredClone(schema) as any, p = root?.properties;
+  const variants = p?.report?.properties?.steps?.items?.anyOf;
+  if (!Array.isArray(variants)) return root;
+  for (const variant of variants) for (const field of ['context','changes','options','calculation','external','change']) {
+    if (variant.properties?.[field] === p[field]) variant.properties[field] = { $ref: '#/properties/' + field };
+  }
+  return root;
 }

@@ -1,3 +1,6 @@
+import {readAnalyzerBudgets} from './analyzer-budget-read.ts';
+import {prepareAssistantBatch} from './assistant-changes.ts';
+import {readFinancialSources} from './financial-sources.ts';
 import {prepareAssistantChange} from './assistant-changes.ts';
 import { isDeepStrictEqual } from 'node:util';
 import type { Pool, PoolClient } from 'pg';
@@ -16,7 +19,7 @@ import type { AssistantProvider } from './analyzer-assistant-provider.ts';
 import { analyzerTaskContext, cancelAnalyzerTask } from './analyzer-task-store.ts';
 import { prepareFinance } from './finance.ts';
 import { analyzerCycle, analyzerQuota, calculateAnalyzerQuery } from './analyzer.ts';
-import { assertReferences } from './operations.ts';
+import { assertReferences,operationsDataset } from './operations.ts';
 import { yandexCatalog } from './yandex-runtime.ts';
 import { reserveCost, settleCost } from './analyzer-cost.ts';
 import { stableJSON } from './finance-history.ts';
@@ -164,19 +167,26 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
       },
     };
     await journal.persist();
-    let savedReply: unknown;
+    let savedReply: unknown;let requestDataset:Awaited<ReturnType<typeof operationsDataset>>|undefined;const reportDependencies=new Set<string>();
     type Calculation = Awaited<ReturnType<typeof calculateAnalyzerQuery>>;
     try {
     await runAssistant(r, model, journal, {
       guard: expected => within(db => guard(db, expected)),
+      external:async(query,calendar)=>{await within(db=>guard(db));const result=await readFinancialSources(query,calendar.currentDate);await within(db=>guard(db));return result;},
       prepareChange: (change,sourceAnswerId) => within(async db => {await guard(db);return prepareAssistantChange(db,userId,id,change,sourceAnswerId);}),
+      resultDependencies:result=>(result as Calculation).dependencyIds,
+      budgets:request=>within(async db=>{await guard(db);return readAnalyzerBudgets(db,userId,request,r.now);}),
+      describeResult:(_query,result)=>(result as Calculation).answer,
+      prepareBatch:changes=>within(async db=>{await guard(db);return prepareAssistantBatch(db,userId,id,changes);}),
       catalog: () => within(async db => { await guard(db); return yandexCatalog(db, userId); }),
       authorizeQuery: query => within(async db => { await guard(db); await assertReferences(db, userId, query.filter); }),
       calculate: (query, calendar) => within(async db => {
         await guard(db); await assertReferences(db, userId, query.filter);
-        return calculateAnalyzerQuery(db, userId, query, r.now, { mode: 'test_adapter', timezone: calendar.timezone,
+        requestDataset??=await operationsDataset(db,userId);
+        const calculation=await calculateAnalyzerQuery(db, userId, query, r.now, { mode: 'test_adapter', timezone: calendar.timezone,
           periodFromQuestion: query.filter.from !== r.global.filter.from || query.filter.through !== r.global.filter.through,
-          followUp: false, provider: { id: 'cashneuro-assistant/1', model: provider.model.bound.modelVersion, version: assistantWorkflowVersion } });
+          followUp: false, provider: { id: 'cashneuro-assistant/1', model: provider.model.bound.modelVersion, version: assistantWorkflowVersion } },requestDataset);
+        for(const dependency of calculation.dependencyIds)reportDependencies.add(dependency);return calculation;
       }),
       render: (_query, result) => (result as Calculation).answer.text,
       commit: payload => within(async db => {
@@ -192,10 +202,12 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
         if (reply.status === 'query') {
           if (!calculation || !isDeepStrictEqual(reply.query, calculation.answer.query)) throw new HttpError(409, 'AI_STATE_CHANGED');
           await assertReferences(db, userId, reply.query!.filter);
-          answer = { ...calculation.answer, followUp: conversation.book.nodes.at(-1)!.parent !== null };
-        } else answer = { ...(reply.status==='error'||reply.code.startsWith('CALCULATOR_')?{notice:{kind:'error' as const,code:reply.code}}:{}),registryVersion, mode: reply.status === 'answer' ? 'ai' : reply.status === 'redirect' ? 'redirect' : reply.status === 'clarification' ? 'clarification' : 'unavailable', text: reply.text,...(reply.calculation?{calculation:reply.calculation}:{}),...(reply.proposal?{proposal:reply.proposal}:{}),generation:r.scope.generation,revision:r.dataRevision,computedAt:r.now.toISOString() };
+          answer = { ...calculation.answer,...(reply.report?{report:reply.report}:{}),...(reply.proposal?{proposal:reply.proposal}:{}), followUp: conversation.book.nodes.at(-1)!.parent !== null };
+        } else answer = { ...(reply.status==='error'||reply.code.startsWith('CALCULATOR_')?{notice:{kind:'error' as const,code:reply.code}}:{}),registryVersion, mode: reply.status === 'answer' ? 'ai' : reply.status === 'redirect' ? 'redirect' : reply.status === 'clarification' ? 'clarification' : 'unavailable', text: reply.text,...(reply.calculation?{calculation:reply.calculation}:{}),...(reply.sources?{sources:reply.sources}:{}),...(reply.report?{report:reply.report}:{}),...(reply.proposal?{proposal:reply.proposal}:{}),generation:r.scope.generation,revision:r.dataRevision,computedAt:r.now.toISOString() };
         await db.query('INSERT INTO finance.analyzer_message(user_id,id,chat_id,question,answer,context,request) VALUES($1,$2,$3,$4,$5,$6,$7)', [userId, id, chatId, text, JSON.stringify(answer), reply.query ? JSON.stringify(reply.query) : null, JSON.stringify(body)]);
-        if (reply.status === 'query' && calculation!.dependencyIds.length) await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[])', [userId, id, calculation!.dependencyIds]);
+        for(const id of reply.reportDependencyIds??[])reportDependencies.add(id);
+        if(reply.report&&reportDependencies.size)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING',[userId,id,[...reportDependencies]]);
+        if (reply.status === 'query' && calculation!.dependencyIds.length) await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING', [userId, id, calculation!.dependencyIds]);
         await db.query(`INSERT INTO finance.assistant_conversation(user_id,chat_id,chat_epoch,generation,conversation) VALUES($1,$2,$3,$4,$5)
           ON CONFLICT(user_id,chat_id) DO UPDATE SET conversation=EXCLUDED.conversation,generation=EXCLUDED.generation`, [userId, chatId, chatEpoch, generation, JSON.stringify(conversation)]);
         const book = conversation.book;

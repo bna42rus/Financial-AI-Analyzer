@@ -1,8 +1,10 @@
+import {planningSchemas,calculatePlanning} from './planning-calculators.ts';
+import type {PlanningInput} from './planning-calculators.ts';
 import {assertClosedSchema} from './closed-schema.ts';
 import type {BasicCalculatorInput,BasicCalculatorResult} from './calculators.ts';
 const closed=(properties:Record<string,unknown>)=>({type:'object',additionalProperties:false,properties,required:Object.keys(properties)});
 const k=(v:string)=>({type:'string',enum:[v]}),decimal={type:'string',minLength:1,maxLength:40,pattern:'^[0-9][0-9 \\u00a0\\u202f]*(?:[.,][0-9]{1,2})?$'},months={type:'integer',minimum:1,maximum:600};
-export const scenarioSchemas=[
+export const scenarioSchemas=[...planningSchemas,
  closed({kind:k('loan_capacity'),monthlyPaymentRubles:decimal,annualRatePercent:decimal,months}),
  closed({kind:k('loan_term'),principalRubles:decimal,annualRatePercent:decimal,monthlyPaymentRubles:decimal}),
  closed({kind:k('savings_goal'),targetRubles:decimal,initialRubles:decimal,annualRatePercent:decimal,months}),
@@ -12,7 +14,7 @@ export const scenarioSchemas=[
  closed({kind:k('reserve'),monthlyExpensesRubles:decimal,reserveMonths:months,availableRubles:decimal}),
  closed({kind:k('percentage'),baseRubles:decimal,percent:decimal}),
 ];
-export type ScenarioInput=
+export type BaseScenarioInput=
  |{kind:'loan_capacity';monthlyPaymentRubles:string;annualRatePercent:string;months:number}
  |{kind:'loan_term';principalRubles:string;annualRatePercent:string;monthlyPaymentRubles:string}
  |{kind:'savings_goal';targetRubles:string;initialRubles:string;annualRatePercent:string;months:number}
@@ -21,15 +23,18 @@ export type ScenarioInput=
  |{kind:'affordability';priceRubles:string;availableRubles:string;monthlyIncomeRubles:string;monthlyExpensesRubles:string;reserveRubles:string;months:number}
  |{kind:'reserve';monthlyExpensesRubles:string;reserveMonths:number;availableRubles:string}
  |{kind:'percentage';baseRubles:string;percent:string};
-export type ScenarioResult={version:'cashneuro-scenario/1';kind:ScenarioInput['kind'];input:ScenarioInput;title:string;metrics:{label:string;value:string;unit:'money'|'count'}[];rows:{month:number;amountMinor:string;closingMinor:string}[];assumptions:string[];scenarios?:BasicCalculatorResult[]};
+export type ScenarioInput=BaseScenarioInput|PlanningInput;
+export type ScenarioResult={version:'cashneuro-scenario/1';kind:ScenarioInput['kind'];input:ScenarioInput;title:string;metrics:{label:string;value:string;unit:'money'|'count'|'percent'}[];rows:{month:number;amountMinor:string;closingMinor:string}[];assumptions:string[];scenarios?:BasicCalculatorResult[]};
 export function parseScenarioInput(raw:unknown):ScenarioInput{assertClosedSchema(raw,{anyOf:scenarioSchemas});return structuredClone(raw) as ScenarioInput;}
 const round=(a:bigint,b:bigint)=>(a+b/2n)/b,decimalRubles=(n:bigint)=>(n/100n)+'.'+(n%100n).toString().padStart(2,'0');
 const fail=(code:string):never=>{throw new TypeError(code);};
-export function calculateScenario(input:ScenarioInput,tools:{money:(v:string)=>string;payment:(principal:bigint,rate:bigint,months:number)=>bigint;calculate:(input:BasicCalculatorInput)=>BasicCalculatorResult}):ScenarioResult{
+export function calculateScenario(rawInput:ScenarioInput,tools:{money:(v:string)=>string;payment:(principal:bigint,rate:bigint,months:number)=>bigint;calculate:(input:BasicCalculatorInput)=>BasicCalculatorResult}):ScenarioResult{
+ if(['investment_change','tax_by_rules','insurance_case','savings_schedule'].includes(rawInput.kind))return calculatePlanning(rawInput as PlanningInput,tools.money);
+ const input=rawInput as BaseScenarioInput;
  const amount=(s:string)=>BigInt(tools.money(s)),rate=(s:string)=>{const n=amount(s);if(n>100000n)fail('CALCULATOR_INPUT_INVALID');return n;};
  for(const [key,v]of Object.entries(input))if(typeof v==='string'&&key!=='kind'){amount(v);if(/RatePercent$|^percent$/u.test(key))rate(v);}
  const r:ScenarioResult={version:'cashneuro-scenario/1',kind:input.kind,input,title:'Расчётный сценарий',metrics:[],rows:[],assumptions:['Сценарий по введённым условиям не меняет операции и обязательства. Равные месяцы, годовая ставка / 12, округление до копейки.']};
- const metric=(label:string,value:bigint,unit:'money'|'count'='money')=>r.metrics.push({label,value:value.toString(),unit});
+ const metric=(label:string,value:bigint,unit:'money'|'count'|'percent'='money')=>r.metrics.push({label,value:value.toString(),unit});
  const loan=(p:bigint,rate:string,n:number)=>tools.calculate({kind:'loan',principalRubles:decimalRubles(p),annualRatePercent:rate,months:n,payment:'annuity'}) as Extract<BasicCalculatorResult,{kind:'loan'}>;
  if(input.kind==='loan_capacity'){
   const payment=amount(input.monthlyPaymentRubles),bps=rate(input.annualRatePercent);if(!payment)fail('CALCULATOR_POSITIVE_PAYMENT_REQUIRED');

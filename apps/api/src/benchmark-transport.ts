@@ -96,8 +96,9 @@ export function replayOnlyBenchmarkTransport(candidate: Candidate, contract: Res
     async complete() { throw new BenchmarkFailure('BENCH_REPLAY_ONLY'); } };
 }
 
-export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy', bodyBuilder: typeof benchmarkRequestBody = benchmarkRequestBody, timeoutMs = 30000): BenchmarkTransport {
+export function createBenchmarkTransport(candidate: Candidate, credentials: unknown, fetcher: typeof fetch = fetch, contract: ResponseContract = 'legacy', bodyBuilder: typeof benchmarkRequestBody = benchmarkRequestBody, timeoutMs = 30000, maximumRequestBytes = 65536): BenchmarkTransport {
   if (!Object.hasOwn(candidates, candidate)) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
+  if (!Number.isInteger(maximumRequestBytes) || maximumRequestBytes < 65536 || maximumRequestBytes > 98304) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   if (!Number.isInteger(timeoutMs) || timeoutMs < 30000 || timeoutMs > 120000) throw new BenchmarkFailure('BENCH_CONFIGURATION_INVALID');
   const spec = candidates[candidate];
   const r = object(credentials, ['apiKey', 'folderId']);
@@ -114,7 +115,7 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
   return { candidate, price: spec.price, bound, ...contractFields(contract), requestBody,
     async complete(prompt, input, schema, reserve) {
       const body = requestBody(prompt, input, schema);
-      if (Buffer.byteLength(body) > 65536) throw new BenchmarkFailure('BENCH_CONTEXT_LIMIT');
+      if (Buffer.byteLength(body) > maximumRequestBytes) throw new BenchmarkFailure('BENCH_CONTEXT_LIMIT');
       await reserve(); // durable reservation must precede every possible dispatch
       const started = performance.now();
       const elapsed = () => Math.min(86400000, Math.max(0, Math.round(performance.now() - started)));

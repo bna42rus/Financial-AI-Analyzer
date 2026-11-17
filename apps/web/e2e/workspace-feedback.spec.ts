@@ -34,7 +34,7 @@ async function setup(page:Page,saved=false){
   await route.fulfill({status,headers,json:result});
  });await page.addInitScript(() => localStorage.setItem('finance-navigation-v1', JSON.stringify({startScreen:'overview',defaultPeriod:'all'})));await page.goto(base+'#workspace');await expect(page.getByRole('region',{name:'Основные показатели'})).toBeVisible();if(saved)await expect(page.getByRole('button',{name:'Представления обзора',exact:true})).toContainText('Existing view');return h;
 }
-async function changeLayout(page:Page){const resize=page.getByRole('button',{name:'Изменить размер виджета: Расходы по категориям',exact:true});if(await resize.count()){await resize.focus();await page.keyboard.press('ArrowLeft');}else{await page.getByRole('button',{name:'Переместить виджет: Расходы по категориям',exact:true}).focus();await page.keyboard.press('ArrowDown');}await expect(page.getByRole('button',{name:'Сохранить представление',exact:true})).toBeVisible();}
+async function changeLayout(page:Page){const resize=page.getByRole('button',{name:'Изменить размер виджета: Расходы по категориям',exact:true});if(await resize.count()){await resize.focus();await page.keyboard.press('ArrowDown');}else{await page.getByRole('button',{name:'Переместить виджет: Расходы по категориям',exact:true}).focus();await page.keyboard.press('ArrowDown');}await expect(page.getByRole('button',{name:'Сохранить представление',exact:true})).toBeVisible();}
 async function saveSheet(page:Page){await page.getByRole('button',{name:'Сохранить как новое',exact:true}).click();return page.getByRole('dialog',{name:'Создать копию представления',exact:true});}
 async function refresh(page:Page){await page.getByRole('button',{name:'Обновить данные',exact:true}).click();}
 

@@ -1,3 +1,7 @@
+import {buildReportSchema,parseReport} from './report.ts';
+import type {ReportRequest} from './report.ts';
+import {financialSourceSchema,parseFinancialSourceRequest} from './financial-sources.ts';
+import type {FinancialSourceRequest} from './financial-sources.ts';
 import {queryMetrics,queryGroupings,queryComparisons} from './registry.ts';
 import {analysisOptionsSchema,parseAnalysisOptions} from './analysis.ts';
 import type {AnalysisOptions} from './analysis.ts';
@@ -37,7 +41,7 @@ const sets = oldEdits.filter(s => s.properties.op.enum[0] === 'set').map(s => {
 export const assistantPlanSchema = closed({
   version: enumeration([assistantVersion]),
   topic: enumeration(['personal_finance', 'general_finance', 'financial_guidance', 'mixed', 'ambiguous', 'unrelated']),
-  action: enumeration(['read', 'explain', 'calculate', 'propose_change', 'unsupported', 'clarification', 'redirect']),
+  action: enumeration(['read', 'explain', 'calculate', 'report', 'external', 'propose_change', 'unsupported', 'clarification', 'redirect']),
   context: closed({ mode: enumeration(['new', 'continue', 'reference', 'pending']), reference: text, restart: { type: 'boolean' } }, ['mode']),
   changes: { type: 'array', maxItems: 64, items: { anyOf: [
     ...Object.entries(scalars).map(([field, values]) => closed({ field: enumeration([field]), op: enumeration(['set']), value: enumeration(values), source }, ['field', 'op', 'value'])),
@@ -46,10 +50,14 @@ export const assistantPlanSchema = closed({
   ] } },
   options: analysisOptionsSchema,
   clarification: {type:'string',minLength:1,maxLength:700},
+  external:financialSourceSchema,
   calculation: calculatorSchema,
   change: assistantChangeSchema,
   needsFreshSources: { type: 'boolean' },
 }, ['version', 'topic', 'action']);
+
+export const reportRequestSchema=buildReportSchema(assistantPlanSchema.properties);
+Object.assign(assistantPlanSchema.properties,{report:reportRequestSchema});
 
 export class AssistantError extends TypeError {
   readonly code: string;
@@ -77,7 +85,7 @@ export function cleanAssistantQuestion(value: unknown): string {
 }
 export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 'clear' | 'use_current'; value?: unknown; source?: string };
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
-  action: 'read' | 'explain' | 'calculate' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; clarification?:string; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean };
+  action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean };
 export function parseAssistantPlan(value: unknown): AssistantPlan {
   if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
@@ -89,8 +97,12 @@ export function parseAssistantPlan(value: unknown): AssistantPlan {
       p.action === 'explain' && !['general_finance', 'financial_guidance', 'mixed'].includes(p.topic)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if (read && !p.context || !read && (p.context !== undefined || p.changes !== undefined)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if ((p.action === 'calculate') !== (p.calculation !== undefined) || p.action === 'calculate' && !['personal_finance','general_finance','financial_guidance','mixed'].includes(p.topic)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  if((p.action==='report')!==(p.report!==undefined))throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  if(p.report){parseReport(p.report,reportRequestSchema);if(!personal&&p.report.steps.some(s=>s.kind==='read'||s.kind==='budgets'||s.kind==='change'))throw new AssistantError('ASSISTANT_PLAN_INVALID');}
   if(p.options){parseAnalysisOptions(p.options);if(!read)throw new AssistantError('ASSISTANT_PLAN_INVALID');}
   if(p.clarification){if(p.action!=='clarification')throw new AssistantError('ASSISTANT_PLAN_INVALID');p.clarification=cleanAssistantQuestion(p.clarification);}
+  if((p.action==='external')!==(p.external!==undefined))throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  if(p.external)parseFinancialSourceRequest(p.external);
   if (p.calculation) parseCalculatorInput(p.calculation);
   if ((p.action==='propose_change') !== (p.change!==undefined)) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   if (p.change) parseAssistantChange(p.change);
@@ -247,7 +259,12 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
     const inherited=resolved.inheritedFrom?book.nodes.find(n=>n.messageId===resolved.inheritedFrom)?.query.options:undefined;
     const options=p.options??inherited;
     if(resolved.query.comparison==='custom'&&!options?.comparisonPeriod)return {status:'clarification',reason:'comparison_period_required'};
-    if(options){resolved.query.options=structuredClone(options);resolved.node.query=resolved.query;}
+    if(options){resolved.query.options=structuredClone(options);const f=resolved.query.filter;
+      if(options.dateBasis)f.calendarBasis=options.dateBasis;
+      if(options.weekdays!==undefined){if(options.weekdays.length)f.weekdays=[...options.weekdays];else delete f.weekdays;}
+      if(options.clock===null){delete f.timeFrom;delete f.timeThrough;}else if(options.clock){if(options.clock.from)f.timeFrom=options.clock.from;if(options.clock.through)f.timeThrough=options.clock.through;}
+      resolved.query.filter=parseOperationsFilter(f);resolved.node.query=resolved.query;
+    }
   }
   return resolved;
 }
@@ -276,3 +293,18 @@ export const calculatorInstructions = 'calculate: только расчёт по
 export const extendedCalculatorInstructions='Дополнительные калькуляторы: loan_capacity — сумма кредита под платёж, ставка/срок обязательны; loan_term — срок по сумме/ставке/платежу; savings_goal — взнос к цели за срок (initialRubles может быть 0); goal_term — срок к цели по взносам; refinance — два кредита с известными ставками/сроками/разовыми расходами; affordability — цена покупки, доступные деньги, доход, расходы, резерв, горизонт; reserve — месячные расходы и выбранное число месяцев; percentage — процент от суммы. Все суммы в рублях десятичными строками. Если параметров нет — clarification с конкретным вопросом; не выдумывай ставку, страховку, остаток, период, комиссию или личный доход. Не называй модели одобрением, официальной ПСК, договорным графиком или гарантированной доходностью. Для льготного периода кредитки нужны условия договора/выписки, не подменяй аннуитетом.';
 
 export const calculatorContextInstructions='activeCalculation и history.calculation — проверенные снимки введённых условий. В продолжении калькулятора сохраняй все их неизменённые параметры и меняй только явно названные. Не теряй досрочные платежи/изменения ставок/расходы рефинансирования. Новый независимый вопрос не наследует условия старого расчёта. Числа результата вычислит сервер. Составную просьбу не объявляй выполненной одним действием: если инструменты не выполняют часть, перечисли её явно.';
+
+export const financialSourceInstructions='Актуальные внешние факты: action=external, external.kind=key_rate (официальная ключевая ставка), currency (ISO-код валюты, дата и необязательная сумма для пересчета), official_guidance (tax_deposits, tax_deductions, deposit_insurance, credit_insurance, investment_risks). Только заданные первичные источники; URL/SQL не передаются. Дата в YYYY-MM-DD, в будущем факт не известен. Официальный курс не равен курсу обмена банка. Справочная страница не подтверждает индивидуальную применимость налоговой нормы. Личные документы, статус, период и условия договора уточняются отдельно. Внешние действия/платежи не выполняются.';
+
+export const reportInstructions='Многошаговая просьба и персональный совет: action=report, report.steps (до пяти связанных шагов). read: label/context/changes/options как обычный read; calculate: label/calculation и optional bindings [{field,ref}]; derive: точная sum/difference/multiply/divide/ratio/percentage над left ref и right {ref} либо {literal,unit}; external: label/external; change: label/change, optional fromStep — номер предыдущего read, optional bindings. Ссылки на ПРЕДЫДУЩИЕ шаги: s1.total/mean/median/count/group1/saving1; для кредита payment/principal/interest/total_paid/months/interest_saved; вклада ending/contributed/interest; прочих калькуляторов metric1..metric9; источника key_rate/conversion. В bindings укажи поле калькулятора/изменения, заполни его временным нулем; сервер подставит точный проверенный параметр с проверкой единиц до расчета. Недостающие личные данные не заменяй нулем БЕЗ привязки. Для среднего за три явно полных календарных месяца divide total на literal 3 count. Расходы не равны остаткам и не доказывают полноту истории. read использует общие фильтры/задачу, явные условия менять через changes; новый независимый шаг mode=new. Рекомендации об экономии: read расходы по категориям (purpose=savings), при нужде отдельно доходы/динамика, then derive для эффектов. Нельзя считать одинаковую экономию дважды или предполагать отказ от лечения/обязательств. Кафе не трогай — исключить эту категорию из сценария. narration short/simple/detailed включает объяснение по проверенным фактам. Действия change создают ТОЛЬКО общий проект изменений, подтверждение отдельно; зависимые новые категории/контрагенты можно создавать по порядку шагов и затем ссылаться на их названия. fromStep фиксирует конкретный read, история и будущее — разные действия. Если нужны дополнительные отсутствующие параметры, clarification с точным перечнем и причиной. Не объявляй один шаг выполнением всей просьбы.';
+
+export const budgetReadInstructions='Действующие бюджеты, остатки и превышения: report шаг {kind:budgets,label,request:{names?,overrunOnly?,date?}}. Сервер разрешает имена и использует период, фильтры и часовой пояс каждого бюджета. Будущая дата требует сценария, не факта. Факты count, budget1_limit/used/remaining/over. Не складывай пересекающиеся бюджеты. Для изменения — отдельный change budget_limit с current/next. Создать бюджет со следующего периода — create_budget applyFrom next. Не подменяй поток денег остатком на счёте.';
+export const additionalPlanningInstructions='Калькуляторы: investment_change — рост/падение за заданный сценарий с явно заданной комиссией, не прогноз; tax_by_rules — incomeRubles/exemptionRubles, явные progressive bands [{upToRubles:null или порог,ratePercent}], rounding kopeck/ruble, без автоматической применимости нормы; insurance_case — премия, лимит, франшиза и ее вид conditional/unconditional, размер убытка, без обещания выплаты; savings_schedule — начальная сумма, годовая ставка, months и additions [{month,amountRubles}], необязательная цель. Нерегулярные/пропущенные взносы перечисляются явно. Для отсутствующей комиссии/ставки/франшизы не подставляй ноль самовольно: уточни условия. Несколько сценариев сравни через report и derive; обычное объяснение понятий — explain без выдуманных текущих цифр.';
+
+export const feeInstructions='Комиссии и страховки учитывай отдельными проверяемыми шагами report: разовый расход суммируется с total_paid; месячный расход умножается multiply на months, затем суммируется. multiply допускает деньги на число периодов, не деньги на деньги. Проценты и основной долг кредита сохраняются отдельно. Для годовых страховок и возврата премии нужны договорные условия; не выдавай расчет за официальную ПСК.';
+
+export const sourceBoundaryInstructions='key_rate и currency — только Банк России и официальные рублевые котировки. Не подменяй ЕЦБ/ФРС/другую страну Банком России и курс обмена курсом ЦБ. Для другого источника уточни запрос или прямо обозначь отсутствие соответствующего источника. Страница official_guidance подтверждает ссылку/дату получения, а не конкретную налоговую ставку или личное право на льготу.';
+
+export const clockInstructions='Отбор по дням недели и времени: options.weekdays — числа 0 воскресенье, 1 понедельник ... 6 суббота, пустой массив снимает ограничение; options.clock {from,through} HH:mm, переход через полночь поддержан, null снимает часы. options.dateBasis operation/posted выбирает календарь этих ограничений. Используется банковское локальное время; неизвестный часовой пояс/время не выдумываются. Для основного периода по дате обработки снять обычный period и задать postedPeriod; не оставляй случайное пересечение месяцев. Часы и дни недели сохраняй при простом изменении периода; новый независимый запрос их не наследует из старого.';
+
+export const periodFactInstructions='В report read сервер даёт period_days, elapsed_days и full_months (если окно состоит из полных календарных месяцев). Для среднемесячных расходов/дохода divide total на full_months; это среднее по выбранному окну, а не доказательство полноты истории. Для сценария до конца месяца: разделить фактический поток на elapsed_days, умножить на period_days, прямо обозначить допущение неизменного темпа. Не превращай поток денег или разницу доходов/расходов в initialRubles/availableRubles: для остатка нужны явные деньги пользователя, начальный баланс и полнота истории.';

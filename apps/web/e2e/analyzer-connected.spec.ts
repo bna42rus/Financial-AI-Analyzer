@@ -137,3 +137,14 @@ test('Analyzer packages keep catalog prices and show payment only when configure
  await expect(dialog.getByRole('button',{name:/Перейти к оплате · 149/})).toBeDisabled();
  await expect(dialog.getByText('Оплата пока не подключена.',{exact:false})).toHaveCount(0);
 });
+
+test('multi-step report shows calculations, official source links and red step errors without page overflow',async({page})=>{
+ const h=await setup(page),chat:Chat={id:crypto.randomUUID(),title:'Связанный расчёт',pinned:false,createdAt:new Date().toISOString(),modifiedAt:new Date().toISOString(),messages:[]};
+ chat.messages.push({id:crypto.randomUUID(),question:'Расчёт и источник',answer:{mode:'ai',registryVersion,text:'Связанный ответ',report:{version:'cashneuro-report/1',facts:[],narrative:[{kind:'conclusion',text:'Расчёт по заданным условиям.'}],sections:[
+  {index:1,label:'Проценты',calculation:calculateFinancial({kind:'percentage',baseRubles:'1000',percent:'10'})},
+  {index:2,label:'Официальный источник',sources:{version:'cashneuro-financial-sources/1',request:{kind:'key_rate'},sources:[{id:'s1',title:'Банк России',url:'https://www.cbr.ru/hd_base/KeyRate/',retrievedAt:'2026-09-10T12:00:00Z',publishedDate:'2026-09-10',facts:[{label:'Тестовая ставка',value:'10%',unit:'percent'}],notice:'Ставка договора задаётся отдельно.'}]}},
+  {index:3,label:'Недостающие условия',error:{code:'REPORT_REFERENCE_MISSING',text:'Укажите сумму и срок для этого расчёта.'}}
+ ]}},createdAt:new Date().toISOString(),actionId:null});
+ h.chats.unshift(chat);await page.getByRole('button',{name:'Обновить данные',exact:true}).click();await page.getByRole('link',{name:'Операции',exact:true}).click();await page.getByRole('link',{name:'Анализатор',exact:true}).click();
+ const report=page.getByRole('region',{name:'Связанный финансовый ответ'});await expect(report).toBeVisible();await expect(report.getByRole('link',{name:'Банк России'})).toHaveAttribute('href','https://www.cbr.ru/hd_base/KeyRate/');await report.getByText('Источник и актуальность',{exact:true}).click();await expect(report).toContainText('по МСК');const alert=report.getByRole('alert');await expect(alert).toContainText('Укажите сумму и срок');await expect(alert).toHaveCSS('color',/rgb\((181, 45, 70|255, 166, 181)\)/);expect(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth)).toBe(false);
+});

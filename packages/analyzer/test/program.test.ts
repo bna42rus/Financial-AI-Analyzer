@@ -65,3 +65,31 @@ test('new budget uses stable category ID and authorized profile timezone',()=>{
 test('dependency closure covers reverse chains, cycles and disconnected data',async()=>{
  const {connectedDependencies}=await import('../src/dependencies.ts');const links=Array.from({length:10000},(_,i)=>({source_id:String(i+1),target_id:String(i)}));links.push({source_id:'7',target_id:'5'},{source_id:'foreign',target_id:'unrelated'});assert.equal(connectedDependencies(['0'],links).length,10001);assert.deepEqual(connectedDependencies(['unknown'],links),['unknown']);
 });
+
+test('investment growth and loss preserve fees as exact explicit scenario costs',()=>{
+ const r=calculateFinancial({kind:'investment_change',initialRubles:'1000',changePercent:'-50',feesRubles:'10'});assert.ok('metrics'in r);assert.equal(r.metrics[2]!.value,'50000');assert.equal(r.metrics[4]!.value,'49000');assert.equal(r.metrics[5]!.value,'-51000');assert.equal(r.metrics[1]!.unit,'percent');assert.throws(()=>calculateFinancial({kind:'investment_change',initialRubles:'1000',changePercent:'-101',feesRubles:'0'}));
+});
+test('provided progressive tax rules calculate only their stated taxable base',()=>{
+ const r=calculateFinancial({kind:'tax_by_rules',incomeRubles:'1000',exemptionRubles:'100',rounding:'kopeck',bands:[{upToRubles:'500',ratePercent:'10'},{upToRubles:null,ratePercent:'20'}]});assert.ok('metrics'in r);assert.equal(r.metrics[2]!.value,'90000');assert.equal(r.metrics[3]!.value,'13000');assert.throws(()=>calculateFinancial({kind:'tax_by_rules',incomeRubles:'1000',exemptionRubles:'0',rounding:'ruble',bands:[{upToRubles:'500',ratePercent:'10'}]}),/BANDS_INCOMPLETE/);
+});
+test('insurance scenarios distinguish conditional and unconditional deductibles',()=>{
+ const base={kind:'insurance_case',premiumRubles:'500',insuredLimitRubles:'20000',deductibleRubles:'1000',lossRubles:'10000'};
+ const a=calculateFinancial({...base,deductibleKind:'conditional'}),b=calculateFinancial({...base,deductibleKind:'unconditional'});assert.ok('metrics'in a&&'metrics'in b);assert.equal(a.metrics[1]!.value,'1000000');assert.equal(b.metrics[1]!.value,'900000');assert.equal(a.metrics[4]!.value,'50000');assert.equal(b.metrics[4]!.value,'150000');
+});
+test('irregular savings never manufacture contributions in missing months',()=>{
+ const r=calculateFinancial({kind:'savings_schedule',initialRubles:'0',annualRatePercent:'0',months:3,targetRubles:'1000',additions:[{month:1,amountRubles:'100'},{month:3,amountRubles:'200'}]});assert.ok('metrics'in r);assert.equal(r.metrics[2]!.value,'30000');assert.equal(r.metrics[3]!.value,'70000');assert.equal(r.rows[1]!.amountMinor,'0');assert.equal(r.rows[2]!.closingMinor,'30000');
+});
+test('management resolves exact owned IDs and refuses implicit category loss',()=>{
+ const c={...catalog,rules:[],budgets:[]},options={newId:randomUUID(),sourceAnswerId:null,parseRubles:calculatorRublesMinor};assert.throws(()=>compileAssistantChange({kind:'manage',entity:'category',action:'delete',name:'Кафе'},c,options),/NEEDS_CHOICE/);const p=compileAssistantChange({kind:'manage',entity:'category',action:'delete',name:'Кафе',replacementName:null},c,options);assert.equal(p.intent.kind,'delete_category');assert.equal(p.intent.id,cat);assert.equal(p.intent.replacementId,null);
+});
+test('remembering a bank identity is server-only and cannot be supplied by model',()=>{
+ const c={...catalog,rules:[],budgets:[]},options={newId:randomUUID(),sourceAnswerId:randomUUID(),parseRubles:calculatorRublesMinor};const change={kind:'remember_answer',name:'Мой перевод',assignments:{kind:'own_transfer',role:'neutral'}};assert.throws(()=>compileAssistantChange(change,c,options));const p=compileAssistantChange(change,c,{...options,rememberConditions:{bankCounterpartyId:randomUUID()}});assert.equal(p.intent.kind,'rule');assert.equal((p.intent.patch as any).assignments.role,'neutral');assert.throws(()=>parseAssistantChange({...change,conditions:{bankCounterpartyId:randomUUID()}}));
+});
+
+test('bank clock filters preserve overnight windows, weekdays and unknown clocks without invented timezones',()=>{
+ const a=row('-10000','expense','2026-11-16'),b=row('-20000','expense','2026-11-17'),c=row('-30000','expense','2026-11-18'),unknown=row('-40000','expense','2026-11-16');a.date={precision:'day',date:'2026-11-16',time:'23:30:00'};b.date={precision:'day',date:'2026-11-17',time:'02:00:00'};c.date={precision:'day',date:'2026-11-18',time:'14:00:00'};
+ const q=query({filter:{timeFrom:'22:00',timeThrough:'06:00'}}),r=result(q,[a,b,c,unknown]),v=analyzeFinancialRows(q,[a,b,c,unknown],catalog,r);assert.equal(v.sum,'30000');assert.equal(v.missingTemporalCount,1);
+ const monday=query({filter:{weekdays:[1],timeFrom:'22:00'}});assert.equal(result(monday,[a,b,c,unknown]).totals.expenses,'10000');
+ const posted=query({filter:{calendarBasis:'posted',weekdays:[2]}});a.postedDate={precision:'day',date:'2026-11-17'};assert.equal(result(posted,[a,b]).totals.expenses,'10000');
+ assert.throws(()=>parseTool({...q,filter:{timeFrom:'25:00'}}));assert.throws(()=>parseTool({...q,filter:{weekdays:[7]}}));
+});
