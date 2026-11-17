@@ -403,7 +403,7 @@ test('program new budget keeps profile timezone and requires confirmed commit',a
 
 test('program report preserves separate evidence, atomically creates and assigns a counterparty, and Undo restores both',async()=>{
  const b=await body();b.text='Покажи расходы по магазинам, посчитай десять процентов и создай контрагента для этих операций';
- outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{narration:'simple',steps:[
   {kind:'read',label:'Расходы',context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','merchant')]},
   {kind:'calculate',label:'Десять процентов',calculation:{kind:'percentage',baseRubles:'0',percent:'10'},bindings:[{field:'baseRubles',ref:'s1.total'}]},
   {kind:'change',label:'Создать получателя',change:{kind:'create_counterparty',name:'Получатель из отчёта'}},
