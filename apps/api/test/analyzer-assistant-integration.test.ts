@@ -410,7 +410,7 @@ test('program report preserves separate evidence, atomically creates and assigns
   {kind:'change',label:'Назначить получателя',fromStep:1,change:{kind:'answer_operations',patch:{counterpartyName:'Получатель из отчёта',comment:'Связанное изменение'}}}
  ]}},{blocks:[{kind:'conclusion',template:'Расходы {{s1.total}}.'}]}];
  const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'FINANCIAL_REPORT',reply.body);
- const a=reply.json().answer;assert.equal(a.report.sections[0].answer.result.totals.expenses,'24690');assert.equal(a.report.sections[1].calculation.metrics[0].value,'2469');assert.equal(calls,3);assert.equal(a.proposal.intent.kind,'compound');
+ const a=reply.json().answer;assert.equal(a.report.sections[0].answer.result.totals.expenses,'24690');assert.equal(a.report.sections[1].calculation.metrics[1].value,'2469');assert.equal(calls,3);assert.equal(a.proposal.intent.kind,'compound');
  const cpId=a.proposal.intent.items[0].id;assert.deepEqual(new Set(a.proposal.intent.items[1].operationIds),new Set(operationIds));
  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');
  const rows=await request('/finance/analyzer-answer-rows',{answerId:b.id,offset:0,section:1});assert.equal(rows.statusCode,200,rows.body);assert.ok(rows.json().points.length);

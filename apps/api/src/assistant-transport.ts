@@ -30,11 +30,15 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
 /** Lossless local references share the exact same closed schemas between a
  * direct action and report steps. Server validation uses the original schema. */
 export function compactAssistantSchema(schema: unknown): unknown {
-  const root = structuredClone(schema) as any, p = root?.properties;
-  const variants = p?.report?.properties?.steps?.items?.anyOf;
-  if (!Array.isArray(variants)) return root;
-  for (const variant of variants) for (const field of ['context','changes','options','calculation','external','change']) {
-    if (variant.properties?.[field] === p[field]) variant.properties[field] = { $ref: '#/properties/' + field };
-  }
+  const root = structuredClone(schema) as any;
+  const share = (plan: any, path: string) => {
+    const p = plan?.properties, variants = p?.report?.properties?.steps?.items?.anyOf;
+    if (!Array.isArray(variants)) return;
+    for (const variant of variants) for (const field of ['context','changes','options','calculation','external','change']) {
+      if (variant.properties?.[field] === p[field]) variant.properties[field] = { $ref: path + '/properties/' + field };
+    }
+  };
+  share(root, '#');
+  share(root?.properties?.plan, '#/properties/plan');
   return root;
 }

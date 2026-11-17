@@ -1,3 +1,4 @@
+import {createCloudAssistantModel} from '../src/assistant-transport.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
@@ -26,7 +27,7 @@ function harness(plan:unknown,narrative:unknown={blocks:[{kind:'conclusion',temp
  const request:AssistantRequest={requestId:randomUUID(),scope,conversation,global,dataRevision:'1',question:'Составь связанный финансовый расчёт',now:new Date('2026-11-17T12:00:00Z'),timezone:'Europe/Moscow'};
  const journal:AssistantJournal={receipt:{fingerprint:assistantRequestFingerprint(request),calls:[]},async persist(){},async reserve(){},async settle(){}};
  const model:AssistantModel={bound:{modelVersion:'synthetic',inputTokens:131072,outputTokens:1200},async complete(input,before){await before();calls++;sent.push(input.input);return {value:input.phase==='check_changes'?{plan,conditions:[]}:input.phase==='explain'?narrative:plan,usage:{modelVersion:'synthetic',inputTokens:100,outputTokens:50}};}};
- const services:AssistantServices={async guard(){},async catalog(){return catalog;},async authorizeQuery(){},async calculate(q){const widget=parseWidget({id:randomUUID(),name:'Синтетический расчёт',metrics:[q.metric],grouping:q.grouping,filter:q.filter,comparison:{kind:q.comparison},chart:'table'}),result=calculateWidget(widget,rows,catalog,{},request.now,'Europe/Moscow'),answer:Answer={registryVersion:'analyzer/5',mode:'ai',text:'Расчёт',query:q,widget,result,generation:scope.generation,revision:'1',accountCount:1,computedAt:request.now.toISOString()};answer.analysis=decorateAnalysis(q,rows,catalog,result);return {answer,dependencyIds:queryOperations(rows,catalog,{filter:{...q.filter,metric:q.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)};},describeResult:(_q,r)=>(r as any).answer,resultDependencies:r=>(r as any).dependencyIds,render:()=>'',async prepareBatch(changes){prepares++;return {version:'cashneuro-change-proposal/1',intent:{kind:'compound',id:request.requestId,items:changes.map(s=>s.change)},title:'Проект',description:['Только после подтверждения'],sourceAnswerId:request.requestId};},async commit(p){commits++;conversation=parseConversation(p.conversation,scope);}};
+ const services:AssistantServices={async guard(){},async catalog(){return catalog;},async authorizeQuery(){},async calculate(q){const widget=parseWidget({id:randomUUID(),name:'Синтетический расчёт',metrics:[q.metric],grouping:q.grouping,filter:q.filter,comparison:{kind:q.comparison},chart:'table'}),result=calculateWidget(widget,rows,catalog,{},request.now,'Europe/Moscow'),answer:Answer={registryVersion:'analyzer/5',mode:'ai',text:'Расчёт',query:q,widget,result,generation:scope.generation,revision:'1',accountCount:1,computedAt:request.now.toISOString()};answer.analysis=decorateAnalysis(q,rows,catalog,result);return {answer,dependencyIds:queryOperations(rows,catalog,{filter:{...q.filter,metric:q.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)};},describeResult:(_q,r)=>(r as any).answer,resultDependencies:r=>(r as any).dependencyIds,render:()=>'Проверенный результат.',async prepareBatch(changes){prepares++;return {version:'cashneuro-change-proposal/1',intent:{kind:'compound',id:request.requestId,items:changes.map(s=>s.change)},title:'Проект',description:['Только после подтверждения'],sourceAnswerId:request.requestId};},async commit(p){commits++;conversation=parseConversation(p.conversation,scope);}};
  return {run:()=>runAssistant(request,model,journal,services),get calls(){return calls;},get prepares(){return prepares;},get commits(){return commits;},get state(){return conversation;},sent,journal,services,request};
 }
 test('report reads expenses and income, derives exact difference and narrates only verified facts',async()=>{
@@ -60,4 +61,20 @@ test('monthly insurance uses exact money times months, never money times money',
 test('operations cashflow cannot be laundered into a confirmed starting balance or wrong monthly basis',()=>{
  const fact={ref:'s1.total',label:'Поток за квартал',value:'90000',display:'900 ₽',unit:'money' as const,flow:true,periodMonths:3};assert.throws(()=>bindReportValues({availableRubles:'0'},[{field:'availableRubles',ref:fact.ref}],[fact]),/BALANCE_UNCONFIRMED/);assert.throws(()=>bindReportValues({monthlyIncomeRubles:'0'},[{field:'monthlyIncomeRubles',ref:fact.ref}],[fact]),/PERIOD_MISMATCH/);
  const monthly=deriveReportFact({kind:'derive',label:'В среднем за месяц',operation:'divide',left:'s1.total',right:{literal:'3',unit:'count'}},2,[fact]);assert.equal(monthly.periodMonths,1);assert.equal(bindReportValues({monthlyIncomeRubles:'0'},[{field:'monthlyIncomeRubles',ref:monthly.ref}],[monthly]).monthlyIncomeRubles,'300.00');assert.throws(()=>bindReportValues({availableRubles:'0'},[{field:'availableRubles',ref:monthly.ref}],[monthly]),/BALANCE_UNCONFIRMED/);
+});
+
+
+test('real HTTP serialization fits both the extended plan and its independent completeness schema',async()=>{
+ const plan={version:assistantVersion,topic:'personal_finance',action:'read',context:{mode:'new'},changes:[change('metric','expenses'),change('grouping','merchant')]},h=harness(plan);let calls=0;
+ const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async(_url,init)=>{
+  calls++;const body=JSON.parse(String(init?.body));assert.ok(Buffer.byteLength(String(init?.body))<=98304);const input=JSON.parse(body.messages[1].content),value=input.candidate?{plan,conditions:[]}:plan;
+  return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:500,completion_tokens:100,total_tokens:600},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify(value)}}]}));
+ });
+ const reply=await runAssistant(h.request,model,h.journal,h.services);assert.equal(reply.code,'FINANCIAL_QUERY');assert.equal(calls,2);
+});
+
+
+test('report references the requested statistic rather than silently binding the sum',async()=>{
+ const p={version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{...read('expenses'),options:{statistic:'mean'}},{kind:'calculate',label:'Доля среднего',calculation:{kind:'percentage',baseRubles:'0',percent:'10'},bindings:[{field:'baseRubles',ref:'s1.total'}]}]}},h=harness(p),reply=await h.run();
+ assert.equal(reply.report!.facts.find(f=>f.ref==='s1.total')!.value,'15000');assert.equal(reply.report!.facts.find(f=>f.ref==='s1.sum')!.value,'30000');assert.equal((reply.report!.sections[1]!.calculation as any).metrics[1].value,'1500');
 });
