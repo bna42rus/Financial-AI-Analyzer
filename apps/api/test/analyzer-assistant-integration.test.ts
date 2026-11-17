@@ -227,13 +227,16 @@ test('one structural repair is accounted and cannot execute model-generated SQL 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n, '3');
 });
 
-test('two different chats racing for the last task unit cannot overbook the quota', async () => {
-  await pg.owner.query(`UPDATE commerce.access_cycle SET quota_policy='{"source":"override","limit":1}' WHERE user_id='first'`);
+test('two different chats with one remaining paid unit cannot dispatch an uncovered reservation', async () => {
+  await pg.owner.query("UPDATE commerce.access_paid_window SET quota=1 WHERE user_id='first'");
+  const {customerAiBudget}=await import('../src/customer-ai-budget.ts');
+  assert.equal((await within(db=>customerAiBudget(db,'first'))).remaining,1);
   const first = await body(), second = await body(); outputs = [plan([set('metric', 'expenses')])];
   const replies = await Promise.all([run(first), run(second)]);
-  assert.equal(replies.filter(r => r.statusCode === 200 && r.json().code === 'FINANCIAL_QUERY').length, 1);
-  assert.equal(calls, 2);
-  assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
+  for (const reply of replies) assert.equal(reply.json().code,'AI_USER_COST_EXHAUSTED',reply.body);
+  assert.equal(calls,0);
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n,'0');
 });
 
 test('browser initialization cannot overwrite a timezone chosen on another device', async () => {
