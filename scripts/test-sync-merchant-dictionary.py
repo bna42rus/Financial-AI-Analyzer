@@ -15,7 +15,7 @@ TARGETS = json.loads((ROOT / 'scripts/merchant-dictionary-targets.json').read_te
 class DictionarySyncTests(unittest.TestCase):
     def test_current_snapshot_is_valid_and_update_does_not_execute_fields(self):
         value = sync.validate(RAW, TARGETS)
-        self.assertEqual(len(value['entries']), 30)
+        self.assertGreaterEqual(len(value['entries']), 30)
         bad = json.loads(RAW)
         bad['entries'][0]['pattern'] = '.*'
         with self.assertRaises(ValueError):

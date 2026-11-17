@@ -108,13 +108,13 @@ function route(a:ActivityDefinition,c:Context,all:readonly ActivityDefinition[],
 export function recognizeActivity(i:ActivityInput):ActivityRecognition{
  const c=sourceContext(i),method=fulfillment(c),result=(status:ActivityRecognition['status'],reason:string,ids:string[]=[],key:string|null=null,provisional=false,parentOnly=false,profileKey:string|null=null,privateLabels?:readonly string[]):ActivityRecognition=>({status,reason,activityIds:ids,targetKey:key,confidence:status==='recognized'?(provisional?80:96):0,provisional,parentOnly,fulfillment:method,profileKey,...(privateLabels?{privateLabels}:{})});
  if(i.role!=='expense'||['refund','reversal','transfer_in','transfer_out','own_transfer','credit_card_repayment','loan_payment','loan_disbursement','interest'].includes(i.kind))return result('delegate_fin','FINANCIAL_CONTEXT_REQUIRED');
+ if(/vending|вендинг/iu.test(i.merchantText)&&!c.has(['цветы','flowers','аптека','pharmacy','электроника','electronics']))return result('recognized','VENDING_REQUIRES_REVIEW',[],'grocery',true);
  const catalog=recognizeCatalogEvidence({...i,merchantText:subjectText(i.merchantText),description:subjectText(i.description)}),profile=catalog.status==='recognized'?catalog:null,profileKey=profile?(profile.profileId?'catalog-v1:'+profile.profileId:'legacy-catalog:'+profile.entry.name):null;
  if(catalog.status==='conflict')return result('conflict',catalog.reason);
  if(profile?.profileId?.startsWith('owner-')&&profile.target&&!/(?:отдельная оплата|отдельно оплаченная|плата за|оплата услуг|услуга:)\s*(?:курьер|доставк)|separate courier fee/u.test(c.f)&&!c.has(['подарочный сертификат','подарочная карта','gift card','покупка телефона','покупка смартфона','покупка оборудования','учебник','книга','лекарство','лекарства'])){
   let key=profile.target;if(key==='grocery'&&method==='delivery')key='grocery_delivery';if(key==='grocery_delivery'&&method==='pickup')key='grocery';if(c.work&&['cloud','software','ai','vpn'].includes(key))key='business_services';
   return result('recognized','OWNER_APPROVED_MERCHANT',[],key,profile.provisional,profile.parentOnly||method==='conflict',profileKey);
  }
- if(/vending|вендинг/iu.test(i.merchantText)&&!c.has(['цветы','flowers','аптека','pharmacy','электроника','electronics']))return result('recognized','VENDING_REQUIRES_REVIEW',[],'grocery',true);
  const primary=find(subjectText(i.merchantText)),body=find(subjectText(i.description));
  const positive=(h:LiteralHit<ActivityDefinition>,text:string)=>{
   const chars=[...catalogFold(text)],before=chars.slice(0,h.from).join(''),after=chars.slice(h.through).join('');

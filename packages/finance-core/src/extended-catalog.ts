@@ -1,9 +1,9 @@
 import {extendedProfiles,extendedCatalogSha256} from './catalog/generated/name-v1.ts';
-import {literalIndex,hasLiteral,literalNegated} from './catalog-lexical.ts';
+import {merchantLiteralIndex,hasLiteral,literalNegated} from './catalog-lexical.ts';
 import type {MerchantEntry} from './merchant-catalog.ts';
 import type {CatalogInput} from './catalog-evidence.ts';
 export {extendedCatalogSha256};
-const index=literalIndex(extendedProfiles.map(p=>({value:p,forms:p.forms})));
+const index=merchantLiteralIndex(extendedProfiles.map(p=>({value:p,forms:p.forms})));
 export const extendedCatalogHits=(text:string)=>index(text);
 export function extendedCatalogEvidence(i:CatalogInput):{status:'recognized';entry:MerchantEntry;literal:string;target:string|null;parentOnly:boolean;provisional:boolean;profileId:string}|{status:'none'|'needs_context'|'conflict';reason:string}{
  const hits=index(i.merchantText).filter(h=>h.value.active&&!literalNegated(i.merchantText,h));

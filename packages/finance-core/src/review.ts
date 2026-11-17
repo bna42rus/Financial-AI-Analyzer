@@ -16,3 +16,10 @@ export function reviewReasonsAfterEdit(reasons:string[],patch:object&{reviewRequ
  if('reviewRequested'in patch)cleared.add('user_requested_review');
  return [...reasons.filter(reason=>!cleared.has(reason)),...(patch.reviewRequested===true?['user_requested_review']:[])];
 }
+
+export function missingCategoryLabel(parts:readonly {role:string;categoryId:string|null}[]=[]):string{
+ if(parts.length<2)return 'Не указана категория';
+ const missing=parts.flatMap((p,i)=>['expense','income'].includes(p.role)&&p.categoryId===null?[i+1]:[]);
+ return missing.length===1?'У части '+missing[0]+' не задана категория':missing.length?'У частей '+missing.join(', ')+' не задана категория':'Не указана категория';
+}
+export function needsPartsCategoryReview(op:{decompositionActive:boolean;parts?:readonly unknown[]}):boolean{return op.decompositionActive||(op.parts?.length??0)>1;}

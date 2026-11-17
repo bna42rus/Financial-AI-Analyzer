@@ -19,3 +19,14 @@ export function literalIndex<T>(rows:readonly {value:T;forms:readonly string[]}[
 export const hasLiteral=(text:string,forms:readonly string[])=>literalIndex([{value:true,forms}])(text).length>0;
 
 export const literalNegated=(text:string,hit:LiteralHit<unknown>)=>/(?:^|[\s,;])(?:не|not)\s+$/u.test([...catalogFold(text)].slice(0,hit.from).join(''));
+
+/** Merchant service forms keep their original spans and guards. For Yandex,
+ * bank separators, terminal numbers and wrapper tokens may separate the words. */
+export function merchantLiteralIndex<T>(rows:readonly {value:T;forms:readonly string[]}[]){
+ const direct=literalIndex(rows),brand=/^(?:yandex|yandeks|jandeks|iandeks|яндекс)$/u;
+ const separated=rows.flatMap(row=>row.forms.flatMap(form=>{const words=catalogFold(form).match(/[\p{L}\p{N}]+/gu)??[];return words.length>1&&words.some(w=>brand.test(w))?[{value:row.value,form:catalogFold(form),words}]:[];}));
+ return (text:string):LiteralHit<T>[]=>{const hits=direct(text),folded=catalogFold(text),tokens=[...folded.matchAll(/[\p{L}]+|[\p{N}]+/gu)].map(m=>({word:m[0],from:[...folded.slice(0,m.index)].length,through:[...folded.slice(0,m.index!+m[0].length)].length}));
+  for(const item of separated){const selected=item.words.map(w=>tokens.find(t=>t.word===w&&!literalNegated(text,{value:true,form:w,from:t.from,through:t.through})));if(selected.some(t=>!t))continue;const from=Math.min(...selected.map(t=>t!.from)),through=Math.max(...selected.map(t=>t!.through));if(!hits.some(h=>h.value===item.value&&h.form===item.form&&h.from===from&&h.through===through))hits.push({value:item.value,form:item.form,from,through});}
+  return hits;
+ };
+}

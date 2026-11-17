@@ -1,12 +1,12 @@
 import {defaultMerchantDictionary} from './catalog/merchant-dictionary-data.ts';
-import {literalIndex,catalogFold} from './catalog-lexical.ts';
+import {merchantLiteralIndex,catalogFold} from './catalog-lexical.ts';
 import {categoryTargets} from './catalog/generated/activity-v1.ts';
 export type DictionaryEntry={id:string;name:string;forms:readonly string[];target:string;confidence:number;tokens?:readonly (readonly string[])[]};
 export type MerchantDictionary={schema:'cashneuro-merchant-dictionary/1';revision:string;entries:readonly DictionaryEntry[]};
 const targets=new Set([...categoryTargets.map(t=>t.key),'scooter','subscription_other','telecom_root','telecom_other','education']);
 let current:MerchantDictionary=defaultMerchantDictionary;
 const words=(text:string)=>catalogFold(text).replace(/[&+]/gu,' ').replace(/[^\p{L}\p{N}]+/gu,' ').replace(/\s+/gu,' ').trim();
-let index=literalIndex(current.entries.map(e=>({value:e,forms:e.forms.map(words)})));
+let index=merchantLiteralIndex(current.entries.map(e=>({value:e,forms:e.forms.map(words)})));
 export function validateMerchantDictionary(value:unknown):MerchantDictionary{
  if(!value||typeof value!=='object'||Array.isArray(value))throw Error('INVALID_MERCHANT_DICTIONARY');
  const d=value as MerchantDictionary;
@@ -20,16 +20,16 @@ export function validateMerchantDictionary(value:unknown):MerchantDictionary{
  }
  return structuredClone(d);
 }
-export function setMerchantDictionary(value:unknown){const next=validateMerchantDictionary(value),nextIndex=literalIndex(next.entries.map(e=>({value:e,forms:e.forms.map(words)})));current=next;index=nextIndex;}
+export function setMerchantDictionary(value:unknown){const next=validateMerchantDictionary(value),nextIndex=merchantLiteralIndex(next.entries.map(e=>({value:e,forms:e.forms.map(words)})));current=next;index=nextIndex;}
 export const merchantDictionaryRevision=()=>current.revision;
 export function dictionaryMerchant(merchant:string,description=''):{entry:DictionaryEntry;target:string;confidence:number}|null{
  if(!merchant.trim()||/\p{Cf}/u.test(merchant))return null;
- const text=words(merchant),tokens=new Set(text.split(' '));
+ const text=words(merchant),tokens=new Set([...text.matchAll(/[\p{L}]+|[\p{N}]+/gu)].filter(m=>!/(?:^| )не $|(?:^| )not $/u.test(text.slice(0,m.index))).map(m=>m[0]));
  const found=new Map(index(text).filter(h=>!/(?:^| )не $|(?:^| )not $/u.test(text.slice(0,h.from))).map(h=>[h.value.id,h.value]));
  for(const e of current.entries)if(e.tokens?.some(set=>set.every(t=>tokens.has(words(t)))))found.set(e.id,e);
  // A specific paid Yandex/Telegram service wins over its containing brand.
  if(found.has('owner-yandex-scooter'))found.delete('owner-samokat');
- if(found.has('owner-yandex-charge')||found.has('owner-yandex-scooter')||found.has('owner-yandex-cloud'))found.delete('owner-yandex-go');
+ if(found.has('owner-yandex-charge')||found.has('owner-yandex-scooter')||found.has('owner-yandex-cloud')||found.has('owner-yandex-drive'))found.delete('owner-yandex-go');
  if(found.has('owner-telegram-premium'))found.delete('owner-telegram');
  if(found.size!==1)return null;
  const entry=[...found.values()][0]!;

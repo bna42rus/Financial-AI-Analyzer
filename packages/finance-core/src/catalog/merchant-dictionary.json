@@ -1,6 +1,6 @@
 {
   "schema": "cashneuro-merchant-dictionary/1",
-  "revision": "2026-11-16.1",
+  "revision": "2026-11-17.2",
   "entries": [
     {
       "id": "owner-restopay",
@@ -72,7 +72,49 @@
         "вкусвиллом"
       ],
       "target": "grocery",
-      "confidence": 96
+      "confidence": 96,
+      "tokens": [
+        [
+          "vv",
+          "kco"
+        ],
+        [
+          "vv",
+          "kso"
+        ],
+        [
+          "vv",
+          "kkm"
+        ],
+        [
+          "vv",
+          "ксо"
+        ],
+        [
+          "vv",
+          "ккм"
+        ],
+        [
+          "вв",
+          "kco"
+        ],
+        [
+          "вв",
+          "kso"
+        ],
+        [
+          "вв",
+          "kkm"
+        ],
+        [
+          "вв",
+          "ксо"
+        ],
+        [
+          "вв",
+          "ккм"
+        ]
+      ]
     },
     {
       "id": "owner-dixy",
@@ -470,6 +512,55 @@
       ],
       "target": "grocery",
       "confidence": 80
+    },
+    {
+      "id": "owner-belkacar",
+      "name": "BelkaCar",
+      "forms": [
+        "belkacar",
+        "belka car",
+        "belkakar",
+        "belka kar",
+        "белкакар",
+        "белка кар",
+        "белкакара",
+        "белкакару",
+        "белкакаром",
+        "белкакаре"
+      ],
+      "target": "carshare",
+      "confidence": 96
+    },
+    {
+      "id": "owner-phobo",
+      "name": "PHOBO",
+      "forms": [
+        "phobo",
+        "pho bo",
+        "pho-bo",
+        "фобо",
+        "фо бо",
+        "фо-бо"
+      ],
+      "target": "cafe",
+      "confidence": 96
+    },
+    {
+      "id": "owner-yandex-drive",
+      "name": "Яндекс Драйв",
+      "forms": [
+        "yandex drive",
+        "yandex draiv",
+        "yandex drayv",
+        "yandeks drive",
+        "яндекс драйв",
+        "яндекс драйва",
+        "яндекс драйву",
+        "яндекс драйве",
+        "яндекс драйвом"
+      ],
+      "target": "carshare",
+      "confidence": 96
     }
   ]
 }

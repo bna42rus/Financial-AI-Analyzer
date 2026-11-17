@@ -1,17 +1,22 @@
 import {extendedCatalogEvidence} from './extended-catalog.ts';
-import {fullCatalogEvidence,supersededLegacy} from './full-catalog.ts';
+import {fullCatalogEvidence,fullCatalogHits,supersededLegacy} from './full-catalog.ts';
 import {merchantCatalog} from './merchant-catalog.ts';
 import type {MerchantEntry} from './merchant-catalog.ts';
 import {groceryEvidence} from './grocery-evidence.ts';
 import {dictionaryMerchant} from './merchant-dictionary.ts';
-import {literalIndex,catalogFold,hasLiteral,literalNegated} from './catalog-lexical.ts';
+import {merchantLiteralIndex,literalIndex,catalogFold,hasLiteral,literalNegated} from './catalog-lexical.ts';
 export type CatalogInput={merchantText:string;description:string;bankCategory?:string;mcc?:string|null};
 export type CatalogEvidence={status:'recognized';entry:MerchantEntry;literal:string;target:string|null;parentOnly:boolean;provisional:boolean;profileId?:string}|{status:'none'|'conflict'|'needs_context';reason:string};
-const aliases=literalIndex(merchantCatalog.map(entry=>({value:entry,forms:entry.aliases})));
+const aliases=merchantLiteralIndex(merchantCatalog.map(entry=>({value:entry,forms:entry.aliases})));
 const serviceTargets:Readonly<Record<string,string>>={grocery:'grocery',cafe:'cafe',fitness:'fitness',public_transport:'public',carsharing:'carshare',powerbank:'powerbank',marketplace:'marketplace',cloud:'cloud',pharmacy:'pharmacy',fuel:'fuel',cinema:'events',books:'books',pets:'pet_goods',home:'home_goods',clothing:'clothes',electronics:'electronics',beauty:'salon',medical:'doctors',rail:'rail',air:'air',hotel:'hotel',education:'courses',cosmetics:'cosmetics',laboratory:'diagnostics',veterinary:'vet'};
 /** Finite spelling data and typed guards; never execute restriction prose. */
 export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
  const dictionary=dictionaryMerchant(input.merchantText,input.description);
+ if(dictionary&&dictionary.entry.id.startsWith('owner-yandex-')){
+  const equivalent:Record<string,string[]>={'owner-yandex-drive':['R23'],'owner-yandex-cloud':['DIG072'],'owner-yandex-go':['R01'],'owner-yandex-scooter':['R28'],'owner-yandex-charge':[]};
+  const other=fullCatalogHits(input.merchantText).filter(h=>h.value.target!==null&&!literalNegated(input.merchantText,h)&&/яндекс|yandex/iu.test(h.value.name)&&!(equivalent[dictionary.entry.id]??[]).includes(h.value.id)&&!(h.value.id==='R28'&&!/самокат|scooter|велосипед|bike/iu.test(h.form))&&!(h.value.id==='R01'&&dictionary.entry.id!=='owner-yandex-go'));
+  if(other.length)return {status:'conflict',reason:'MULTIPLE_YANDEX_SERVICES'};
+ }
  if(dictionary)return {status:'recognized',entry:{name:dictionary.entry.name,aliases:[...dictionary.entry.forms],service:'unknown',source:'owner-approved:merchant-dictionary'},literal:dictionary.entry.name,target:dictionary.target,parentOnly:false,provisional:dictionary.confidence<90,profileId:dictionary.entry.id};
  // Search projection only: bank/terminal wrappers and branch identifiers
  // cannot change the immutable permitted source or keyed identity.
@@ -49,7 +54,7 @@ export function recognizeCatalogEvidence(input:CatalogInput):CatalogEvidence{
 /** A single display identity per recognized profile, independent of source alphabet. */
 export function canonicalCatalogName(name:string,raw=''):string{
  if(name==='Ozon'&&/ozon[ ._-]*fresh|озон[ ._-]*фреш/iu.test(raw))return 'Ozon Fresh';
- const preferred:Record<string,string>={'Ворлд Класс':'World Class','Спирит Фитнес':'Spirit Fitness','Т2':'t2','585*ЗОЛОТОЙ':'585 Золотой','Икс Фит':'X-Fit','Timeweb':'TimeWeb','Timeweb Cloud':'TimeWeb','Энерго':'Energo'};
+ const preferred:Record<string,string>={'Ворлд Класс':'World Class','Спирит Фитнес':'Spirit Fitness','Т2':'t2','585*ЗОЛОТОЙ':'585 Золотой','Икс Фит':'X-Fit','Timeweb':'TimeWeb','Timeweb Cloud':'TimeWeb','Энерго':'Energo','БелкаКар':'BelkaCar'};
  return preferred[name]??name.split(/\s+[\/]\s+|\s+—\s+/u)[0]!.trim();
 }
 /** Additional explicitly agreed broad service profiles. They do not identify a

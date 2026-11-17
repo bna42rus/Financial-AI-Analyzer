@@ -1,3 +1,4 @@
+import {missingCategoryLabel} from '../../../packages/finance-core/src/review';
 import {useEffect,useRef,useState} from 'react';
 import {RefreshCw} from 'lucide-react';
 import {api} from './server-client';
@@ -34,7 +35,7 @@ export function ServerReview({state,refreshKey,command,disabled,timezone,onOpen,
   {error&&<p role="alert" className={common.error}>{error}</p>}{command?.snapshot().title.startsWith('Решение при проверке')&&command.snapshot().error&&command.snapshot().phase!=='preview'&&<p role="alert" className={common.error}>{command.snapshot().error}</p>}
   {queue?.remaining===0&&<p className={styles.muted}>Все операции проверены.</p>}
   {queue&&op&&<div className={styles.settingsStack}>
-   <div className={styles.currentReview}><button className={common.linkButton} onClick={()=>onOpen(op.id)}>{name(op)}</button><p className={styles.muted}>{values(op)}</p><p>{op.reviewReasons.map(r=>reviewNames[r]??'Нужно проверить').join(' · ')}</p></div>
+   <div className={styles.currentReview}><button className={common.linkButton} onClick={()=>onOpen(op.id)}>{name(op)}</button><p className={styles.muted}>{values(op)}</p><p>{op.reviewReasons.map(r=>r==='category_not_defined'?missingCategoryLabel(op.parts):reviewNames[r]??'Нужно проверить').join(' · ')}</p></div>
    <ReviewIssues key={'issues:'+op.id} op={op} state={state} command={command} disabled={locked} timezone={timezone} onAccessError={onAccessError} edits={edits} onStage={setEdits} fieldsDirty={fieldsDirty} fieldPatch={fieldPatch}/>
    <QuickReviewFields key={queue.id+':'+op.id} op={op} state={state} onDirty={setFieldsDirty} onDraft={setFieldPatch} extraReady={!!edits.components||edits.links.length>0||Object.keys(edits.patch).length>0} similarIds={applySimilar?selected.filter(id=>similar.includes(id)):[]} requireSimilarSelection={applySimilar} similarControls={<>
     <label><input type="checkbox" checked={applySimilar} disabled={locked||!similar.length} onChange={e=>setApplySimilar(e.target.checked)}/>Применить к похожим операциям ({similar.length})</label>

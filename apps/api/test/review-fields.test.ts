@@ -15,3 +15,13 @@ test('bank verification clears only parser/import issues, not duplicates or cate
  assert.deepEqual(reviewReasonsAfterEdit(reasons,{corrections:{amountMinor:'100',operationDate:{precision:'day',date:'2026-01-01'},accountId:'account'}}),['possible_duplicate','low_category_confidence']);
  assert.deepEqual(reviewReasonsAfterEdit(reasons,{corrections:{amountMinor:'100'}}),reasons);
 });
+
+test('missing category names actual parts and a whole operation does not open the parts editor',async()=>{
+ const {missingCategoryLabel,needsPartsCategoryReview}=await import('../../../packages/finance-core/src/review.ts');
+ const part={role:'expense',categoryId:null};
+ assert.equal(missingCategoryLabel([part]),'Не указана категория');
+ assert.equal(needsPartsCategoryReview({decompositionActive:false,parts:[part]}),false);
+ assert.equal(missingCategoryLabel([{role:'expense',categoryId:'food'},part]),'У части 2 не задана категория');
+ assert.equal(missingCategoryLabel([part,part]),'У частей 1, 2 не задана категория');
+ assert.equal(needsPartsCategoryReview({decompositionActive:true,parts:[part,part]}),true);
+});
