@@ -91,6 +91,13 @@ jobs:
           apps/api/test/merchant-source.test.ts
           apps/api/test/classification-plan.test.ts
           apps/api/test/classification-pass.test.ts
+          apps/api/test/category-continuity.test.ts
+          apps/api/test/review-fields.test.ts
+          apps/api/test/review-remember.test.ts
+          apps/api/test/bank-event-repair.test.ts
+          packages/finance-core/test/merchant-dictionary.test.ts
+          packages/finance-core/test/own-transfer.test.ts
+          packages/imports/test/transfer-identity.test.ts
           apps/api/test/classification-smoke-support.test.ts
           apps/api/test/classification-admission.test.ts
           apps/api/test/assistant-monthly.test.ts

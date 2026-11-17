@@ -16,7 +16,7 @@ const rootAliases:Readonly<Record<string,readonly string[]>>={
 const genericLeaf=new Set(['Магазины','Уход','Прочие расходы','Обслуживание','Уведомления','Комиссии'].map(catalogFold));
 const targets=new Map(categoryTargets.map(t=>[t.key,t]));
 export type CategoryResolution={status:'resolved';categoryId:string;subcategoryId:string|null;precision:'specific'|'parent'}|{status:'missing'|'ambiguous'|'invalid_binding';reason:string};
-export type CategoryBindings=Readonly<Record<string,{categoryId:string;subcategoryId:string|null}>>;
+export type CategoryBindings=Readonly<Record<string,{categoryId:string;subcategoryId:string|null;automatic?:boolean}>>;
 /** All IDs come from the supplied owner's graph. No creation, resurrection,
  * fuzzy category matching, first candidate or sibling substitution. */
 export function resolveOwnCategory(key:string,categories:readonly Category[],role:Role='expense',options:{bindings?:CategoryBindings;parentOnly?:boolean;target?:CategoryTarget}={}):CategoryResolution{

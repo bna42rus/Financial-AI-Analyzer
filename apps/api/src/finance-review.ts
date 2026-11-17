@@ -1,6 +1,6 @@
 import type {PoolClient} from 'pg';
 import {object,choice,operationDay,uuid} from '../../../packages/finance-core/src/model.ts';
-import {prepareFinance,financeView} from './finance.ts';
+import {prepareFinance,financeView,loadFinance} from './finance.ts';
 import {reviewGroupIds} from '../../../packages/finance-core/src/review-group.ts';
 import {selectionIds} from './finance-bulk.ts';
 import {HttpError} from './types.ts';
@@ -57,6 +57,8 @@ export async function attentionQueue(db:PoolClient,userId:string,input:unknown){
   next.push(next.shift()!);
  }
  if(stable(next)!==stable(row.operation_ids))row=(await db.query<SessionRow>('UPDATE finance.review_session SET operation_ids=$3,cursor=0,revision=revision+1,updated_at=clock_timestamp() WHERE user_id=$1 AND id=$2 RETURNING *',[userId,row.id,next])).rows[0]!;
- const anchor=next[0],similar=anchor?reviewGroupIds(view.operations,next,anchor,true).slice(0,1000):[],wanted=new Set(anchor?[anchor,...similar]:[]);
+ const privateGraph=(await loadFinance(db,userId)).graph,bankIds=new Map(privateGraph.operations.map(o=>[o.id,o.bankCounterpartyId]));
+ const groupRows=view.operations.map(o=>({...o,bankCounterpartyId:bankIds.get(o.id)}));
+ const anchor=next[0],similar=anchor?reviewGroupIds(groupRows,next,anchor,true).slice(0,1000):[],wanted=new Set(anchor?[anchor,...similar]:[]);
  return {id:row.id,generation:state.generation,financeRevision:state.revision,revision:String(row.revision),remaining:next.length,anchor,operations:unresolved.filter(o=>wanted.has(o.id)),similar};
 }

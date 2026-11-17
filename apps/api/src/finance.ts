@@ -1,3 +1,4 @@
+import {preserveCategoryContinuity} from './category-continuity.ts';
 import {parseCounterpartyRuleConditions,parseProposalOperations,saveCounterpartyOptions} from './counterparty-proposals.ts';
 import {parseCategoryBinding,applyCategoryBinding} from './category-bindings.ts';
 import type {CategoryBindingIntent} from './category-bindings.ts';
@@ -96,8 +97,8 @@ export async function loadFinance(db:PoolClient,userId:string){
  const evidence=await sourceEvidence(db,userId),evidenceByOperation=new Map<string,typeof evidence>();
  for(const row of evidence){const own=evidenceByOperation.get(row.transaction_id)??[];own.push(row);evidenceByOperation.set(row.transaction_id,own);}
  const transactionById=new Map(t.map(r=>[r.id,r]));
- const bindings=(await db.query('SELECT target_key,category_id,subcategory_id FROM finance.category_binding WHERE user_id=$1 ORDER BY target_key',[userId])).rows;
- const categoryBindings=Object.fromEntries(bindings.map(b=>[b.target_key,{categoryId:b.category_id,subcategoryId:b.subcategory_id}]));
+ const bindings=(await db.query('SELECT target_key,category_id,subcategory_id,automatic FROM finance.category_binding WHERE user_id=$1 ORDER BY target_key',[userId])).rows;
+ const categoryBindings=Object.fromEntries(bindings.map(b=>[b.target_key,{categoryId:b.category_id,subcategoryId:b.subcategory_id,automatic:b.automatic}]));
  const bankParties=new Map<string,Set<string>>();
  const partyEvidence=(await db.query<{transaction_id:string;counterparty_id:string}>(
   `SELECT DISTINCT finance.canonical_operation(o.user_id,o.transaction_id) AS transaction_id,b.counterparty_id
@@ -149,10 +150,11 @@ export async function operationView(db:PoolClient,userId:string,id:unknown){
  const {graph,state,parties}=await loadFinance(db,userId),op=graph.operations.find(o=>o.id===canonical);if(!op)throw new HttpError(404,'NOT_FOUND');
  const resolved=reconcile(graph),related=(l:{sourceId:string;targetId:string})=>l.sourceId===op.id||l.targetId===op.id;
  const links=graph.links.filter(related),linkIds=new Set(links.map(l=>l.id));
- const {bankRefHmac,...source}=op.source,{bankCounterpartyId,...publicOp}=op;return {...publicOp,source,displayName:operationDisplayName(op,{counterparties:parties}),generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
+ const dateSources=(await db.query('SELECT DISTINCT operation_date AS "operationDate",posted_date AS "postedDate" FROM finance.source_observation WHERE user_id=$1 AND finance.canonical_operation(user_id,transaction_id)=$2 LIMIT 20',[userId,op.id])).rows;
+ const {bankRefHmac,...source}=op.source,{bankCounterpartyId,...publicOp}=op;return {...publicOp,source,dateSources,matchingRuleIds:(await db.query("SELECT id,name,enabled,priority,conditions,assignments FROM finance.rule WHERE user_id=$1 AND enabled AND dependency_status='ready'",[userId])).rows.filter((r:Rule)=>{const account=graph.accounts.find(a=>a.id===effective(op).accountId);return !!account&&ruleMatches(op,account,r);}).map((r:Rule)=>r.id),displayName:operationDisplayName(op,{counterparties:parties}),generation:state.generation,revision:state.revision,projection:resolved.operations.find(p=>p.id===op.id),components:graph.components.filter(c=>c.transactionId===op.id),links,linkStates:resolved.links.filter(l=>linkIds.has(l.id))};
 }
 type BaseIntent={kind:'operation'|'components'|'link'|'account'|'category'|'counterparty'|'rule'|'analytics'|'undo';id:string;patch?:Record<string,unknown>;parts?:Component[];link?:Link;create?:boolean;value?:unknown};
-type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[]};
+type OperationCardIntent={kind:'operation_card';id:string;patch?:BaseIntent;components?:BaseIntent;links:BaseIntent[];review?:BulkIntent};
 type CreateHistoricalRuleIntent={kind:'create_rule_with_history';id:string;patch:Omit<Rule,'id'>};
 type AccountSettingsIntent={kind:'account_settings';id:string;accounts:BaseIntent[]};
 type Intent={kind:'reset_categories';id:string}|AccountSettingsIntent|OperationCardIntent|CreateHistoricalRuleIntent|CategoryBindingIntent|SelectedCategoryIntent|OverviewIntent|BudgetIntent|ViewIntent|RuleIntent|BaseIntent|BulkIntent|StructuralIntent|EntityIntent|ExclusionIntent|RestoreIntent|CancelImportIntent|MergeDuplicateIntent|{kind:'duplicate_different';id:string};
@@ -171,8 +173,8 @@ export function parseIntent(value:unknown):Intent {
   }
   if(k==='create_rule_with_history'){const r=object(value,['kind','id','patch']);return {kind:k,id:uuid(r.id),patch:{...validateRule(r.patch),enabled:true}};}
   if(k==='operation_card'){
-   const r=object(value,['kind','id','patch','components','links']),id=uuid(r.id);
-   if(!Array.isArray(r.links)||r.links.length>50||!r.links.length&&r.patch===undefined&&r.components===undefined)throw new TypeError('INVALID_INTENT');
+   const r=object(value,['kind','id','patch','components','links','review']),id=uuid(r.id);
+   if(!Array.isArray(r.links)||r.links.length>50||!r.links.length&&r.patch===undefined&&r.components===undefined&&r.review===undefined)throw new TypeError('INVALID_INTENT');
    const patch=r.patch===undefined?undefined:parseIntent({kind:'operation',id,patch:r.patch}) as BaseIntent;
    const components=r.components===undefined?undefined:parseIntent({kind:'components',id,parts:r.components}) as BaseIntent;
    const links=r.links.map(raw=>{
@@ -182,7 +184,7 @@ export function parseIntent(value:unknown):Intent {
     return intent;
    });
    if(new Set(links.map(l=>l.id)).size!==links.length)throw new TypeError('INVALID_INTENT');
-   return {kind:k,id,patch,components,links};
+   const review=r.review===undefined?undefined:parseBulkIntent(r.review);if(review&&(!review.reviewScope||review.reviewScope.anchorId!==id||!review.operationIds.includes(id)))throw new TypeError('INVALID_REVIEW_SCOPE');return {kind:k,id,patch,components,links,review};
   }
   if(k==='merge_duplicate')return parseMergeDuplicate(value);
   if(k==='duplicate_different'){const r=object(value,['kind','id']);return {kind:k,id:uuid(r.id)};}
@@ -281,6 +283,7 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
  }
  if(intent.kind==='operation_card'){
   await row(db,userId,'transaction',intent.id);
+  if(intent.review)await apply(db,userId,structuredClone(intent.review),currentRevision,actionId);
   if(intent.patch)await applyBase(db,userId,structuredClone(intent.patch),currentRevision);
   if(intent.components)await applyBase(db,userId,structuredClone(intent.components),currentRevision);
   for(const [linkIndex,edit] of intent.links.entries()){
@@ -295,8 +298,9 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
   return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind}};
  }
  if(intent.kind==='bulk_operations'){
-  const review=intent.reviewScope?await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations):null;
-  const loaded=await loadFinance(db,userId),patches=bulkPatches(intent,loaded.graph);let warnings:unknown[]=[];
+  const loaded=await loadFinance(db,userId),bankIds=new Map(loaded.graph.operations.map(o=>[o.id,o.bankCounterpartyId]));
+  const review=intent.reviewScope?await assertReviewGroup(db,userId,intent.reviewScope,intent.operationIds,(await financeView(db,userId)).operations.map(o=>({...o,bankCounterpartyId:bankIds.get(o.id)}))):null;
+  const patches=bulkPatches(intent,loaded.graph);let warnings:unknown[]=[];
   if('analyticsOverride'in intent.patch){const result=await applyExclusion(db,userId,{kind:'set_exclusion',id:intent.id,scope:{kind:'operations',operationIds:intent.operationIds},value:intent.patch.analyticsOverride as 'default'|'include'|'exclude',includeRelated:false},loaded.graph);warnings=result.details.warnings as unknown[];}
   for(const item of patches){delete item.patch.analyticsOverride;if(Object.keys(item.patch).length)await applyBase(db,userId,{kind:'operation',id:item.id,patch:item.patch},currentRevision,loaded);}
   let ruleName:string|undefined;
@@ -305,7 +309,7 @@ async function apply(db:PoolClient,userId:string,intent:Intent,currentRevision:s
    const conditions=anchor&&reviewRuleConditions(anchor,intent.patch as Parameters<typeof reviewRuleConditions>[1]);
    if(!review?.liveQueue||!anchor||!conditions)throw new HttpError(409,'REVIEW_GROUP_CHANGED');
    const label=conditions.bankCounterpartyId?(loaded.parties.find(p=>p.id===conditions.bankCounterpartyId)?.name||anchor.semantics.merchant.value||'По банковскому совпадению'):conditions.merchantEquals!;
-   const {merchant:_merchant,...assignments}=intent.patch as Rule['assignments'];
+   const assignments=Object.fromEntries(Object.entries(intent.patch).filter(([key])=>['kind','role','categoryId','subcategoryId','merchant','counterpartyId'].includes(key))) as Rule['assignments'];
    const matching=loaded.rules.filter(r=>r.enabled&&stableJSON(r.conditions)===stableJSON(conditions));
    if(matching.some(r=>Object.entries(assignments).some(([key,value])=>key in r.assignments&&stableJSON((r.assignments as Record<string,unknown>)[key])!==stableJSON(value))))throw new HttpError(409,'REVIEW_RULE_CONFLICT');
    if(!matching.some(r=>stableJSON(r.assignments)===stableJSON(assignments))){
@@ -390,6 +394,7 @@ async function applyBase(db:PoolClient,userId:string,intent:BaseIntent,currentRe
  const table=intent.kind,before=intent.create?null:await row(db,userId,table,id),values:Record<string,unknown>={};
  if(table==='account'){activeAccount(graph,id);for(const [input,key]of Object.entries({name:'display_name',type:'account_type',analyticsEnabled:'analytics_enabled',defaultVisible:'default_visible',loanMode:'loan_mode'}))if(input in p)values[key]=p[input];}
  if(table==='category'){
+  if(!intent.create&&typeof p.name==='string'&&p.name!==before.name)await preserveCategoryContinuity(db,userId,graph,id);
   if(p.parentId&&graph.categories.some(c=>c.parentId===id))throw new HttpError(409,'CATEGORY_PARENT_CONFLICT');
   if(!intent.create&&(('role'in p&&p.role!==before.role)||('parentId'in p&&p.parentId!==before.parent_id))){
    const occupied=(await db.query("SELECT 1 FROM finance.transaction WHERE user_id=$1 AND (category_id=$2 OR subcategory_id=$2) UNION ALL SELECT 1 FROM finance.component WHERE user_id=$1 AND (category_id=$2 OR subcategory_id=$2) UNION ALL SELECT 1 FROM finance.rule WHERE user_id=$1 AND (assignments->>'categoryId'=$2::text OR assignments->>'subcategoryId'=$2::text) LIMIT 1",[userId,id])).rowCount;

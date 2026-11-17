@@ -121,12 +121,24 @@ test('structured food MCC resolves a homonym and is also respected by the determ
  }
 });
 
-test('/5 known activity conflicts and unavailable own targets cannot fall through to model/cache inference',()=>{
+test('/5 activity conflicts stay blocked while known purposes can map into custom categories',()=>{
  for(const name of ['Аптека Север','Optika Север','СТО','Вендинг','Ресторан Аптека','Яндекс Go']){
   const g=graph(),o=g.operations[0]!;o.source.merchantText=name;o.source.description='Покупка '+name;o.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};o.semantics=initialSemantics('purchase',name);
-  assert.equal(classificationSignal(o,g),null,name);assert.equal(classificationPlan(g).groups.length,0,name);
+  const signal=classificationSignal(o,g);if(name==='Ресторан Аптека'){assert.equal(signal,null,name);assert.equal(classificationPlan(g).groups.length,0,name);}else if(signal){assert.ok(signal.purpose,name);assert.ok((signal.purposeConfidence??0)<=100,name);}
  }
  const g=graph(),o=g.operations[0]!;o.source.merchantText='UnknownMerchant24';o.source.description='Покупка UnknownMerchant24';o.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};o.semantics=initialSemantics('purchase','UnknownMerchant24');
  assert.equal(classificationSignal(o,g)?.merchant,'UnknownMerchant24');assert.equal(classificationPlan(g).groups.length,1);
  o.source.versions.sourceTextEvidence='unknown';assert.equal(classificationPlan(g).groups.length,0);
+});
+
+
+test('known grocery purpose can be distributed into a rebuilt private category tree on request',()=>{
+ const g=graph(),o=g.operations[0]!;o.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};o.source.merchantText='VKUSVILL';o.source.description='Оплата в VKUSVILL';o.semantics=initialSemantics('purchase','ВкусВилл');
+ g.categories=[{id:'food',name:'Питание',role:'expense',parentId:null,hidden:false},{id:'leaf',name:'Продукты домой',role:'expense',parentId:'food',hidden:false}];
+ const plan=classificationPlan(g);assert.equal(plan.groups.length,1);assert.ok(plan.groups[0]!.signal.purpose);const choice=parseClassification(response(plan,'food',96,'leaf'),plan,plan.groups)[0]!;assert.equal(choice.categoryId,'food');assert.equal(choice.subcategoryId,'leaf');assert.deepEqual(applyClassification(o,choice).source,o.source);
+});
+
+test('a model cannot turn an ordinary grocery purchase into delivery without delivery evidence',()=>{
+ const g=graph(),o=g.operations[0]!;o.source.versions={sourceSanitizer:'bank-source/5',sourceTextEvidence:'intact'};o.source.merchantText='VKUSVILL';o.source.description='Оплата в VKUSVILL';o.semantics=initialSemantics('purchase','ВкусВилл');g.categories[1]!.name='Доставка продуктов';
+ const plan=classificationPlan(g,[],true);assert.equal(plan.groups.length,1);const d=parseClassification(response(plan,'food',96,'leaf'),plan,plan.groups)[0]!;assert.equal(d.categoryId,'food');assert.equal(d.subcategoryId,null);
 });

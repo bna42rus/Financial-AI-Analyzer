@@ -445,6 +445,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         ("SELECT to_regclass('commerce.maintenance') IS NOT NULL", '0056_maintenance.sql'),
         ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='bank_events_repaired')", '0057_bank_event_repair.sql'),
         ("SELECT to_regclass('finance.observation_peer_account') IS NOT NULL AND EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='workspace' AND column_name='classifier_dictionary_initialized')", '0058_classifier_dictionary.sql'),
+        ("SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='finance' AND table_name='category_binding' AND column_name='automatic')", '0059_category_continuity.sql'),
     ):
         if sql(probe) != 't':
             sql('BEGIN;\n' + (source / 'packages/database/migrations' / filename).read_text() + '\nCOMMIT;')

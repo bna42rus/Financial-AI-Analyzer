@@ -40,7 +40,7 @@ export async function classificationStatus(db:PoolClient,userId:string,input:unk
  const operatingBudget=await provider?.budgetState?.(db);
  const available=enabled&&(!work.requiresModel||dispatchAllowed&&(!operatingBudget||BigInt(operatingBudget.remainingAtoms)>=required))&&!unresolvedReceipt;
  const importing=!!(await db.query("SELECT 1 FROM finance.ingestion_batch WHERE user_id=$1 AND status IN ('accepted','processing') LIMIT 1",[userId])).rowCount;
- const canStart=available&&!importing&&dispatch?.state!=='queued'&&Number(stats.uncertain)===0&&work.needed;
+ const canStart=loaded.graph.categories.some(c=>!c.hidden)&&available&&!importing&&dispatch?.state!=='queued'&&Number(stats.uncertain)===0&&work.needed;
  if(r.start){if(!available)throw new HttpError(503,'CLASSIFICATION_UNAVAILABLE');if(canStart)await enqueueClassification(db,userId);else if(dispatch?.state!=='queued')throw new HttpError(409,'CLASSIFICATION_NOT_NEEDED');}
  const last=work.last&&['completed','failed'].includes(work.last.state)&&work.last.catalog_hash===work.inputHash&&work.last.decisions.summary?{id:work.last.id,...work.last.decisions.summary,...(work.last.decisions.summary.unresolved<=1000?{unresolvedIds:work.last.decisions.baseline.map(b=>b.id).filter(id=>loaded.graph.operations.some(op=>op.id===id&&op.semantics.category.value===null))}:{})}:null;
  return {enabled,state:r.start?'queued':dispatch?.state??'idle',...stats,canStart:r.start?false:canStart,sourceKey:work.inputHash,passId:work.last?.id??null,last};

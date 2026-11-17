@@ -27,7 +27,7 @@ export function parseBulkIntent(value:unknown):BulkIntent {
  if('subcategoryId'in patch&&!('categoryId'in patch))throw new TypeError('CATEGORY_REQUIRED');
  if('categoryId'in patch&&!('subcategoryId'in patch))patch.subcategoryId=null;
  let reviewScope:ReviewScope|undefined;if(r.reviewScope!==undefined){const s=object(r.reviewScope,['sessionId','revision','anchorId']);if(Object.keys(s).length!==3||typeof s.revision!=='string'||!/^\d{1,20}$/.test(s.revision))throw new TypeError('INVALID_REVIEW_SCOPE');reviewScope={sessionId:uuid(s.sessionId),revision:s.revision,anchorId:uuid(s.anchorId)};}
- if(r.rememberRule!==undefined&&(r.rememberRule!==true||!reviewScope||!Object.keys(patch).every(k=>['kind','role','categoryId','subcategoryId','merchant'].includes(k))||!Object.keys(patch).some(k=>['kind','role','categoryId','subcategoryId'].includes(k))))throw new TypeError('INVALID_BULK_ACTION');
+ if(r.rememberRule!==undefined&&(r.rememberRule!==true||!reviewScope||!Object.keys(patch).some(k=>['kind','role','categoryId','subcategoryId','merchant','counterpartyId'].includes(k))))throw new TypeError('INVALID_BULK_ACTION');
  return {kind:'bulk_operations',id:randomUUID(),operationIds:selectionIds(r.operationIds),patch,verify,...(reviewScope?{reviewScope}:{}),...(r.rememberRule?{rememberRule:true}:{})};
 }
 export function bulkPatches(intent:BulkIntent,graph:Graph){
@@ -43,6 +43,7 @@ export function bulkPatches(intent:BulkIntent,graph:Graph){
    if('categoryId'in patch&&op.semantics.subcategory.userVerified)delete patch.categoryId;
    if(!('categoryId'in patch)&&'subcategoryId'in patch&&op.semantics.category.value!==intent.patch.categoryId)delete patch.subcategoryId;
    delete patch.merchant;delete patch.comment;delete patch.reviewRequested;
+   if(patch.kind&&patch.kind!=='own_transfer'&&BigInt(effective(op).amountMinor)*BigInt(effective(graph.operations.find(o=>o.id===intent.reviewScope!.anchorId)!).amountMinor)<0n)delete patch.kind;
    if(('kind'in patch||'role'in patch)&&!allowedOperationRoles((patch.kind??op.semantics.kind.value) as Kind,effective(op).amountMinor).includes((patch.role??op.semantics.role.value) as Role)){delete patch.kind;delete patch.role;}
    const role=patch.role??op.semantics.role.value;
    const category=graph.categories.find(c=>c.id===('categoryId'in patch?patch.categoryId:op.semantics.category.value));

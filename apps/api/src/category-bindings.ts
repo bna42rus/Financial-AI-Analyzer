@@ -18,6 +18,6 @@ export async function applyCategoryBinding(db:PoolClient,userId:string,intent:Ca
  const previous=(await db.query('SELECT * FROM finance.category_binding WHERE user_id=$1 AND target_key=$2',[userId,intent.targetKey])).rows[0];
  if(intent.categoryId===null)await db.query('DELETE FROM finance.category_binding WHERE user_id=$1 AND target_key=$2',[userId,intent.targetKey]);
  else await db.query(`INSERT INTO finance.category_binding(user_id,id,target_key,category_id,subcategory_id) VALUES($1,$2,$3,$4,$5)
- ON CONFLICT(user_id,target_key) DO UPDATE SET category_id=EXCLUDED.category_id,subcategory_id=EXCLUDED.subcategory_id,revision=finance.category_binding.revision+1`,[userId,previous?.id??intent.id,intent.targetKey,intent.categoryId,intent.subcategoryId]);
+ ON CONFLICT(user_id,target_key) DO UPDATE SET category_id=EXCLUDED.category_id,subcategory_id=EXCLUDED.subcategory_id,automatic=false,revision=finance.category_binding.revision+1`,[userId,previous?.id??intent.id,intent.targetKey,intent.categoryId,intent.subcategoryId]);
  return {table:'batch',id:intent.id,before:null,details:{kind:intent.kind,targetLabel:target.path.join(' / ')||target.labels[0],categoryId:intent.categoryId,subcategoryId:intent.subcategoryId,removed:intent.categoryId===null,sourceFactsPreserved:true,financialRolesUnchanged:true,financialOperationsDeleted:0}};
 }

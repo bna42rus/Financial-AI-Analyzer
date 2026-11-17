@@ -4,7 +4,7 @@ import {object,uuid,dateFact} from '../../../packages/finance-core/src/model.ts'
 import {HttpError} from './types.ts';
 
 const definitions={
- category_binding:{table:'category_binding',id:'id',keys:['target_key','category_id','subcategory_id'],readonly:[]},
+ category_binding:{table:'category_binding',id:'id',keys:['target_key','category_id','subcategory_id','automatic'],readonly:[]},
  overview_view:{table:'overview_view',id:'id',keys:['name','definition','is_default','dependency_status','position'],readonly:[]},
  budget:{table:'budget',id:'id',keys:['name','definition','limits','enabled','dependency_status'],readonly:[]},
  operations_view:{table:'operations_view',id:'id',keys:['name','definition','is_default','dependency_status','position'],readonly:[]},

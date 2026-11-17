@@ -54,3 +54,27 @@ test('one operation card previews and commits bank values, components and a rela
  await command({kind:'undo',id:randomUUID(),value:actionId});
  assert.deepEqual(await persisted(),{row:{comment:'',corrections:{},decomposition:false},links:0});
 });
+
+
+test('review fields, local comment, future rule and parts commit together without changing bank facts or totals',async()=>{
+ const id=ids[0]!;await command({kind:'operation',id,patch:{reviewRequested:true}});
+ const queue=(await request('/finance/review-queue',{})).json(),before=await within(db=>financeView(db,'first')),op=before.operations.find(o=>o.id===queue.anchor)!;
+ const detail=(await request('/finance/operation',{id:op.id})).json(),amount=BigInt(op.amountMinor);
+ const parts=[{id:randomUUID(),type:'other',amountMinor:(amount+100n).toString(),role:'expense',categoryId:category,subcategoryId:null},{id:randomUUID(),type:'other',amountMinor:'-100',role:'expense',categoryId:category,subcategoryId:null}];
+ await command({kind:'operation_card',id:op.id,links:[],components:parts,review:{kind:'bulk_operations',operationIds:[op.id],reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:op.id},rememberRule:true,patch:{categoryId:category,subcategoryId:null,comment:'Local review note'}}});
+ const after=await within(db=>financeView(db,'first')),saved=(await request('/finance/operation',{id:op.id})).json();
+ assert.equal(saved.comment,'Local review note');assert.deepEqual(saved.source,detail.source);assert.equal(saved.components.length,2);assert.equal(after.summary.netExpensesMinor,before.summary.netExpensesMinor);
+ const remembered=after.rules.find(r=>r.assignments.categoryId===category);assert.ok(remembered);assert.equal('comment' in remembered.assignments,false);
+});
+
+test('an invalid staged allocation rolls back the review fields and remembered rule',async()=>{
+ const id=ids[0]!;await command({kind:'operation',id,patch:{reviewRequested:true}});const queue=(await request('/finance/review-queue',{})).json(),before=await within(db=>financeView(db,'first'));
+ await assert.rejects(()=>command({kind:'operation_card',id,links:[],components:[{id:randomUUID(),type:'other',amountMinor:'-1',role:'expense',categoryId:category,subcategoryId:null}],review:{kind:'bulk_operations',operationIds:[id],reviewScope:{sessionId:queue.id,revision:queue.revision,anchorId:id},rememberRule:true,patch:{categoryId:category,subcategoryId:null,comment:'Must roll back'}}}));
+ const after=await within(db=>financeView(db,'first'));assert.deepEqual(after.rules,before.rules);assert.equal(after.operations.find(o=>o.id===id)!.comment,before.operations.find(o=>o.id===id)!.comment);
+});
+
+test('renaming a recognized category keeps its semantic ID mapping and creating a category never distributes history',async()=>{
+ await command({kind:'category',id:category,patch:{name:'Корзина'}});const renamed=await within(db=>financeView(db,'first'));assert.ok(Object.values(renamed.categoryBindings??{}).some(b=>b.categoryId===category));
+ const previous=renamed.operations.map(o=>o.classification),newId=randomUUID();await command({kind:'category',id:newId,create:true,patch:{name:'Мои кофейни',role:'expense',parentId:null}});
+ const after=await within(db=>financeView(db,'first'));assert.deepEqual(after.operations.map(o=>o.classification),previous);assert.ok(after.categories.some(c=>c.id===newId));
+});

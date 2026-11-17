@@ -35,9 +35,15 @@
       "path": "docs/product/approved-classifier-20261116.md",
       "role": "approved_amendment",
       "sha256": "27bc5afaef58641d4bf036a5c526c771ff4e006fe32bd6b45d40f340642120da"
+    },
+    {
+      "path": "docs/product/approved-category-review-20261117.md",
+      "role": "approved_amendment",
+      "sha256": "04a97d06a7f80573dc967cddafabc7e133059c10320df7a4de651500a045f4a8"
     }
   ],
   "precedence": [
+    "Approved category-review amendment 2026-11-17 resolves the previously pending category policy, manual-only redistribution triggers, existing Review UI, inline structural resolution, rules/counterparty interaction and field-specific errors in its stated scope",
     "Approved classifier amendment 2026-11-16 overrides canonical display names, finite dictionary additions, transfer self-evidence, printed local clocks and overview credit notice in its stated scope; category replacement policy remains pending owner approval",
     "Approved maintenance amendment 2026-11-14 defines the scheduled maintenance UI, API gate, operator control and manual reopening in its stated scope",
     "Approved mobile-interface amendment 2026-11-14 overrides mobile widget layout, compact spacing, form alignment, Analyzer sizing/Enter behavior and review-rule availability in its stated scope",

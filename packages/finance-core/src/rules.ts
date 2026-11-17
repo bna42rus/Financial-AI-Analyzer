@@ -37,11 +37,12 @@ export function reviewRuleConditions(operation:Operation,draft:{kind?:Kind;merch
  const source=reviewRuleSource(kind,fact.amountMinor,merchant,!!operation.bankCounterpartyId);
  if(source==='transfer'&&kind==='own_transfer')return {bankCounterpartyId:operation.bankCounterpartyId};
  if(source==='transfer')return {bankCounterpartyId:operation.bankCounterpartyId,accountId,direction,kind};
- if(source==='purchase')return {merchantEquals:merchant,accountId,direction,kind};
+ if(source==='purchase')return {merchantEquals:operation.semantics.merchant.value.trim()||merchant,accountId,direction,kind};
 }
 /** The same closed predicate is used for future imports and explicit historical selection. */
 export function ruleMatches(operation:Operation,account:Account,rule:Rule):boolean {
  const c=rule.conditions;
+ if(c.bankCounterpartyId&&rule.assignments.kind==='own_transfer'&&!['transfer_in','transfer_out','own_transfer'].includes(operation.semantics.kind.value))return false;
  if(!Object.keys(c).length)return false;
  const f=effective(operation),amount=BigInt(f.amountMinor),text=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU');
  // Freeze the former matching input only for an intact, untouched /5 bank

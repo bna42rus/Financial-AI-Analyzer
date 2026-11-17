@@ -1,3 +1,5 @@
+> Historical proposal. Superseded by ../product/approved-category-review-20261117.md; automatic distribution on category creation and new mandatory setup UI are rejected.
+
 # Категории пользователя — предложение для согласования
 
 Статус: НЕ СОГЛАСОВАНО; текущая реализация не изменена этим предложением.
