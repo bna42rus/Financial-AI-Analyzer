@@ -78,7 +78,7 @@ beforeEach(async () => {
     await acceptAccount(db, 'first', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic assistant account', type: 'bank_account' });
     operationIds = await syntheticOperations(db, 'first', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id);
   });
-  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":20}')");
+  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10000}')");
   assert.equal((await request('/finance/assistant-profile', { timezone: 'Asia/Vladivostok' })).statusCode, 200);
 });
 async function body() {
@@ -384,7 +384,7 @@ test('natural operation changes require a current last-answer scope and freeze e
 
 test('program grouped statistics use current owned rows and immutable answer scope',async()=>{
  const b=await body();b.text='Сравни медианные расходы по магазинам';outputs=[{...plan([set('metric','expenses'),set('grouping','merchant')]),options:{statistic:'median'}}];
- const first=await run(b);assert.equal(first.statusCode,200,first.body);const a=first.json().answer;assert.equal(a.query.grouping,'merchant');assert.equal(a.analysis.value,'12345');assert.equal(a.analysis.count,2);assert.equal(a.result.totals.expenses,'24690');
+ const first=await run(b);assert.equal(first.statusCode,200,first.body);assert.equal(first.json().code,'FINANCIAL_QUERY',first.body);const a=first.json().answer;assert.equal(a.query.grouping,'merchant');assert.equal(a.analysis.value,'12345');assert.equal(a.analysis.count,2);assert.equal(a.result.totals.expenses,'24690');
  const message=(await request('/finance/analyzer-state',{chatId:b.chatId})).json().chats.flatMap((c:any)=>c.messages).find((m:any)=>m.id===b.id);assert.equal(message.answer.analysis.value,a.analysis.value);
  const timings=(await pg.owner.query('SELECT receipt FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0].receipt.result.timings;assert.equal(timings.calls.length,2);assert.ok(timings.preparedMs>=0);assert.equal(JSON.stringify(timings).includes(b.text),false);
 });
