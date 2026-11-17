@@ -1,4 +1,5 @@
-import {randomUUID} from 'node:crypto';
+import {createHash} from 'node:crypto';
+function bindingId(userId:string,key:string){const h=createHash('sha256').update(JSON.stringify(['category-binding/1',userId,key])).digest('hex');return h.slice(0,8)+'-'+h.slice(8,12)+'-4'+h.slice(13,16)+'-8'+h.slice(17,20)+'-'+h.slice(20,32);}
 import type {PoolClient} from 'pg';
 import type {Graph} from '../../../packages/finance-core/src/model.ts';
 import {categoryTargets} from '../../../packages/finance-core/src/catalog/generated/activity-v1.ts';
@@ -14,13 +15,13 @@ export function categoryContinuity(graph:Graph,id:string){
  for(const [key,values]of seen)if(values.size===1&&!graph.categoryBindings?.[key]){const pair=JSON.parse([...values][0]!) as {categoryId:string;subcategoryId:string|null};if(pair.categoryId===id||pair.subcategoryId===id)result.set(key,pair);}
  return [...result].map(([key,pair])=>({key,...pair}));
 }
-export async function preserveCategoryContinuity(db:PoolClient,userId:string,graph:Graph,id:string){for(const b of categoryContinuity(graph,id))await db.query('INSERT INTO finance.category_binding(user_id,id,target_key,category_id,subcategory_id,automatic) VALUES($1,$2,$3,$4,$5,true) ON CONFLICT(user_id,target_key) DO NOTHING',[userId,randomUUID(),b.key,b.categoryId,b.subcategoryId]);}
+export async function preserveCategoryContinuity(db:PoolClient,userId:string,graph:Graph,id:string){for(const b of categoryContinuity(graph,id))await db.query('INSERT INTO finance.category_binding(user_id,id,target_key,category_id,subcategory_id,automatic) VALUES($1,$2,$3,$4,$5,true) ON CONFLICT(user_id,target_key) DO NOTHING',[userId,bindingId(userId,b.key),b.key,b.categoryId,b.subcategoryId]);}
 
 /** Only a user-requested pass may remember inferred mappings; private mappings win. */
 export async function rememberClassificationBindings(db:PoolClient,userId:string,graph:Graph){
  const seen=new Map<string,Set<string>>();
  for(const op of graph.operations){const c=op.semantics.category,s=op.semantics.subcategory;if(c.source!=='ai'||c.userVerified||s.userVerified||!c.value||c.confidence<90)continue;const e=activityDecision(op,graph.categories)?.evidence;if(e?.status!=='recognized'||!e.targetKey||!/^[a-z][a-z_]{1,63}$/.test(e.targetKey)||graph.categoryBindings?.[e.targetKey]&&!graph.categoryBindings[e.targetKey]!.automatic)continue;const values=seen.get(e.targetKey)??new Set<string>();values.add(JSON.stringify({categoryId:c.value,subcategoryId:s.value,automatic:true}));seen.set(e.targetKey,values);}
  const added:Record<string,{categoryId:string;subcategoryId:string|null;automatic:boolean}>={};
- for(const [key,values] of seen){if(values.size!==1)continue;const pair=JSON.parse([...values][0]!) as {categoryId:string;subcategoryId:string|null;automatic:boolean};await db.query(`INSERT INTO finance.category_binding(user_id,id,target_key,category_id,subcategory_id,automatic) VALUES($1,$2,$3,$4,$5,true) ON CONFLICT(user_id,target_key) DO UPDATE SET category_id=EXCLUDED.category_id,subcategory_id=EXCLUDED.subcategory_id,revision=finance.category_binding.revision+1 WHERE finance.category_binding.automatic`,[userId,randomUUID(),key,pair.categoryId,pair.subcategoryId]);added[key]=pair;}
+ for(const [key,values] of seen){if(values.size!==1)continue;const pair=JSON.parse([...values][0]!) as {categoryId:string;subcategoryId:string|null;automatic:boolean};await db.query(`INSERT INTO finance.category_binding(user_id,id,target_key,category_id,subcategory_id,automatic) VALUES($1,$2,$3,$4,$5,true) ON CONFLICT(user_id,target_key) DO UPDATE SET category_id=EXCLUDED.category_id,subcategory_id=EXCLUDED.subcategory_id,revision=finance.category_binding.revision+1 WHERE finance.category_binding.automatic`,[userId,bindingId(userId,key),key,pair.categoryId,pair.subcategoryId]);added[key]=pair;}
  return added;
 }
