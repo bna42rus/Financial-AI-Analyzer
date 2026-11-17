@@ -1,5 +1,5 @@
-import {allowedOperationRoles} from '../../../packages/finance-core/src/model';
-import type {Kind,Role} from '../../../packages/finance-core/src/model';
+import {allowedOperationRoles} from '../../../packages/finance-core/src/model.ts';
+import type {Kind,Role} from '../../../packages/finance-core/src/model.ts';
 import type {FinanceState,OperationPatch} from './finance-client';
 export type ReviewRow=FinanceState['operations'][number];
 export type ReviewKey='merchant'|'kind'|'role'|'category'|'subcategory'|'counterparty'|'comment';

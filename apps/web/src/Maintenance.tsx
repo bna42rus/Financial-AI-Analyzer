@@ -21,7 +21,7 @@ export function MaintenanceBoundary({children}:{children:ReactNode}){
  const visited=useRef(false),running=useRef(false),mounted=useRef(false);
  const update=useCallback(async()=>{
   if(running.current)return;running.current=true;
-  try{const next=await api<Maintenance>('/access/maintenance',undefined,AbortSignal.timeout(7000));if(!valid(next))throw Error('Invalid maintenance status');if(mounted.current){setStatus(next);try{localStorage.setItem(cacheKey,JSON.stringify(next));}catch{}}}
+  try{const next=await api<Maintenance>('/access/maintenance',undefined,AbortSignal.timeout(7000));if(!valid(next))throw Error('Invalid maintenance status');if(mounted.current){setStatus(next);try{if(next.phase==='none')localStorage.removeItem(cacheKey);else localStorage.setItem(cacheKey,JSON.stringify(next));}catch{}}}
   catch{/* A failed status request does not activate maintenance. Server-side gates remain authoritative. */}
   finally{running.current=false;if(mounted.current)setLoaded(true);}
  },[]);
