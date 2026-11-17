@@ -57,6 +57,12 @@ jobs:
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Verify category continuity and review fields offline
         run: pnpm --filter @finance/api exec node --import tsx --test test/classification-plan.test.ts test/classification-pass.test.ts test/category-continuity.test.ts test/review-fields.test.ts test/review-remember.test.ts ../../packages/finance-core/test/merchant-followups.test.ts
+      - name: Verify Analyzer arithmetic and workflow offline
+        run: pnpm --filter @finance/api exec node --import tsx --test ../../packages/analyzer/test/program.test.ts test/assistant-workflow.test.ts test/assistant-durability.test.ts
+      - name: Verify Analyzer HTTP changes and source scopes
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-name-pattern='program ' test/analyzer-assistant-integration.test.ts
       - name: Verify review atomic commit, rollback and category identity over HTTP
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
@@ -105,6 +111,7 @@ jobs:
           packages/finance-core/test/grocery-recognition.test.ts
           packages/analyzer/test/merchant-rule.test.ts
           packages/analyzer/test/calculators.test.ts
+          packages/analyzer/test/program.test.ts
           packages/analyzer/test/assistant-changes.test.ts
           packages/analyzer/test/interface-actions.test.ts
           packages/analyzer/test/question-catalog.test.ts

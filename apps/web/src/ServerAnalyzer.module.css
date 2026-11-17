@@ -51,3 +51,16 @@
 .moreExamples{margin-top:12px}.moreExamples summary{cursor:pointer;color:var(--color-primary);margin-bottom:10px}
 
 @media(max-width:700px){.layout{height:150svh;max-height:200svh;min-height:0;flex:none;grid-template-rows:minmax(0,1fr)}}
+/* Approved answer typography. Scaling applies on every viewport. */
+.layout [role="log"] article p,.analysis {font-size:calc(17px * var(--text-scale,1));line-height:1.6}
+.layout [role="log"] article h3 {font-size:calc(19px * var(--text-scale,1));line-height:1.35;margin:1rem 0 .6rem}
+.layout [role="log"] article p {margin:.65rem 0;overflow-wrap:anywhere}
+.layout [role="log"] article details {font-size:calc(15px * var(--text-scale,1));line-height:1.6;margin-top:.8rem}
+.tableWrap {max-width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain}
+.tableWrap table {font-size:calc(15px * var(--text-scale,1));width:100%;border-collapse:collapse}
+.tableWrap th:not(:first-child),.tableWrap td:not(:first-child) {text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tableWrap th:first-child,.tableWrap td:first-child {min-width:8rem;white-space:normal;text-align:left}
+.analysisNote {color:var(--color-secondary-text);font-size:calc(14px * var(--text-scale,1))!important}
+.analysis {min-width:0}.metricGrid {display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));gap:12px}.metricGrid>div {border:1px solid var(--color-border);border-radius:12px;padding:12px}.metricGrid dt {font-size:.85em;color:var(--color-secondary-text)}.metricGrid dd {margin:6px 0 0;font-size:1.3em;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.calculatorChart {margin:16px 0;max-width:100%;color:var(--color-text)}.calculatorChart svg {display:block;width:100%;max-height:260px}.calculatorChart text {fill:currentColor;font-size:14px}.chartLine {stroke:var(--color-primary);stroke-width:3;fill:none}.chartAxis {stroke:var(--color-border);stroke-width:1}
+@media(max-width:700px){.layout [role="log"] article p,.analysis{font-size:calc(16px * var(--text-scale,1))}.tableWrap table{font-size:calc(14px * var(--text-scale,1))}}

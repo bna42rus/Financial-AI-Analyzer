@@ -101,6 +101,11 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await send('Сумма расходов, сентябрь 2026'); await count(1); await idle();
     assert.equal((await messages())[0]!.answer.result.totals.expenses, '24690');
     await expect(page.getByRole('log', { name: 'Сообщения диалога' })).toContainText('246,90 ₽'); assert.equal(calls, 2);
+    const answerText=page.getByRole('log',{name:'Сообщения диалога'}).locator('article p').first();
+    assert.ok(await answerText.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))>=16);
+    await page.locator('html').evaluate(el=>(el as HTMLElement).style.setProperty('--text-scale','1.25'));
+    assert.ok(await answerText.evaluate(el=>parseFloat(getComputedStyle(el).fontSize))>=20);
+    await page.locator('html').evaluate(el=>(el as HTMLElement).style.removeProperty('--text-scale'));
 
     // The Analyzer unmounts here. The enclosing workspace must retain A->B->A.
     await screen(page, 'Обзор'); const global = page.getByRole('group', { name: 'Общие фильтры' });

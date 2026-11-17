@@ -10,7 +10,7 @@ export type TextItem={text:string;x:number;y:number;width:number};
 export type PdfLayout=TextItem[][];
 export const bankPdfAdapter='bank-pdf/2' as const;
 export const legacyPdfParserVersions={tbank:'tbank-movement-pdf/1',ozon:'ozon-movement-pdf/1',sber:'sber-card-pdf/1'} as const;
-export const pdfParserVersions={tbank:'tbank-movement-pdf/3',ozon:'ozon-movement-pdf/3',sber:'sber-card-pdf/3'} as const;
+export const pdfParserVersions={tbank:'tbank-movement-pdf/3',ozon:'ozon-movement-pdf/3',sber:'sber-card-pdf/4'} as const;
 export type PdfFailure='UNKNOWN_FORMAT'|'AMBIGUOUS_FORMAT'|'UNSUPPORTED_LAYOUT'|'LOCAL_LIMIT'|'LOCAL_READ_FAILED'|'PASSWORD_REQUIRED'|'WRONG_PASSWORD'|'OCR_REQUIRED'|'OCR_UNCERTAIN'|'PREPARATION_CLOSED';
 export class BankPdfError extends Error {readonly code:PdfFailure;constructor(code:PdfFailure){super(code);this.code=code;}}
 export const MAX_PDF_BYTES=20*1024*1024,MAX_PDF_PAGES=100,MAX_PDF_ITEMS=100000,MAX_PDF_TEXT=2000000;
@@ -73,7 +73,8 @@ function header(bank:Bank,page:Line[],index:number):Columns|null{
 }
 function rowStart(line:Line,c:Columns){
  const first=cell(line,c.date,c.posted??c.time??c.doc??c.description),amount=cell(line,c.amount,c.end);
- if(/^\d{2}\.\d{2}\./.test(first)&&(c.time===undefined||/^\d{2}:/.test(cell(line,c.time,c.description))||Boolean(amount)))return true;
+ const rowDescription=cell(line,c.description,c.description<c.amount?c.amount:Infinity);
+ if(/^\d{2}\.\d{2}\./.test(first)&&(c.time===undefined||Boolean(amount)||Boolean(rowDescription)))return true;
  // A financial row with a missing/corrupted date is still an issue, never silently omitted.
  const description=cell(line,c.description,c.description<c.amount?c.amount:Infinity);
  if(!description)return false;try{pdfMoney(amount);return true;}catch{return false;}

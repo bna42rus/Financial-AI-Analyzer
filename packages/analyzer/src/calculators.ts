@@ -1,3 +1,5 @@
+import {scenarioSchemas,parseScenarioInput,calculateScenario} from './scenario-calculators.ts';
+import type {ScenarioInput,ScenarioResult} from './scenario-calculators.ts';
 import {assertClosedSchema} from './closed-schema.ts';
 
 export const calculatorVersion='cashneuro-calculator/1';
@@ -6,6 +8,7 @@ const enumeration=(values:readonly string[])=>({type:'string',enum:values});
 const decimal={type:'string',minLength:1,maxLength:40,pattern:'^[0-9][0-9 \\u00a0\\u202f]*(?:[.,][0-9]{1,2})?$'};
 const month={type:'integer',minimum:1,maximum:600};
 export const calculatorSchema={anyOf:[
+ ...scenarioSchemas,
  closed({kind:enumeration(['loan']),principalRubles:decimal,annualRatePercent:decimal,months:month,payment:enumeration(['annuity','differentiated']),
   prepayments:{type:'array',maxItems:120,items:closed({month,amountRubles:decimal,strategy:enumeration(['reduce_term','reduce_payment'])})},
   rateChanges:{type:'array',maxItems:60,items:closed({month,annualRatePercent:decimal})}},['kind','principalRubles','annualRatePercent','months','payment']),
@@ -13,13 +16,15 @@ export const calculatorSchema={anyOf:[
  closed({kind:enumeration(['real_return']),netReturnPercent:{...decimal,pattern:'^-?[0-9][0-9 \\u00a0\\u202f]*(?:[.,][0-9]{1,2})?$'},inflationPercent:{...decimal,pattern:'^-?[0-9][0-9 \\u00a0\\u202f]*(?:[.,][0-9]{1,2})?$'}}),
 ]};
 export type LoanInput={kind:'loan';principalRubles:string;annualRatePercent:string;months:number;payment:'annuity'|'differentiated';prepayments?:{month:number;amountRubles:string;strategy:'reduce_term'|'reduce_payment'}[];rateChanges?:{month:number;annualRatePercent:string}[]};
-export type CalculatorInput=LoanInput|{kind:'deposit';principalRubles:string;annualRatePercent:string;months:number;capitalization:boolean;monthlyAdditionRubles?:string}|{kind:'real_return';netReturnPercent:string;inflationPercent:string};
+export type BasicCalculatorInput=LoanInput|{kind:'deposit';principalRubles:string;annualRatePercent:string;months:number;capitalization:boolean;monthlyAdditionRubles?:string}|{kind:'real_return';netReturnPercent:string;inflationPercent:string};
+export type CalculatorInput=BasicCalculatorInput|ScenarioInput;
 export type LoanRow={month:number;openingMinor:string;annualRateBps:number;interestMinor:string;principalMinor:string;paymentMinor:string;extraMinor:string;unusedExtraMinor:string;closingMinor:string};
 export type DepositRow={month:number;openingMinor:string;interestMinor:string;additionMinor:string;closingMinor:string};
-export type CalculatorResult={version:typeof calculatorVersion;kind:'loan';input:LoanInput;principalMinor:string;regularPaymentMinor:string;totalPaidMinor:string;interestMinor:string;months:number;interestSavedMinor:string;monthsSaved:number;unappliedPrepayments:number[];rows:LoanRow[];assumptions:string[]}
+export type BasicCalculatorResult={version:typeof calculatorVersion;kind:'loan';input:LoanInput;principalMinor:string;regularPaymentMinor:string;totalPaidMinor:string;interestMinor:string;months:number;interestSavedMinor:string;monthsSaved:number;unappliedPrepayments:number[];rows:LoanRow[];assumptions:string[]}
  |{version:typeof calculatorVersion;kind:'deposit';input:Extract<CalculatorInput,{kind:'deposit'}>;contributedMinor:string;interestMinor:string;endingMinor:string;rows:DepositRow[];assumptions:string[]}
  |{version:typeof calculatorVersion;kind:'real_return';input:Extract<CalculatorInput,{kind:'real_return'}>;realReturnPercent:string;assumptions:string[]};
 
+export type CalculatorResult=BasicCalculatorResult|ScenarioResult;
 const fail=():never=>{throw new TypeError('CALCULATOR_INPUT_INVALID');};
 /** Decimal rubles/percent to hundredths. Grouping is accepted only in triples. */
 function hundredths(text:string):bigint{
@@ -34,7 +39,8 @@ const monthlyDenominator=120_000n;
 const signedPercent=(s:string)=>{const n=(s.startsWith('-')?-1n:1n)*hundredths(s.replace(/^-/u,''));if(n< -10_000n||n>100_000n)fail();return n;};
 export function parseCalculatorInput(raw:unknown):CalculatorInput{
  try{assertClosedSchema(raw,calculatorSchema);}catch{fail();}
- const v=structuredClone(raw) as CalculatorInput;
+ if(!['loan','deposit','real_return'].includes((raw as {kind:string}).kind)){const v=parseScenarioInput(raw);for(const [key,value]of Object.entries(v))if(typeof value==='string'&&key!=='kind'){if(/RatePercent$|^percent$/u.test(key))rate(value);else amount(value);}return v;}
+ const v=structuredClone(raw) as BasicCalculatorInput;
  if(v.kind==='real_return'){signedPercent(v.netReturnPercent);if(signedPercent(v.inflationPercent)<=-10_000n)fail();return v;}
  amount(v.principalRubles,true);rate(v.annualRatePercent);
  if(v.kind==='deposit'){if(v.monthlyAdditionRubles!==undefined)amount(v.monthlyAdditionRubles);return v;}
@@ -81,7 +87,9 @@ function loan(input:LoanInput){
  if(balance!==0n)fail();return {rows,regular,principal,total,interestTotal};
 }
 export function calculateFinancial(raw:unknown):CalculatorResult{
- const input=parseCalculatorInput(raw);
+ const parsed=parseCalculatorInput(raw);
+ if(!['loan','deposit','real_return'].includes(parsed.kind))return calculateScenario(parsed as ScenarioInput,{money:calculatorRublesMinor,payment:annuity,calculate:input=>calculateFinancial(input) as BasicCalculatorResult});
+ const input=parsed as BasicCalculatorInput;
  if(input.kind==='real_return'){
   const net=signedPercent(input.netReturnPercent),inflation=signedPercent(input.inflationPercent),difference=net-inflation,absolute=round((difference<0n?-difference:difference)*10_000n,10_000n+inflation);
   return {version:calculatorVersion,kind:input.kind,input,realReturnPercent:(difference<0n&&absolute?'-':'')+(absolute/100n)+'.'+(absolute%100n).toString().padStart(2,'0'),assumptions:['Реальная доходность = (1 + чистая номинальная доходность) / (1 + инфляция) − 1.','Чистая доходность уже учитывает комиссии и налоги; оба процента относятся к одному периоду. Это введённые условия, не текущие рыночные данные.']};
@@ -100,6 +108,7 @@ export function calculateFinancial(raw:unknown):CalculatorResult{
 }
 function rubles(s:string){const n=BigInt(s),a=n<0n?-n:n;return (n<0n?'-':'')+(a/100n).toString().replace(/\B(?=(\d{3})+(?!\d))/g,' ')+','+(a%100n).toString().padStart(2,'0')+' ₽';}
 export function calculatorText(r:CalculatorResult){
+ if('metrics'in r)return r.title+': '+r.metrics.map(m=>m.label+' — '+(m.unit==='money'?rubles(m.value):m.value)).join('; ')+'.';
  if(r.kind==='real_return')return `Реальная доходность по введённым условиям: ${r.realReturnPercent.replace('.',',')}%. Это расчётная модель, а не прогноз.`;
  if(r.kind==='deposit')return `По введённым условиям за ${r.input.months} мес.: внесено ${rubles(r.contributedMinor)}, проценты ${rubles(r.interestMinor)}, всего ${rubles(r.endingMinor)}. Расчётная модель без налогов и комиссий.`;
  return `Расчётная модель кредита: первый платёж ${rubles(r.regularPaymentMinor)}, срок ${r.months} мес., проценты ${rubles(r.interestMinor)}, всего ${rubles(r.totalPaidMinor)}. Экономия процентов относительно варианта без досрочных платежей: ${rubles(r.interestSavedMinor)}. Это не официальный график банка.`;

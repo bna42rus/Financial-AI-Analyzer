@@ -1,3 +1,4 @@
+import {financialTimezone} from './finance-profile.ts';
 import type {PoolClient} from 'pg';
 import {compileAssistantChange,ChangeError} from '../../../packages/analyzer/src/assistant-changes.ts';
 import type {AssistantChange,ChangeCatalog} from '../../../packages/analyzer/src/assistant-changes.ts';
@@ -26,6 +27,6 @@ export async function prepareAssistantChange(db:PoolClient,userId:string,request
   const data=await operationsDataset(db,userId),query=answer.query;
   operationIds=queryOperations(data.operations,data.state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id);
  }
- const proposal=compileAssistantChange(change,catalog,{newId:requestId,sourceAnswerId,operationIds,parseRubles:calculatorRublesMinor});
+ const proposal=compileAssistantChange(change,catalog,{newId:requestId,sourceAnswerId,operationIds,parseRubles:calculatorRublesMinor,timezone:await financialTimezone(db,userId)??undefined});
  parseIntent(proposal.intent);return proposal;
 }

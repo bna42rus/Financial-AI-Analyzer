@@ -1,3 +1,5 @@
+import {parseCalculatorInput} from './calculators.ts';
+import type {CalculatorInput} from './calculators.ts';
 import { object, uuid } from '../../finance-core/src/model.ts';
 import { parseTaskBook, emptyTaskBook, globalSnapshot } from './task-context.ts';
 import type { TaskNode, TaskBook, TaskScope, GlobalSnapshot } from './task-context.ts';
@@ -5,7 +7,7 @@ import { parseCalendar, cleanAssistantQuestion, AssistantError, assistantGroupin
 import type { Calendar, SourceContext } from './assistant-plan.ts';
 
 export const conversationVersion = 'cashneuro-assistant-conversation/2';
-export type ConversationTurn = { messageId: string; question: string; calendar: Calendar; global: GlobalSnapshot;
+export type ConversationTurn = { calculation?:CalculatorInput; messageId: string; question: string; calendar: Calendar; global: GlobalSnapshot;
   status: 'query' | 'answer' | 'redirect' | 'clarification' | 'unsupported' | 'error'; code: string; pending: boolean };
 export type CategoryChoice = { node: TaskNode; options: string[] };
 export type Conversation = { version: typeof conversationVersion; book: TaskBook; turns: ConversationTurn[]; pendingMessageId: string | null; categoryChoice: CategoryChoice | null };
@@ -17,12 +19,12 @@ export function parseConversation(value: unknown, scope: TaskScope): Conversatio
   if (r.version !== conversationVersion || !Array.isArray(r.turns) || r.turns.length > 100) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
   const book = parseTaskBook(r.book, scope), seen = new Set<string>();
   const turns = r.turns.map(raw => {
-    const v = object(raw, ['messageId', 'question', 'calendar', 'global', 'status', 'code', 'pending']);
+    const v = object(raw, ['messageId', 'question', 'calendar', 'global', 'status', 'code', 'pending','calculation']);
     const messageId = uuid(v.messageId);
     if (seen.has(messageId) || cleanAssistantQuestion(v.question) !== v.question || typeof v.pending !== 'boolean' ||
         typeof v.code !== 'string' || !/^[A-Z][A-Z0-9_]{0,80}$/.test(v.code) || !['query', 'answer', 'redirect', 'clarification', 'unsupported', 'error'].includes(String(v.status))) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
     if ((v.status === 'query') !== book.nodes.some(n => n.messageId === messageId) || v.pending && ['query', 'answer', 'redirect'].includes(String(v.status))) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
-    seen.add(messageId); return { ...v, messageId, calendar: parseCalendar(v.calendar), global: globalSnapshot(v.global) } as ConversationTurn;
+    seen.add(messageId); return { ...v,...(v.calculation?{calculation:parseCalculatorInput(v.calculation)}:{}), messageId, calendar: parseCalendar(v.calendar), global: globalSnapshot(v.global) } as ConversationTurn;
   });
   if (book.nodes.some(n => !seen.has(n.messageId))) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
   const pendingMessageId = r.pendingMessageId === null ? null : uuid(r.pendingMessageId);
@@ -47,13 +49,14 @@ export function conversationInput(raw: Conversation, scope: TaskScope, question:
   const selected = state.turns.map((turn, index) => ({ turn, index })).filter(({ turn, index }) => index >= state.turns.length - 12 || unresolved(turn, index) || turn.messageId === head);
   const history = selected.map(({ turn, index }) => {
     const node = state.book.nodes.find(n => n.messageId === turn.messageId);
-    return { ref: 'h' + (index + 1), question: turn.question, calendar: turn.calendar, status: turn.status, pending: unresolved(turn, index),
+    return { ...(turn.calculation?{calculation:turn.calculation}:{}),ref: 'h' + (index + 1), question: turn.question, calendar: turn.calendar, status: turn.status, pending: unresolved(turn, index),
       ...(node ? { task: { metric: node.query.metric, grouping: assistantGrouping[node.query.grouping], comparison: node.query.comparison } } : {}) };
   });
   const sources: Record<string, SourceContext> = Object.fromEntries(selected.map(({ turn, index }) => ['h' + (index + 1), { calendar: turn.calendar, global: turn.global, pending: unresolved(turn, index) }]));
   const pending = state.turns.findIndex(t => t.messageId === state.pendingMessageId);
   const active = state.book.nodes.at(-1)?.query;
   return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar),
+    activeCalculation:state.turns.findLast(t=>t.status==='query'||t.status==='answer')?.calculation??null,
     activeTask: active ? { metric: active.metric, grouping: assistantGrouping[active.grouping], comparison: active.comparison, omittedChanges: 'preserve' } : null,
     categoryChoice: state.categoryChoice ? { options: state.categoryChoice.options, omittedChanges: 'preserve' } : null,
     pendingRequest: pending < 0 ? null : history.find(t => t.ref === 'h' + (pending + 1)) ?? null,

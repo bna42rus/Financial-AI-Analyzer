@@ -453,8 +453,8 @@ test('calculator route returns code-computed cents, records the exact model and 
  const h=harness(),p={version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'}};
  const result=await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[p]);
  assert.equal(result.code,'FINANCIAL_CALCULATION');assert.equal(result.calculation?.kind,'loan');if(result.calculation?.kind==='loan')assert.equal(result.calculation.totalPaidMinor,'10100');
- assert.equal(h.calls.length,1);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);assert.equal(h.state.book.nodes.length,0);
- assert.deepEqual(await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[]),result);assert.equal(h.calls.length,1);
+ assert.equal(h.calls.length,2);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);assert.equal(h.state.book.nodes.length,0);
+ assert.deepEqual(await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[]),result);assert.equal(h.calls.length,2);
 });
 test('a natural change is a persisted proposal after completeness review and never a calculation or implicit write',async()=>{
  const h=harness();let prepared=0;const proposal={version:'cashneuro-change-proposal/1' as const,intent:{kind:'account' as const,id:trialId(1),patch:{name:'Моя карта'}},title:'Переименовать счёт',description:['Моя карта'],sourceAnswerId:null};

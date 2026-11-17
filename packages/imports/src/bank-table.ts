@@ -6,7 +6,7 @@ import type {ExtractedFile,ExtractedRow} from './local.ts';
 import type {Bank} from './contract.ts';
 
 export const localBankAdapter='bank-local/1' as const;
-export const localParserVersions=['tbank-movement-pdf/3','ozon-movement-pdf/3','sber-card-pdf/3','tbank-movement-pdf/2','ozon-movement-pdf/2','sber-card-pdf/2','tbank-table/1','ozon-table/1','sber-table/1','tbank-ocr/1','ozon-ocr/1','sber-ocr/1'] as const;
+export const localParserVersions=['sber-card-pdf/4','tbank-movement-pdf/3','ozon-movement-pdf/3','sber-card-pdf/3','tbank-movement-pdf/2','ozon-movement-pdf/2','sber-card-pdf/2','tbank-table/1','ozon-table/1','sber-table/1','tbank-ocr/1','ozon-ocr/1','sber-ocr/1'] as const;
 const norm=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const bankName=(s:string):Bank|null=>({'т-банк':'tbank','тбанк':'tbank','тинькофф':'tbank','tbank':'tbank','ozon банк':'ozon','озон банк':'ozon','сбербанк':'sber','сбер':'sber'} as Record<string,Bank>)[norm(s)]??null;
 export const MAX_TABLE_TEXT=2_000_000,MAX_TABLE_CELLS=40_000;

@@ -381,3 +381,20 @@ test('natural operation changes require a current last-answer scope and freeze e
  const tool={name:'finance_action',answerId:proposalId,intent:p.intent},actionId=randomUUID();const preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);
  const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);assert.deepEqual(new Set((await pg.owner.query("SELECT id FROM finance.transaction WHERE comment='Из проверенного ответа'")).rows.map(r=>r.id)),new Set(operationIds));
 });
+
+test('program grouped statistics use current owned rows and immutable answer scope',async()=>{
+ const b=await body();b.text='Сравни медианные расходы по магазинам';outputs=[{...plan([set('metric','expenses'),set('grouping','merchant')]),options:{statistic:'median'}}];
+ const first=await run(b);assert.equal(first.statusCode,200,first.body);const a=first.json().answer;assert.equal(a.query.grouping,'merchant');assert.equal(a.analysis.value,'12345');assert.equal(a.analysis.count,2);assert.equal(a.result.totals.expenses,'24690');
+ const message=(await request('/finance/analyzer-state',{chatId:b.chatId})).json().chats.flatMap((c:any)=>c.messages).find((m:any)=>m.id===b.id);assert.equal(message.answer.analysis.value,a.analysis.value);
+ const timings=(await pg.owner.query('SELECT receipt FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0].receipt.result.timings;assert.equal(timings.calls.length,2);assert.ok(timings.preparedMs>=0);assert.equal(JSON.stringify(timings).includes(b.text),false);
+});
+test('program new personal rule is proposed, previewed and committed through ordinary authority',async()=>{
+ const b=await body();b.text='Создай правило Restopay для будущих операций';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_rule',name:'Restopay в продукты',conditions:{merchantEquals:'Restopay'},assignments:{categoryName:'Продукты',role:'expense'}}}];
+ const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'CHANGE_PROPOSED');const proposal=reply.json().answer.proposal;assert.equal(proposal.intent.kind,'rule');assert.equal(Number((await pg.owner.query('SELECT count(*) AS n FROM finance.rule WHERE user_id=$1',['first'])).rows[0].n),0);
+ const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:proposal.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);
+ const committed=await request('/finance/commit',{actionId});assert.equal(committed.statusCode,200,committed.body);const rule=(await pg.owner.query('SELECT conditions,assignments FROM finance.rule WHERE user_id=$1 AND id=$2',['first',b.id])).rows[0];assert.equal(rule.conditions.merchantEquals,'Restopay');assert.equal(rule.assignments.role,'expense');
+});
+test('program new budget keeps profile timezone and requires confirmed commit',async()=>{
+ const b=await body();b.text='Создай месячный бюджет Продукты 5000 рублей за вычетом возвратов';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_budget',name:'Продукты на месяц',amountRubles:'5000',period:'month',basis:'net',categoryName:'Продукты'}}];
+ const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'CHANGE_PROPOSED');const p=reply.json().answer.proposal;assert.equal(p.intent.definition.timezone,'Asia/Vladivostok');const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:p.intent}});assert.equal(preview.statusCode,200,preview.body);const saved=await request('/finance/commit',{actionId});assert.equal(saved.statusCode,200,saved.body);assert.equal((await pg.owner.query('SELECT definition FROM finance.budget WHERE user_id=$1 AND id=$2',['first',b.id])).rows[0].definition.timezone,'Asia/Vladivostok');
+});

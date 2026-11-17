@@ -1,8 +1,10 @@
+import {connectedDependencies} from '../../../packages/analyzer/src/dependencies.ts';
+import {decorateAnalysis} from '../../../packages/analyzer/src/analysis.ts';
 import {financialTimezone} from './finance-profile.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {object,uuid} from '../../../packages/finance-core/src/model.ts';
-import {parseWidget,calculateWidget} from '../../../packages/finance-core/src/overview.ts';
+import {parseWidget,calculateWidget,metricNames} from '../../../packages/finance-core/src/overview.ts';
 import {parseOperationsFilter,queryOperations} from '../../../packages/finance-core/src/operations.ts';
 import type {OperationsFilter} from '../../../packages/finance-core/src/operations.ts';
 import {safeText} from '../../../packages/privacy/src/text.ts';
@@ -167,14 +169,15 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
 /** Shared exact financial execution for both HTTP contracts. No model arithmetic. */
 export async function calculateAnalyzerQuery(db:PoolClient,userId:string,query:Query,now:Date,options:{mode:Answer['mode'];periodFromQuestion:boolean;followUp:boolean;timezone?:string;provider?:Answer['provider']}){
  await assertReferences(db,userId,query.filter);const {state,operations}=await operationsDataset(db,userId);
-  const widget=parseWidget({id:randomUUID(),name:query.metric==='income'?'Доходы':query.metric==='attention'?'Требуют внимания':'Расходы',metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:{kind:query.comparison},chart:'table',topN:query.grouping==='operation'?3:10});
+  const widget=parseWidget({id:randomUUID(),name:metricNames[query.metric],metrics:[query.metric],grouping:query.grouping,filter:query.filter,period:'global',comparison:query.comparison==='custom'?{kind:'custom',...query.options?.comparisonPeriod}:{kind:query.comparison},chart:query.options?.chart??(query.grouping==='time'?'line':query.grouping==='none'?'table':'bar'),topN:query.options?.topN??10,granularity:query.options?.granularity??'auto',direction:query.options?.direction??'desc'});
   const result=calculateWidget(widget,operations,state,{},now,options.timezone??await financialTimezone(db,userId)??'Etc/UTC');
   const selected=queryOperations(operations,state,{filter:query.filter,sort:'date',direction:'asc',group:'none'}).operations;
   let dependencyIds=selected.map(o=>o.id);if(result.comparisonFilter)dependencyIds=[...new Set([...dependencyIds,...queryOperations(operations,state,{filter:result.comparisonFilter,sort:'date',direction:'asc',group:'none'}).operations.map(o=>o.id)])];
   // Linked source facts outside the visible period contribute to terminal allocations.
   const links=(await db.query('SELECT source_id,target_id FROM finance.link WHERE user_id=$1',[userId])).rows;
-  const connected=new Set(dependencyIds);let grew=true;while(grew){grew=false;for(const link of links)if(connected.has(link.source_id)||connected.has(link.target_id))for(const linked of [link.source_id,link.target_id])if(!connected.has(linked)){connected.add(linked);grew=true;}}dependencyIds=[...connected];
+  dependencyIds=connectedDependencies(dependencyIds,links);
   const answer:Answer={text:result.operationCount?'Расчёт по вашим сохранённым операциям.':'По этим условиям операций нет.',mode:options.mode,registryVersion,query,result,widget,generation:state.generation,revision:state.revision,accountCount:new Set(selected.map(o=>o.accountId)).size,actionOperationCount:queryOperations(operations,state,{filter:{...query.filter,metric:query.metric},sort:'date',direction:'asc',group:'none'}).total,computedAt:now.toISOString(),periodFromQuestion:options.periodFromQuestion,followUp:options.followUp,...(options.provider?{provider:options.provider}:{})};
+ answer.analysis=decorateAnalysis(query,operations,state,result);
  return {answer,dependencyIds};
 }
 
@@ -190,6 +193,7 @@ export async function analyzerAnswerRows(db:PoolClient,userId:string,input:unkno
  if(a.generation!==state.generation||a.revision!==state.revision)throw new HttpError(409,'FINANCE_CHANGED');
  await assertReferences(db,userId,a.query.filter);
  const result=calculateWidget(a.widget,operations,state,{},new Date(a.computedAt!),await financialTimezone(db,userId)??'Etc/UTC',true);
+ decorateAnalysis(a.query,operations,state,result);
  const offset=Number(r.offset),points=result.tablePoints??[],next=offset+50;
  return {points:points.slice(offset,next),nextOffset:next<points.length?next:null,total:points.length};
 }
