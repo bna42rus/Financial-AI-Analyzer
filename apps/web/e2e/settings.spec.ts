@@ -1,3 +1,4 @@
+import {chooseOption} from './choice-picker';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -50,26 +51,26 @@ test('appearance changes actual styles, follows system theme and remains across 
   const initialFont = await page.locator('body').evaluate(e => parseFloat(getComputedStyle(e).fontSize));
   await expect(page.locator('html')).toHaveCSS('color-scheme', 'light dark');
   const systemBackground = await page.locator('body').evaluate(e => getComputedStyle(e).backgroundColor);
-  await page.getByLabel('Тема', { exact: true }).selectOption('light');
+  await chooseOption(page.getByLabel('Тема', { exact: true }),'light');
   await expect(page.locator('html')).toHaveCSS('color-scheme', 'light');
   expect(await page.locator('body').evaluate(e => getComputedStyle(e).backgroundColor)).not.toBe(systemBackground);
-  await page.getByLabel('Тема', { exact: true }).selectOption('dark');
+  await chooseOption(page.getByLabel('Тема', { exact: true }),'dark');
   await expect(page.locator('html')).toHaveCSS('color-scheme', 'dark');
   await expect(page.locator('body')).toHaveCSS('background-color', systemBackground);
   const comfortablePadding = await page.locator('[data-section="accounts"]').evaluate(e => parseFloat(getComputedStyle(e).paddingTop));
-  await page.getByLabel('Плотность', { exact: true }).selectOption('compact');
+  await chooseOption(page.getByLabel('Плотность', { exact: true }),'compact');
   expect(await page.locator('[data-section="accounts"]').evaluate(e => parseFloat(getComputedStyle(e).paddingTop))).toBeLessThan(comfortablePadding);
-  await page.getByLabel('Размер текста', { exact: true }).selectOption('large');
-  await page.getByLabel('Анимация', { exact: true }).selectOption('reduced');
+  await chooseOption(page.getByLabel('Размер текста', { exact: true }),'large');
+  await chooseOption(page.getByLabel('Анимация', { exact: true }),'reduced');
   expect(await page.locator('body').evaluate(e => parseFloat(getComputedStyle(e).fontSize))).toBeGreaterThan(initialFont);
   await page.getByRole('link', { name: 'Обзор', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-density', 'compact');
   await section(page, 'Интерфейс');
-  await expect(page.getByLabel('Размер текста', { exact: true })).toHaveValue('large');
-  await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('dark');
+  await expect(page.getByLabel('Размер текста', { exact: true })).toHaveAttribute('value','large');
+  await expect(page.getByLabel('Тема', { exact: true })).toHaveAttribute('value','dark');
   expect(await page.evaluate(() => ({keys:Object.keys(localStorage),session:sessionStorage.length,value:JSON.parse(localStorage.getItem('finance-appearance-v1')!)}))).toEqual({keys:['finance-appearance-v1'],session:0,value:{theme:'dark',density:'compact',textSize:'large',motion:'reduced'}});
   await page.reload();
-  await expect(page.getByLabel('Тема', {exact:true})).toHaveValue('dark');
+  await expect(page.getByLabel('Тема', {exact:true})).toHaveAttribute('value','dark');
 });
 
 test('account and exclusion links open the exact rows even after restrictive filters', async ({ page }) => {
@@ -94,21 +95,21 @@ test('appearance reset preserves filters, financial rows and Analyzer conversati
   await page.getByRole('button', { name: /^Сколько я потратил за выбранный период\?/ }).click();
   await expect(page.getByRole('log')).toContainText('58 869 ₽');
   await section(page, 'Интерфейс');
-  await page.getByLabel('Тема', { exact: true }).selectOption('dark');
-  await page.getByLabel('Плотность', { exact: true }).selectOption('compact');
-  await page.getByLabel('Размер текста', { exact: true }).selectOption('large');
-  await page.getByRole('button', { name: 'Сбросить оформление', exact: true }).click();
+  await chooseOption(page.getByLabel('Тема', { exact: true }),'dark');
+  await chooseOption(page.getByLabel('Плотность', { exact: true }),'compact');
+  await chooseOption(page.getByLabel('Размер текста', { exact: true }),'large');
+  await page.getByRole('button', { name: 'Оформление по умолчанию', exact: true }).click();
   await expect(page.getByRole('status')).toHaveText('Оформление сброшено. Данные и фильтры сохранены.');
-  await expect(page.getByLabel('Тема', { exact: true })).toHaveValue('system');
-  await expect(page.getByLabel('Плотность', { exact: true })).toHaveValue('comfortable');
-  await expect(page.getByLabel('Размер текста', { exact: true })).toHaveValue('standard');
+  await expect(page.getByLabel('Тема', { exact: true })).toHaveAttribute('value','system');
+  await expect(page.getByLabel('Плотность', { exact: true })).toHaveAttribute('value','comfortable');
+  await expect(page.getByLabel('Размер текста', { exact: true })).toHaveAttribute('value','standard');
   await page.getByRole('link', { name: 'Анализатор', exact: true }).click();
   await expect(page.getByRole('log')).toContainText('58 869 ₽');
   await page.getByRole('link', { name: 'Обзор', exact: true }).click();
   await expect(page.getByTestId('expenses')).toHaveText('58 869 ₽');
-  await page.getByLabel('Банк', { exact: true }).selectOption('Сбер');
+  await chooseOption(page.getByLabel('Банк', { exact: true }),'Сбер');
   await section(page, 'Интерфейс');
-  await page.getByRole('button', { name: 'Сбросить оформление', exact: true }).click();
+  await page.getByRole('button', { name: 'Оформление по умолчанию', exact: true }).click();
   await page.getByRole('link', { name: 'Обзор', exact: true }).click();
   await expect(page.getByTestId('expenses')).toHaveText('32 199 ₽');
   await section(page, 'Счета');
@@ -129,12 +130,12 @@ test('settings routes, back navigation, focus and large text fit narrow screens'
   await page.getByRole('button', { name: 'Интерфейс', exact: true }).click();
   await expect(page).toHaveURL(/#settings\/interface$/);
   await expect(page.getByRole('heading', { name: 'Интерфейс', exact: true })).toBeFocused();
-  await page.getByLabel('Размер текста', { exact: true }).selectOption('large');
-  await page.getByLabel('Тема', { exact: true }).selectOption('dark');
+  await chooseOption(page.getByLabel('Размер текста', { exact: true }),'large');
+  await chooseOption(page.getByLabel('Тема', { exact: true }),'dark');
   for (const width of [320, 390, 1024, 1440]) {
     await page.setViewportSize({ width, height: 850 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await expect(page.getByRole('button', { name: 'Сбросить оформление', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Оформление по умолчанию', exact: true })).toBeVisible();
   }
   await page.setViewportSize({ width: info.project.name === 'mobile' ? 390 : 1280, height: 850 });
   await page.goBack();

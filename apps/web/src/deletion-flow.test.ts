@@ -14,3 +14,16 @@ test('changed scope and access loss discard confirmation instead of widening or 
 test('a disposed reset ignores a delayed epoch and cannot affect another workspace',async()=>{const h=harness();let resolve!:(v:Awaited<ReturnType<typeof h.deps.epoch>>)=>void;h.deps.epoch.mockImplementationOnce(()=>new Promise(r=>{resolve=r;}));const p=h.flow.begin(reset);h.flow.dispose();const n=h.events.length;resolve({generation:h.generation,revision:'1',recentAuthenticationRequired:true});await p;expect(h.deps.request).not.toHaveBeenCalled();expect(h.events).toHaveLength(n);});
 test('confirmed cleanup remains completed when fresh data cannot be read',async()=>{const h=harness();h.deps.committed.mockRejectedValueOnce(new Error('offline'));await h.flow.begin(reset);await h.flow.confirm();expect(h.events.at(-1)?.phase).toBe('done');expect(h.events.at(-1)?.error).toContain('Удаление завершено');expect(h.events.at(-1)?.receipt?.cleanup.counts?.operations).toBe(2);await h.flow.retry();expect(h.deps.request).toHaveBeenCalledTimes(2);});
 test('interface reset after an offline epoch change stores only opaque UI metadata and clears appearance',()=>{const values=new Map<string,string>(),store={getItem:(k:string)=>values.get(k)??null,setItem:(k:string,v:string)=>values.set(k,v),removeItem:(k:string)=>values.delete(k)},root={dataset:{}};vi.stubGlobal('localStorage',store);vi.stubGlobal('document',{documentElement:root});try{expect(acceptInterfaceEpoch('opaque-first')).toBe(false);applyAppearance({...defaultAppearance,theme:'dark'});expect(acceptInterfaceEpoch('opaque-first')).toBe(false);expect(values.has('finance-appearance-v1')).toBe(true);expect(acceptInterfaceEpoch('opaque-second')).toBe(true);applyAppearance({...defaultAppearance});expect([...values]).toEqual([['finance-interface-epoch-v1','opaque-second']]);}finally{vi.unstubAllGlobals();}});
+test('going back from a deletion preview cannot commit its obsolete selection',async()=>{
+ const h=harness(),epoch={generation:h.generation,revision:'1'};
+ await h.flow.begin({kind:'delete_financial',scope:{kind:'period',from:'2026-09-01',through:'2026-09-10'}},epoch);
+ const previous=h.events.at(-1)?.preview?.actionId;
+ h.flow.back();
+ await h.flow.confirm();
+ expect(h.deps.request).toHaveBeenCalledOnce();
+ await h.flow.begin({kind:'delete_financial',scope:{kind:'period',from:'2026-09-02',through:'2026-09-10'}},epoch);
+ await h.flow.confirm();
+ const commit=h.deps.request.mock.calls.find(([path])=>path==='/finance/commit');
+ expect(commit?.[1].actionId).not.toBe(previous);
+ expect(h.deps.request.mock.calls[1]?.[1]).toMatchObject({intent:{scope:{from:'2026-09-02'}}});
+});

@@ -12,7 +12,7 @@ test('real CSV/XLSX local preparation preserves only exact closed facts and pars
   const files=[new File([fixture.csv],'Private.csv'),new File([new Uint8Array(fixture.xlsx)],'Private.xlsx')];
   return module.prepareLocalBankFiles(context,crypto.randomUUID(),files.map(file=>({fileId:crypto.randomUUID(),file})));
  },{csv:syntheticCsv,xlsx:[...syntheticXlsx()]});
- expect(result.localIssues).toEqual([]);expect(result.batch.versions.adapter).toBe('bank-local/1');expect(result.batch.versions.sanitizer).toBe('bank-source/3');
+ expect(result.localIssues).toEqual([]);expect(result.batch.versions.adapter).toBe('bank-local/1');expect(result.batch.versions.sanitizer).toBe('bank-source/4');
  expect(result.batch.files.map((f:any)=>f.rows.map((r:any)=>r.amountMinor))).toEqual([['-1001','2000'],['-1001','2000']]);expect(result.batch.files.every((f:any)=>f.rows.every((r:any)=>r.parser==='tbank-table/1'&&r.descriptionHmac?.length===64))).toBe(true);
  for(const secret of ['Private','00000000000000000001'])expect(JSON.stringify(result)).not.toContain(secret);
  expect(external).toEqual([]);expect(writes).toEqual([]);expect(await page.evaluate(()=>localStorage.length+sessionStorage.length)).toBe(0);expect(await page.evaluate(()=>indexedDB.databases())).toEqual([]);

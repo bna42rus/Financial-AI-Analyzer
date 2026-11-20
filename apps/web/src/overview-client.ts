@@ -10,6 +10,11 @@ export const groupingNames={time:'Время',category:'Категория',subc
 export const comparisonNames={none:'Не сравнивать',previous_same:'Предыдущий период той же длины',previous_month:'Предыдущий месяц',previous_year:'Предыдущий год',custom:'Другие даты'};
 export const chartNames={bar:'Столбцы',line:'Линия',donut:'Кольцо',table:'Таблица'};
 export const granularityNames={auto:'Автоматически',day:'День',week:'Неделя',month:'Месяц',quarter:'Квартал',year:'Год'};
-export function metricValue(metric:Metric,value:string){return ['operation_count','attention'].includes(metric)?value+' операций':formatMoney(value);}
+export function metricValue(metric:Metric,value:string){return ['operation_count','attention'].includes(metric)?value+' '+({zero:'операций',one:'операция',two:'операции',few:'операции',many:'операций',other:'операций'}[new Intl.PluralRules('ru').select(Number(value))]):formatMoney(value);}
 
 export function pointLabel(p:OverviewPoint,grouping:Widget['grouping'],granularity:string){if(grouping==='time'&&/^\d{4}-\d{2}-\d{2}$/.test(p.label)){const d=new Date(p.label+'T00:00:00Z');return granularity==='year'?p.label.slice(0,4):granularity==='quarter'?Math.floor((d.getUTCMonth())/3)+1+' квартал '+d.getUTCFullYear():new Intl.DateTimeFormat('ru-RU',granularity==='month'?{month:'long',year:'numeric',timeZone:'UTC'}:{day:'numeric',month:'short',year:'numeric',timeZone:'UTC'}).format(d);}return kindNames[p.label]??roleNames[p.label]??bankNames[p.label]??p.label;}
+
+export function timezoneLabel(zone:string){try{const name=new Intl.DateTimeFormat('ru-RU',{timeZone:zone,timeZoneName:'longGeneric'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName')?.value??zone,offset=new Intl.DateTimeFormat('en',{timeZone:zone,timeZoneName:'longOffset'}).formatToParts(new Date()).find(p=>p.type==='timeZoneName')?.value.replace('GMT','UTC')??'';return name+(offset?' ('+offset+')':'');}catch{return zone;}}
+
+export function periodRange(f:{from?:string;through?:string}){const label=(d:string)=>/^\d{4}-\d{2}-\d{2}$/.test(d)?d.split('-').reverse().join('.'):d;return [f.from?label(f.from):'Начало истории',f.through?label(f.through):'Последняя операция'].join(' — ');}
+export function comparisonIntervalLabel(granularity:string,index:number){return ({day:'День',week:'Неделя',month:'Месяц',quarter:'Квартал',year:'Год'}[granularity]??'Интервал')+' '+(index+1);}

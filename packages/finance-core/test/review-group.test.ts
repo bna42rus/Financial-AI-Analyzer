@@ -28,3 +28,10 @@ test('single remaining items and over-limit sessions produce no truncated sugges
  assert.deepEqual(reviewGroupIds([op('one')],['one'],'one'),[]);
  const ids=Array.from({length:1001},(_,i)=>String(i));assert.deepEqual(reviewGroupIds(ids.map(id=>op(id)),ids,'0'),[]);
 });
+
+test('stable peer transfers can be reviewed across directions; a name alone cannot join transfers',()=>{
+ const a=op('out',{amountMinor:'-100',bankCounterpartyId:'owned-peer',classification:initialSemantics('transfer_out',''),reviewReasons:['unresolved_transfer']}),b=op('in',{amountMinor:'100',bankCounterpartyId:'owned-peer',classification:initialSemantics('transfer_in',''),reviewReasons:['unresolved_transfer']});
+ assert.deepEqual(reviewGroupIds([a,b],['out','in'],'out'),['out','in']);
+ assert.deepEqual(reviewGroupIds([a,{...b,bankCounterpartyId:undefined}],['out','in'],'out'),[]);
+ assert.deepEqual(reviewGroupIds([a,{...b,bankCounterpartyId:'other-peer'}],['out','in'],'out'),[]);
+});

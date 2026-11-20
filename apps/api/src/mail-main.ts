@@ -17,7 +17,7 @@ let postbox:PostboxConfig|undefined;
 if(transport==='postbox'){
  const secret=await privateJson(join(process.env.CREDENTIALS_DIRECTORY!,'postbox.json'));
  if(secret.sender!=='notifications@cashneuro.ru'||typeof secret.username!=='string'||typeof secret.password!=='string')throw new Error('POSTBOX_CONFIGURATION_DENIED');
- postbox={sender:secret.sender,username:secret.username,password:secret.password,environment:'staging',recipients:(process.env.MAIL_TEST_RECIPIENTS??'').split(',').map(v=>v.trim()).filter(Boolean)};
+ postbox={sender:secret.sender,username:secret.username,password:secret.password,environment:'staging'};
 }
 const pool=new Pool({connectionString:url.toString()});
 const worker=await startMailWorker({profile,pool,wrappingKey:key.bytes,kmsKey:key.kmsKey,environment:environment as 'development'|'staging',postbox,financeOrigin:process.env.FINANCE_ORIGIN??'',controlOrigin:process.env.CONTROL_ORIGIN??'',adminRecipient:process.env.MAIL_ADMIN_RECIPIENT??''});

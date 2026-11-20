@@ -46,10 +46,10 @@ test('a stale preview cannot confirm a later revision', () => {
   const store = reviewRequest(ready(), command({ actualMinor: '50000', decision: 'topup', reason: 'Нужна доплата' }), reviewed);
   assert.throws(() => reviewRequest(store, command({ actionId: 'next' }), reviewed), /изменилась/);
 });
-test('underpayment and overpayment require an explicit choice and reason', () => {
+test('underpayment and overpayment require an explicit choice; notes are optional', () => {
   for (const amount of ['50000', '120000']) {
     assert.throws(() => reviewRequest(ready(), command({ actualMinor: amount }), reviewed), /отличается/);
-    assert.throws(() => reviewRequest(ready(), command({ actualMinor: amount, decision: 'accept_full' }), reviewed));
+    assert.equal(reviewRequest(ready(), command({ actualMinor: amount, decision: 'accept_full' }), reviewed).purchases.length,1);
     const store = reviewRequest(ready(), command({ actualMinor: amount, decision: 'accept_full', reason: 'Согласовано за полный тариф' }), reviewed);
     assert.equal(store.purchases[0]!.duration.count, 1); assert.equal(store.purchases[0]!.actualMinor, amount);
   }

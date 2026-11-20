@@ -10,18 +10,21 @@ import { createCloudAssistantModel } from './assistant-transport.ts';
 import { candidates } from './benchmark-transport.ts';
 import { costPolicy } from './analyzer-cost.ts';
 import type { CostPolicy } from './analyzer-cost.ts';
+import { monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch, authorizeMonthlyDispatch, monthlyBudgetState } from './assistant-monthly.ts';
+import type { MonthlyBudgetState } from './assistant-monthly.ts';
+import { verifyClassificationTariff } from './classification-tariff.ts';
 
-export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; allowed(email: string): boolean; authorizeDispatch(db: PoolClient): Promise<void>; readonly model: AssistantModel; forRequest(): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
+export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
 const providers = new WeakSet<object>();
 export const isAssistantProvider = (value: unknown): value is AssistantProvider => !!value && typeof value === 'object' && providers.has(value);
 /** Isolated HTTP/DB acceptance only. No key loader, default fetch or live switch.
  * The explicit fetcher receives a synthetic key; it must be a test transport. */
-export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>): AssistantProvider {
+export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>, allowedEmails?:readonly string[]): AssistantProvider {
   if (typeof fetcher !== 'function') throw new Error('ASSISTANT_PROVIDER_CONFIGURATION_DENIED');
   const model = createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher);
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
-  const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (_email: string) => true, async authorizeDispatch(_db: PoolClient) {},
-    forRequest: () => createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher),
+  const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (email: string) => !allowedEmails||allowedEmails.includes(email.toLowerCase()), async authorizeDispatch(_db: PoolClient) {},
+    forRequest: (purpose: 'assistant'|'classification' = 'assistant') => createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher,purpose),
     binding: { workflow: assistantWorkflowVersion, plan: assistantVersion, bound: model.bound, cost } });
   providers.add(provider); return provider;
 }
@@ -39,19 +42,31 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
   const metadata = await inspectCloudTaskModel(credentials,fetcher);
   if (metadata.modelMetadataSha256 !== settings.modelMetadataSha256 || metadata.numericMetadata.context_length !== 131072 || metadata.numericMetadata.max_model_len !== 131072) throw new AssistantError('ASSISTANT_MODEL_CHANGED');
   const model = createCloudAssistantModel(credentials,fetcher), snapshot = structuredClone(settings);
-  const provider: AssistantProvider = Object.freeze({ pool,environment:'staging' as const, model,policy:settings.cost,
+  const refreshTariff = monthlyTariffGuard(settings.tariffCheckedAt, () => verifyClassificationTariff(fetcher, now), now);
+  const requestModel = (purpose: 'assistant'|'classification' = 'assistant') => {
+    const result = createCloudAssistantModel(credentials,fetcher,purpose);
+    if (!settings.monthly) return result;
+    return { ...result, async complete(...args: Parameters<AssistantModel['complete']>) { await refreshTariff(); return result.complete(...args); } } as AssistantModel;
+  };
+  const provider: AssistantProvider = Object.freeze({ pool,environment:'staging' as const, model,
+    costPeriod: settings.monthly ? 'project' as const : undefined,
+    get policy() { return settings.monthly ? monthlyPolicy(settings.cost, settings.monthly, now()) : settings.cost; },
     allowed: (email: string) => settings.allowedEmails.includes(email.toLowerCase()),
-    forRequest: () => createCloudAssistantModel(credentials,fetcher),
-    async authorizeDispatch(db: PoolClient) {
+    async budgetState(db: PoolClient) { return settings.monthly ? monthlyBudgetState(db, provider.policy) : undefined; },
+    forRequest: requestModel,
+    async prepareDispatch(db: PoolClient, policy: CostPolicy) { if (settings.monthly) await prepareMonthlyDispatch(db, policy); },
+    async authorizeDispatch(db: PoolClient, policy = provider.policy) {
       checkAssistantStagingSettings(settings,now());
       if (!isDeepStrictEqual(settings,snapshot)) throw new AssistantError('ASSISTANT_STAGING_CONFIGURATION_DENIED');
+      if (settings.monthly) { await authorizeMonthlyDispatch(db, policy, now()); return; }
       // reserveCost holds the project row lock through this check; concurrent
-      // users cannot race the total-call ceiling. This includes the new reserve.
-      const count = Number((await db.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation WHERE project_id=$1 AND project_period_start=$2', [settings.cost.projectId,settings.cost.projectPeriodStart])).rows[0].n);
+      // users cannot race the total-call ceiling. A trigger counts all tenants
+      // without exposing their RLS-protected receipts, including the new reserve.
+      const count = Number((await db.query('SELECT dispatch_count AS n FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2', [settings.cost.projectId,settings.cost.projectPeriodStart])).rows[0].n);
       if (count > settings.maximumCalls) throw new AssistantError('ASSISTANT_PILOT_CALL_LIMIT');
     },
     binding:{workflow:assistantWorkflowVersion,plan:assistantVersion,sourceSha256,modelMetadataSha256:metadata.modelMetadataSha256,
-      bound:model.bound,cost:settings.cost,admission:settings.admission,maximumCalls:settings.maximumCalls,expiresAt:settings.expiresAt,tariffCheckedAt:settings.tariffCheckedAt},
+      bound:model.bound,cost:settings.cost,admission:settings.admission,...(settings.monthly ? { monthly: settings.monthly } : { maximumCalls:settings.maximumCalls,expiresAt:settings.expiresAt,tariffCheckedAt:settings.tariffCheckedAt })},
   });
   providers.add(provider);return provider;
 }

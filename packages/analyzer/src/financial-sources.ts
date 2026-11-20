@@ -1,0 +1,8 @@
+import {assertClosedSchema} from './closed-schema.ts';
+import {dateFact} from '../../finance-core/src/model.ts';
+const closed=(properties:Record<string,unknown>,required=Object.keys(properties))=>({type:'object',additionalProperties:false,properties,required});
+export const financialSourceSchema={anyOf:[closed({kind:{type:'string',enum:['key_rate']},date:{type:'string',pattern:'^\\d{4}-\\d{2}-\\d{2}$'}},['kind']),closed({kind:{type:'string',enum:['currency']},currency:{type:'string',pattern:'^[A-Z]{3}$'},date:{type:'string',pattern:'^\\d{4}-\\d{2}-\\d{2}$'},amount:{type:'string',pattern:'^(0|[1-9][0-9]{0,12})([.,][0-9]{1,2})?$'}},['kind','currency']),closed({kind:{type:'string',enum:['official_guidance']},topic:{type:'string',enum:['tax_deposits','tax_deductions','deposit_insurance','credit_insurance','investment_risks']}})]};
+export type FinancialSourceRequest={kind:'key_rate';date?:string}|{kind:'currency';currency:string;date?:string;amount?:string}|{kind:'official_guidance';topic:'tax_deposits'|'tax_deductions'|'deposit_insurance'|'credit_insurance'|'investment_risks'};
+export type VerifiedSource={id:string;title:string;url:string;retrievedAt:string;publishedDate?:string;facts:{label:string;value:string;unit:'text'|'percent'|'money';minor?:string}[];notice?:string};
+export type FinancialSourcesResult={version:'cashneuro-financial-sources/1';request:FinancialSourceRequest;sources:VerifiedSource[]};
+export function parseFinancialSourceRequest(value:unknown):FinancialSourceRequest{assertClosedSchema(value,financialSourceSchema);const q=structuredClone(value) as FinancialSourceRequest;if('date'in q&&q.date)dateFact({precision:'day',date:q.date});return q;}

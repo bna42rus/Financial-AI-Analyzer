@@ -1,3 +1,4 @@
+import {AppBoundary,StatusPage} from '../../web/src/StatusPage';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AdminApp } from './AdminApp';
@@ -6,4 +7,4 @@ import { apiOrigin } from '../../web/src/server-client';
 import '../../web/src/theme.css';
 const root=document.getElementById('root');
 if(!root)throw new Error('Application root is missing');
-createRoot(root).render(<StrictMode>{apiOrigin?<ServerAdmin/>:<AdminApp/>}</StrictMode>);
+createRoot(root).render(<StrictMode><AppBoundary>{!['/','/index.html'].includes(location.pathname)?<StatusPage kind="404"/>:<>{apiOrigin?<ServerAdmin/>:<AdminApp/>}</>}</AppBoundary></StrictMode>);

@@ -1,3 +1,4 @@
+import {removeProposalOperationIds} from './counterparty-proposals.ts';
 import {dependentLinks} from '../../../packages/finance-core/src/allocation-graph.ts';
 import {randomUUID} from 'node:crypto';
 import type {PoolClient} from 'pg';
@@ -130,6 +131,7 @@ async function deleteFinancial(db:PoolClient,userId:string,intent:Extract<Struct
  // Delete the closed link set in one statement before transaction FK cascades, including deep descendants.
  await db.query('DELETE FROM finance.link WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,removedLinkIds]);
  await db.query('DELETE FROM finance.transaction WHERE user_id=$1 AND id=ANY($2::uuid[])',[userId,selected]);
+ await removeProposalOperationIds(db,userId,[...selected,...retained]);
  await invalidatePendingImports(db,userId);
  await db.query(`UPDATE finance.transaction t SET review_reasons=review_reasons-'possible_duplicate',revision=revision+1 WHERE t.user_id=$1 AND t.id=ANY($2::uuid[]) AND review_reasons @> '["possible_duplicate"]'::jsonb AND NOT EXISTS(SELECT 1 FROM finance.duplicate_candidate d WHERE d.user_id=t.user_id AND d.status='candidate' AND (d.left_id=t.id OR d.right_id=t.id))`,[userId,duplicateSurvivors]);
  if(accountIds.length){

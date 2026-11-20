@@ -1,3 +1,7 @@
+import {metrics as coreMetrics} from '../../finance-core/src/metrics.ts';
+import {groupings as coreGroupings} from '../../finance-core/src/overview.ts';
+import {parseAnalysisOptions} from './analysis.ts';
+import type {AnalysisOptions} from './analysis.ts';
 import {object,choice} from '../../finance-core/src/model.ts';
 import {parseOperationsFilter} from '../../finance-core/src/operations.ts';
 import type {OperationsFilter} from '../../finance-core/src/operations.ts';
@@ -6,26 +10,29 @@ import type {ActionTool} from './actions.ts';
 import {safeText} from '../../privacy/src/text.ts';
 import {resolveScope} from './context.ts';
 
-export const registryVersion='analyzer/3';
+export const registryVersion='analyzer/5';
+export const queryMetrics=coreMetrics.filter((m):m is Exclude<typeof coreMetrics[number],'budget'>=>m!=='budget');
+export const queryGroupings=coreGroupings;
+export const queryComparisons=['none','previous_same','previous_month','previous_year','custom'] as const;
 export const registry=[
  {name:'query_finances',version:2,principal:'owner',access:'active_entitlement',scope:'filtered_current_finances',confirmation:'none'},
  {name:'set_inclusion',version:1,principal:'owner',access:'active_entitlement',scope:'fixed_answer_operations',confirmation:'preview_then_explicit_commit'},
  {name:'edit_operations',version:1,principal:'owner',access:'active_entitlement',scope:'fixed_answer_operations',confirmation:'backend_policy'},
  {name:'finance_action',version:1,principal:'owner',access:'active_entitlement',scope:'closed_backend_intents',confirmation:'backend_policy'},
 ] as const;
-export type Query={name:'query_finances';metric:'expenses'|'income'|'attention';grouping:'none'|'category'|'operation';comparison:'none'|'previous_same';filter:OperationsFilter};
+export type Query={name:'query_finances';metric:typeof queryMetrics[number];grouping:typeof queryGroupings[number];comparison:typeof queryComparisons[number];filter:OperationsFilter;options?:AnalysisOptions};
 export type Tool=Query|ActionTool;
 export function parseTool(value:unknown):Tool {
  if(value&&typeof value==='object'&&!Array.isArray(value)&&(value as {name?:unknown}).name!=='query_finances')return parseActionTool(value);
- const r=object(value,['name','metric','grouping','comparison','filter']);if(r.name!=='query_finances')throw new TypeError('UNKNOWN_ANALYZER_TOOL');
+ const r=object(value,['name','metric','grouping','comparison','filter','options']);if(r.name!=='query_finances')throw new TypeError('UNKNOWN_ANALYZER_TOOL');
  const filter=parseOperationsFilter(r.filter??{});if(filter.metric)throw new TypeError('METRIC_FILTER_CONFLICT');
- return {name:r.name,metric:choice(r.metric,['expenses','income','attention']),grouping:choice(r.grouping??'none',['none','category','operation']),comparison:choice(r.comparison??'none',['none','previous_same']),filter};
+ return {name:r.name,metric:choice(r.metric,queryMetrics),grouping:choice(r.grouping??'none',queryGroupings),comparison:choice(r.comparison??'none',queryComparisons),filter,...(r.options!==undefined?{options:parseAnalysisOptions(r.options)}:{})};
 }
 export type Relevance='financial'|'adjacent'|'ambiguous'|'unrelated';
 export type Interpretation={relevance:Relevance;query?:Query;periodFromQuestion:boolean;followUp:boolean};
 const months=['январ','феврал','март','апрел','ма[йя]','июн','июл','август','сентябр','октябр','ноябр','декабр'];
 /** Finite deterministic commands are explicitly separate from an AI classifier. */
-export function interpret(text:string,global:OperationsFilter,context?:Query,now=new Date(),previousGlobal?:OperationsFilter):Interpretation {
+export function interpret(text:string,global:OperationsFilter,context?:Query,now=new Date(),previousGlobal?:OperationsFilter,timezone='Etc/UTC'):Interpretation {
  const q=safeText(text,2000).toLocaleLowerCase('ru-RU').replace(/ё/g,'е').replace(/[?!.,]+$/g,'').trim();
  const financial=/(расход|доход|потрат|деньг|операци|категори|кредит|вклад|счет|банк|финанс|ставк|курс|налог|тариф|бюджет)/u.test(q);
  const followUp=/^а (по категориям|за .+)$/u.test(q);
@@ -45,7 +52,7 @@ export function interpret(text:string,global:OperationsFilter,context?:Query,now
  else return {relevance:followUp||q.length<8?'ambiguous':financial?'financial':'unrelated',periodFromQuestion:false,followUp:false};
  let filter:OperationsFilter=resolveScope(global,followUp&&context?context.filter:undefined,previousGlobal).filter;
  if(date)filter={...filter,from:date[1],through:date[2]};
- if(month){const n=months.findIndex(m=>new RegExp('^'+m).test(month[1]!)),year=Number(month[2]??new Intl.DateTimeFormat('en',{timeZone:'Europe/Moscow',year:'numeric'}).format(now));filter={...filter,from:`${year}-${String(n+1).padStart(2,'0')}-01`,through:new Date(Date.UTC(year,n+1,0)).toISOString().slice(0,10)};}
+ if(month){const n=months.findIndex(m=>new RegExp('^'+m).test(month[1]!)),year=Number(month[2]??new Intl.DateTimeFormat('en',{timeZone:timezone,year:'numeric'}).format(now));filter={...filter,from:`${year}-${String(n+1).padStart(2,'0')}-01`,through:new Date(Date.UTC(year,n+1,0)).toISOString().slice(0,10)};}
  filter=parseOperationsFilter(filter);
  if(comparison!=='none'&&(!filter.from||!filter.through))return {relevance:'ambiguous',periodFromQuestion:false,followUp:false};
  return {relevance:'financial',query:{name:'query_finances',metric,grouping,comparison,filter},periodFromQuestion:!!periodSuffix,followUp};

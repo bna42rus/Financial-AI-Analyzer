@@ -17,6 +17,6 @@ trap 'rm -rf -- "$build"' EXIT
 git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
 printf '%s\n' 'Сборка проверенного релиза. Рабочий API продолжает работать.'
 (cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && VITE_API_ORIGIN=https://test.cashneuro.ru node scripts/build-connected-web.mjs finance "$sha")
-printf '%s\n' "$test_email" | sudo /usr/bin/python3 "$build/scripts/install-assistant-staging.py" --email-stdin \
+printf '%s\n' "$test_email" | sudo /usr/bin/python3 -B "$build/scripts/install-assistant-staging.py" --email-stdin \
   --source "$build" --sha "$sha" --key-file "$key_file" \
   --budget-file "$budget_one" --budget-file "$budget_two"

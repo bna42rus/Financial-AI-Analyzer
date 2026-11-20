@@ -6,7 +6,13 @@ const labelledIdentifiers=/(?<![\p{L}\p{N}])(?:сч[её]т|карт[аы]|до�
 export function sanitizeText(value:string):string {
  // Join identifiers before matching. Invisible format characters must not
  // split a card/passport/email into fragments that bypass the network guard.
- return value.normalize('NFKC').replace(/\p{Cf}/gu,'').replace(passports,'[реквизиты скрыты]').replace(emails,'[реквизиты скрыты]').replace(labelledIdentifiers,'[реквизиты скрыты]').replace(identifiers,'[реквизиты скрыты]').replace(/[\u0000-\u001f\u007f]/g,' ').trim();
+ let text=value.normalize('NFKC').replace(/\p{Cf}/gu,'');
+ // All numeric identifiers require a digit, all emails require @. Avoid
+ // quadratic email-pattern scans on long non-email bank descriptions.
+ if(/\d/u.test(text))text=text.replace(passports,'[реквизиты скрыты]');
+ if(text.includes('@'))text=text.replace(emails,'[реквизиты скрыты]');
+ if(/\d/u.test(text))text=text.replace(labelledIdentifiers,'[реквизиты скрыты]').replace(identifiers,'[реквизиты скрыты]');
+ return text.replace(/[\u0000-\u001f\u007f]/g,' ').trim();
 }
 export function safeText(value:unknown,max=500):string {
  if(typeof value!=='string'||value.length>max||sanitizeText(value)!==value.trim()||/[\u0000-\u001f\u007f]/.test(value))throw new TypeError('UNSANITIZED_TEXT');return value.trim();
