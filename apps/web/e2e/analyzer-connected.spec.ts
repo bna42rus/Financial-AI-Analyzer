@@ -162,3 +162,15 @@ test('new chat waits for creation before accepting a draft and preserves the pre
  await expect(input).toBeEditable();await expect(input).toHaveValue('');await input.fill('Вопрос нового диалога');await expect(input).toHaveValue('Вопрос нового диалога');expect(h.chats[1]!.messages).toHaveLength(1);
  await history(page);await page.getByRole('button',{name:'Мои расходы',exact:true}).filter({visible:true}).click();await expect(input).toHaveValue('Несохранённый прежний вопрос');
 });
+
+test('deleting a chat keeps confirmation until the refreshed context can accept the next question',async({page})=>{
+ const h=await setup(page);await send(page,'Мои расходы');await expect(log(page)).toContainText('300 ₽');const deletedId=h.chats[0]!.id;
+ let deleted=false,release!:()=>void,started!:()=>void;const gate=new Promise<void>(r=>release=r),seen=new Promise<void>(r=>started=r);
+ await page.route('http://127.0.0.1:3000/finance/analyzer-chat',async route=>{if(route.request().method()!=='OPTIONS'&&route.request().postDataJSON().delete)deleted=true;return route.fallback();});
+ await page.route('http://127.0.0.1:3000/finance/analyzer-state',async route=>{if(route.request().method()!=='OPTIONS'&&deleted){started();await gate;}return route.fallback();});
+ await history(page);await page.getByRole('button',{name:/^Настроить диалог:/}).filter({visible:true}).click();await page.getByRole('dialog',{name:'Настройки диалога',exact:true}).getByRole('button',{name:'Удалить',exact:true}).click();
+ const confirmation=page.getByRole('dialog',{name:'Удалить диалог?',exact:true});await confirmation.getByRole('button',{name:'Удалить диалог',exact:true}).click();await seen;
+ try{await expect(confirmation).toBeVisible();await expect(page.getByLabel('Ваш финансовый вопрос',{exact:true})).toBeDisabled();}finally{release();}
+ await expect(confirmation).toHaveCount(0);const field=page.getByLabel('Ваш финансовый вопрос',{exact:true});await expect(field).toBeEditable();await expect(field).toHaveValue('');await field.fill('Мои расходы после удаления');
+ await expect(page.getByRole('button',{name:'Отправить вопрос',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Отправить вопрос',exact:true}).click();await expect(log(page)).toContainText('300 ₽');expect(h.chats).toHaveLength(1);expect(h.chats[0]!.id).not.toBe(deletedId);
+});

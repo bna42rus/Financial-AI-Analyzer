@@ -147,7 +147,7 @@ for (const mobile of [false, true]) test(`assistant HTTP UI: profile timezone, m
     await page.getByRole('dialog', { name: 'Удалить диалог?', exact: true }).getByRole('button', { name: 'Удалить диалог', exact: true }).click(); await expect(management).toHaveCount(0); await idle(); barrier.resolve();
     await expect(page.getByRole('button', { name: 'Повторить тот же вопрос', exact: true })).toHaveCount(0); await expect(page.getByRole('button', { name: 'Остановить ответ', exact: true })).toHaveCount(0);
     for(const table of ['assistant_conversation','assistant_run'])assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.'+table)).rows[0].n,'0');
-    assert.equal((await messages()).length, 0); await page.getByLabel('Ваш финансовый вопрос', { exact: true }).fill('Новый вопрос'); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeEnabled();
+    assert.equal((await messages()).length, 0); await page.getByLabel('Ваш финансовый вопрос', { exact: true }).fill('Новый вопрос'); await expect(page.getByLabel('Ваш финансовый вопрос', {exact:true})).toHaveValue('Новый вопрос'); await expect(page.getByRole('button', { name: 'Отправить вопрос', exact: true })).toBeEnabled();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false); assert.deepEqual(errors, []);
     assert.deepEqual(await page.evaluate(() => Object.keys(sessionStorage)), []); assert.deepEqual(await page.evaluate(() => Object.keys(localStorage)), ['finance-interface-epoch-v1']);
 
