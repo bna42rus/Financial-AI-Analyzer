@@ -15,8 +15,7 @@ jobs:
   bootstrap-checks:
     name: bootstrap-checks
     runs-on: ubuntu-latest
-    # Real PostgreSQL and HTTP suites include two 10k-row browser journeys.
-    # Individual request/test timeouts still detect stalled operations.
+    # Security and HTTP browser suites run independently with separate databases.
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
@@ -40,6 +39,27 @@ jobs:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
         # Overview has its own PostgreSQL/browser job below; run each large suite once.
         run: pnpm --filter @finance/api run test:integration:base
+
+  http-browser-checks:
+    name: http-browser-checks
+    runs-on: ubuntu-latest
+    # Independent database/browser journeys must not wait for the long security suite.
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned package manager
+        run: npm install --global pnpm@11.25.0 --ignore-scripts
+      - name: Install locked dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Start disposable PostgreSQL 18 without a shared registry
+        run: bash .github/scripts/start-isolated-postgres.sh
+      - name: Reject known high and critical dependency advisories
+        run: pnpm run check:dependency-security
       - name: Install browser for interface checks
         run: pnpm --filter @finance/web exec playwright install --with-deps chromium --only-shell
       - name: Check full application, payment review and registration over HTTP with PostgreSQL

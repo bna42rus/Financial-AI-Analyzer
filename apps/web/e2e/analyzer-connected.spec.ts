@@ -171,6 +171,6 @@ test('deleting a chat keeps confirmation until the refreshed context can accept 
  await history(page);await page.getByRole('button',{name:/^Настроить диалог:/}).filter({visible:true}).click();await page.getByRole('dialog',{name:'Настройки диалога',exact:true}).getByRole('button',{name:'Удалить',exact:true}).click();
  const confirmation=page.getByRole('dialog',{name:'Удалить диалог?',exact:true});await confirmation.getByRole('button',{name:'Удалить диалог',exact:true}).click();await seen;
  try{await expect(confirmation).toBeVisible();await expect(page.getByLabel('Ваш финансовый вопрос',{exact:true})).toBeDisabled();}finally{release();}
- await expect(confirmation).toHaveCount(0);const field=page.getByLabel('Ваш финансовый вопрос',{exact:true});await expect(field).toBeEditable();await expect(field).toHaveValue('');await field.fill('Мои расходы после удаления');
+ await expect(confirmation).toHaveCount(0);const field=page.getByLabel('Ваш финансовый вопрос',{exact:true});await expect(field).toBeEditable();await expect(field).toHaveValue('');await field.fill('Мои расходы');
  await expect(page.getByRole('button',{name:'Отправить вопрос',exact:true})).toBeEnabled();await page.getByRole('button',{name:'Отправить вопрос',exact:true}).click();await expect(log(page)).toContainText('300 ₽');expect(h.chats).toHaveLength(1);expect(h.chats[0]!.id).not.toBe(deletedId);
 });
