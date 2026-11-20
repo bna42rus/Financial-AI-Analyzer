@@ -6,7 +6,7 @@ import {maskedOperationText} from './operation-display';
 import overviewStyles from './Overview.module.css';
 import {useMutationNotice} from './Notifications';
 import {canSplitPurchase} from './operation-relations';
-import {useEffect,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import {X} from 'lucide-react';
 import {kinds} from '../../../packages/finance-core/src/model';
@@ -43,7 +43,9 @@ export function ServerOperation({onUndo,initial,accounts,sourceAccounts,categori
  const correctionsChanged=JSON.stringify(draft)!==JSON.stringify(draftCorrections(op));
  const dirty=Object.keys(fields).length>0||merchant!==op.semantics.merchant.value||comment!==op.comment||correctionsChanged||!!parts||links.length>0;
  function reset(){setFields({});setMerchant(op.semantics.merchant.value);setComment(op.comment);setDraft(draftCorrections(op));setCorrecting(false);setParts(undefined);setLinks([]);setSubmitted({});setChecked(false);setLocalError('');setNotice('');}
- useEffect(()=>{reset();setRelationEditor(null);},[op]);
+ // Reset the committed snapshot before enabling the next paint/input event.
+ // A passive effect can otherwise erase the user's first edit after Save/Undo.
+ useLayoutEffect(()=>{reset();setRelationEditor(null);},[op]);
  useEffect(()=>{if(!blocked&&!dirty)return;const warn=(event:BeforeUnloadEvent)=>{event.preventDefault();event.returnValue='';};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[blocked,dirty]);
  function requestLeave(action=onClose){if(blocked)return;if(dirty)setDiscard(()=>action);else action();}
  const accountName=(id:string)=>sourceAccounts.find(a=>a.id===id)?.name??'Счёт',categoryName=(id:string|null)=>categories.find(c=>c.id===id)?.name??'Без категории',partyName=(id:string|null)=>parties.find(p=>p.id===id)?.name??'Не задан';

@@ -1,5 +1,5 @@
 import {SelectField} from './SelectField';
-import {useEffect,useId,useRef,useState} from 'react';
+import {useEffect,useLayoutEffect,useId,useRef,useState} from 'react';
 import type {Account} from '../../../packages/finance-core/src/model';
 import {safeText,sanitizeText} from '../../../packages/privacy/src/text';
 import type {FinanceState} from './finance-client';
@@ -20,9 +20,9 @@ const original=(a:Account):Fields=>({name:shortName(a),type:a.type,analyticsEnab
 
 export function SettingsAccounts({state,disabled,command,commandState,openOperations,openStructure,openDeletion,onNavigationGuard}:{onNavigationGuard:(guard:((action:()=>void)=>boolean)|null)=>void;state:FinanceState;disabled:boolean;command:WorkspaceCommand|null;commandState:CommandState;openOperations:(id:string)=>void;openStructure:(id:string)=>void;openDeletion:(id:string)=>void}){
  const [draft,setDraft]=useState<Record<string,{base:Fields;value:Fields}>>({}),[errors,setErrors]=useState<Record<string,string>>({});
- useEffect(()=>{setDraft({});setErrors({});},[state.generation]);
+ useLayoutEffect(()=>{setDraft({});setErrors({});},[state.generation]);
  const title='Сохранить настройки счетов',sent=useRef<{actionId:string|null}|null>(null);
- useEffect(()=>{
+ useLayoutEffect(()=>{
   if(!sent.current||commandState.title!==title)return;
   if(commandState.preview)sent.current.actionId=commandState.preview.actionId;
   if(commandState.phase==='idle'){
