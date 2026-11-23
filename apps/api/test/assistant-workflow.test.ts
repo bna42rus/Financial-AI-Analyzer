@@ -1,3 +1,7 @@
+import {BenchmarkFailure} from '../src/benchmark-transport.ts';
+import {assistantFailureText,assistantErrorCode,assistantCapabilityText,knownAssistantFailureText} from '../../../packages/analyzer/src/assistant-feedback.ts';
+import {CostError} from '../../../packages/analyzer/src/cost.ts';
+import {HttpError} from '../src/types.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assistantVersion, parseAssistantPlan, profileCalendar, compileAssistantPlan, cleanAssistantQuestion } from '../../../packages/analyzer/src/assistant-plan.ts';
@@ -16,13 +20,13 @@ const plan = (changes: unknown[], mode = 'new') => ({ version: assistantVersion,
 function harness() {
   let conversation = emptyConversation(scope), calls: CompletionInput[] = [], catalogs = 0, calculations = 0, currentGlobal = structuredClone(global), currentNow = new Date('2026-10-15T22:30:00Z');
   const journals = new Map<string, AssistantJournal>(), requests = new Map<string, AssistantRequest>();
-  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog; prepareChange?: AssistantServices['prepareChange'] } = {}) => {
+  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; modelError?:Error; reserveError?:Error; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog; prepareChange?: AssistantServices['prepareChange'] } = {}) => {
     if (options.global) currentGlobal = options.global; if (options.now) currentNow = options.now;
     const request: AssistantRequest = requests.get(trialId(n)) ?? { requestId: trialId(n), scope, conversation: structuredClone(conversation), global: currentGlobal, dataRevision: '1', question, now: currentNow, timezone: options.timezone ?? calendar.timezone };
     requests.set(request.requestId, request);
     let index = 0; let lastPlan: unknown;
     const model: AssistantModel = { bound: { inputTokens: 131072, outputTokens: 1200, modelVersion: 'synthetic' }, async complete(input, before) {
-      calls.push(input); await before(); if (options.failure) throw Error('SYNTHETIC_TIMEOUT');
+      calls.push(input); await before(); if(options.modelError) throw options.modelError; if (options.failure) throw Error('SYNTHETIC_TIMEOUT');
       let value: any;
       if (input.phase === 'check_changes') {
         const next = replies[index] as any;
@@ -32,7 +36,7 @@ function harness() {
       } else { value = replies[index++]; if (['understand', 'repair'].includes(input.phase)) lastPlan = value; }
       return { value, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } };
     } };
-    const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() {}, async settle() {} } as AssistantJournal;
+    const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() { if(options.reserveError) throw options.reserveError; }, async settle() {} } as AssistantJournal;
     journals.set(request.requestId, journal);
     const services: AssistantServices = { prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
       async calculate(query, actualCalendar) { calculations++; assert.equal(actualCalendar.timezone, request.timezone); return trialResult(query); },
@@ -476,3 +480,67 @@ test('a basic exact question uses the current saved filters without a model call
  assert.equal(result.status,'query');assert.equal(result.modelCalls,0);assert.equal(h.calls.length,0);
  assert.equal(result.query?.filter.from,global.filter.from);assert.deepEqual(result.query?.filter.categoryIds,[category]);
 });
+
+
+test('capability questions are free, truthful and never create proposals or replace the last calculation', async () => {
+  const h=harness();
+  await h.execute(5000,'Сколько я потратил за выбранный период',[]);
+  const before=structuredClone(h.state.book);
+  for(const [n,question] of ['Что ты умеешь?','А умеешь ли ты рассчитать кредит?','сможешь создать бюджет?'].entries()){
+    const reply=await h.execute(5001+n,question,[]);
+    assert.equal(reply.code,'ASSISTANT_CAPABILITIES');assert.equal(reply.modelCalls,0);
+    assert.equal(reply.proposal,undefined);assert.deepEqual(h.state.book,before);
+    assert.deepEqual(reply.usage,[]);
+  }
+  assert.equal(h.calls.length,0);
+  assert.match(assistantCapabilityText('сможешь создать бюджет?',true)!,/после|подтвержден/);
+  assert.match(assistantCapabilityText('сможешь создать бюджет?',false)!,/не подключен|не подключён/);
+});
+
+test('concrete budget and calculation requests still use tools instead of capability replies', async () => {
+  for(const q of ['Создай бюджет на продукты 10к в месяц','можешь создать бюджет на продукты 10000 в месяц?', 'можешь рассчитать кредит 100000 под 20%?', 'А умеешь ли ты рассчитать кредит 100000 на год?']) assert.equal(assistantCapabilityText(q,true),null,q);
+  assert.match(assistantCapabilityText('А умеешь ли ты выдать кредит?',true)!,/нет.*инструмента/);
+  assert.match(assistantCapabilityText('Умеешь ли ты перевести деньги?',true)!,/нет.*инструмента/);
+});
+
+test('quota, service cap and pending receipts retain distinct causes when dispatch is rejected', async () => {
+  for(const error of [new CostError('AI_USER_COST_EXHAUSTED'),new CostError('AI_PROJECT_COST_EXHAUSTED'),new HttpError(409,'AI_COST_RECONCILIATION_REQUIRED')]){
+    const h=harness();const reply=await h.execute(5010,'Посчитай расходы',[plan([set('metric','expenses')])],{reserveError:error});
+    assert.equal(reply.status,'error');assert.equal(reply.code,error.code);assert.equal(reply.modelCalls,0);assert.deepEqual(reply.usage,[]);
+    assert.equal(reply.text,assistantFailureText(error.code));assert.doesNotMatch(reply.text,/из-за технической ошибки/);
+    assert.equal(h.journals.get(trialId(5010))!.receipt.calls.length,0);
+  }
+  assert.match(assistantFailureText('AI_USER_COST_EXHAUSTED'),/лимита.*недостаточно/i);
+  assert.match(assistantFailureText('AI_PROJECT_COST_EXHAUSTED'),/ограничение сервиса/);
+  assert.match(assistantFailureText('AI_COST_RECONCILIATION_REQUIRED'),/стоимость предыдущего/);
+  assert.match(assistantFailureText('ALLOWANCE_COST_PENDING'),/не сообщение об исчерпании/);
+});
+
+test('public errors never expose exceptions or claim a guessed cause or a free failed call',()=>{
+  const secret='token=PRIVATE secret response';
+  assert.equal(assistantErrorCode(new Error(secret)),'ASSISTANT_INTERNAL_ERROR');
+  assert.equal(assistantErrorCode({code:'AI_QUOTA_EXHAUSTED',message:secret}),'AI_QUOTA_EXHAUSTED');
+  const text=assistantFailureText(assistantErrorCode(new Error(secret)));
+  assert.match(text,/Точная причина пока не установлена/);assert.doesNotMatch(text,/PRIVATE|бесплат|не списан/);
+  assert.match(assistantFailureText('ASSISTANT_DELIVERY_UNKNOWN'),/стоимость не подтверждены/);
+});
+
+
+test('known transport failures explain the observed cause and keep unknown cost holds intact',async()=>{
+  for(const [code,networkCode,responsePhase,expected] of [
+    ['BENCH_IDENTITY_DENIED_HTTP_401',undefined,undefined,/отклонил подключение/],
+    ['BENCH_PROVIDER_FAILURE_HTTP_429',undefined,undefined,/ограничение провайдера/],
+    ['BENCH_PROVIDER_FAILURE_HTTP_503',undefined,undefined,/на своей стороне/],
+    ['BENCH_DELIVERY_UNKNOWN','TIMEOUT',undefined,/не ответил за отведенное|не ответил за отведённое/],
+    ['BENCH_DELIVERY_UNKNOWN','EAI_AGAIN',undefined,/соединение/],
+    ['BENCH_RESPONSE_INVALID',undefined,'USAGE',/не подтвердил данные/],
+  ] as const){
+    const error=new BenchmarkFailure(code);if(networkCode)error.networkCode=networkCode;if(responsePhase)error.responsePhase=responsePhase;
+    const h=harness();const reply=await h.execute(5011,'Посчитай расходы',[],{modelError:error});
+    assert.equal(reply.code,'ASSISTANT_DELIVERY_UNKNOWN');assert.match(reply.text,expected);assert.match(reply.text,/стоимость не подтверждены/);
+    assert.equal(h.journals.get(trialId(5011))!.receipt.calls[0]!.state,'unknown');
+    assert.equal(reply.modelCalls,1);assert.deepEqual(reply.usage,[]);
+  }
+});
+
+test('missing HTTP error codes preserve ordinary API fallbacks',()=>{assert.equal(knownAssistantFailureText(undefined),undefined);assert.equal(knownAssistantFailureText(null),undefined);assert.equal(knownAssistantFailureText({}),undefined);});
