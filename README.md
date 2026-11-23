@@ -17,6 +17,10 @@
 
 [Одиночные правки карточки](docs/architecture/live-operation-review.md), [отмена импортов и решения по дублям](docs/architecture/import-cancellation-dedupe.md), [объединение дубликатов](docs/architecture/duplicate-merge.md) и [редакторы связей/частей](docs/architecture/operation-relations.md) работают поверх сохранённых финансовых данных. [Загрузка PDF и восстановление результата](docs/architecture/live-import-ui.md) подключены. [Массовая правка и ручной Review](docs/architecture/review-bulk-actions.md) подключены. [Структурные настройки и редактор правил](docs/architecture/settings-rule-editors.md) подключены. [Физическое удаление и сброс](docs/architecture/deletion-reset-ui.md) подключены. Создание правил из массовых действий, групповые предложения Review, recurring patterns, остальные форматы, финальная классификация, бюджеты и AI-Анализатор ещё предстоят. [Общий план](docs/product/implementation-plan.md). Исторический bootstrap-status описывает ранние этапы, а реестр покрытия не объявляет весь продукт готовым.
 
+## Программа развития Анализатора
+
+[Единый рабочий план](docs/product/analyzer-improvement-program-20261117.md): правильность ответов, контекст и общие фильтры, скорость, себестоимость, визуальный стиль, ссылки/действия, этапы и критерии приёмки. [Согласованный каталог](docs/product/analyzer-capabilities-20261117.md) содержит 240 задач и 12 сквозных диалогов. Статусы реализации и испытаний отмечаются отдельно.
+
 ## Проверки и Development
 
 Нужны Node.js 24 и pnpm 11.25.0. Установить зависимости: `pnpm install --frozen-lockfile --ignore-scripts`. `pnpm run check` проверяет исходники, денежное/финансовое ядро, access/import models, TypeScript и сборки web/admin/API.

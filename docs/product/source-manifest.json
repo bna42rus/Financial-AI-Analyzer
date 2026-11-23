@@ -10,9 +10,56 @@
       "path": "docs/product/context_handoff.docx",
       "role": "decision_context",
       "sha256": "50fb15bf485d7c5a570e6195833af8c167b811a2355fa7cfdc829b5cce8a7b26"
+    },
+    {
+      "path": "docs/product/approved-onboarding-20261111.md",
+      "role": "approved_amendment",
+      "sha256": "96a7605b4c86775a939c14d744b59a511e6c74ff7fd8f6bd7fcea4111224f2a0"
+    },
+    {
+      "path": "docs/product/approved-billing-periods-20261112.md",
+      "role": "approved_amendment",
+      "sha256": "437f2f04b118e016f5de4f7adc939a147479c1d2571397f9c4f835a084e775a1"
+    },
+    {
+      "path": "docs/product/approved-mobile-interface-20261114.md",
+      "role": "approved_amendment",
+      "sha256": "a48383ff682b44f9ad45d35322c31d8c0a263fc923c2d0921596d8d1ba083c0e"
+    },
+    {
+      "path": "docs/product/approved-maintenance-20261114.md",
+      "role": "approved_amendment",
+      "sha256": "78dba42fe25dbbaaed3f73420a154543d49d1d2bdbd96797f26446ceff0de6a1"
+    },
+    {
+      "path": "docs/product/approved-classifier-20261116.md",
+      "role": "approved_amendment",
+      "sha256": "27bc5afaef58641d4bf036a5c526c771ff4e006fe32bd6b45d40f340642120da"
+    },
+    {
+      "path": "docs/product/approved-category-review-20261117.md",
+      "role": "approved_amendment",
+      "sha256": "12e35497da22dcb13dec7655977952a4a01ceff93dbad5a5f8190d22e5dff42a"
+    },
+    {
+      "path": "docs/product/analyzer-improvement-program-20261117.md",
+      "role": "approved_amendment",
+      "sha256": "fbbc8fb8e74431b49309939d573ed04f86d5845046f34be5bee56f8d2b465d1e"
+    },
+    {
+      "path": "docs/product/analyzer-capabilities-20261117.md",
+      "role": "approved_amendment",
+      "sha256": "62963636c9be46778007c1fdab0334dd2722365d87eb8f90111a9578ac0968e3"
     }
   ],
   "precedence": [
+    "Approved Analyzer program and 240-task catalog 2026-11-17 define target scope, global-filter/context behavior, performance goals, cost/quality gates and response/visual contracts; delivery remains phased and unverified until acceptance; existing accounting, access, privacy, billing and deployment controls remain active",
+    "Approved category-review amendment 2026-11-17 resolves the previously pending category policy, manual-only redistribution triggers, existing Review UI, inline structural resolution, rules/counterparty interaction and field-specific errors in its stated scope",
+    "Approved classifier amendment 2026-11-16 overrides canonical display names, finite dictionary additions, transfer self-evidence, printed local clocks and overview credit notice in its stated scope; category replacement policy remains pending owner approval",
+    "Approved maintenance amendment 2026-11-14 defines the scheduled maintenance UI, API gate, operator control and manual reopening in its stated scope",
+    "Approved mobile-interface amendment 2026-11-14 overrides mobile widget layout, compact spacing, form alignment, Analyzer sizing/Enter behavior and review-rule availability in its stated scope",
+    "Approved billing-periods amendment 2026-11-12 overrides trial eligibility, verification amount, queued periods, manual allowances, suspension, cards and Staging outer login in its stated scope",
+    "Approved onboarding amendment 2026-11-11 overrides first-access registration, trial, renewal and allowance clauses in its stated scope",
     "Approved E-04 replaces mandatory admin SMS recovery; other access/security requirements remain active",
     "Approved amendments A-01..A-11 and B-01..B-10 override the specifically named clauses",
     "Other original PDF requirements remain active in full",

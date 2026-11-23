@@ -1,3 +1,4 @@
+import {counterpartyEvidenceKinds} from './counterparty-evidence.ts';
 import {BankPdfError,pdfMoney} from './bank-pdf.ts';
 import {dateFact} from '../../finance-core/src/model.ts';
 import {extractSafeSource,localSourceSanitizer} from './safe-source.ts';
@@ -5,7 +6,7 @@ import type {ExtractedFile,ExtractedRow} from './local.ts';
 import type {Bank} from './contract.ts';
 
 export const localBankAdapter='bank-local/1' as const;
-export const localParserVersions=['tbank-movement-pdf/2','ozon-movement-pdf/2','sber-card-pdf/2','tbank-table/1','ozon-table/1','sber-table/1','tbank-ocr/1','ozon-ocr/1','sber-ocr/1'] as const;
+export const localParserVersions=['sber-card-pdf/4','tbank-movement-pdf/3','ozon-movement-pdf/3','sber-card-pdf/3','tbank-movement-pdf/2','ozon-movement-pdf/2','sber-card-pdf/2','tbank-table/1','ozon-table/1','sber-table/1','tbank-ocr/1','ozon-ocr/1','sber-ocr/1'] as const;
 const norm=(s:string)=>s.normalize('NFKC').toLowerCase().replace(/ё/g,'е').replace(/\s+/g,' ').trim();
 const bankName=(s:string):Bank|null=>({'т-банк':'tbank','тбанк':'tbank','тинькофф':'tbank','tbank':'tbank','ozon банк':'ozon','озон банк':'ozon','сбербанк':'sber','сбер':'sber'} as Record<string,Bank>)[norm(s)]??null;
 export const MAX_TABLE_TEXT=2_000_000,MAX_TABLE_CELLS=40_000;
@@ -41,7 +42,9 @@ export function tableDate(value:string){
   // Validate the calendar independently: Date.parse can normalize 30 February.
   dateFact({precision:'day',date:s.slice(0,10)});
   if(!/T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d/.test(s))throw new Error('INVALID_DATE');
-  return dateFact({precision:'instant',instant:new Date(s).toISOString()});
+  const z=s.endsWith('Z')?0:(s.at(-6)==='-'?-1:1)*(Number(s.slice(-5,-3))*60+Number(s.slice(-2)));
+  if(Math.abs(z)>840||Number(s.slice(-2))>59&&!s.endsWith('Z'))throw new Error('INVALID_DATE');
+  return dateFact({precision:'instant',instant:new Date(s).toISOString(),sourceOffsetMinutes:z});
  }
  throw new Error('INVALID_DATE');
 }
@@ -69,7 +72,13 @@ export function parseBankTable(fileId:string,bytes:Uint8Array,table:string[][]):
   row.currency=['RUB','RUR','643','₽','руб.'].includes(r[currency]!.trim())?'RUB':r[currency];
   // A per-row account must agree with explicit file metadata when both are present.
   if(accountMeta.length&&accountColumn>=0&&norm(r[accountColumn]??'')!==norm(accountMeta[0]!))row.account.value=undefined;
-  row.localDescription=r[description];row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,localSourceSanitizer);return row;
+  const side=row.direction==='debit'?'получателя':row.direction==='credit'?'отправителя':null;
+  if(side){
+   const fields={bank_contract:['договор контрагента'],bank_account:['номер счета '+side,'счет '+side],card:['номер карты '+side],phone:['телефон '+side,'номер телефона '+side]};
+   row.localCounterpartyEvidence=counterpartyEvidenceKinds.map(kind=>({kind,value:r[idx(fields[kind])]})).filter(entry=>entry.value?.trim());
+   row.localCounterpartyName=r[idx(['имя '+side,'фио '+side])];
+  }
+  row.localMcc=r[idx(['mcc','код mcc'])];row.localBankCategory=r[idx(['категория','категория банка'])];row.localMerchant=r[idx(['магазин','название магазина','торговая точка'])];row.localDescription=r[description];row.safeSource=extractSafeSource(row.localDescription,row.amountMinor,localSourceSanitizer);return row;
  });
  return {fileId,bank,bytes,rows};
 }

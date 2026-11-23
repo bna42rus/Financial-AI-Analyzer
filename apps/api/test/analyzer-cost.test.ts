@@ -37,6 +37,8 @@ beforeEach(async()=>{
     await pg.owner.query('INSERT INTO identity.security_state(user_id,indefinite) VALUES($1,true)',[user]);
     await within(user,db=>prepareFinance(db,user));
     await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES($1,clock_timestamp()-interval '1 day','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10}')",[user]);
+  // Monetary dispatch requires an actual active paid allowance window.
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id=$1",[user]);
   }
 });
 async function request(user='first'){
@@ -81,11 +83,19 @@ test('tokenization failure dispatches nothing and has an explicit not_sent usage
 });
 test('last user budget is reserved atomically across concurrent requests without holding a connection over network wait',async()=>{
   behavior='block';barrier=deferred();const service=createYandexAnalyzer(metadata,transport,policy),a=await request(),b=await request();
-  await pg.owner.query('INSERT INTO commerce.ai_user_budget(user_id,anchor_at,period_start,limit_atoms,spent_atoms) VALUES($1,$2,$3,$4,$5)',['first',a.anchorAt,a.periodStart,rubAmount('100').toString(),rubAmount('99.5').toString()]);
+  await pg.owner.query("UPDATE commerce.access_cycle SET indefinite=false,access_end=now()+interval '10 days' WHERE user_id='first'");
+  const {rows}=await pg.owner.query("SELECT commerce.set_customer_allowance(user_id,clock_timestamp(),access_end,50) AS saved FROM commerce.access_cycle WHERE user_id='first'");
+  assert.equal(rows[0].saved,true);
   const first=service.call(a,v=>v);
-  await waitForPaid();
-  await assert.rejects(service.call(b,v=>v),/AI_USER_COST_EXHAUSTED/);assert.equal(paidCalls,1);barrier.resolve();await first;
-  const balance=(await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows[0];assert.equal(balance.spent_atoms,rubAmount('99.524').toString());assert.equal(balance.reserved_atoms,'0');
+  try{await waitForPaid();await assert.rejects(service.call(b,v=>v),/AI_USER_COST_EXHAUSTED/);assert.equal(paidCalls,1);}
+  finally{barrier.resolve();await first;}
+  const balance=(await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows[0];assert.equal(balance.spent_atoms,rubAmount('0.024').toString());assert.equal(balance.reserved_atoms,'0');
+  const {customerAiBudget}=await import('../src/customer-ai-budget.ts');
+  await pg.owner.query("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor,status,paid_at) VALUES('first',$1,1000,3900,'paid',now())",[randomUUID()]);
+  await pg.owner.query("SELECT commerce.set_customer_allowance(user_id,clock_timestamp(),access_end,1) FROM commerce.access_cycle WHERE user_id='first'");
+  const budget=await within('first',db=>customerAiBudget(db,'first'));
+  assert.equal(budget.remaining,0);assert.equal(budget.extra,1000);
+
 });
 test('global project reserve prevents a second user overspending the same cap',async()=>{
   behavior='block';barrier=deferred();const service=createYandexAnalyzer(metadata,transport,{...policy,projectLimitRub:'0.5'}),a=await request(),b=await request('second');

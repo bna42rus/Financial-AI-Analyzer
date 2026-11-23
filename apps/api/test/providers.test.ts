@@ -105,16 +105,16 @@ const config = { sender:'notifications@cashneuro.ru', username:'synthetic-api-id
 const message = { to:'inbox@example.org',subject:'Проверка',text:'Синтетическое письмо' };
 const id = '01234567-1234-1234-1234-123456789abc';
 
-test('Postbox enforces test inboxes and blocks header injection before invoking SMTP', async () => {
+test('Postbox accepts valid staging recipients and blocks header injection before invoking SMTP', async () => {
   let calls=0;
   const transport=postboxTransport(config,async payload => { calls++; assert.equal(payload.username,config.username);
-    assert.equal(payload.to,message.to); assert.equal(payload.id,id); return {acceptance:'postbox'}; });
+    assert.match(payload.to??'',/@example\.org$/); assert.equal(payload.id,id); return {acceptance:'postbox'}; });
   assert.equal(transport.idempotent,false); assert.deepEqual(await transport.deliver(id,message),{acceptance:'postbox'});
-  for(const invalid of [{...message,to:'customer@example.org'},{...message,subject:'a\r\nBcc: victim@example.org'},
+  await transport.deliver(id,{...message,to:'customer@example.org'});
+  for(const invalid of [{...message,subject:'a\r\nBcc: victim@example.org'},
     {...message,to:'inbox@example.org\nX'},{...message,text:'x'.repeat(65537)}])
     await assert.rejects(transport.deliver(id,invalid),{message:'REJECTED'});
-  assert.equal(calls,1);
-  assert.throws(()=>postboxTransport({...config,recipients:[]}),/POSTBOX_CONFIGURATION_DENIED/);
+  assert.equal(calls,2);
   assert.throws(()=>postboxTransport({...config,environment:'production'} as never),/POSTBOX_CONFIGURATION_DENIED/);
 });
 
@@ -131,4 +131,12 @@ test('Postbox retries only explicit transient refusal; unknown SMTP outcome stay
 test('Python SMTP bridge tests acceptance, TLS verification, transient refusal and lost DATA reply', () => {
   const result=spawnSync('/usr/bin/python3',['-I',fileURLToPath(new URL('./postbox_smtp_test.py',import.meta.url))],{encoding:'utf8'});
   assert.equal(result.status,0,result.stderr);
+});
+
+test('YooKassa interactive payments authorize before capture and use separate stable operation keys',async()=>{
+ const {createAccessPaymentProvider}=await import('../src/access-payment-provider.ts'),id='00000000-0000-4000-8000-000000000101',providerId='00000000-0000-4000-8000-000000000102';
+ const calls:{url:string;key:string;body:any}[]=[];
+ const provider=createAccessPaymentProvider({shopId:'123456',secret:'test_synthetic_key_123456789',origin:'https://test.cashneuro.ru',test:true},async(url,init)=>{calls.push({url:String(url),key:new Headers(init?.headers).get('Idempotence-Key')!,body:JSON.parse(String(init?.body))});return json({id:providerId,test:true});});
+ await provider.create({id,value:'10.00',title:'Проверка карты',authorize:true,save:true,cardOnly:true});await provider.capture!(providerId,id,'10.00');await provider.capture!(providerId,id,'10.00');await provider.cancel!(providerId,id);
+ assert.equal(calls[0]!.body.capture,false);assert.equal(calls[0]!.body.save_payment_method,true);assert.equal(calls[0]!.body.payment_method_data.type,'bank_card');assert.equal(calls[0]!.body.confirmation.return_url,'https://test.cashneuro.ru/#payment-return');assert.equal(calls[1]!.key,calls[2]!.key);assert.equal(new Set([calls[0]!.key,calls[1]!.key,calls[3]!.key]).size,3);assert.match(calls[1]!.url,/\/capture$/);assert.match(calls[3]!.url,/\/cancel$/);
 });

@@ -25,3 +25,21 @@ export async function extensionAt(db:PoolClient,cycle:Cycle,duration:Duration,no
  if(Date.parse(finish)<=Date.parse(continuous?cycle.accessEnd:now))throw new HttpError(409,'INVALID_DURATION');
  return {calendarMonths,extraDays,extension:{requestId,actionId,at:now,mode:continuous?'continuous':'restored',previousEnd:cycle.accessEnd,accessEnd:finish,anchorAt:anchor,timezone:cycle.timezone,duration}};
 }
+
+/** Append the purchased duration while retaining the account's original accounting anchor. */
+export async function queuedExtensionAt(db:PoolClient,cycle:Cycle,duration:Duration,now:string,requestId:string,actionId:string){
+ const active=!!cycle.accessEnd&&Date.parse(cycle.accessEnd)>Date.parse(now);
+ const previous=(await db.query("SELECT kind,allowance_anchor FROM commerce.access_paid_window WHERE user_id=current_setting('app.user_id',true) AND ends_at=$1 ORDER BY starts_at DESC LIMIT 1",[cycle.accessEnd])).rows[0];
+ let anchor=active?cycle.accessEnd!:now,months=0;
+ if(active&&duration.kind==='calendar_months'&&previous?.kind==='calendar_months'){
+  const candidate=previous.allowance_anchor?.toISOString()??(cycle.extraDays===0&&!cycle.endOffsetMs?cycle.anchorAt:null);
+  if(candidate){const check=(await db.query("WITH d AS(SELECT $1::timestamptz AT TIME ZONE $3 AS a,$2::timestamptz AT TIME ZONE $3 AS e),n AS(SELECT *,((extract(year FROM e)-extract(year FROM a))*12+extract(month FROM e)-extract(month FROM a))::int AS count FROM d) SELECT count,a+make_interval(months=>count)=e AS exact FROM n",[candidate,cycle.accessEnd,cycle.timezone])).rows[0];if(check?.exact){anchor=candidate;months=check.count;}}
+ }
+ const periodCycle=active?{...cycle,anchorAt:anchor,calendarMonths:months,extraDays:0,endOffsetMs:0}:cycle;
+ const result=await extensionAt(db,periodCycle,duration,now,requestId,actionId),allowanceAnchor=result.extension.anchorAt;
+ if(!active)return {...result,allowanceAnchor,endOffsetMs:0};
+ const calendarMonths=cycle.calendarMonths+(duration.kind==='calendar_months'?duration.count:0),extraDays=cycle.extraDays+(duration.kind==='days'?duration.count:0);
+ if(calendarMonths>36500||extraDays>36500)throw new HttpError(409,'INVALID_DURATION');
+ const grid=(await db.query("SELECT (($1::timestamptz AT TIME ZONE $2)+make_interval(months=>$3)) AT TIME ZONE $2 AS base",[cycle.anchorAt,cycle.timezone,calendarMonths])).rows[0].base.getTime()+extraDays*86400000;
+ return {...result,calendarMonths,extraDays,allowanceAnchor,endOffsetMs:Date.parse(result.extension.accessEnd)-grid,extension:{...result.extension,anchorAt:cycle.anchorAt}};
+}

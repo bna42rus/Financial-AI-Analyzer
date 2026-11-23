@@ -1,3 +1,4 @@
+import {chooseOption} from '../../web/e2e/choice-picker';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 async function openExample(page:Page,section='requests') { await page.goto('/#'+section);await page.getByRole('button',{name:'Открыть пример',exact:true}).click(); }
@@ -8,9 +9,9 @@ test('admin data is empty until opt-in, queue filters and browser navigation pre
   await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(0);
   await page.getByRole('button',{name:'Открыть пример',exact:true}).click();await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(5);
   await page.getByRole('textbox',{name:'Поиск заявки'}).fill('банк б');await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(1);
-  await page.getByRole('textbox',{name:'Поиск заявки'}).fill('');await page.getByRole('combobox',{name:'Статус',exact:true}).selectOption('under_review');await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(2);
+  await page.getByRole('textbox',{name:'Поиск заявки'}).fill('');await chooseOption(page.getByRole('combobox',{name:'Статус',exact:true}),'under_review');await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(2);
   await page.getByRole('link',{name:'Продления',exact:true}).click();await expect(page.getByRole('heading',{name:'Продления подключим следующим блоком'})).toBeVisible();
-  await page.goBack();await expect(page.getByRole('combobox',{name:'Статус',exact:true})).toHaveValue('under_review');
+  await page.goBack();await expect(page.getByRole('combobox',{name:'Статус',exact:true})).toHaveAttribute('value','under_review');
   await page.getByRole('button',{name:'Закрыть пример',exact:true}).click();await expect(page.getByRole('button',{name:'Открыть пример',exact:true})).toBeVisible();
   await page.reload();await expect(page.getByRole('button',{name:/Открыть заявку/})).toHaveCount(0);
 });
@@ -54,8 +55,8 @@ test('custom periods and rejection have explicit reasons and do not pretend to t
   await expect(page.getByRole('dialog')).toContainText('Заявка закрыта');await page.getByRole('button',{name:'Закрыть окно'}).click();await page.getByRole('link',{name:'Оплаты',exact:true}).click();await expect(page.getByText('Требуется ручной возврат',{exact:true})).toBeVisible();
 });
 test('invitations can be cancelled/reissued with paid rights and old records retained',async({page})=>{
-  await openExample(page,'invitations');await page.getByRole('button',{name:'Отменить',exact:true}).click();await page.getByRole('textbox',{name:'Причина',exact:true}).fill('Ссылка отменена по просьбе пользователя');await page.getByRole('button',{name:'Подтвердить в примере',exact:true}).click();await expect(page.getByText('Отменено',{exact:true})).toBeVisible();
-  await page.getByRole('button',{name:'Подготовить новое',exact:true}).click();await page.getByRole('textbox',{name:'Причина',exact:true}).fill('Нужна новая ссылка');await page.getByRole('button',{name:'Подтвердить в примере',exact:true}).click();
+  await openExample(page,'invitations');await page.getByRole('button',{name:'Отменить',exact:true}).click();await page.getByRole('textbox',{name:'Заметка (необязательно)',exact:true}).fill('Ссылка отменена по просьбе пользователя');await page.getByRole('button',{name:'Подтвердить в примере',exact:true}).click();await expect(page.getByText('Отменено',{exact:true})).toBeVisible();
+  await page.getByRole('button',{name:'Подготовить новое',exact:true}).click();await page.getByRole('textbox',{name:'Заметка (необязательно)',exact:true}).fill('Нужна новая ссылка');await page.getByRole('button',{name:'Подтвердить в примере',exact:true}).click();
   await expect(page.getByText('2 записей',{exact:true})).toBeVisible();await expect(page.getByText('Отменено',{exact:true})).toBeVisible();await expect(page.getByRole('button',{name:'Подготовить новое',exact:true})).toHaveCount(1);
   await page.getByRole('link',{name:'Оплаты',exact:true}).click();await expect(page.getByText('1 записей',{exact:true})).toBeVisible();
   await page.getByRole('link',{name:'История действий',exact:true}).click();await expect(page.getByText('Приглашение отменено',{exact:true})).toBeVisible();await expect(page.getByText('Подготовлено новое приглашение',{exact:true})).toBeVisible();

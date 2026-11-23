@@ -32,7 +32,7 @@ export function checkAssistantPermit(value: unknown): AssistantPermit {
       !Number.isInteger(p.maximumCalls) || Number(p.maximumCalls) < 1 || Number(p.maximumCalls) > authorization.maximumCalls) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   tokenPrice(p.price); const b = object(p.bound, ['inputTokens', 'outputTokens', 'modelVersion']);
   if (p.previousBudgetSha256 !== undefined && (typeof p.previousBudgetSha256 !== 'string' || !/^[a-f0-9]{64}$/.test(p.previousBudgetSha256))) throw new AssistantError('ASSISTANT_PERMIT_INVALID');
-  if (b.inputTokens !== 131072 || b.outputTokens !== 1200 || b.modelVersion !== 'openai/gpt-oss-120b') throw new AssistantError('ASSISTANT_PERMIT_INVALID');
+  if (b.inputTokens !== 131072 || ![1200, 2400].includes(Number(b.outputTokens)) || typeof b.outputTokens !== 'number' || b.modelVersion !== 'openai/gpt-oss-120b') throw new AssistantError('ASSISTANT_PERMIT_INVALID');
   return p as AssistantPermit;
 }
 /** Read-only admission. A larger ceiling requires a NEW explicit authorization

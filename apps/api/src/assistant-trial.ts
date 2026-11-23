@@ -104,6 +104,7 @@ export function scoreAssistantTrial(c: AssistantTrialCase, reply: AssistantReply
  * dependencies creates a different experiment and refuses old receipts. */
 export async function assistantTrialManifest() {
   const root = new URL('../../../', import.meta.url), pending = [new URL('./assistant-trial-main.ts', import.meta.url), new URL('../../../package.json', import.meta.url), new URL('../../../pnpm-lock.yaml', import.meta.url)];
+  const queued = new Set(pending.map(url => url.href));
   const source: Record<string, string> = {};
   for (let i = 0; i < pending.length; i++) {
     const url = pending[i]!, key = url.href.slice(root.href.length);
@@ -111,7 +112,7 @@ export async function assistantTrialManifest() {
     if (key in source) continue;
     const text = await readFile(url, 'utf8'); source[key] = createHash('sha256').update(text).digest('hex');
     if (!/\.(?:ts|js|mjs)$/.test(url.pathname)) continue;
-    for (const pattern of [/^\s*import\s+(?:[^;'"`]+\s+from\s+)?['"](\.[^'"`]+)['"]/gmu, /^\s*export\s+(?:type\s+)?(?:\{[^}]*\}|\*)\s+from\s+['"](\.[^'"`]+)['"]/gmu]) for (const m of text.matchAll(pattern)) pending.push(new URL(m[1]!, url));
+    for (const pattern of [/^\s*import\s+(?:[^;'"`]+\s+from\s+)?['"](\.[^'"`]+)['"]/gmu, /^\s*export\s+(?:type\s+)?(?:\{[^}]*\}|\*)\s+from\s+['"](\.[^'"`]+)['"]/gmu]) for (const m of text.matchAll(pattern)) { const child = new URL(m[1]!, url); if (!child.href.startsWith(root.href)) throw Error('ASSISTANT_TRIAL_SOURCE_INVALID'); if (!queued.has(child.href)) { queued.add(child.href); pending.push(child); } }
   }
   const sorted = Object.fromEntries(Object.entries(source).sort(([a], [b]) => a.localeCompare(b)));
   return { version: assistantTrialVersion, sourceSha256: createHash('sha256').update(JSON.stringify(sorted)).digest('hex'), source: sorted,

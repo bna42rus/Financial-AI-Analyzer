@@ -92,3 +92,8 @@ test('abort closes pending extraction and prevents returning raw or prepared row
  const e:LocalPdfEngine={getDocument:()=>({promise:new Promise((_,r)=>{reject=r}),destroy:async()=>{destroyed++;reject(new Error('Private interrupted PDF'));}})};
  const pending=readLocalPdf(e,randomUUID(),new Uint8Array([1]),undefined,a.signal);a.abort();await assert.rejects(pending,/PREPARATION_CLOSED/);assert.equal(destroyed,1);
 });
+
+test('Sber processing-date continuation with a clock is not a new rejected transaction',async()=>{
+ const layout=syntheticLayout('sber');layout[0]!.find(i=>i.x===100&&i.y===639)!.text='14:10';layout[0]!.find(i=>i.x===100&&i.y===589)!.text='18:20';
+ const file=(await prepare('sber',layout)).files[0]!;assert.equal(file.rowsFound,2);assert.equal(file.rows.length,2);assert.deepEqual(file.issues,[]);assert.deepEqual(file.rows.map(r=>r.amountMinor),['-1001','1001']);
+});

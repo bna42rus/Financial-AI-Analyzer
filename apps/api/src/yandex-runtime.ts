@@ -99,7 +99,7 @@ export function createYandexAnalyzer(pool: Pool, transport: YandexTransport, pol
 export async function yandexCatalog(db: PoolClient, userId: string): Promise<Catalog> {
   const accounts = (await db.query('SELECT id,display_name AS name FROM finance.account WHERE user_id=$1 AND merged_into_id IS NULL ORDER BY id LIMIT 101', [userId])).rows;
   const categories = (await db.query('SELECT id,name,parent_id AS "parentId",role FROM finance.category WHERE user_id=$1 AND hidden=false ORDER BY id LIMIT 251', [userId])).rows;
-  const counterparties = (await db.query('SELECT id,name FROM finance.counterparty WHERE user_id=$1 AND merged_into_id IS NULL ORDER BY id LIMIT 101', [userId])).rows;
+  const counterparties = (await db.query("SELECT id,name FROM finance.counterparty WHERE user_id=$1 AND merged_into_id IS NULL AND state='registered' ORDER BY id LIMIT 101", [userId])).rows;
   const catalog: Catalog = { accounts, categories, counterparties };
   for (const key of Object.keys(catalogLimits) as (keyof Catalog)[]) {
     const rows = catalog[key];

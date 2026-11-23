@@ -34,6 +34,34 @@ async function accountRule(accountId:string){const {preview}=await command({kind
 function newAccount(id:string){return {id,name:'Split destination',type:'bank_account',analyticsEnabled:true,defaultVisible:true,loanMode:null};}
 async function splitIntent(destination:string){const w=await view();return {kind:'split_account',id:account,newAccounts:[newAccount(destination)],observations:w.accountSources.filter((b:{assignedAccountId:string})=>b.assignedAccountId===account).map((b:{observationId:string})=>({id:b.observationId,accountId:destination})),operations:w.operations.filter((o:{accountId:string})=>o.accountId===account).map((o:{id:string})=>({id:o.id,accountId:destination})),aliases:w.accountAliases.filter((a:{accountId:string})=>a.accountId===account).map((a:{id:string})=>({id:a.id,accountId:destination}))};}
 
+test('account settings preview is atomic, updates only requested fields, and is reversible as one action',async()=>{
+ const second=await extraAccount();await append('-1000','purchase',null,second);
+ const initial=await view(),actionId=randomUUID(),requestBase={actionId,generation:initial.generation,revision:initial.revision};
+ const intent={kind:'account_settings',id:randomUUID(),accounts:[{id:account,patch:{name:'Renamed synthetic account'}},{id:second,patch:{analyticsEnabled:false}}]};
+ const missing={...intent,accounts:[intent.accounts[0],{id:randomUUID(),patch:{analyticsEnabled:false}}]};
+ assert.equal((await request('/finance/preview',{...requestBase,intent:missing})).statusCode,404);
+ assert.equal((await view()).accounts.find((a:{id:string})=>a.id===account).name,initial.accounts.find((a:{id:string})=>a.id===account).name);
+ const preview=await request('/finance/preview',{...requestBase,intent});
+ assert.equal(preview.statusCode,200,preview.body);
+ assert.equal(preview.json().impact.after.netExpensesMinor,'0');
+ assert.equal((await view()).summary.netExpensesMinor,'1000');
+ assert.equal((await request('/finance/commit',{actionId})).statusCode,200);
+ const changed=await view();
+ assert.equal(changed.accounts.find((a:{id:string})=>a.id===account).name,'Renamed synthetic account');
+ assert.equal(changed.accounts.find((a:{id:string})=>a.id===second).analyticsEnabled,false);
+ await command({kind:'undo',id:randomUUID(),value:actionId});
+ assert.deepEqual((await view()).accounts,initial.accounts);
+ assert.equal((await view()).summary.netExpensesMinor,'1000');
+});
+test('account merge history selects only the latest active merge for its target',async()=>{
+ const donor=await extraAccount(),unrelated=await extraAccount();await append('-1000','purchase',null,donor);
+ const merged=await command({kind:'merge_accounts',id:account,sourceIds:[donor]});
+ const read=async(id:string)=>(await request('/finance/history-query',{mergeTargetId:id,limit:1})).json().actions;
+ assert.deepEqual((await read(account)).map((a:{id:string})=>a.id),[merged.actionId]);
+ assert.deepEqual(await read(unrelated),[]);
+ await command({kind:'undo',id:randomUUID(),value:merged.actionId});
+ assert.deepEqual(await read(account),[]);
+});
 test('merge moves matching bindings, aliases, rules and corrections without overwriting bank facts',async()=>{
  const donor=await extraAccount(),a=await append('-1000'),b=await append('-2000','purchase',null,donor),aliasId=await alias(donor),ruleId=await accountRule(donor);
  await command({kind:'account',id:donor,patch:{analyticsEnabled:false}});await command({kind:'operation',id:a.transactionId,patch:{corrections:{accountId:donor,amountMinor:'-800'}}});
@@ -89,9 +117,9 @@ test('physical deletion preserves independently verified refund meaning and acti
  await command(link(r.transactionId,p.transactionId,'2000'));await command({kind:'operation',id:r.transactionId,patch:{role:'expense',categoryId:category}});await command({kind:'components',id:r.transactionId,parts:[{type:'other',amountMinor:'2000',role:'expense',categoryId:category}]});
  await command({kind:'delete_financial',scope:{kind:'operations',operationIds:[p.transactionId]}});const op=(await request('/finance/operation',{id:r.transactionId})).json();assert.equal(op.semantics.role.userVerified,true);assert.equal(op.projection.parts[0].categoryId,category);assert.equal((await view()).summary.netExpensesMinor,'-2000');assert.equal(op.components.length,1);
 });
-test('period deletion uses corrected dates and Moscow calendar without changing bank precision',async()=>{
+test('period deletion uses corrected dates and observed bank calendar without changing bank precision',async()=>{
  const old=await append('-1000'),corrected=await append('-2000');await command({kind:'operation',id:corrected.transactionId,patch:{corrections:{operationDate:{precision:'day',date:'2026-10-08'}}}});
- const instant=await within('first',async db=>acceptObservation(db,'first',importEpoch((await financeView(db,'first'))),randomUUID(),null,{accountId:account,operationDate:{precision:'instant',instant:'2026-10-08T22:30:00Z'},postedDate:null,amountMinor:'-3000',currency:'RUB',merchantText:'Safe',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}},'purchase'));
+ const instant=await within('first',async db=>acceptObservation(db,'first',importEpoch((await financeView(db,'first'))),randomUUID(),null,{accountId:account,operationDate:{precision:'instant',instant:'2026-10-08T22:30:00Z',sourceOffsetMinutes:180},postedDate:null,amountMinor:'-3000',currency:'RUB',merchantText:'Safe',description:'Safe',bankCategory:'',bankRefHmac:null,versions:{parser:'1',normalizer:'1',sanitizer:'1'}},'purchase'));
  const deletion=await command({kind:'delete_financial',scope:{kind:'period',from:'2026-10-08',through:'2026-10-08'}});assert.deepEqual(deletion.preview.impact.removedOperationIds,[corrected.transactionId]);const w=await view();assert.deepEqual(new Set(w.operations.map((o:{id:string})=>o.id)),new Set([old.transactionId,instant.transactionId]));assert.equal(w.summary.netExpensesMinor,'4000');
 });
 test('account deletion removes donor sources and aliases and retains disabled rules with setup status',async()=>{

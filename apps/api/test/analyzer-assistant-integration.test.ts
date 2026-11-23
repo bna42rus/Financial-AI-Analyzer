@@ -1,3 +1,4 @@
+import {reserveCost,reconcileRecordedAssistantCosts} from '../src/analyzer-cost.ts';
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash, generateKeyPairSync } from 'node:crypto';
@@ -17,6 +18,7 @@ import { assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
 import { createTestAssistantProvider, createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
+import { monthlyPeriod } from '../src/assistant-monthly.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, config: Config;
 let cookie: string, generation: string, account: string, operationIds: string[], calls = 0, outputs: unknown[], outgoing: any[], behavior = 'normal';
@@ -34,6 +36,7 @@ const fetcher: typeof fetch = async (_url, options) => {
   assert.equal(Number(reserved), 1);
   await onDispatch?.();
   if (behavior === 'timeout') throw Error('synthetic-timeout');
+  if (behavior === 'key-expired') return new Response(JSON.stringify({error:{code:'API_KEY_EXPIRED',message:'API key expired'}}),{status:403});
   let value: any;
   if (input.candidate) {
     const next: any = outputs[0];
@@ -76,7 +79,9 @@ beforeEach(async () => {
     await acceptAccount(db, 'first', importEpoch(state), { id: account, bankId: 'tbank', systemName: 'Synthetic assistant account', type: 'bank_account' });
     operationIds = await syntheticOperations(db, 'first', 2, account, state.categories.find(c => c.name === 'Продукты' && c.parentId === null)!.id);
   });
-  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":20}')");
+  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds','Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10000}')");
+  // Functional scenario has an active paid allowance window, as the current billing contract requires.
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id='first'");
   assert.equal((await request('/finance/assistant-profile', { timezone: 'Asia/Vladivostok' })).statusCode, 200);
 });
 async function body() {
@@ -108,12 +113,12 @@ test('profile timezone has no Moscow fallback and an invalid or missing profile 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_task_request')).rows[0].n, '0');
 });
 
-test('off-topic and general explanations store history without reading the financial catalog or consuming a task unit', async () => {
+test('off-topic is free, ordinary AI explanation consumes one unit and neither reads the financial catalog', async () => {
   const b = await body(); outputs = [{ version: assistantVersion, topic: 'unrelated', action: 'redirect' }];
-  const off = await run({ ...b, text: 'Почему белка рыжая?' }); assert.equal(off.statusCode, 200, off.body); assert.equal(off.json().answer.mode, 'redirect');
+  const off = await run({ ...b, text: 'Почему белка рыжая?' }); assert.equal(off.statusCode, 200, off.body); assert.equal(off.json().answer.mode, 'redirect');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
   outputs = [{ version: assistantVersion, topic: 'general_finance', action: 'explain' }, { text: 'Инфляция уменьшает покупательную способность денег.' }];
   const explained = await run({ ...b, id: randomUUID(), text: 'Объясни инфляцию.' }); assert.equal(explained.statusCode, 200, explained.body); assert.equal(explained.json().answer.mode, 'ai'); assert.equal(calls, 3);
-  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '0');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
   assert.equal((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation.turns.length, 2);
   for (const input of outgoing) assert.equal('catalog' in input, false);
 });
@@ -223,13 +228,16 @@ test('one structural repair is accounted and cannot execute model-generated SQL 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n, '3');
 });
 
-test('two different chats racing for the last task unit cannot overbook the quota', async () => {
-  await pg.owner.query(`UPDATE commerce.access_cycle SET quota_policy='{"source":"override","limit":1}' WHERE user_id='first'`);
+test('two different chats with one remaining paid unit cannot dispatch an uncovered reservation', async () => {
+  await pg.owner.query("UPDATE commerce.access_paid_window SET quota=1 WHERE user_id='first'");
+  const {customerAiBudget}=await import('../src/customer-ai-budget.ts');
+  assert.equal((await within(db=>customerAiBudget(db,'first'))).remaining,1);
   const first = await body(), second = await body(); outputs = [plan([set('metric', 'expenses')])];
   const replies = await Promise.all([run(first), run(second)]);
-  assert.equal(replies.filter(r => r.statusCode === 200 && r.json().code === 'FINANCIAL_QUERY').length, 1);
-  assert.equal(calls, 2);
-  assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
+  for (const reply of replies) assert.equal(reply.json().code,'AI_USER_COST_EXHAUSTED',reply.body);
+  assert.equal(calls,0);
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.ai_cost_reservation')).rows[0].n,'0');
 });
 
 test('browser initialization cannot overwrite a timezone chosen on another device', async () => {
@@ -252,13 +260,13 @@ test('a one-connection pool can complete a request without waiting for a second 
 });
 
 
-async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@example.test'], clock = () => new Date()) {
+async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@example.test'], clock = () => new Date(), monthly = false) {
   const at = clock(), metadata = { id: 'openai/gpt-oss-120b', context_length: 131072, max_model_len: 131072 };
-  const raw = { realm:'staging/finance',apiKey:'synthetic-staging-key-for-tests-only',allowedEmails,
+  const raw = { ...(monthly ? { monthly: { version:'cashneuro-staging-monthly/1',limitRub:'100',activatedAt:at.toISOString() } } : {}), realm:'staging/finance',apiKey:'synthetic-staging-key-for-tests-only',allowedEmails,
     sourceSha256:'a'.repeat(64),modelMetadataSha256:createHash('sha256').update(JSON.stringify(metadata)).digest('hex'),maximumCalls,
     admission:{budgetSha256:'b'.repeat(64),spentAtoms:'0',calls:60-maximumCalls,stageCapAtoms:'10000000000',stageMaximumCalls:60},
     tariffCheckedAt:new Date(at.getTime()-1000).toISOString(),tariffSource:assistantTariffSource,expiresAt:new Date(at.getTime()+3600000).toISOString(),
-    cost:{projectId:'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
+    cost:{projectId:monthly ? 'staging/assistant-monthly' : 'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
       price:{version:'test-staging',currency:'RUB',inputRubPerMillion:'15.86',outputRubPerMillion:'61'}},
   };
   const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => String(url).endsWith('/models') ? new Response(JSON.stringify({data:[metadata]})) : fetcher(url,options),raw.sourceSha256,clock);
@@ -272,6 +280,42 @@ async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@e
   return { config:{...config,environment:'staging' as const,baseURL:'https://test.cashneuro.ru',origin:'https://test.cashneuro.ru',assistantProvider:provider,wrappingKey:key.bytes,kmsKey:key},raw };
 }
 const stageRun = (target: Awaited<ReturnType<typeof createServer>>, b: Awaited<ReturnType<typeof body>>) => target.fastify.inject({method:'POST',url:'/finance/analyzer-task',payload:b,headers:{origin:'https://test.cashneuro.ru',cookie,'content-type':'application/json'}});
+
+for (const scenario of ['prior-reported', 'current-reported', 'prior-unknown'] as const) {
+  test(`monthly Staging ledger separates access quota and preserves legacy history: ${scenario}`, async t => {
+    const at = new Date(), month = monthlyPeriod(at), start = Date.parse(month.projectPeriodStart);
+    const accessAnchor = new Date(start - 20 * 86400000).toISOString();
+    let quotaStart = new Date(accessAnchor);
+    for (;;) { const next = new Date(quotaStart); next.setUTCMonth(next.getUTCMonth()+1); if (next>at) break; quotaStart=next; }
+    await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=$1 WHERE user_id='first'", [accessAnchor]);
+    const legacyId = randomUUID(), created = new Date(start + (scenario === 'current-reported' ? 1 : -86400000)).toISOString();
+    await pg.owner.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,created_at,usage_state,input_tokens,output_tokens,anchor_at,period_start)
+      VALUES('first',$1,'plan',$2,$3,'synthetic-legacy','legacy/1',$4,$5,$6,$7,$8,$8)`,
+      [legacyId,'c'.repeat(64),scenario === 'prior-unknown' ? 'unknown' : 'completed',created,
+        scenario === 'prior-unknown' ? 'unknown' : 'reported',scenario === 'prior-unknown' ? null : 9809,scenario === 'prior-unknown' ? null : 254,accessAnchor]);
+    const old = (await pg.owner.query('SELECT * FROM commerce.analyzer_request WHERE request_id=$1', [legacyId])).rows;
+    const b = await body(), staging = await stagingConfig(t, 2, ['first@example.test'], () => at, true), target = await createServer(staging.config);
+    try {
+      outputs = [plan([set('metric','expenses')])];
+      const result = await stageRun(target,b);
+      assert.equal(result.statusCode,200,result.body);
+      assert.equal(result.json().code,scenario === 'prior-reported' ? 'FINANCIAL_QUERY' : 'AI_COST_RECONCILIATION_REQUIRED',result.body);
+      assert.equal(calls,scenario === 'prior-reported' ? 2 : 0);
+      assert.deepEqual((await pg.owner.query('SELECT * FROM commerce.analyzer_request WHERE request_id=$1', [legacyId])).rows,old);
+      assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation WHERE request_id=$1', [legacyId])).rows[0].n,0);
+      if (scenario === 'prior-reported') {
+        const receipt = (await pg.owner.query(`SELECT c.anchor_at=$2::timestamptz AS money_anchor,c.period_start=$2::timestamptz AS money_period,
+          r.anchor_at=$3::timestamptz AS quota_anchor,r.period_start=$4::timestamptz AS quota_period,c.state
+          FROM commerce.ai_cost_reservation c JOIN commerce.analyzer_request r USING(user_id,request_id,step) WHERE c.request_id=$1`, [b.id,month.projectPeriodStart,accessAnchor,quotaStart.toISOString()])).rows;
+        assert.equal(receipt.length,2);
+        assert.ok(receipt.every(r => r.money_anchor && r.money_period && r.quota_anchor && r.quota_period && r.state === 'settled'));
+        assert.equal((await pg.owner.query("SELECT sum(units)::int AS n FROM commerce.analyzer_usage WHERE user_id='first' AND anchor_at=$1 AND period_start=$2",[accessAnchor,quotaStart.toISOString()])).rows[0].n,1);
+      } else {
+        assert.equal((await pg.owner.query('SELECT count(*)::int AS n FROM commerce.ai_cost_reservation')).rows[0].n,0);
+      }
+    } finally { await target.close(); }
+  });
+}
 
 test('the real Staging configuration uses KMS, preserves prior call admission and enforces the shared pilot ceiling', async t => {
   const b=await body(),staging=await stagingConfig(t),target=await createServer(staging.config);
@@ -298,4 +342,150 @@ test('expired Staging authorization blocks a fresh POST without resetting known 
     const reply=await stageRun(target,{...b,id:randomUUID()});assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'ASSISTANT_STAGING_CONFIGURATION_DENIED');assert.equal(calls,2);
     assert.equal((await pg.owner.query('SELECT spent_atoms FROM commerce.ai_project_budget')).rows[0].spent_atoms,before);
   }finally{await target.close();}
+});
+
+test('the pilot call ceiling includes another tenant without exposing their private cost receipts',async t=>{
+ const b=await body(),staging=await stagingConfig(t,2,['first@example.test','second@example.test']),target=await createServer(staging.config),provider=staging.config.assistantProvider!;
+ try{
+  outputs=[plan([set('metric','expenses')])];assert.equal((await stageRun(target,b)).statusCode,200);assert.equal(calls,2);
+  await assert.rejects(within(async db=>{
+   const id=randomUUID(),at=provider.policy.projectPeriodStart;
+   await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES('second',$1,'classification',$2,'sent','synthetic',$3,$4,$4,'not_sent')`,[id,'c'.repeat(64),provider.model.bound.modelVersion,at]);
+   await reserveCost(db,{userId:'second',requestId:id,step:'classification',anchorAt:at,periodStart:at},provider.policy,provider.model.bound);
+   await provider.authorizeDispatch(db);
+  },'second'),/ASSISTANT_PILOT_CALL_LIMIT/);
+  assert.equal((await pg.owner.query('SELECT dispatch_count FROM commerce.ai_project_budget')).rows[0].dispatch_count,2);
+  assert.equal((await pg.owner.query("SELECT count(*)::int AS n FROM commerce.ai_cost_reservation WHERE user_id='second'")).rows[0].n,0);
+ }finally{await target.close();}
+});
+
+test('deterministic calculator returns exact code results, charges once and preserves every financial source',async()=>{
+ const b={...await body(),text:'Аннуитет 100 рублей, 12% годовых, один месяц'},before=(await pg.owner.query('SELECT id,source_observation_id,corrections,semantics FROM finance.transaction ORDER BY id')).rows;
+ outputs=[{version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'}}];
+ const result=await run(b);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().code,'FINANCIAL_CALCULATION');assert.equal(result.json().answer.calculation.totalPaidMinor,'10100');assert.equal(result.json().answer.calculation.interestMinor,'100');assert.equal(calls,2);
+ assert.deepEqual((await pg.owner.query('SELECT id,source_observation_id,corrections,semantics FROM finance.transaction ORDER BY id')).rows,before);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action')).rows[0].n,'0');assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
+ const replay=await run(b);assert.deepEqual(replay.json(),result.json());assert.equal(calls,2);assert.equal((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
+ for(const v of outgoing){const text=JSON.stringify(v);assert.ok(!text.includes(account));assert.ok(!operationIds.some(id=>text.includes(id)));}
+});
+
+test('natural account proposal without a query cannot write until exact preview and explicit commit, then supports Undo',async()=>{
+ const b={...await body(),text:'Переименуй счёт Synthetic account в Мой основной счёт'},old=(await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name;
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'account',name:old,patch:{name:'Мой основной счёт'}}}];
+ const result=await run(b);assert.equal(result.statusCode,200,result.body);assert.equal(result.json().code,'CHANGE_PROPOSED');assert.equal(result.json().answer.query,undefined);assert.equal(calls,2);
+ const tool={name:'finance_action',answerId:b.id,intent:result.json().answer.proposal.intent};
+ assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,old);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action')).rows[0].n,'0');
+ const forged=await request('/finance/analyzer-propose',{actionId:randomUUID(),tool:{...tool,intent:{...tool.intent,patch:{name:'Подменено клиентом'}}}});assert.equal(forged.statusCode,409,forged.body);assert.equal(forged.json().code,'ANALYZER_PROPOSAL_CHANGED');
+ const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,old);
+ const committed=await request('/finance/commit',{actionId});assert.equal(committed.statusCode,200,committed.body);assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,'Мой основной счёт');
+ assert.deepEqual((await request('/finance/commit',{actionId})).json(),committed.json());
+ const w=await within(db=>financeView(db,'first')),undoId=randomUUID();const undo=await request('/finance/preview',{actionId:undoId,generation:w.generation,revision:w.revision,intent:{kind:'undo',id:randomUUID(),value:actionId}});assert.equal(undo.statusCode,200,undo.body);assert.equal((await request('/finance/commit',{actionId:undoId})).statusCode,200);assert.equal((await pg.owner.query('SELECT display_name FROM finance.account WHERE id=$1',[account])).rows[0].display_name,old);
+});
+
+test('natural operation changes require a current last-answer scope and freeze exact IDs before preview',async()=>{
+ const b=await body(),change={version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'answer_operations',patch:{comment:'Из проверенного ответа'}}};
+ outputs=[change];const missing=await run({...b,text:'Добавь комментарий операциям этого ответа'});assert.equal(missing.json().code,'ASSISTANT_CHANGE_SCOPE_REQUIRED');assert.equal(missing.json().answer.proposal,undefined);
+ outputs=[plan([set('metric','expenses')])];const read=await run({...b,id:randomUUID(),text:'Покажи мои расходы'});assert.equal(read.json().code,'FINANCIAL_QUERY');
+ const proposalId=randomUUID();outputs=[change];const proposed=await run({...b,id:proposalId,text:'Добавь комментарий операциям этого ответа'});assert.equal(proposed.json().code,'CHANGE_PROPOSED');const p=proposed.json().answer.proposal;assert.deepEqual(new Set(p.intent.operationIds),new Set(operationIds));
+ const tool={name:'finance_action',answerId:proposalId,intent:p.intent},actionId=randomUUID();const preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);
+ const commit=await request('/finance/commit',{actionId});assert.equal(commit.statusCode,200,commit.body);assert.deepEqual(new Set((await pg.owner.query("SELECT id FROM finance.transaction WHERE comment='Из проверенного ответа'")).rows.map(r=>r.id)),new Set(operationIds));
+});
+
+test('program grouped statistics use current owned rows and immutable answer scope',async()=>{
+ const b=await body();b.text='Сравни медианные расходы по магазинам';outputs=[{...plan([set('metric','expenses'),set('grouping','merchant')]),options:{statistic:'median'}}];
+ const first=await run(b);assert.equal(first.statusCode,200,first.body);assert.equal(first.json().code,'FINANCIAL_QUERY',first.body);const a=first.json().answer;assert.equal(a.query.grouping,'merchant');assert.equal(a.analysis.value,'12345');assert.equal(a.analysis.count,2);assert.equal(a.result.totals.expenses,'24690');
+ const message=(await request('/finance/analyzer-state',{chatId:b.chatId})).json().chats.flatMap((c:any)=>c.messages).find((m:any)=>m.id===b.id);assert.equal(message.answer.analysis.value,a.analysis.value);
+ const timings=(await pg.owner.query('SELECT receipt FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0].receipt.result.timings;assert.equal(timings.calls.length,2);assert.ok(timings.preparedMs>=0);assert.equal(JSON.stringify(timings).includes(b.text),false);
+});
+test('program new personal rule is proposed, previewed and committed through ordinary authority',async()=>{
+ const b=await body();b.text='Создай правило Restopay для будущих операций';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_rule',name:'Restopay в продукты',conditions:{merchantEquals:'Restopay'},assignments:{categoryName:'Продукты',role:'expense'}}}];
+ const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'CHANGE_PROPOSED');const proposal=reply.json().answer.proposal;assert.equal(proposal.intent.kind,'rule');assert.equal(Number((await pg.owner.query('SELECT count(*) AS n FROM finance.rule WHERE user_id=$1',['first'])).rows[0].n),0);
+ const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:proposal.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal(preview.json().requiresConfirmation,true);
+ const committed=await request('/finance/commit',{actionId});assert.equal(committed.statusCode,200,committed.body);const rule=(await pg.owner.query('SELECT conditions,assignments FROM finance.rule WHERE user_id=$1 AND id=$2',['first',b.id])).rows[0];assert.equal(rule.conditions.merchantEquals,'Restopay');assert.equal(rule.assignments.role,'expense');
+});
+test('program new budget keeps profile timezone and requires confirmed commit',async()=>{
+ const b=await body();b.text='Создай месячный бюджет Продукты 5000 рублей за вычетом возвратов';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_budget',name:'Продукты на месяц',amountRubles:'5000',period:'month',basis:'net',categoryName:'Продукты'}}];
+ const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'CHANGE_PROPOSED');const p=reply.json().answer.proposal;assert.equal(p.intent.definition.timezone,'Asia/Vladivostok');const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:p.intent}});assert.equal(preview.statusCode,200,preview.body);const saved=await request('/finance/commit',{actionId});assert.equal(saved.statusCode,200,saved.body);assert.equal((await pg.owner.query('SELECT definition FROM finance.budget WHERE user_id=$1 AND id=$2',['first',b.id])).rows[0].definition.timezone,'Asia/Vladivostok');
+});
+
+test('program report preserves separate evidence, atomically creates and assigns a counterparty, and Undo restores both',async()=>{
+ const b=await body();b.text='Покажи расходы по магазинам, посчитай десять процентов и создай контрагента для этих операций';
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{narration:'simple',steps:[
+  {kind:'read',label:'Расходы',context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','merchant')]},
+  {kind:'calculate',label:'Десять процентов',calculation:{kind:'percentage',baseRubles:'0',percent:'10'},bindings:[{field:'baseRubles',ref:'s1.total'}]},
+  {kind:'change',label:'Создать получателя',change:{kind:'create_counterparty',name:'Получатель из отчёта'}},
+  {kind:'change',label:'Назначить получателя',fromStep:1,change:{kind:'answer_operations',patch:{counterpartyName:'Получатель из отчёта',comment:'Связанное изменение'}}}
+ ]}},{blocks:[{kind:'conclusion',template:'Расходы {{s1.total}}.'}]}];
+ const reply=await run(b);assert.equal(reply.statusCode,200,reply.body);assert.equal(reply.json().code,'FINANCIAL_REPORT',reply.body);
+ const a=reply.json().answer;assert.equal(a.report.sections[0].answer.result.totals.expenses,'24690');assert.equal(a.report.sections[1].calculation.metrics[1].value,'2469');assert.equal(calls,3);assert.equal(a.proposal.intent.kind,'compound');
+ const cpId=a.proposal.intent.items[0].id;assert.deepEqual(new Set(a.proposal.intent.items[1].operationIds),new Set(operationIds));
+ assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');
+ const rows=await request('/finance/analyzer-answer-rows',{answerId:b.id,offset:0,section:1});assert.equal(rows.statusCode,200,rows.body);assert.ok(rows.json().points.length);
+ const dependencyIds=(await pg.owner.query('SELECT transaction_id FROM finance.analyzer_dependency WHERE user_id=$1 AND message_id=$2',['first',b.id])).rows.map(r=>r.transaction_id);assert.deepEqual(new Set(dependencyIds),new Set(operationIds));
+ const tool={name:'finance_action',answerId:b.id,intent:a.proposal.intent},actionId=randomUUID();
+ const altered=structuredClone(tool);altered.intent.items[0].patch.name='Подмена';assert.equal((await request('/finance/analyzer-propose',{actionId:randomUUID(),tool:altered})).json().code,'ANALYZER_PROPOSAL_CHANGED');
+ const preview=await request('/finance/analyzer-propose',{actionId,tool});assert.equal(preview.statusCode,200,preview.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');
+ const saved=await request('/finance/commit',{actionId});assert.equal(saved.statusCode,200,saved.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'1');assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE comment='Связанное изменение'")).rows[0].n,'2');
+ const state=await within(db=>financeView(db,'first')),undoId=randomUUID();const undo=await request('/finance/preview',{actionId:undoId,generation:state.generation,revision:state.revision,intent:{kind:'undo',id:randomUUID(),value:actionId}});assert.equal(undo.statusCode,200,undo.body);const undone=await request('/finance/commit',{actionId:undoId});assert.equal(undone.statusCode,200,undone.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');assert.equal((await pg.owner.query("SELECT count(*) AS n FROM finance.transaction WHERE comment='Связанное изменение'")).rows[0].n,'0');
+});
+
+test('program compound preview rolls back an earlier child if a later child is invalid',async()=>{
+ const state=await within(db=>financeView(db,'first')),cpId=randomUUID(),actionId=randomUUID();
+ const result=await request('/finance/preview',{actionId,generation:state.generation,revision:state.revision,intent:{kind:'compound',id:randomUUID(),items:[{kind:'counterparty',id:cpId,create:true,patch:{name:'Откатить',isSelf:false}},{kind:'operation',id:randomUUID(),patch:{comment:'Не существует'}}]}});
+ assert.ok(result.statusCode>=400,result.body);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.counterparty WHERE id=$1',[cpId])).rows[0].n,'0');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.action WHERE id=$1',[actionId])).rows[0].n,'0');
+});
+
+test('program remember derives future rule conditions from owned operations and never passes private IDs to the model',async()=>{
+ const b=await body();b.text='Покажи расходы';outputs=[plan([set('metric','expenses')])];assert.equal((await run(b)).statusCode,200);
+ const id=randomUUID();outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'remember_answer',name:'Запомнить магазин',assignments:{categoryName:'Продукты',role:'expense'}}}];
+ const reply=await run({...b,id,text:'Запомни для следующих таких покупок продукты'});assert.equal(reply.json().code,'CHANGE_PROPOSED',reply.body);const proposal=reply.json().answer.proposal;assert.equal(proposal.intent.kind,'rule');assert.ok(Object.keys(proposal.intent.patch.conditions).length);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.rule WHERE id=$1',[id])).rows[0].n,'0');
+ const actionId=randomUUID(),preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:id,intent:proposal.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal((await request('/finance/commit',{actionId})).statusCode,200);
+ for(const input of outgoing)for(const operationId of operationIds)assert.equal(JSON.stringify(input).includes(operationId),false);
+});
+
+test('program next-period budget is distinguishable from current actual and report refuses future actual',async()=>{
+ const b=await body();b.text='Создай бюджет на продукты со следующего месяца';outputs=[{version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'create_budget',name:'Со следующего месяца',amountRubles:'1000',period:'month',basis:'net',applyFrom:'next'}}];
+ const reply=await run(b);assert.equal(reply.json().code,'CHANGE_PROPOSED',reply.body);const actionId=randomUUID(),p=reply.json().answer.proposal;const preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:p.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal((await request('/finance/commit',{actionId})).statusCode,200);
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'budgets',label:'Бюджеты',request:{names:['Со следующего месяца']}}]}}];const result=await run({...b,id:randomUUID(),text:'Какой факт по этому бюджету?'});assert.equal(result.json().code,'FINANCIAL_REPORT',result.body);const item=result.json().answer.report.sections[0].budgets.items[0];assert.equal(item.indicator,null);assert.equal(item.upcomingLimit.limitMinor,'100000');
+ outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'budgets',label:'Будущий факт',request:{names:['Со следующего месяца'],date:'2099-01-01'}}]}}];const future=await run({...b,id:randomUUID(),text:'Покажи фактические расходы по бюджету в будущем'});assert.ok(future.json().answer.report.sections[0].error,future.body);
+});
+
+
+test('recorded usage settles an interrupted hold once, while genuinely unknown usage stays reserved',async()=>{
+  const b=await body();behavior='timeout';
+  const response=await run(b);assert.equal(response.statusCode,200,response.body);
+  assert.equal(response.json().code,'ASSISTANT_DELIVERY_UNKNOWN');assert.equal(calls,1);
+  const db=await pg.owner.connect();
+  try{
+    await db.query('BEGIN');
+    assert.equal(await reconcileRecordedAssistantCosts(db,'first'),0);
+    const saved=(await db.query('SELECT workflow,receipt FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0];
+    // Reconstruct the durable write-ahead receipt at a crash boundary. The
+    // immutable final result is replaced only by this synthetic owner fixture.
+    delete saved.receipt.result;delete saved.receipt.conversation;
+    saved.receipt.calls[0].state='failed';saved.receipt.calls[0].code='ASSISTANT_MODEL_ERROR';
+    saved.receipt.calls[0].usage={inputTokens:500,outputTokens:50,modelVersion:'openai/gpt-oss-120b'};
+    await db.query('DELETE FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id]);
+    await db.query('INSERT INTO finance.assistant_run(user_id,request_id,workflow,receipt) VALUES($1,$2,$3,$4)',['first',b.id,saved.workflow,JSON.stringify(saved.receipt)]);
+    assert.equal(await reconcileRecordedAssistantCosts(db,'first'),1);
+    assert.equal(await reconcileRecordedAssistantCosts(db,'first'),0);
+    const cost=(await db.query('SELECT state,settled_atoms,reserved_atoms FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0];
+    assert.equal(cost.state,'settled');assert.ok(BigInt(cost.settled_atoms)>0n);assert.ok(BigInt(cost.settled_atoms)<BigInt(cost.reserved_atoms));
+    const recorded=(await db.query('SELECT state,usage_state,input_tokens FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0];
+    assert.equal(recorded.state,'completed');assert.equal(recorded.usage_state,'reported');assert.equal(recorded.input_tokens,500);
+    assert.equal((await db.query('SELECT reserved_atoms FROM commerce.ai_user_budget WHERE user_id=$1',['first'])).rows[0].reserved_atoms,'0');
+    assert.equal(calls,1);await db.query('COMMIT');
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+});
+
+
+test('an expired key rejects before inference, releases the reservation and stops further dispatches',async()=>{
+  const b=await body();behavior='key-expired';
+  const first=await run(b);assert.equal(first.statusCode,200,first.body);assert.equal(first.json().code,'AI_PROVIDER_KEY_EXPIRED');assert.equal(calls,1);
+  const cost=(await pg.owner.query('SELECT state,settled_atoms,reported_input_tokens FROM commerce.ai_cost_reservation WHERE request_id=$1',[b.id])).rows[0];
+  assert.equal(cost.state,'released');assert.equal(cost.settled_atoms,'0');assert.equal(cost.reported_input_tokens,null);
+  const requestRow=(await pg.owner.query('SELECT state,usage_state,dispatched_at FROM commerce.analyzer_request WHERE request_id=$1',[b.id])).rows[0];
+  assert.equal(requestRow.state,'failed');assert.equal(requestRow.usage_state,'unknown');assert.ok(requestRow.dispatched_at);
+  const next=await run({...b,id:randomUUID()});assert.equal(next.statusCode,200,next.body);assert.equal(next.json().code,'AI_PROVIDER_KEY_EXPIRED');assert.equal(calls,1);
+  assert.equal((await pg.owner.query('SELECT reserved_atoms FROM commerce.ai_user_budget')).rows[0].reserved_atoms,'0');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
 });

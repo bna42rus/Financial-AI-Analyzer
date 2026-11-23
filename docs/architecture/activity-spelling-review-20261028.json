@@ -1,0 +1,37 @@
+{
+  "audit": "cashneuro-activity-spelling-audit/2",
+  "status": "PASS_LEXICAL_DATA_ONLY",
+  "baseline_commit": "061085a12be5804e28e4facca7a032db0d117f26",
+  "scope": "Finite spelling data, retention, raw literal boundaries, normalization and fully recorded containment. NOT product semantic classification.",
+  "activities": 194,
+  "old_forms_preserved": 1391,
+  "forms_within_records": 4282,
+  "distinct_normalized_forms": 4282,
+  "new_forms": 2891,
+  "new_form_types": {
+    "cyrillic": 1088,
+    "materialized_transliteration": 1680,
+    "latin": 101,
+    "explicit_mixed": 22
+  },
+  "exact_cross_activity_collision_groups": 0,
+  "containment_groups": 31,
+  "containment_examples": 188,
+  "all_containment_groups_have_design_resolution": true,
+  "hand_written_literal_boundary_probes_passed": 54,
+  "registered_literals_checked": 4282,
+  "inventory_checks_per_literal": {
+    "enclosed_literal": 1,
+    "case_variant": 1,
+    "forbidden_attached_boundary": 7
+  },
+  "context_guards": 9,
+  "composition_rules": 8,
+  "future_semantic_scenario_families": 153,
+  "data_sha256": "ddb75404b30060c59e1b7a226b5ce55bf4e02ce85877ce080f0feb84e2207120",
+  "runtime_tests": "NOT_RUN",
+  "ui_tests": "NOT_RUN",
+  "model_tests": "NOT_RUN",
+  "paid_calls": 0,
+  "limitations": "No morphological exhaustiveness, observed banking-alias evidence, semantic parser implementation, category accuracy, sanitizer or Staging acceptance is claimed by literal checks."
+}

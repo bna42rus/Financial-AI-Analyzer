@@ -1,0 +1,4166 @@
+{
+  "schema": "cashneuro-catalog-source-dispositions/1",
+  "date": "2026-10-27",
+  "baseline_commit": "a76d8c762a4b5c2bbeb4f98acd020e2bf14e9d2c",
+  "authorization": "Давай делай сразу 4 блока которые обязательные. Остальные не нужно. … Нужно все закрыть не должно быть никаких пробелов, закрой.",
+  "scope": "All explicit previous PEND rows and all 61 HOME source records in the pinned corpus; policy below covers every other profile. A final v1 disposition is not a claim that every public source was verified.",
+  "global_activation_policy": {
+    "baseline_primary_profiles": "Retain dated SRC/IDX/REG/REF context and existing restrictions. No inferred new aliases; source website is not banking evidence.",
+    "unverified_or_non_primary_only": "Not eligible for new global activation in v1; existing manual decisions, history, imports and actual source facts survive.",
+    "international": "Profile/brand can be described by its primary source; actual RUB transaction/context required. No promise of availability/payment from RF or new investment/insurance extension.",
+    "historical": "Historical source/context only, no current global operator equality or account merge.",
+    "generic_activity": "May be activity evidence under the separate approved activity policy; never invent one merchant identity.",
+    "unknown_transaction": "Known merchant/activity retained; explicit conditional outcome/Review/category choice, no invented financial role/receipt/parts. This is a defined input-dependent outcome, not an unresolved catalog rule."
+  },
+  "counts": {
+    "GENERIC_ACTIVITY_ONLY": 1,
+    "PROFILE_CONTEXT_ONLY": 33,
+    "PROFILE_CONFIRMED": 59,
+    "HISTORICAL_CONTEXT_ONLY": 6,
+    "EXCLUDED_FROM_ACTIVE_V1": 27,
+    "REF_PROFILE": 3
+  },
+  "records": [
+    {
+      "id": "BEA013",
+      "name": "Белорусская косметика — разные продавцы",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA013 | Белорусская косметика — разные продавцы | PEND, 26.10.2026 | Обычная фраза, не единая подтверждённая сеть; конкретный оператор нужен |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "GENERIC_ACTIVITY_ONLY",
+      "source_url": "",
+      "evidence_method": "NO_SINGLE_IDENTITY",
+      "decision_reason": "«Белорусская косметика» — описание ассортимента/деятельности многих продавцов, не единая сеть. Решение окончательное для v1: отдельную merchant-identity не создавать; доказанная деятельность может участвовать в ACT/личном выборе.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Не единая merchant-identity. Только доказанная деятельность/личное решение; без восстановления конкретного бренда."
+    },
+    {
+      "id": "BEA031",
+      "name": "ESTEL Professional",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA031 | ESTEL Professional | PEND, 26.10.2026 | Профессиональная косметика для волос; подтвердить источник/оператора |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://estelprofessional.com/",
+      "evidence_method": "IDX_BRAND",
+      "decision_reason": "Первичный профиль производителя ESTEL подтверждён; косметическая марка не автоматически получатель. Обучение/фирменный магазин/товар отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Только подтверждённый прямой продавец/вид товара: косметика → Косметика и уход; обучение/профсервис отдельно. Не назначать получателя по марке на чужом товаре."
+    },
+    {
+      "id": "BEA032",
+      "name": "KAPOUS Professional",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA032 | KAPOUS Professional | PEND, 26.10.2026 | Профессиональные средства для волос; проверить канал продажи |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.kapous.ru/kapous/",
+      "evidence_method": "IDX_BRAND",
+      "decision_reason": "Первичный производитель/магазин/обучение по предмету, не любой бренд на упаковке merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Подтверждённая обычная косметическая покупка → Косметика и уход; обучение/сырьё/иной предмет отдельно, марка не платёжный получатель."
+    },
+    {
+      "id": "BEA033",
+      "name": "Чистая линия — косметическая марка",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA033 | Чистая линия — косметическая марка | PEND, 26.10.2026 | Общее выражение и другие сервисы, без идентичности не активировать |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.chistayalinia.ru/products",
+      "evidence_method": "IDX_BRAND",
+      "decision_reason": "Первичный косметический бренд подтверждён; общее выражение/иная отрасль не эта identity, розничный продавец отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Косметический товар по доказанному предмету → Косметика и уход; не имя сети из общего выражения."
+    },
+    {
+      "id": "BEA037",
+      "name": "Точка красоты",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA037 | Точка красоты | PEND, 26.10.2026 | Общее сочетание, до официального источника и оператора не распознавать |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://tochkafamily.ru/content/o-kompani",
+      "evidence_method": "IDX",
+      "decision_reason": "Правильный первичный профиль Точки красоты; отдельный салон/сервис, не обычная фраза и не Банк Точка.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Установленная обычная услуга салона → Красота и уход / Парикмахерские и салоны, без лишнего Review."
+    },
+    {
+      "id": "BEA038",
+      "name": "МОНЕ — салоны",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA038 | МОНЕ — салоны | PEND, 26.10.2026 | Имя многозначно, актуальную сеть/сайт проверить |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://salonmone.ru/about/",
+      "evidence_method": "IDX",
+      "decision_reason": "Правильный первичный профиль салонов MONE; художник/имя/обычная Моне не эта сеть.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Установленная обычная услуга салона → Парикмахерские и салоны, другое известное назначение выше."
+    },
+    {
+      "id": "BEA049",
+      "name": "ПИLКИ / Пилки",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA049 | ПИLКИ / Пилки | PEND, 26.10.2026 | Название сети требует первичного источника/актуальности; инструмент пилки не салон |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://pilkinail.ru/",
+      "evidence_method": "SRC_LOCAL",
+      "decision_reason": "Первичный профиль маникюрной сети Санкт-Петербурга, инструмент пилки не салон.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Установленная маникюрная услуга → Парикмахерские и салоны; инструмент пилки как товар отдельно."
+    },
+    {
+      "id": "BEA050",
+      "name": "Пальчики — ногтевые студии",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA050 | Пальчики — ногтевые студии | PEND, 26.10.2026 | Общее слово, подтвердить сеть и оператора |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://palchiki.com/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль маникюрной сети, обычное слово/перевод физлицу отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Установленная маникюрная/педикюрная услуга → Парикмахерские и салоны, не общий токен."
+    },
+    {
+      "id": "BEA054",
+      "name": "Epilas / Эпилас",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| BEA054 | Epilas / Эпилас | PEND, 26.10.2026 | До первичного подтверждения сети/оператора не включать |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://epilas.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль эпиляции; эстетическая услуга не выдуманный врачебный диагноз.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Обычная установленная эстетическая эпиляция → Прочий уход; известная врачебная услуга отдельно и без вывода диагноза."
+    },
+    {
+      "id": "DIG004",
+      "name": "Огонь",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-digital-categories-20261027.md",
+          "row": "| DIG004 | Огонь | Прочие подписки | Только гипотеза для подтверждённой подписки; PEND запрещает автоматическую активацию. **PEND: автоматическая активация запрещена.** |"
+        },
+        {
+          "document": "merchant-catalog-digital-list-20261026.md",
+          "row": "| DIG004 | Огонь | https://ogon.ru/ | PEND | Кандидат комплексной подписки: прямой источник прочитать не удалось, актуальный сервис/оператора подтвердить; обычное слово не бренд. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "HISTORICAL_CONTEXT_ONLY",
+      "source_url": "https://gazprombonus.premier.one/",
+      "evidence_method": "IDX_PARTNER_HIST",
+      "decision_reason": "Непосредственный партнёр описывает подписку Огонь/Газпром Бонус. Это не одноимённая банковская карта Огонь; актуальный общий продукт не активируется по голому слову.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная историческая услуга по исходным правилам и фактическому периоду; новая текущая global identity не активируется по старому имени."
+    },
+    {
+      "id": "DIG018",
+      "name": "VK Музыка",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-digital-categories-20261027.md",
+          "row": "| DIG018 | VK Музыка | Видео и музыка | Музыкальное размещение только условно после первичного подтверждения; PEND не снят. **PEND: автоматическая активация запрещена.** |"
+        },
+        {
+          "document": "merchant-catalog-digital-list-20261026.md",
+          "row": "| DIG018 | VK Музыка | https://vk.com/music | PEND | Кандидат музыкального продукта: прямое чтение ограничено, первичное подтверждение текущего продукта/платёжного контура дополнить; не весь VK. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.rustore.ru/catalog/app/com.uma.musicvk",
+      "evidence_method": "IDX_APP",
+      "decision_reason": "Приложение VK Музыка опубликовано разработчиком VK и описывает музыкальный продукт. Не весь VK, не подтверждение оплаченной подписки/контрагента каждого списания.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "DIG032",
+      "name": "VK Donut",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-digital-categories-20261027.md",
+          "row": "| DIG032 | VK Donut | По предмету контента; при неизвестности — условно, см. правило | Условная предметная развилка DIG030; PEND сохраняется. Слово Donut не устанавливает пожертвование. **PEND: автоматическая активация запрещена.** |"
+        },
+        {
+          "document": "merchant-catalog-digital-list-20261026.md",
+          "row": "| DIG032 | VK Donut | https://donut.vk.com/ | PEND | Кандидат авторской монетизации, прямое чтение ограничено; первичное подтверждение дополнить. Не весь VK и не благотворительность автоматически. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://github.com/VKCOM/vk-api-schema/blob/master/donut/methods.json",
+      "evidence_method": "SRC_API",
+      "decision_reason": "Прочитана первичная схема VKCOM: методы donut.getSubscription/getSubscriptions/isDon. Подтверждён тип подписок, не тариф/доступность/назначение каждого доната/новый благотворительный платёж.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "EDU025",
+      "name": "Умназия",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-education-family-20261027.md",
+          "row": "| EDU025 | Умназия | PEND: https://umnazia.ru/ | Первичная страница недоступна; найдены только сторонние карточки, актуальная identity/профиль пока не закрыты. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://umnazia.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный первичный профиль не получен; каталоги курсов/промокоды не подтверждают нужный текущий сервис. Не объявляется закрытие компании.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "EDU056",
+      "name": "Дочки-Сыночки",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-education-family-20261027.md",
+          "row": "| EDU056 | Дочки-Сыночки | PEND: https://www.dochkisinochki.ru/ | Незакрытый PEND MP054 сохраняется, новая таблица не превращает его в SRC. Связь: MP054 |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://dochkisinochki.ru/",
+      "evidence_method": "REF_ATTEMPTED_HIST_BLOG",
+      "decision_reason": "Тот же профиль MP054, не новый оператор. Индексирован старый блог сети, но достаточный текущий торговый контур не подтверждён. Статья о детской куртке не доказывает нынешний магазин; новые global aliases выключены.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "same_profile_as": "MP054",
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "EDU059",
+      "name": "Кораблик",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-education-family-20261027.md",
+          "row": "| EDU059 | Кораблик | PEND: https://www.korablik.ru/ | Собственная страница недоступна; партнёрский список издателя — только зацепка, не актуальная первичная верификация. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://korablik.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нет достаточного первичного профиля нужного продавца/периода; слово кораблик не торговая сеть без основания.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "EDU061",
+      "name": "TOY.RU",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-education-family-20261027.md",
+          "row": "| EDU061 | TOY.RU | PEND: https://www.toy.ru/ | Первичная страница недоступна; отраслевая карточка только кандидат, не подтверждение текущей торговли. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://toy.ru/",
+      "evidence_method": "ATTEMPTED_HIST_FILE",
+      "decision_reason": "Доступна индексированная инструкция игрушки с CDN, не подтверждение текущего оператора торговой сети. Не расширять toy/игрушку до merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "FASH054",
+      "name": "Sneakerhead",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH054 | Sneakerhead | PEND | магазин сникеров: активность, сайт и география требуют проверки |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://sneakerhead.ru/contacts-page/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичные магазины/оферта/каталог подтверждают обувной профиль; не фактические банковские aliases.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанный обычный обувной профиль → Одежда и аксессуары / Обувь; известный иной товар/личное правило выше."
+    },
+    {
+      "id": "FASH067",
+      "name": "ASKENT",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH067 | ASKENT | PEND | сумки и кожгалантерея — подтвердить текущего продавца/сайт |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://askent.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Собственный профиль включает обувь и аксессуары. При известном товаре по нему; при доказанном fashion и неизвестном типе — широкий родитель + Review, не неизменно сумки.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанный ASKENT включает обувь и аксессуары: известный товар → соответствующая ветвь; доказанный fashion без типа → родитель Одежда и аксессуары + Review, не всегда Аксессуары."
+    },
+    {
+      "id": "FASH068",
+      "name": "ELEGANZZA",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH068 | ELEGANZZA | PEND | сумки/аксессуары, отличать бренд товара от продавца |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://eleganzza.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль аксессуаров; марка на товаре и продавец отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Обычная установленная покупка аксессуара → Одежда и аксессуары / Аксессуары, без лишнего Review из-за чека."
+    },
+    {
+      "id": "FASH069",
+      "name": "LABBRA",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH069 | LABBRA | PEND | сумки/аксессуары; требуется отдельный первичный источник |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://labbra.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный торговый профиль сумок/аксессуаров.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Обычный специализированный аксессуарный профиль → Аксессуары, известный иной товар по фактам."
+    },
+    {
+      "id": "FASH070",
+      "name": "Dr.Koffer",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH070 | Dr.Koffer | PEND | кожгалантерея; реальные торговые обозначения требуют источника |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.koffer.ru/about/",
+      "evidence_method": "SRC",
+      "decision_reason": "Подтверждён правильный сайт Dr.Koffer; drkoffer.ru не считается тем же адресом по догадке.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Установленный профиль кожгалантереи/багажа → Аксессуары; производитель/другой продавец не подмена получателя."
+    },
+    {
+      "id": "FASH071",
+      "name": "1001 Сумка",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH071 | 1001 Сумка | PEND | название сети и актуальная география требуют источника; цифры важны |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://1001sumka.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточного первичного подтверждения именно прежней identity нет. Найденная «1000 и одна сумка» на 1000i1sumka.com не доказана тем же оператором; не переименовывать старую запись.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "FASH072",
+      "name": "Neri Karra",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH072 | Neri Karra | PEND | аксессуары; не обязательно конечный продавец |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.nerikarra.com/",
+      "evidence_method": "SRC_INT_BRAND",
+      "decision_reason": "Международный производитель/бренд сумок подтверждён, текущий конкретный продавец/оплата из РФ не выводятся. Не все товарные марки merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Только известный предмет/достаточно доказанный собственный канал продажи; марка товара не merchant. Обычная установленная покупка аксессуара → Аксессуары."
+    },
+    {
+      "id": "FASH079",
+      "name": "Orby",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH079 | Orby | PEND | детская одежда, текущая сеть требует подтверждения |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://nebo-trk.com/orby/",
+      "evidence_method": "SRC_LOCATION",
+      "decision_reason": "Первичная карточка торгового центра подтверждает конкретный магазин ORBY и детский/подростковый профиль; не обещает географию всей сети.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанный специализированный детский профиль в области источника → Семья и дети / Детские товары, личная Одежда/Обувь выше; не выводить личность ребёнка."
+    },
+    {
+      "id": "FASH082",
+      "name": "Bossa Nova",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH082 | Bossa Nova | PEND | детская одежда, омоним музыкального жанра, источник/актуальность проверить |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.bossa.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль детской одежды Bossa Nova; музыкальный жанр не merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанный детский торговый профиль → Детские товары; известная взрослая/иная линия выше."
+    },
+    {
+      "id": "FASH087",
+      "name": "BRANDSHOP",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH087 | BRANDSHOP | PEND | мультибренд одежды/обуви, актуальный источник проверить |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://brandshop.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный широкий fashion-каталог; предмет/личное правило выше общего родителя.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "При установленном fashion и неизвестном типе → широкий Одежда и аксессуары + Review; известный товар/личное правило выше, без доказанного направления не угадывать."
+    },
+    {
+      "id": "FASH095",
+      "name": "АДАМАС",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH095 | АДАМАС | PEND | ювелирная сеть; актуальные магазины/сайт проверить |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.moskvorechije.ru/stores/adamas",
+      "evidence_method": "SRC_LOCATION",
+      "decision_reason": "Первичная карточка магазина торгового центра и собственные правила подарочных карт ADAMAS подтверждают ювелирный профиль; не все магазины/юрлица/инвестиционный металл.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Обычная установленная покупка украшения → Аксессуары; подарок/инвестиционный актив только по подтверждённому основанию."
+    },
+    {
+      "id": "FASH096",
+      "name": "Бронницкий ювелир",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH096 | Бронницкий ювелир | PEND | украшения; топоним Бронницы не торговый бренд |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.bronnitsy.com/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный торговый ювелирный профиль, не просто топоним Бронницы.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Обычное украшение → Аксессуары, не автоматически подарок/инвестиция."
+    },
+    {
+      "id": "FASH097",
+      "name": "Линии Любви",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "row": "| FASH097 | Линии Любви | PEND | ювелирная сеть; общее словосочетание не identity |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://liniilubvi.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Установлен правильный первичный сайт сети; linesoflove.ru не повышен по созвучию.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Обычное украшение → Аксессуары; личное решение/известный иной предмет выше."
+    },
+    {
+      "id": "FIN046",
+      "name": "Госавтоинспекция / ГИБДД",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-financial-events-20261027.md",
+          "row": "| FIN046 | Госавтоинспекция / ГИБДД | PEND: https://госавтоинспекция.рф/ | Профиль в указанном первичном источнике/прежнем разделе; пределы в соседней колонке. Достаточное чтение первичной институциональной страницы ограничено; похожие домены не подтверждение. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://parking.mos.ru/fines/pay/",
+      "evidence_method": "IDX_PUBLIC_BODY",
+      "decision_reason": "Первичный городской портал прямо различает санкции АМПП/МАДИ/ГИБДД. Подтверждён институциональный профиль, не клонирующие домены/ставки/текущие реквизиты; ясный штраф по основанию.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Ясная государственная санкция по фактическому основанию → Налоги и обязательные платежи / Штрафы; не всё имя ГИБДД штраф или госпошлина."
+    },
+    {
+      "id": "FIN051",
+      "name": "Фонд капитального ремонта Москвы",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-financial-events-20261027.md",
+          "row": "| FIN051 | Фонд капитального ремонта Москвы | PEND: https://fond.mos.ru/ | Профиль в указанном первичном источнике/прежнем разделе; пределы в соседней колонке. Прямое чтение ограничено, первичный профиль не подтверждён достаточно для новой активации. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.mos.ru/upload/documents/oiv/ad_kr_605.pdf",
+      "evidence_method": "REF_SRC_PUBLIC_BODY_HIST",
+      "decision_reason": "Тот же профиль HOME051, не новый оператор. Первичный городской документ подтверждает полное имя московского фонда и жилищный профиль. Документ исторический; нынешние реквизиты/тарифы/состав взноса из него не выводятся. Ясный жилищный взнос не благотворительность.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "same_profile_as": "HOME051",
+      "category_resolution": "Ясный жилищный взнос за капремонт → Жильё и дом / Коммунальные услуги либо личная подходящая ветвь, не благотворительность/налог из слова фонд."
+    },
+    {
+      "id": "GFT009",
+      "name": "Цветы.ру — кандидат",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-gifts-charity-20261027.md",
+          "row": "| GFT009 | Цветы.ру — кандидат | PEND: https://cvety.ru/ | Текущая первичная страница сообщает о будущем открытии, работающая торговая услуга не подтверждена. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://tsvety.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный торговый профиль не получен; «цветы» общий термин, не сеть по домену/похожей выдаче.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "GFT010",
+      "name": "Красный Куб — кандидат",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-gifts-charity-20261027.md",
+          "row": "| GFT010 | Красный Куб — кандидат | PEND: https://www.redcube.ru/ | Первичная страница не прочитана; карточка магазина на сайте ТЦ — зацепка, не подтверждение текущей всей сети/aliases. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://redcube.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Текущий достаточный первичный контур не получен; купоны/справочники не равны торговому источнику.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "GFT011",
+      "name": "Экспетро — кандидат",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-gifts-charity-20261027.md",
+          "row": "| GFT011 | Экспетро — кандидат | PEND: https://expetro.ru/ | Собственный российский профиль не прочитан, найдены только сторонние карточки; иностранный похожий магазин не подмена. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://expetro.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нет достаточного первичного торгового источника, отдельные справочники не выданы за подтверждение текущей сети.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "GFT014",
+      "name": "Другие подарки — кандидат",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-gifts-charity-20261027.md",
+          "row": "| GFT014 | Другие подарки — кандидат | PEND: https://www.drugiepodarki.com/ | Собственный .com не прочитан, .ru не подтверждён; сторонних каталогов недостаточно для новой активации. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://drugiepodarki.com/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нет достаточного первичного профиля конкретного продавца; обычное сочетание другие подарки не identity.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "GFT056",
+      "name": "Нужна помощь — кандидат истории",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-gifts-charity-20261027.md",
+          "row": "| GFT056 | Нужна помощь — кандидат истории | PEND: https://nuzhnapomosh.ru/ | Нынешняя страница только краткая информационная заметка; работающий профиль пожертвований/оператор не подтверждены. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "HISTORICAL_CONTEXT_ONLY",
+      "source_url": "https://nuzhnapomosh.ru/media/post/kak-provesti-sbor-na-polzuyas-sluchaem-gajd-dlya-novichkov-i-prodvinutyh/",
+      "evidence_method": "IDX_HIST",
+      "decision_reason": "Собственный исторический текст фонда сообщает о решении ликвидации; нынешняя главная иной информационный профиль. Окончательно без нового глобального назначения пожертвований по одному имени; доказанная история сохраняется.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная историческая услуга по исходным правилам и фактическому периоду; новая текущая global identity не активируется по старому имени."
+    },
+    {
+      "id": "HOME001",
+      "name": "Лемана ПРО",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME001. Лемана ПРО"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://lemanapro.ru/faq/tovary-partnerov/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичная FAQ подтверждает многопродуктовый торговый профиль; чужой конкретный товар/партнёр и услуги отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME002",
+      "name": "DOM Лента",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME002. DOM Лента"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://domlenta.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "DOM Лента подтверждён собственным каталогом; российская историческая связь с OBI подтверждена пресс-релизом Ленты, не все мировые OBI.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME003",
+      "name": "Петрович",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME003. Петрович"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://petrovich.ru/catalog/",
+      "evidence_method": "IDX",
+      "decision_reason": "Собственный каталог строительных товаров, омоним/получатель-физлицо отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME004",
+      "name": "ВсеИнструменты.ру",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME004. ВсеИнструменты.ру"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.vseinstrumenti.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль инструментов/строительства/работы, известный иной товар выше общего профиля.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME005",
+      "name": "Максидом",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME005. Максидом"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.maxidom.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный многопродуктовый DIY-каталог, не содержимое каждого чека.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME006",
+      "name": "Бауцентр",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME006. Бауцентр"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://baucenter.ru/catalog/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный каталог строительства/ремонта/дома.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME007",
+      "name": "Мегастрой",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME007. Мегастрой"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://megastroy.com/development",
+      "evidence_method": "IDX",
+      "decision_reason": "Собственный профиль сети/развития, не все одноимённые компании.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME008",
+      "name": "Стройландия",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME008. Стройландия"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://stroylandiya.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный строительный каталог, география/контрагент не из общего имени.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME009",
+      "name": "Строительный двор",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME009. Строительный двор"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://sdvor.com/",
+      "evidence_method": "SRC",
+      "decision_reason": "Собственный строительный торговый профиль.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME010",
+      "name": "Сатурн",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME010. Сатурн"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://msk.saturn.net/",
+      "evidence_method": "IDX_LOCAL",
+      "decision_reason": "Подтверждён московский торговый профиль, не планета/банк/чужой Сатурн.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME011",
+      "name": "Вимос",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME011. Вимос"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://vimos.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный торговый профиль Вимос.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME012",
+      "name": "Аксон",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME012. Аксон"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://play.google.com/store/apps/details?hl=ru&id=com.akson.aksonapp",
+      "evidence_method": "SRC_APP",
+      "decision_reason": "Самостоятельно опубликованное приложение AKSON.RU подтверждает торговый профиль, не медицинский Axon/не каждый платёж и не весь текущий сайт.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME013",
+      "name": "Колорлон",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME013. Колорлон"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://colorlon.ru/",
+      "evidence_method": "SRC_LOCAL",
+      "decision_reason": "Первичный новосибирский каталог Колорлон, не разные одноимённые компании.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME014",
+      "name": "Добрострой",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME014. Добрострой"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.dobrostroy.com/complain",
+      "evidence_method": "IDX_LOCAL",
+      "decision_reason": "Подтверждён конкретный строительный супермаркет Севастополя; это не подтверждение всей прежней гипотезы об астраханской сети. dobrostroy.ru — другой профиль услуг и не подменяет магазин.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME015",
+      "name": "Сантехника-Онлайн",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME015. Сантехника-Онлайн"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://santehnika-online.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный сантехнический торговый каталог.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME016",
+      "name": "Сантехника.ру",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME016. Сантехника.ру"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://santehnika.ru/",
+      "evidence_method": "SRC_NEGATIVE",
+      "decision_reason": "Прочитанная страница сообщает о продаже домена; достаточный профиль конкретного продавца не подтверждён. Это не доказательство закрытия любой сантехнической фирмы. Не менять на похожий магазин.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "HOME017",
+      "name": "KERAMA MARAZZI",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME017. KERAMA MARAZZI"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://kerama-marazzi.com/",
+      "evidence_method": "SRC",
+      "decision_reason": "Подтверждены производитель/ассортимент; марка на товаре не автоматически платёжный получатель.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME018",
+      "name": "Плитка.ру",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME018. Плитка.ру"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://plitka.ru/",
+      "evidence_method": "SRC_NARROWED",
+      "decision_reason": "Фактически прочитан Таймекс-М, тротуарная/облицовочная плитка/оборудование. Не выдавать за любую сеть керамической плитки; прежние общие формы требуют доказанной identity.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME019",
+      "name": "Hoff",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME019. Hoff"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://hoff.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный каталог мебели/дома.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME020",
+      "name": "Askona",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME020. Askona"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://askona.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный каталог сна/мебели, товар/услуга по фактам.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME021",
+      "name": "Орматек",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME021. Орматек"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://horeca.ormatek.com/",
+      "evidence_method": "IDX_PRODUCT",
+      "decision_reason": "Первичный профиль мебели/сна Ormatek и гостиничного направления; B2B-страница не делает каждый платёж рабочим.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME022",
+      "name": "Лазурит",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME022. Лазурит"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://lazurit.com/shops/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный список магазинов/мебельный профиль.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME023",
+      "name": "Шатура",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME023. Шатура"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.shatura.com/rooms/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный мебельный каталог, не город Шатура как достаточная identity.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME024",
+      "name": "Дятьково",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME024. Дятьково"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://dyatkovo.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный мебельный каталог.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME025",
+      "name": "Ангстрем",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME025. Ангстрем"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.angstrem-mebel.ru/catalog/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный мебельный каталог, физический термин/электроника не merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME026",
+      "name": "Столплит",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME026. Столплит"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.stolplit.ru/shops/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный список магазинов Столплит, не каждый сторонний сайт дилера.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME027",
+      "name": "Много мебели",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME027. Много мебели"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://mnogomebeli.com/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный мебельный каталог.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME028",
+      "name": "Divan.ru",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME028. Divan.ru"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.divan.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный мебельный каталог, общее слово диван не identity.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME029",
+      "name": "MOON",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME029. MOON"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://moon.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный мебельный каталог, луна/обычное moon не merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME030",
+      "name": "Mr.Doors",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME030. Mr.Doors"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.mrdoors.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Собственный профиль мебели/кухонь, не все любые doors.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME031",
+      "name": "Мария",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME031. Мария"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.marya.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль мебели/кухонь Мария; имя получателя само не identity.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME032",
+      "name": "E1",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME032. E1"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://e-1.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль фабрики Е1; маршрут/технический код E1 отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME033",
+      "name": "Первая мебельная фабрика",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME033. Первая мебельная фабрика"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.1mf.ru/about/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль Первой мебельной фабрики Санкт-Петербурга, не любой первой фабрики.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME034",
+      "name": "Цвет диванов",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME034. Цвет диванов"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://zvet.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный первичный текущий профиль получить не удалось, справочники/отзывы не заменены первичным подтверждением; новая глобальная identity выключена, не объявлена компания закрытой.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "HOME035",
+      "name": "Кухонный Двор",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME035. Кухонный Двор"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.kuxni.net/",
+      "evidence_method": "IDX",
+      "decision_reason": "Подтверждён правильный первичный сайт Кухонного Двора; kuhni-dvor.ru не повышен по похожести.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME036",
+      "name": "Стильные кухни",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME036. Стильные кухни"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.stilkuhni.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль Стильные Кухни и Интерьеры.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME037",
+      "name": "Галамарт",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME037. Галамарт"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://galamart.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный широкий товарный каталог, не неизвестная корзина по догадке.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME038",
+      "name": "KuchenLand Home",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME038. KuchenLand Home"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://kuchenland.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль товаров для дома.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME039",
+      "name": "Cozy Home",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME039. Cozy Home"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://cozyhome.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль домашнего текстиля/декора.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME040",
+      "name": "Посуда Центр",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME040. Посуда Центр"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://posudacenter.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный каталог посуды/кухни/дома.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME041",
+      "name": "Домовой",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME041. Домовой"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://tddomovoy.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль магазина Домовой; слово/книга/другая фирма отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME042",
+      "name": "Твой Дом",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME042. Твой Дом"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://tvoydom.ru/hypermarket/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль гипермаркетов дома, конкретный иной предмет выше широкого профиля.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME043",
+      "name": "Порядок",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME043. Порядок"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://poryadok.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный широкий каталог; порядок как слово не merchant.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME044",
+      "name": "Мосэнергосбыт",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME044. Мосэнергосбыт"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.mos.ru/upload/documents/files/2124/EkspertnoezakluchenieMosenergosbitna2026god.pdf",
+      "evidence_method": "IDX_PUBLIC_BODY",
+      "decision_reason": "Официальный городской документ описывает энергосбытовой профиль 2026. Реквизиты/суммы/тарифы не копируются; не все похожие сайты/платежи эта компания.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME045",
+      "name": "МосОблЕИРЦ",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME045. МосОблЕИРЦ"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://krasnogorsk-adm.ru/ist/organisation/mosobleirts.html",
+      "evidence_method": "IDX_PUBLIC_BODY",
+      "decision_reason": "Официальная карточка территориального органа администрации подтверждает расчётный центр; квитанция/состав платежа по фактам, не новый виртуальный счёт.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME046",
+      "name": "Мосводоканал",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME046. Мосводоканал"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.mosvodokanal.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный городской коммунальный профиль, не любой водоканал РФ.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME047",
+      "name": "МОСГАЗ",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME047. МОСГАЗ"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.mos-gaz.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный столичный газотранспортный профиль; газовое обслуживание/коммунальные/АЗС различимы.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME048",
+      "name": "Газпром межрегионгаз",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME048. Газпром межрегионгаз"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://mrg.gazprom.ru/contacts/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичная информация Газпром межрегионгаз; региональная организация и назначение отдельно, не АЗС/банк группы.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME049",
+      "name": "Т Плюс",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME049. Т Плюс"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://mptplus.tplusgroup.ru/",
+      "evidence_method": "IDX_PRODUCT",
+      "decision_reason": "Первичный сервис Т+ подтверждает профиль поставщика/канала; короткие Т+/ПСК сами не получатель и не категория любого платежа.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME050",
+      "name": "Петербургская сбытовая компания",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME050. Петербургская сбытовая компания"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.gov.spb.ru/gov/otrasl/energ_kom/ip/elektro/ao-psk/",
+      "evidence_method": "IDX_PUBLIC_BODY",
+      "decision_reason": "Официальный энергокомитет Санкт-Петербурга с материалами 2026 подтверждает организацию; ПСК короткое многозначное сокращение отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME051",
+      "name": "Фонд капитального ремонта Москвы",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME051. Фонд капитального ремонта Москвы"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.mos.ru/upload/documents/oiv/ad_kr_605.pdf",
+      "evidence_method": "SRC_PUBLIC_BODY_HIST",
+      "decision_reason": "Первичный городской документ подтверждает полное имя московского фонда и жилищный профиль. Документ исторический; нынешние реквизиты/тарифы/состав взноса из него не выводятся. Ясный жилищный взнос не благотворительность.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Ясный жилищный взнос → Коммунальные услуги/личная ветвь; реквизиты/ставки не из исторического источника."
+    },
+    {
+      "id": "HOME052",
+      "name": "Qlean",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME052. Qlean"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://qlean.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Собственный профиль клининга; известная рабочая/иная услуга отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME053",
+      "name": "Домовёнок",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME053. Домовёнок"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.domovenok.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Собственный профиль клининга, общее слово Домовёнок не сеть.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME054",
+      "name": "YouDo (межраздельная площадка заказов и фриланса, ссылка FR01)",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME054. YouDo (межраздельная площадка заказов и фриланса, ссылка FR01)"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "REF_PROFILE",
+      "source_url": "https://youdo.com/frilans",
+      "evidence_method": "REF_SRC",
+      "decision_reason": "Тот же FR01, горизонтальная площадка; не автоматический домашний ремонт.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME055",
+      "name": "Профи.ру (межраздельная площадка специалистов; ссылка FR02)",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME055. Профи.ру (межраздельная площадка специалистов; ссылка FR02)"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "REF_PROFILE",
+      "source_url": "https://profi.ru/about/",
+      "evidence_method": "REF_SRC",
+      "decision_reason": "Тот же FR02, предмет/роль/оплата площадки отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME056",
+      "name": "Яндекс Услуги / Яндекс Исполнители (межраздельный поиск специалистов; ссылка FR03)",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME056. Яндекс Услуги / Яндекс Исполнители (межраздельный поиск специалистов; ссылка FR03)"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "REF_PROFILE",
+      "source_url": "https://uslugi.yandex.ru/",
+      "evidence_method": "REF_SRC",
+      "decision_reason": "Тот же FR03 Яндекс Исполнители, не все услуги Яндекса и не автоматическое жильё.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME057",
+      "name": "Руки",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME057. Руки"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://hands.ru/company/about/",
+      "evidence_method": "IDX",
+      "decision_reason": "Установлен правильный первичный профиль сервиса Руки; ruki.ru не подменяет его. Прежнее условие Бытовые услуги + Review при неизвестной работе, известный ремонт → Ремонт, сохраняется.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME058",
+      "name": "Яндекс Аренда",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME058. Яндекс Аренда"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://arenda.yandex.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный сервис аренды, фактическая арендная плата/комиссия/депозит отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME059",
+      "name": "Циан",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME059. Циан"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.cian.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль площадки недвижимости; реклама/комиссия/аренда/возврат не один смысл.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME060",
+      "name": "Домклик",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME060. Домклик"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://biz.domclick.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль недвижимости/сделок; банковская ипотека/страховка/сервис не одно назначение.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "HOME061",
+      "name": "Этажи",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-master-20261025.md",
+          "locator": "#### HOME061. Этажи"
+        }
+      ],
+      "previous_state": "SOURCE_NOT_COMPLETED",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://www.etagi.com/",
+      "evidence_method": "SRC_LOCAL",
+      "decision_reason": "Первичный региональный профиль агентства, не гарантия всех филиалов/операторов РФ.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "MP033",
+      "name": "Корпорация Центр",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-marketplaces-20261027.md",
+          "row": "| MP033 | Корпорация Центр | PEND: https://kcentr.ru/ | Прямое чтение недоступно, достаточного первичного подтверждения в этом шаге нет. Ссылка: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://kcentr.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нет достаточного первичного профиля текущего нужного продавца; портфолио дизайнера/отзывы не заменены собственным источником. История/manual не удалены.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "MP034",
+      "name": "НОРД — кандидат сети nord24",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-marketplaces-20261027.md",
+          "row": "| MP034 | НОРД — кандидат сети nord24 | PEND: https://nord24.ru/ | Главная недоступна; производитель nord.ru и self-profile на внешней площадке не закрывают identity этой сети. Ссылка: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://nord24.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Не подтверждён нужный retail nord24; найденный nord.ru — производитель техники, а не доказательство того же продавца. Не подменять бренд по названию.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "MP036",
+      "name": "Техносклад — кандидат tehnosklad.ru",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-marketplaces-20261027.md",
+          "row": "| MP036 | Техносклад — кандидат tehnosklad.ru | PEND: https://tehnosklad.ru/ | Запрошенный домен недоступен; найденное texnosklad.ru не объявлено той же компанией. Ссылка: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://tehnosklad.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нужный прежний кандидат не подтверждён. texnosklad.ru — другая найденная торговая страница, равенство операторов/истории не установлено и не выдумано.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "MP038",
+      "name": "Фотосклад.ру",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-marketplaces-20261027.md",
+          "row": "| MP038 | Фотосклад.ру | PEND: https://www.fotosklad.ru/ | Прямая страница CAPTCHA; достаточного нового первичного подтверждения профиля нет. Ссылка: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.fotosklad.ru/expert/pages/gid-po-sajtu/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный торгово-информационный профиль Фотосклада подтверждён; дата/конкретный товар/услуга не из общего имени.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная обычная фототехника → выбранная будущая Техника и электроника при доступном узле; аксессуар/печать/иной предмет по фактам, отсутствующий узел не создавать молча."
+    },
+    {
+      "id": "MP054",
+      "name": "Дочки-Сыночки",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-marketplaces-20261027.md",
+          "row": "| MP054 | Дочки-Сыночки | PEND: https://www.dochkisinochki.ru/ | Первичное чтение недоступно; актуальный оператор/статус и историческая привязка не закрыты. Ссылка: Будущий профильный раздел; не завершение всего раздела |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://dochkisinochki.ru/",
+      "evidence_method": "ATTEMPTED_HIST_BLOG",
+      "decision_reason": "Индексирован старый блог сети, но достаточный текущий торговый контур не подтверждён. Статья о детской куртке не доказывает нынешний магазин; новые global aliases выключены.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET015",
+      "name": "Win mobile",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET015 | Win mobile | PEND | Региональная мобильная связь, точные актуальные операторы/источники требуют проверки | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://winmobile.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточное первичное подтверждение текущего нужного оператора не получено; k-telecom.ru ведёт на петербургский еТелеком и не доказывает Win mobile. Не заменять регионального мобильного оператора по совпадению имени.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET016",
+      "name": "Севмобайл",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET016 | Севмобайл | PEND | Регион/актуальность и платёжный оператор требуют проверки, короткое название не активировать | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://sev-mob.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный текущий первичный профиль не получен; вторичные сообщения о переходе не выданы за подтверждённый source/rebrand. Новая глобальная identity выключена без утверждения о закрытии компании.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET023",
+      "name": "Wifire / NetByNet",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET023 | Wifire / NetByNet | PEND | Исторические торговые обозначения, текущая активность и платёжный канал требуют проверки | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://surgut.wifire.ru/wifirepackets",
+      "evidence_method": "IDX_LOCAL",
+      "decision_reason": "Первичный региональный Wifire профиль подтверждён, не юридическое равенство всех NetByNet/платежей/регионов и не автоматическая замена на Ростелеком.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "NET024",
+      "name": "ОнЛайм / OnLime",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET024 | ОнЛайм / OnLime | PEND | Историческая связь с Ростелекомом, не активировать старое имя без даты/оператора | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "HISTORICAL_CONTEXT_ONLY",
+      "source_url": "https://www.onlime.ru/legal/",
+      "evidence_method": "IDX_HIST",
+      "decision_reason": "Первичная информация об историческом контуре ОнЛайм/Ростелеком есть; новая текущая identity/счета не объединяются, история по доказанному периоду.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная историческая услуга по исходным правилам и фактическому периоду; новая текущая global identity не активируется по старому имени."
+    },
+    {
+      "id": "NET036",
+      "name": "ИНСИС",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET036 | ИНСИС | PEND | Екатеринбург: сторонние сайты подключения могут быть партнёрскими; нужен первичный источник конкретного оператора | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://www.profintel.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный первичный профиль ISP ИНСИС не получен. insys.ru описывает инструментальные системы, insisinet.ru не подтверждён как нужный оператор; они не заменяют источник по похожему имени.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET037",
+      "name": "Конвекс",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET037 | Конвекс | PEND | Региональный ISP; точные нынешние реквизиты и актуальность требуют проверки | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://promo.convex.ru/",
+      "evidence_method": "IDX_LOCAL",
+      "decision_reason": "Первичный провайдерский профиль Convex, регион/оператор/вид оплаты отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "NET038",
+      "name": "ПАКТ",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET038 | ПАКТ | PEND | Петербургский интернет-провайдер: подтвердить сеть, оператора, регион и активность | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://pakt.ru/about/",
+      "evidence_method": "IDX",
+      "decision_reason": "Первичный профиль петербургского оператора ПАКТ, не generic pact/пакет.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "NET040",
+      "name": "RiNet",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET040 | RiNet | PEND | Региональный интернет: нужна проверка текущего торгового канала и типа оплаты | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://rinet.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нет достаточного первичного подтверждения нужного текущего торгового контура; не угадывать новое обслуживание по исторической марке.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET041",
+      "name": "2КОМ",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET041 | 2КОМ | PEND | Московский ISP/историческая марка, подтвердить период/оператора перед автоматикой | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://2kom.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный первичный профиль/период не получен; страницы подборщиков тарифов не доказательство текущего самостоятельного оператора.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET042",
+      "name": "Seven Sky",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET042 | Seven Sky | PEND | Марка ISP и вероятные исторические изменения, без источника не активировать | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://seven-sky.net/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточный первичный профиль/оператор не получены; не склеивать разные Sky/Seven и не подменять источники агрегаторами.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "NET044",
+      "name": "UIS",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET044 | UIS | PEND | Корпоративная телефония/коллтрекинг, текущие названия и торговый оператор проверяются | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.uiscom.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль облачных коммуникаций подтверждён, не автоматически домашний интернет.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "NET045",
+      "name": "Телфин",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET045 | Телфин | PEND | IP-телефония/АТС; проверить прямой источник/получателя, не вся оплата «домашняя связь» | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://www.telphin.ru/",
+      "evidence_method": "IDX",
+      "decision_reason": "Установлен правильный первичный сайт Телфин; telfin.ru не объявлен тем же ресурсом по созвучию.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "NET046",
+      "name": "Zadarma",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET046 | Zadarma | PEND | IP-телефония, бизнес и частные номера; подтвердить юрисдикцию и операторские обозначения | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://zadarma.com/ru/",
+      "evidence_method": "SRC_INT",
+      "decision_reason": "Первичный международный профиль IP-телефонии, не обещание подключения/оплаты из РФ/принадлежности каждого номера.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "NET047",
+      "name": "Sipuni",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-list-20261026.md",
+          "row": "| NET047 | Sipuni | PEND | Облачная АТС/телефония, подтвердить платёжные формы и актуального продавца | PEND |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://sipuni.com/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль облачной телефонии/АТС, не все расходы связь для дома.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "PET065",
+      "name": "Догтренинг — dogtrening.com",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-animals-20261027.md",
+          "row": "| PET065 | Догтренинг — dogtrening.com | организация/обучающий сервис | PEND: https://dogtrening.com/dogtrening | Индексированные собственные профиль/онлайн-занятия есть, но текущая главная сообщает о временной приостановке доступа. Связь: — |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "HISTORICAL_CONTEXT_ONLY",
+      "source_url": "https://dogtrening.com/dogtrening",
+      "evidence_method": "IDX_HIST_WITH_CURRENT_STOP",
+      "decision_reason": "Собственные профиль/онлайн-уроки индексируются; прямая главная 27.10 сообщает о временной приостановке. Окончательное решение v1: без новой общей активации, доказанная история по прежним фактам; компания не объявлена закрытой.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная историческая услуга по исходным правилам и фактическому периоду; новая текущая global identity не активируется по старому имени."
+    },
+    {
+      "id": "TEL014",
+      "name": "Дополнение: Яндекс Сим; PEND сохраняется",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL014 | Дополнение: Яндекс Сим; PEND сохраняется |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL014 | Яндекс Сим | REVIEW | PEND: сообщается о запуске/пилоте в 2026 году; не запускать alias без независимого официального подтверждения и периода; не Яндекс Плюс/Go. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://yandex.ru/company/news/28-08-2026-01",
+      "evidence_method": "SRC_ANNOUNCEMENT",
+      "decision_reason": "Яндекс собственным анонсом 28.08.2026 подтвердил Яндекс Сим, собственная продуктовая страница sim.yandex.ru прочитана. Это не Туристический ЯСим/eSIM и не факт оплаченности/доступности каждого тарифа; фактическая услуга отдельно.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "TEL015",
+      "name": "Дополнение: Почта России Мобайл; PEND сохраняется",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL015 | Дополнение: Почта России Мобайл; PEND сохраняется |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL015 | Почта России Мобайл | REVIEW | PEND: пилот/ограниченная география; не вся оплата Почты России мобильная связь. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://info.pochta.ru/support",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточная первичная информация о нужном мобильном продукте Почты не получена. Сторонняя новость не делает всякий платёж Почте мобильной связью.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "TEL019",
+      "name": "NET015 Win mobile; PEND сохраняется",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL019 | NET015 Win mobile; PEND сохраняется |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL019 | Win mobile | REVIEW | PEND: региональный мобильный бренд, актуального оператора/географию и платёжную строку установить отдельно. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://winmobile.ru/",
+      "evidence_method": "REF_ATTEMPTED",
+      "decision_reason": "Тот же профиль NET015, не новый оператор. Достаточное первичное подтверждение текущего нужного оператора не получено; k-telecom.ru ведёт на петербургский еТелеком и не доказывает Win mobile. Не заменять регионального мобильного оператора по совпадению имени.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "same_profile_as": "NET015",
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "TEL026",
+      "name": "NET023 Wifire / NetByNet; история/период и PEND сохраняются",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL026 | NET023 Wifire / NetByNet; история/период и PEND сохраняются |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL026 | Wifire / NetByNet | REVIEW | PEND/исторический контур, срок присутствия и актуальное обозначение в России проверить до активации. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://surgut.wifire.ru/wifirepackets",
+      "evidence_method": "REF_IDX_LOCAL",
+      "decision_reason": "Тот же профиль NET023, не новый оператор. Первичный региональный Wifire профиль подтверждён, не юридическое равенство всех NetByNet/платежей/регионов и не автоматическая замена на Ростелеком.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "same_profile_as": "NET023",
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "TEL031",
+      "name": "NET029 Интерсвязь; различие доказательств/PEND не стирать",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL031 | NET029 Интерсвязь; различие доказательств/PEND не стирать |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL031 | Интерсвязь | REVIEW | PEND для актуального платежного источника/региона, провайдер Южного Урала; проверить торговый профиль. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://intersvyaz.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Нет достаточного первичного подтверждения текущего нужного профиля; не объявлять отсутствующую первичную проверку выполненной. Известная деятельность/личные правила сохраняются.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "TEL033",
+      "name": "Seven Sky",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL033 | Seven Sky | REVIEW | PEND: нужна актуальная самостоятельная роль оператора/бренда и источники; не случайный Seven/Sky. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://seven-sky.net/",
+      "evidence_method": "REF_ATTEMPTED",
+      "decision_reason": "Тот же профиль NET042, не новый оператор. Достаточный первичный профиль/оператор не получены; не склеивать разные Sky/Seven и не подменять источники агрегаторами.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "same_profile_as": "NET042",
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "TEL034",
+      "name": "Дополнение: Эт Хоум; PEND сохраняется",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL034 | Дополнение: Эт Хоум; PEND сохраняется |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL034 | Эт Хоум / ЭтХоум | REVIEW | PEND: домашний интернет Санкт-Петербурга, проверить действующую компанию и прямой платёжный реквизит. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "HISTORICAL_CONTEXT_ONLY",
+      "source_url": "https://at-home.ru/",
+      "evidence_method": "SRC_REDIRECT",
+      "decision_reason": "Переход на еТелеком наблюдён, но один redirect не доказывает юридическое равенство всех исторических ЭтХоум/счетов. ethоme.ru не используется как подтверждение оператора; новая глобальная identity вне активного v1, история только по source.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная историческая услуга по исходным правилам и фактическому периоду; новая текущая global identity не активируется по старому имени."
+    },
+    {
+      "id": "TEL035",
+      "name": "2КОМ",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL035 | 2КОМ | REVIEW | PEND: исторический/региональный провайдер, источник и возможное поглощение проверить. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://2kom.ru/",
+      "evidence_method": "REF_ATTEMPTED",
+      "decision_reason": "Тот же профиль NET041, не новый оператор. Достаточный первичный профиль/период не получен; страницы подборщиков тарифов не доказательство текущего самостоятельного оператора.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "same_profile_as": "NET041",
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "TEL036",
+      "name": "Дополнение: Алмател; PEND сохраняется, не объявлять все связанные бренды aliases",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL036 | Дополнение: Алмател; PEND сохраняется, не объявлять все связанные бренды aliases |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL036 | Алмател | REVIEW | PEND: бренд/оператор/актуальная география требуют проверки; не транслитерировать произвольно. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "EXCLUDED_FROM_ACTIVE_V1",
+      "source_url": "https://almatel.ru/",
+      "evidence_method": "ATTEMPTED",
+      "decision_reason": "Достаточное первичное подтверждение актуального контура не получено; не соединять 2КОМ/бренды в одного получателя по вторичным справочникам.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Новая глобальная merchant-identity не применяется. Существующие банковские факты/ручное решение/личное правило и independently известная деятельность сохраняются; операция не удаляется/не блокируется."
+    },
+    {
+      "id": "TEL037",
+      "name": "Сибирские сети",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL037 | Сибирские сети | REVIEW | PEND: провайдер/исторический бренд, текущая организация и платёжный контур проверить. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONTEXT_ONLY",
+      "source_url": "https://promo.sibset.ru/main",
+      "evidence_method": "IDX_LOCAL",
+      "decision_reason": "Первичный профиль Сибсетей подтверждён; отдельные региональные юридические лица/счета не сливаются.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "TEL038",
+      "name": "Дополнение: Инетком; PEND сохраняется",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-connectivity-categories-20261026.md",
+          "row": "| TEL038 | Дополнение: Инетком; PEND сохраняется |"
+        },
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL038 | Инетком | REVIEW | PEND: региональный интернет-провайдер, точные реквизиты и актуальность проверить. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "PROFILE_CONFIRMED",
+      "source_url": "https://inetcom.ru/",
+      "evidence_method": "SRC",
+      "decision_reason": "Первичный профиль Инетком как оператора связи подтверждён, регион/платёж/получатель по фактам.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Прежняя подготовленная профильная категория/U-контракт действует при достаточном фактическом контексте. Источник/историческая пометка PEND больше не единственное основание отказа; неизвестный предмет/роль/категория имеет явно заданный путь выбора без вымышленного назначения."
+    },
+    {
+      "id": "TEL039",
+      "name": "Электронный город / Новотелеком",
+      "previous_sources": [
+        {
+          "document": "merchant-catalog-telecom-20261026.md",
+          "row": "| TEL039 | Электронный город / Новотелеком | REVIEW | PEND: региональный провайдер, исторические связи и современное платежное имя нуждаются в проверке. |"
+        }
+      ],
+      "previous_state": "PEND",
+      "decision_date": "2026-10-27",
+      "disposition": "HISTORICAL_CONTEXT_ONLY",
+      "source_url": "https://l37-193-193-152.novotelecom.ru/index.php?Itemid=106&id=1&option=com_contact&view=contact",
+      "evidence_method": "IDX_HIST",
+      "decision_reason": "Историческая первичная контактная страница домена Новотелеком есть; текущая торговая роль Электронного города не объявляется автоматически прежней и не сливается с Сибсетями.",
+      "observed_bank_aliases_proven": false,
+      "runtime_activated": false,
+      "requires_actual_payment_context": true,
+      "category_resolution": "Доказанная историческая услуга по исходным правилам и фактическому периоду; новая текущая global identity не активируется по старому имени."
+    }
+  ],
+  "new_block_inventories": {
+    "LOG": {
+      "title": "Почта, курьерские службы и грузоперевозки",
+      "document": "merchant-catalog-logistics-20261027.md",
+      "profiles": 22,
+      "forms": 136,
+      "rules": 20,
+      "collisions": 12,
+      "test_families": 32,
+      "parameters": 8
+    },
+    "SVC": {
+      "title": "Бытовые мастерские, химчистки и ремонт техники",
+      "document": "merchant-catalog-household-services-20261027.md",
+      "profiles": 16,
+      "forms": 90,
+      "rules": 20,
+      "collisions": 12,
+      "test_families": 32,
+      "parameters": 8
+    },
+    "PRF": {
+      "title": "Юридические, бухгалтерские и документальные услуги",
+      "document": "merchant-catalog-professional-services-20261027.md",
+      "profiles": 16,
+      "forms": 97,
+      "rules": 20,
+      "collisions": 12,
+      "test_families": 32,
+      "parameters": 8
+    },
+    "OFF": {
+      "title": "Офис, полиграфия, коворкинги и реклама",
+      "document": "merchant-catalog-office-advertising-20261027.md",
+      "profiles": 27,
+      "forms": 168,
+      "rules": 20,
+      "collisions": 12,
+      "test_families": 32,
+      "parameters": 8
+    }
+  },
+  "new_profile_sources": [
+    {
+      "id": "LOG001",
+      "name": "Почта России",
+      "forms": [
+        "Почта России",
+        "Почты России",
+        "Почте России",
+        "Почтой России",
+        "Pochta Rossii",
+        "Pochta Russia",
+        "Russian Post"
+      ],
+      "url": "https://info.pochta.ru/support/post-rules/delivery-terms",
+      "source_status": "SRC",
+      "category_rule": "Отдельная почтовая услуга → Транспорт / Прочий транспорт при доступном узле; товар, наложенный платёж, перевод и финуслуга отдельно.",
+      "restriction": "Почта Банк, магазин, почтовый перевод и стоимость содержимого не доставка автоматически.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG002",
+      "name": "EMS Почта России",
+      "forms": [
+        "EMS",
+        "EMS Почта России",
+        "ЕМС Почта России",
+        "EMS Russian Post",
+        "Курьер экспресс Почта России"
+      ],
+      "url": "https://info.pochta.ru/support/parcels/ems",
+      "source_status": "SRC_PRODUCT",
+      "category_rule": "Курьерский продукт LOG001, не отдельный новый банк/получатель; обычная доставка по общему LOG-правилу.",
+      "restriction": "Голое EMS может быть медицинской/технической аббревиатурой; «курьер экспресс» общее сочетание без Почты не бренд.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG003",
+      "name": "СДЭК",
+      "forms": [
+        "СДЭК",
+        "СДЕK",
+        "СДЭКа",
+        "СДЭКе",
+        "СДЭКу",
+        "CDEK",
+        "Cdek.ru"
+      ],
+      "url": "https://www.cdek.ru/ru/",
+      "source_status": "SRC",
+      "category_rule": "Отдельная курьерская/посылочная услуга; при известной рабочей цели → Рабочие расходы; стоимость товара отдельно.",
+      "restriction": "CDEK.Shopping MP009 — агентский товарный выкуп, не та же доставка; общий CDEK не доказывает Shopping.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG004",
+      "name": "DPD",
+      "forms": [
+        "DPD",
+        "ДПД",
+        "ДиПиДи",
+        "DPD Russia",
+        "DPD.ru"
+      ],
+      "url": "https://www.dpd.ru/",
+      "source_status": "SRC",
+      "category_rule": "Доставка посылки/груза по установленному предмету; не сама покупка из магазина.",
+      "restriction": "ДПД вне транспортного контекста не достаточная identity; стоимость наложенного товара не комиссия DPD.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG005",
+      "name": "Деловые Линии",
+      "forms": [
+        "Деловые Линии",
+        "Деловых Линий",
+        "Деловым Линиям",
+        "Деловыми Линиями",
+        "ДеловыеЛинии",
+        "Delovye Linii",
+        "Delovie Linii",
+        "Dellin"
+      ],
+      "url": "https://www.dellin.ru/",
+      "source_status": "SRC",
+      "category_rule": "Грузовая перевозка/отдельные логистические услуги; не пассажирский билет.",
+      "restriction": "Деловые линии как обычные слова/связь не бренд; хранение/страховка/возврат отдельно если установлены.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG006",
+      "name": "ПЭК",
+      "forms": [
+        "ПЭК",
+        "Первая Экспедиционная Компания",
+        "Первой Экспедиционной Компании",
+        "PEK",
+        "Pecom",
+        "Pecom.ru"
+      ],
+      "url": "https://pecom.ru/entity/",
+      "source_status": "IDX",
+      "category_rule": "Профиль перевозки/хранения/логистики, конкретный платёж по назначению.",
+      "restriction": "ПЭК техническое сокращение не перевозчик без контекста; не весь остаток баланса стоимость перевозки.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG007",
+      "name": "Байкал Сервис",
+      "forms": [
+        "Байкал Сервис",
+        "Байкал-Сервис",
+        "БайкалСервис",
+        "Байкала Сервис",
+        "Baikal Service",
+        "Baikal Servis",
+        "Baikalsr"
+      ],
+      "url": "https://www.baikalsr.ru/",
+      "source_status": "IDX",
+      "category_rule": "Грузовая перевозка, отдельная сумма упаковки/хранения при фактах.",
+      "restriction": "Байкал озеро/вода/путешествие не транспортная компания.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG008",
+      "name": "ЖелДорЭкспедиция",
+      "forms": [
+        "ЖелДорЭкспедиция",
+        "Желдорэкспедиции",
+        "Желдорэкспедицию",
+        "ЖДЭ",
+        "ЖелДор Экспедиция",
+        "Zheldorexpedicia",
+        "JDE"
+      ],
+      "url": "https://www.jde.ru/",
+      "source_status": "SRC",
+      "category_rule": "Грузовая логистика, не пассажирская поездка только из «желдор».",
+      "restriction": "ЖД/железная дорога/экспедиция по отдельности не merchant; не Ж/д билеты автоматически.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG009",
+      "name": "Энергия — транспортная компания",
+      "forms": [
+        "ТК Энергия",
+        "Транспортная компания Энергия",
+        "Транспортной компании Энергия",
+        "TK Energia",
+        "TK Energiya",
+        "NRG-TK"
+      ],
+      "url": "https://nrg-tk.pro/uslugi/internet_magazinam/",
+      "source_status": "IDX",
+      "category_rule": "Именно транспортный профиль Энергии, отдельная доставка по LOG-правилу.",
+      "restriction": "Энергия/NRG без транспортного контекста не сеть; нефтеперевозчик tc-nrg.ru не автоматически эта компания.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG010",
+      "name": "КИТ",
+      "forms": [
+        "ТК КИТ",
+        "Транспортная компания КИТ",
+        "Транспортной компании КИТ",
+        "TK KIT",
+        "TK-KIT",
+        "КИТ Грузоперевозки"
+      ],
+      "url": "https://tk-kit.ru/",
+      "source_status": "SRC",
+      "category_rule": "Грузовая перевозка при доказанном конкретном профиле; история GTD только при отдельном подтверждении периода.",
+      "restriction": "Кит животное, набор kit, KIT в IT/бренде товара не транспортная identity; GTD не добавлен слепо как alias.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG011",
+      "name": "Возовоз",
+      "forms": [
+        "Возовоз",
+        "Возовоза",
+        "Возовозу",
+        "Возовозе",
+        "Vozovoz",
+        "Vozovoz.ru"
+      ],
+      "url": "https://vozovoz.ru/",
+      "source_status": "SRC",
+      "category_rule": "Грузоперевозка, доставка до адреса/упаковка по фактам.",
+      "restriction": "Возврат, упаковка, известная другая услуга не выдуманная вторая перевозка; имя не определяет цель бизнеса.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG012",
+      "name": "Major Express",
+      "forms": [
+        "Major Express",
+        "MajorExpress",
+        "Мэйджор Экспресс",
+        "Мейджор Экспресс",
+        "МэйджорЭкспресс",
+        "МейджорЭкспресс"
+      ],
+      "url": "https://www.major-express.ru/",
+      "source_status": "IDX",
+      "category_rule": "Курьерская/грузовая доставка, не стоимость вложения.",
+      "restriction": "Major автодилер/другое Major/Express не этот оператор; не автоматически обслуживание автомобиля.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG013",
+      "name": "City Express",
+      "forms": [
+        "City Express",
+        "CityExpress",
+        "Сити Экспресс",
+        "СитиЭкспресс",
+        "Сити-Экспресс"
+      ],
+      "url": "https://www.cityexpress.ru/",
+      "source_status": "IDX",
+      "category_rule": "Экспресс-почта/посылки по установленному логистическому профилю.",
+      "restriction": "City/Express общие слова и иные бренды не полная identity.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG014",
+      "name": "Курьер Сервис Экспресс / КСЭ",
+      "forms": [
+        "Курьер Сервис Экспресс",
+        "Курьер-Сервис-Экспресс",
+        "Курьер Сервиса Экспресс",
+        "КСЭ",
+        "CSE",
+        "Courier Service Express"
+      ],
+      "url": "https://www.cse.ru/",
+      "source_status": "SRC",
+      "category_rule": "Курьерский профиль, отдельная доставка по LOG-контракту.",
+      "restriction": "КСЭ/CSE короткие аббревиатуры вне логистического контекста не достаточны.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG015",
+      "name": "Достависта",
+      "forms": [
+        "Достависта",
+        "Достависты",
+        "Достависте",
+        "Достависту",
+        "Доставистой",
+        "Dostavista",
+        "Dostavista.ru"
+      ],
+      "url": "https://dostavista.ru/tariffs/courier-delivery",
+      "source_status": "IDX",
+      "category_rule": "Курьерская услуга; оплаченная доставка не доказательство содержания посылки.",
+      "restriction": "Доставить как глагол не бренд; выплата курьеру не обязательно покупка пользователя/зарплата; Borzo не глобальный alias всех стран.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG016",
+      "name": "PONY EXPRESS",
+      "forms": [
+        "Pony Express",
+        "PonyExpress",
+        "Пони Экспресс",
+        "ПониЭкспресс",
+        "Пони-Экспресс"
+      ],
+      "url": "https://www.ponyexpress.ru/",
+      "source_status": "SRC",
+      "category_rule": "Экспресс-доставка/логистика по фактам.",
+      "restriction": "Пони как животное/игрушка и обычное Express не оператор; международная строка не обещание текущего маршрута.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG017",
+      "name": "DIMEX",
+      "forms": [
+        "DIMEX",
+        "Даймэкс",
+        "Даймекс",
+        "Даймэкса",
+        "Даймэксу",
+        "Даймэксе"
+      ],
+      "url": "https://www.dimex.ws/",
+      "source_status": "SRC",
+      "category_rule": "Курьерская экспресс-доставка.",
+      "restriction": "Похожие имена товаров/медицинские слова не сеть; неизвестный дополнительный сбор не угадывать.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG018",
+      "name": "5Post",
+      "forms": [
+        "5Post",
+        "5 Post",
+        "5-Post",
+        "ФайвПост",
+        "Файв Пост",
+        "ПятьПост",
+        "FivePost"
+      ],
+      "url": "https://fivepost.ru/about/",
+      "source_status": "IDX",
+      "category_rule": "Посылочная логистика; передача в магазине не продуктовая покупка.",
+      "restriction": "Касса Пятёрочки/Перекрёстка может быть выдачей 5Post; цифра 5 сохраняется, Post сам по себе не бренд.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG019",
+      "name": "B2CPL",
+      "forms": [
+        "B2CPL",
+        "B2C PL",
+        "БиТуСиПиЭл",
+        "Би Ту Си Пи Эл"
+      ],
+      "url": "https://fivepost.ru/partners/b2cpl/",
+      "source_status": "IDX_PARTNER",
+      "category_rule": "Профиль курьерской компании подтверждён прямой карточкой партнёра 5Post; не общие B2C-услуги.",
+      "restriction": "Подтверждён профиль партнёра, не банковские aliases/все филиалы/принадлежность платежа 5Post.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG020",
+      "name": "TopDelivery",
+      "forms": [
+        "TopDelivery",
+        "Top Delivery",
+        "ТопДеливери",
+        "Топ Деливери",
+        "Топ-Деливери"
+      ],
+      "url": "https://www.topdelivery.ru/",
+      "source_status": "SRC",
+      "category_rule": "Доставка заказов, услуги бизнесу; возврат/хранение/товар по назначению.",
+      "restriction": "Delivery/топ/доставка без полного имени не identity; Деливери продуктов из прежнего каталога отдельно.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG021",
+      "name": "Яндекс Доставка",
+      "forms": [
+        "Яндекс Доставка",
+        "Яндекс Доставки",
+        "Яндекс Доставке",
+        "Яндекс Доставку",
+        "Яндекс Доставкой",
+        "Yandex Dostavka",
+        "YandexDostavka",
+        "Yandex Dostavki",
+        "Yandex Dostavke",
+        "Yandex Dostavku"
+      ],
+      "url": "https://dostavka.yandex.ru/",
+      "source_status": "REF_SRC",
+      "category_rule": "Тот же сервис из раздела доставки master; здесь уточнён логистический предмет, не новый merchant/повторная операция.",
+      "restriction": "Yandex Delivery отдельно неоднозначно с Деливери; один Яндекс или Яндекс Go не этот профиль. Состав отправления не угадывать.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "LOG022",
+      "name": "Boxberry — историческая связь",
+      "forms": [
+        "Boxberry",
+        "Box Berry",
+        "Боксберри",
+        "Бокс Берри",
+        "Боксберри Доставка"
+      ],
+      "url": "https://dostavka.yandex.ru/boxberry/",
+      "source_status": "HIST_SRC",
+      "category_rule": "Первичная страница прямо описывает переход в Яндекс Доставку; сохранить историческое имя и дату, не переписать старый source.",
+      "restriction": "Не два расхода/не автоматическое слияние ID/счетов/получателей; не обещать самостоятельного нынешнего оператора по старому имени.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC001",
+      "name": "Диана — химчистка",
+      "forms": [
+        "Химчистка Диана",
+        "Диана химчистка",
+        "Химчистки Диана",
+        "Diana Dryclean",
+        "Dryclean Diana",
+        "Диана Сервис"
+      ],
+      "url": "https://dryclean.ru/",
+      "source_status": "SRC",
+      "category_rule": "Обычная химчистка/стирка → Жильё и дом / Бытовые услуги без category Review из-за отсутствия списка вещей.",
+      "restriction": "Диана — также имя/магазины/другие фирмы; частный перевод Диане не переименовывать в сеть.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC002",
+      "name": "Леда — химчистка",
+      "forms": [
+        "Химчистка Леда",
+        "Леда химчистка",
+        "Химчистки Леда",
+        "Leda Dryclean",
+        "Leda Dry Cleaning"
+      ],
+      "url": "https://leda.ru/",
+      "source_status": "IDX",
+      "category_rule": "Стирка/химчистка/известный ремонт по бытовой услуге.",
+      "restriction": "Леда как имя/мифология/иной бизнес не сеть; доставка вещей не новая одежда.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC003",
+      "name": "Лисичка — химчистка",
+      "forms": [
+        "Химчистка Лисичка",
+        "Лисичка химчистка",
+        "Химчистки Лисичка",
+        "Lisichka Dryclean",
+        "Lisichka Dry Cleaning"
+      ],
+      "url": "https://lisichka.ru/",
+      "source_status": "IDX",
+      "category_rule": "Очевидная бытовая услуга по установленной сети.",
+      "restriction": "Лисичка гриб/животное/детский бренд/физлицо не торговая identity химчистки.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC004",
+      "name": "Контраст — химчистка",
+      "forms": [
+        "Химчистка Контраст",
+        "Контраст химчистка",
+        "Контраст Клининг",
+        "Contrast Cleaners",
+        "Contrast-Cleaners",
+        "Kontrast Himchistka"
+      ],
+      "url": "https://contrast-cleaners.ru/en/",
+      "source_status": "SRC",
+      "category_rule": "Установленная химчистка/чистка вещей/известные услуги по предмету.",
+      "restriction": "Контраст в фотографии/обычное слово/другая организация не сеть; химия как купленный товар отдельно.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC005",
+      "name": "BIANCA — химчистка",
+      "forms": [
+        "BIANCA химчистка",
+        "Химчистка Бианка",
+        "Бианка химчистка",
+        "Bianca Dryclean",
+        "Bianca Dry Cleaning"
+      ],
+      "url": "https://bianca.ru/",
+      "source_status": "IDX",
+      "category_rule": "Химчистка и сопутствующая установленная бытовая услуга.",
+      "restriction": "Bianca как имя/модный бренд не химчистка по одному токену; bianca-city.ru не объявлен официальным этим профилем.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC006",
+      "name": "СамПРАЧКА",
+      "forms": [
+        "СамПРАЧКА",
+        "Сам Прачка",
+        "Сам-Прачка",
+        "Сампрачки",
+        "Сампрачке",
+        "Samprachka",
+        "Sam Prachka"
+      ],
+      "url": "https://samprachka.com/",
+      "source_status": "SRC",
+      "category_rule": "Прачечная самообслуживания → Бытовые услуги; продажа оборудования/франшиза отдельно.",
+      "restriction": "Оплата терминалу подтверждает услугу только при достаточном контексте, номер машины не имя продавца.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC007",
+      "name": "Лавандерия — Нижний Новгород",
+      "forms": [
+        "Лавандерия Нижний Новгород",
+        "Лавандерия НН",
+        "Лавандерии НН",
+        "Lavanderia NN",
+        "Lavanderia-NN"
+      ],
+      "url": "https://lavanderia-nn.ru/uslugi/samoobsluzhivanie/",
+      "source_status": "SRC_LOCAL",
+      "category_rule": "Конкретная подтверждённая нижегородская прачечная/химчистка.",
+      "restriction": "Lavanderia — общее обозначение прачечной/многие независимые сервисы; не все города и не lavanderia.ru.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC008",
+      "name": "Мобильный портной — Санкт-Петербург",
+      "forms": [
+        "Мобильный портной",
+        "Мобильного портного",
+        "Мобильному портному",
+        "Mobilny Portnoy",
+        "Rematelier",
+        "Rem Atelier"
+      ],
+      "url": "https://rematelier.ru/",
+      "source_status": "SRC_LOCAL",
+      "category_rule": "Ателье, ремонт/пошив по существующей бытовой/личной категории; покупка одежды отдельно.",
+      "restriction": "Портной как профессия и частный перевод не эта сеть; подтверждён петербургский профиль, не любой мобильный мастер.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC009",
+      "name": "Ателье Онлайн — atelier-online.ru",
+      "forms": [
+        "Ателье Онлайн",
+        "Ателье-Онлайн",
+        "Atelier Online",
+        "Atelier-Online",
+        "Atelie Online"
+      ],
+      "url": "https://atelier-online.ru/",
+      "source_status": "SRC_LOCAL",
+      "category_rule": "Ремонт/пошив одежды как услуга, не автоматическая покупка новой одежды.",
+      "restriction": "«Ателье онлайн» может описывать способ заказа другой фирмы; нужен достаточный контекст именно этого сервиса.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC010",
+      "name": "Мастер Минутка",
+      "forms": [
+        "Мастер Минутка",
+        "Мастер-Минутка",
+        "Мастера Минутка",
+        "Master Minutka",
+        "MasterMinutka"
+      ],
+      "url": "https://masterminutka.ru/",
+      "source_status": "SRC_LOCAL",
+      "category_rule": "Дом быта: известный ремонт обуви/часов/ателье/ключи по бытовой услуге.",
+      "restriction": "Не спутать с кафе/обычным словом Минутка или независимой мастерской; профиль первичного сайта Санкт-Петербург.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC011",
+      "name": "МУЛЬТИ-МАСТЕР",
+      "forms": [
+        "Мульти-Мастер",
+        "Мульти Мастер",
+        "Мультимастер",
+        "Мульти-Мастера",
+        "Multi Master",
+        "Multi-Master",
+        "Multimaster"
+      ],
+      "url": "https://multi-master.ru/",
+      "source_status": "SRC",
+      "category_rule": "Бытовой сервис по известному виду работ; широкий профиль дома быта достаточен для Бытовых услуг.",
+      "restriction": "Не любой multimaster-товар/мастер; multimaster.ru без дефиса не объявлен тем же сайтом/оператором.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC012",
+      "name": "Мистер-Мастер — Люберцы",
+      "forms": [
+        "Мистер-Мастер Люберцы",
+        "Мистер Мастер Люберцы",
+        "Mister Master Lyubertsy",
+        "Mistermaster1"
+      ],
+      "url": "https://mistermaster1.ru/",
+      "source_status": "SRC_LOCAL",
+      "category_rule": "Подтверждённый ремонт обуви/сумок/чемоданов; исходный предмет не становится новой покупкой.",
+      "restriction": "Мистер Мастер — несколько независимых компаний; голое имя без нужного контекста не все мастерские РФ.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC013",
+      "name": "Pedant.ru",
+      "forms": [
+        "Pedant.ru",
+        "Pedant Ru",
+        "Pedant",
+        "Педант",
+        "Педанта",
+        "Педанте",
+        "Педанту"
+      ],
+      "url": "https://pedant.ru/",
+      "source_status": "SRC",
+      "category_rule": "Обычный ремонт личной техники → Бытовые услуги; явно рабочая техника/работа по пользовательской цели.",
+      "restriction": "Педант — обычное слово/человек; аксессуар/продажа аппарата/франшиза/подписка не автоматически ремонт.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC014",
+      "name": "iSupport",
+      "forms": [
+        "iSupport",
+        "I Support",
+        "iSupport.ru",
+        "АйСаппорт",
+        "Ай Саппорт"
+      ],
+      "url": "https://isupport.ru/",
+      "source_status": "SRC",
+      "category_rule": "Сервис ремонта техники; известная покупка в связанном магазине по товару, не repair.",
+      "restriction": "Support как общее слово/служба поддержки другой компании не identity; «официальная авторизация» не выводится из имени.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC015",
+      "name": "RSS — ремонт техники",
+      "forms": [
+        "RSS сервис",
+        "RSS ремонт",
+        "РСС сервис",
+        "РСС ремонт",
+        "RSS Service",
+        "RSS.ru"
+      ],
+      "url": "https://www.rss.ru/",
+      "source_status": "SRC",
+      "category_rule": "Известный ремонт компьютерной/офисной техники по личной/рабочей цели.",
+      "restriction": "RSS-лента/рассылка/любая аббревиатура RSS не сервисный центр; технику для бизнеса не определять по названию устройства.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "SVC016",
+      "name": "Химдиван",
+      "forms": [
+        "Химдиван",
+        "Хим-Диван",
+        "Химдивана",
+        "Химдиване",
+        "Himdivan",
+        "Khimdivan"
+      ],
+      "url": "https://himdivan.ru/",
+      "source_status": "IDX",
+      "category_rule": "Химчистка мебели/ковров по домашней бытовой услуге; офисная уборка по установленной рабочей цели.",
+      "restriction": "Не новый диван/мебель и не химтовар из названия; неизвестный размер/состав работ не придумывать.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF001",
+      "name": "Реестр нотариусов / ФНП — справочная инфраструктура",
+      "forms": [
+        "Федеральная нотариальная палата",
+        "Федеральной нотариальной палаты",
+        "ФНП",
+        "Notariat",
+        "Notariat.ru",
+        "Реестр нотариусов"
+      ],
+      "url": "https://minjust.gov.ru/ru/pages/reestr-notariusov-rossijskoj-federacii/",
+      "source_status": "REG",
+      "category_rule": "Подтверждённый институт/реестр, не единый получатель всех нотариальных оплат; назначение реальной услуги отдельно.",
+      "restriction": "Реестр не создаёт операцию/нотариуса/договор, слово нотариус не госпошлина автоматически; реальные дела/документы не модели.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF002",
+      "name": "Московская городская нотариальная палата",
+      "forms": [
+        "Московская городская нотариальная палата",
+        "Московской городской нотариальной палаты",
+        "МГНП",
+        "MGNP",
+        "Mgnp.info"
+      ],
+      "url": "https://www.mgnp.info/",
+      "source_status": "SRC_INST",
+      "category_rule": "Профиль палаты/справочного канала; платёж конкретному нотариусу не переименовывать в палату.",
+      "restriction": "Организация института и фактический исполнитель различны, членство/статус каждого лица не по общему имени.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF003",
+      "name": "ПРАВОКАРД",
+      "forms": [
+        "ПРАВОКАРД",
+        "Правокарда",
+        "Правокарде",
+        "Pravocard",
+        "Pravo Card"
+      ],
+      "url": "https://biz.pravocard.ru/",
+      "source_status": "IDX",
+      "category_rule": "Юридический сервис; бизнес-продукт по известному назначению → Рабочие расходы/Сервисы для работы, личные услуги отдельно.",
+      "restriction": "Не госорган/госпошлина, не карта банка; пакет/подписка/разовая помощь по source, не вымышленное судебное дело.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF004",
+      "name": "Европейская Юридическая Служба",
+      "forms": [
+        "Европейская Юридическая Служба",
+        "Европейской Юридической Службы",
+        "ЕЮС",
+        "EUS",
+        "ELS24",
+        "ELS24.com"
+      ],
+      "url": "https://els24.com/",
+      "source_status": "SRC",
+      "category_rule": "Юридическая помощь/пакеты; личная и рабочая цель различимы.",
+      "restriction": "Не каждая служба/аббревиатура EUS эта компания; защищённые детали дела не требуются для общей категории.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF005",
+      "name": "Амулекс",
+      "forms": [
+        "Амулекс",
+        "Амулекса",
+        "Амулексе",
+        "Амулексу",
+        "Amulex",
+        "Amulex.ru"
+      ],
+      "url": "https://amulex.ru/",
+      "source_status": "SRC",
+      "category_rule": "Юридическая услуга/сервисный пакет по известной цели и личной структуре.",
+      "restriction": "Не страховка/кредит/госпошлина из юридического имени; банковский пакет с услугой не весь юридический expense.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF006",
+      "name": "СберПраво",
+      "forms": [
+        "СберПраво",
+        "Сбер Право",
+        "Сбер-Право",
+        "СберПрава",
+        "SberPravo",
+        "Sber Pravo"
+      ],
+      "url": "https://sberpravo.ru/",
+      "source_status": "SRC",
+      "category_rule": "Юридический сервис, не банковское обслуживание; известная цель выше группы Сбер.",
+      "restriction": "Один Сбер/право/банк не этот продукт; не СберПрайм/страхование/перевод.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF007",
+      "name": "ДЕ-ЮРЕ — de-ure.ru",
+      "forms": [
+        "Бюро адвокатов ДЕ-ЮРЕ",
+        "ДЕ-ЮРЕ",
+        "Де Юре",
+        "De-Ure",
+        "De Ure",
+        "De-Ure.ru"
+      ],
+      "url": "https://de-ure.ru/",
+      "source_status": "IDX",
+      "category_rule": "Конкретное адвокатское бюро; оплата профессиональной услуги по цели.",
+      "restriction": "Де-юре как выражение не merchant; de-jure.ru оказался иным/неподтверждённым адресом, не считать его alias этого бюро.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF008",
+      "name": "Кнопка — бухгалтерский сервис",
+      "forms": [
+        "Бухгалтерия Кнопка",
+        "Кнопка бухгалтерия",
+        "Кнопки бухгалтерия",
+        "Knopka бухгалтерия",
+        "Knopka.com"
+      ],
+      "url": "https://knopka.com/",
+      "source_status": "SRC",
+      "category_rule": "Очевидный бухгалтерский аутсорсинг для работы → Рабочие расходы/Сервисы для работы по фактическому продукту.",
+      "restriction": "Кнопка как предмет/интерфейс не сервис; банк/налог/зарплата сотрудников не часть оплаты бухгалтера без фактов.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF009",
+      "name": "Моё дело",
+      "forms": [
+        "Моё дело",
+        "Моего дела",
+        "Моему делу",
+        "Моём деле",
+        "Moe Delo",
+        "Moedelo",
+        "Moedelo.org"
+      ],
+      "url": "https://www.moedelo.org/",
+      "source_status": "IDX",
+      "category_rule": "Бухгалтерская программа и аутсорсинг различимы: сервис работы либо фактическая бухгалтерская услуга.",
+      "restriction": "«Моё дело» обычная фраза не бренд; цена тарифа не налог/госпошлина, без расчётного налога от AI.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF010",
+      "name": "Небо — nebopro.ru",
+      "forms": [
+        "Небо бухгалтерия",
+        "Бухгалтерия Небо",
+        "НебоПро",
+        "NeboPro",
+        "Nebo Pro",
+        "Nebopro.ru"
+      ],
+      "url": "https://nebopro.ru/",
+      "source_status": "SRC",
+      "category_rule": "Профиль учёта/отчётности/ПО; программный доступ → Сервисы для работы/ПО, персональная налоговая услуга отдельно.",
+      "restriction": "Небо как слово/торговый центр/поездка не бухгалтерия; технический отчёт не новая финансовая операция.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF011",
+      "name": "Фингуру",
+      "forms": [
+        "Фингуру",
+        "Фин-Гуру",
+        "Фингуру бухгалтерия",
+        "Finguru",
+        "Fin Guru",
+        "Fingu.ru"
+      ],
+      "url": "https://fingu.ru/",
+      "source_status": "SRC",
+      "category_rule": "Бухгалтерское сопровождение/софт по реальному продукту и рабочей цели.",
+      "restriction": "Финансовый гуру как выражение/инвестблогер не сервис; finguru.ru не объявляется действующим адресом по созвучию.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF012",
+      "name": "Главбух Ассистент",
+      "forms": [
+        "Главбух Ассистент",
+        "ГлавбухАссистент",
+        "Главбух-Ассистент",
+        "Glavbukh Assistent",
+        "GBA Business",
+        "Gba.business.ru"
+      ],
+      "url": "https://gba.business.ru/",
+      "source_status": "SRC",
+      "category_rule": "Бухгалтерский аутсорсинг/продукт по фактической услуге; налоговые платежи клиентской компании отдельно.",
+      "restriction": "Журнал Главбух/Система Главбух/другой продукт семейства не автоматически тот же получатель.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF013",
+      "name": "ТрансЛинк — бюро переводов",
+      "forms": [
+        "ТрансЛинк",
+        "Транс Линк",
+        "Транс-Линк",
+        "ТрансЛинка",
+        "TransLink",
+        "Trans Link",
+        "T-Link.ru"
+      ],
+      "url": "https://www.t-link.ru/",
+      "source_status": "SRC",
+      "category_rule": "Письменный/устный перевод документов по известной личной/рабочей цели; не денежный transfer.",
+      "restriction": "Транспорт/связь Translink и перевод денег не этот профиль; translink.ru не назначать по созвучию.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF014",
+      "name": "ТранЭкспресс — бюро переводов",
+      "forms": [
+        "ТранЭкспресс",
+        "Тран Экспресс",
+        "Тран-Экспресс",
+        "ТранЭкспресса",
+        "TranExpress",
+        "Tran Express",
+        "Tran-Express.ru"
+      ],
+      "url": "https://tran-express.ru/about",
+      "source_status": "SRC",
+      "category_rule": "Лингвистическая услуга; известная нотариальная часть/допрасход только по подтверждённому составу.",
+      "restriction": "Express/транспортная компания не бюро; не все языки/нотариальное заверение/персональные документы угадывать по оплате.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF015",
+      "name": "Лингвотек",
+      "forms": [
+        "Лингвотек",
+        "Лингвотека",
+        "Лингвотеке",
+        "Lingvotech",
+        "Lingvo Tech",
+        "Lingvotech.com"
+      ],
+      "url": "https://lingvotech.com/",
+      "source_status": "SRC",
+      "category_rule": "Лингвистические/переводческие услуги по предмету и цели.",
+      "restriction": "Лингвистическая школа/ПО/любой Lingvo не бюро; личность/национальность/содержание документа не выводятся.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "PRF016",
+      "name": "Мои документы / МФЦ — административный канал",
+      "forms": [
+        "Мои документы",
+        "Моих документов",
+        "Моим документам",
+        "МФЦ",
+        "MFC",
+        "Moi Dokumenty",
+        "Центр госуслуг Мои документы"
+      ],
+      "url": "https://www.mos.ru/upload/newsfeed/newsfeed/dlyapdfcentrigosyslyg.pdf",
+      "source_status": "IDX_INST",
+      "category_rule": "Подтверждён канал центров госуслуг Москвы, не платный юридический merchant всех операций; назначение платежа отдельно.",
+      "restriction": "Не создавать расход из записи/визита; пошлина отдельно от сервисного сбора и не автоматически плата МФЦ.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF001",
+      "name": "Комус",
+      "forms": [
+        "Комус",
+        "Комуса",
+        "Комусе",
+        "Комусу",
+        "Комусом",
+        "Komus",
+        "Komus.ru",
+        "Комус магазин"
+      ],
+      "url": "https://landing.komus.net/",
+      "source_status": "REF_EDU069",
+      "category_rule": "Тот же многопрофильный продавец EDU069; известная канцелярия для учёбы/работы/дома по предмету и цели.",
+      "restriction": "Одно имя не делает всё рабочими расходами; мебель/техника/бытовая корзина отдельно, не новый получатель из OFF.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF002",
+      "name": "ОФИСМАГ",
+      "forms": [
+        "ОФИСМАГ",
+        "Офис Маг",
+        "Офис-Маг",
+        "Офисмага",
+        "Офисмаге",
+        "OfficeMag",
+        "Office Mag",
+        "Officemag.ru"
+      ],
+      "url": "https://www.officemag.ru/",
+      "source_status": "REF_EDU070",
+      "category_rule": "Тот же продавец EDU070; назначение по известному товару/учёбе/работе.",
+      "restriction": "Офис в имени не доказывает бизнес-цель пользователя и не все покупки учебные материалы.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF003",
+      "name": "КанцПарк",
+      "forms": [
+        "КанцПарк",
+        "Канц Парк",
+        "Канц-Парк",
+        "Канцпарка",
+        "Канцпарке",
+        "Kanzpark",
+        "Kanz Park"
+      ],
+      "url": "https://kanzpark.ru/",
+      "source_status": "SRC",
+      "category_rule": "Канцелярия, учебные/офисные/творческие товары: известная цель определяет ветвь.",
+      "restriction": "Парк не отдых, канцелярия не обязательно бизнес; не угадывать ребёнка/школу/должность.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF004",
+      "name": "Самсон — офисный дистрибьютор",
+      "forms": [
+        "Самсон Опт",
+        "Самсон-Опт",
+        "Самсонопт",
+        "Samson Opt",
+        "Samsonopt",
+        "Samsonopt.ru"
+      ],
+      "url": "https://www.samsonopt.ru/",
+      "source_status": "SRC",
+      "category_rule": "Офисное снабжение по фактическим товарам/цели; группа/дистрибьютор не каждый retail-brand товара.",
+      "restriction": "Самсон имя/клиника/товар Samsonite не этот продавец; оптовый профиль не даёт право определять владельца ИП.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF005",
+      "name": "Копирка",
+      "forms": [
+        "Копирка",
+        "Копирки",
+        "Копирке",
+        "Копирку",
+        "Kopirka",
+        "Kopirka.ru"
+      ],
+      "url": "https://kopirka.ru/",
+      "source_status": "IDX",
+      "category_rule": "Печать документов/полиграфия/фото/сувениры по известному предмету; рекламный тираж → Реклама.",
+      "restriction": "Копирка как материал/обычное слово не сеть; весь неизвестный заказ не фото/бизнес автоматически.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF006",
+      "name": "Копицентр — copy.spb.ru",
+      "forms": [
+        "Копицентр СПб",
+        "Копицентр Санкт-Петербург",
+        "Copy.spb.ru",
+        "Copy SPB",
+        "Копицентр copy.spb"
+      ],
+      "url": "https://copy.spb.ru/about/",
+      "source_status": "IDX_LOCAL",
+      "category_rule": "Конкретная петербургская компания печати; работа/учёба/личные документы различимы.",
+      "restriction": "Копицентр — общее слово; не любой пункт копирования эта организация.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF007",
+      "name": "netPrint",
+      "forms": [
+        "netPrint",
+        "Net Print",
+        "Нетпринт",
+        "Нет Принт",
+        "Нетпринта",
+        "Нетпринте",
+        "Netprint.ru"
+      ],
+      "url": "https://netprint.ru/",
+      "source_status": "SRC",
+      "category_rule": "Фотопечать/фотокниги/известный сувенир по предмету; цель подарка только если установлена.",
+      "restriction": "Не фотоаппарат/ПО по имени, не любая print-компания; семейные отношения/содержимое фото не выводить.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF008",
+      "name": "ФОТОпроект",
+      "forms": [
+        "ФОТОпроект",
+        "Фото Проект",
+        "Фото-Проект",
+        "Фотопроекта",
+        "FotoProekt",
+        "Foto Proekt",
+        "Fotoproekt.ru"
+      ],
+      "url": "https://fotoproekt.ru/",
+      "source_status": "IDX",
+      "category_rule": "Фотопечать/фотокниги/известный товар по фактам.",
+      "restriction": "Общее словосочетание фотопроект не сеть; не угадывать событие/людей/подарок.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF009",
+      "name": "Printio",
+      "forms": [
+        "Printio",
+        "Принтио",
+        "Printio.ru",
+        "Print IO",
+        "Принтио магазин"
+      ],
+      "url": "https://printio.ru/",
+      "source_status": "SRC",
+      "category_rule": "Известная печатная одежда/товар → соответствующая товарная ветвь, рекламный тираж по деловой цели.",
+      "restriction": "Не автоматически канцелярия/типография для бизнеса из принта; не выдумывать состав корзины.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF010",
+      "name": "PrintSide",
+      "forms": [
+        "PrintSide",
+        "Print Side",
+        "Print-Side",
+        "ПринтСайд",
+        "Принт Сайд",
+        "Printside.ru"
+      ],
+      "url": "https://printside.ru/polygraphy/",
+      "source_status": "IDX",
+      "category_rule": "Полиграфия по установленному личному/учебному/рекламному назначению.",
+      "restriction": "Широкий печатный профиль не подтверждает рекламную цель каждого заказа; plain print не имя.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF011",
+      "name": "Практик — коворкинг",
+      "forms": [
+        "Практик коворкинг",
+        "Коворкинг Практик",
+        "Сервисные офисы Практик",
+        "Praktik Coworking",
+        "Praktik Work",
+        "Praktik.work"
+      ],
+      "url": "https://voronezh.praktik.work/",
+      "source_status": "IDX_LOCAL",
+      "category_rule": "Подтверждён профиль рабочего пространства; обычная рабочая аренда → Рабочие расходы, не жильё.",
+      "restriction": "Практик как профессия/книга/сервис не сеть; первичная страница подтверждает конкретный регион, не состав всех площадок.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF012",
+      "name": "SOK — коворкинг",
+      "forms": [
+        "SOK коворкинг",
+        "Коворкинг SOK",
+        "СОК коворкинг",
+        "SOK Works",
+        "Sok.works"
+      ],
+      "url": "https://sok.works/",
+      "source_status": "SRC",
+      "category_rule": "Коворкинг/сервисный офис → Рабочие расходы при обычном установленном назначении.",
+      "restriction": "Сок как напиток/магазин/аббревиатура спорткомплекса не офис, не общий токен SOK без контекста.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF013",
+      "name": "Ключ — рабочие пространства",
+      "forms": [
+        "Ключ коворкинг",
+        "Коворкинг Ключ",
+        "Ключ офисы",
+        "The Key Space",
+        "TheKey",
+        "Thekey.space"
+      ],
+      "url": "https://thekey.space/",
+      "source_status": "SRC",
+      "category_rule": "Коворкинг/переговорная/рабочий офис по фактам, не аренда квартиры.",
+      "restriction": "Ключи как изготовление/ремонт замка и klyuch.club — другой проект; не сливать с новым SVC домом быта.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF014",
+      "name": "Space 1",
+      "forms": [
+        "Space 1",
+        "Space1",
+        "Спейс 1",
+        "Спейс1",
+        "Space One",
+        "Space1.ru"
+      ],
+      "url": "https://space1.ru/",
+      "source_status": "SRC",
+      "category_rule": "Сервисный офис/рабочее пространство, фактическое допобслуживание отдельно.",
+      "restriction": "Единица значима, Space без 1 не бренд; не космос/игра/склад/гостиница по слову space.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF015",
+      "name": "Workki",
+      "forms": [
+        "Workki",
+        "Workki.co",
+        "Ворки",
+        "Воркки",
+        "Workki Coworking"
+      ],
+      "url": "https://workki.co/",
+      "source_status": "SRC",
+      "category_rule": "Коворкинг/кабинет/переговорная по известной рабочей услуге.",
+      "restriction": "Work/работа как общее слово и Workzilla FR06 не этот оператор.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF016",
+      "name": "CEO Spaces",
+      "forms": [
+        "CEO Spaces",
+        "CEO Space",
+        "СЕО Спейсес",
+        "СЕО Спэйсес",
+        "CEO Rooms",
+        "Ceorooms"
+      ],
+      "url": "https://ceorooms.ru/ceospaces",
+      "source_status": "SRC_PRODUCT",
+      "category_rule": "Рабочие пространства/проект оператора по фактической услуге, не отдельный банк/новый счёт.",
+      "restriction": "CEO должность/SEO реклама/слово rooms не identity; не выдумывать общий merchant всех продуктов семейства.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF017",
+      "name": "Meeting Point",
+      "forms": [
+        "Meeting Point",
+        "MeetingPoint",
+        "Митинг Поинт",
+        "МитингПоинт",
+        "Point2Meet",
+        "Point 2 Meet"
+      ],
+      "url": "https://point2meet.ru/placements/1036",
+      "source_status": "IDX_LOCAL",
+      "category_rule": "Профиль сервисного офиса/переговорной, не гостиница из слова room.",
+      "restriction": "Meeting point как место встречи/строка маршрута не сеть; цифра 2 сохраняется в продуктовой форме.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF018",
+      "name": "PAGE — коворкинги",
+      "forms": [
+        "PAGE коворкинг",
+        "Коворкинг PAGE",
+        "PAGE Club",
+        "PageClub",
+        "Пейдж коворкинг",
+        "Пэйдж коворкинг"
+      ],
+      "url": "https://pageclub.ru/",
+      "source_status": "SRC",
+      "category_rule": "Коворкинги/гибкие офисы по обычной рабочей аренде.",
+      "restriction": "Page как веб-страница/книга не оператор; pagecoworking.ru не объявлен официальным по догадке.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF019",
+      "name": "Яндекс Директ",
+      "forms": [
+        "Яндекс Директ",
+        "Яндекс.Директ",
+        "ЯндексДирект",
+        "Яндекс Директа",
+        "Yandex Direct",
+        "Yandex Direkt",
+        "YandexDirect"
+      ],
+      "url": "https://direct.yandex.ru/",
+      "source_status": "SRC",
+      "category_rule": "Известная оплата рекламного размещения/управления → Работа и бизнес / Реклама; стадия баланса отдельно.",
+      "restriction": "Директ/прямой/Яндекс без сервиса не identity; доступная сумма кабинета не отдельный расход.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF020",
+      "name": "VK Реклама",
+      "forms": [
+        "VK Реклама",
+        "ВК Реклама",
+        "VK Ads",
+        "VK Advertising",
+        "ВКонтакте Реклама",
+        "ВКРеклама"
+      ],
+      "url": "https://elama.ru/",
+      "source_status": "PARTNER",
+      "category_rule": "Профиль рекламной системы подтверждён непосредственно интегратором eLama; рекламное размещение по фактам.",
+      "restriction": "Основные страницы VK недоступны для чтения; не заявлена первичная проверка всего VK. Музыка/игры/донат/маркетплейс в VK не реклама.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF021",
+      "name": "Яндекс Бизнес",
+      "forms": [
+        "Яндекс Бизнес",
+        "Яндекс.Бизнес",
+        "ЯндексБизнес",
+        "Яндекс Бизнеса",
+        "Yandex Business",
+        "Yandex Biznes"
+      ],
+      "url": "https://business.yandex.ru/",
+      "source_status": "SRC",
+      "category_rule": "Установленный рекламный продукт/услуга продвижения → Реклама; справочная запись без платежа не расход.",
+      "restriction": "Не любой платёж Яндексу бизнес, не регистрация ИП/налог/банковская услуга из слова бизнес.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF022",
+      "name": "Авито — продвижение и размещение",
+      "forms": [
+        "Авито Продвижение",
+        "Продвижение Авито",
+        "Авито Реклама",
+        "Avito Ads",
+        "Avito Promotion",
+        "Авито размещение"
+      ],
+      "url": "https://www.avito.ru/",
+      "source_status": "REF_MP006",
+      "category_rule": "Сервис той же площадки MP006/FR10; известная рабочая реклама → Реклама, личная продажа/продвижение по цели.",
+      "restriction": "Общее Авито не реклама: покупка/продажа/доставка/баланс/возврат отдельно, новая identity не создаётся.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF023",
+      "name": "2ГИС — реклама",
+      "forms": [
+        "2ГИС Реклама",
+        "Реклама 2ГИС",
+        "2GIS Ads",
+        "2GIS Advertising",
+        "2ГИС продвижение",
+        "2GIS Business"
+      ],
+      "url": "https://reklama.2gis.ru/",
+      "source_status": "SRC",
+      "category_rule": "Рекламное размещение по известной услуге, не все данные справочника платные.",
+      "restriction": "2GIS карта/поиск без платежа не расход; цифра 2 значима, не убрать при упрощении.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF024",
+      "name": "eLama",
+      "forms": [
+        "eLama",
+        "e Lama",
+        "Елама",
+        "Еламы",
+        "Еламе",
+        "eLama.ru"
+      ],
+      "url": "https://elama.ru/",
+      "source_status": "SRC",
+      "category_rule": "Рекламная платформа/интегратор: размещение/услуга/пополнение/возврат по фактам без двойного учёта.",
+      "restriction": "Не весь общий баланс расход сегодня, комиссия не выдумывается; обучение из каталога платформы не реклама автоматически.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF025",
+      "name": "click.ru",
+      "forms": [
+        "click.ru",
+        "Click Ru",
+        "ClickRu",
+        "Клик.ру",
+        "Клик ру",
+        "Кликру"
+      ],
+      "url": "https://click.ru/",
+      "source_status": "SRC",
+      "category_rule": "Рекламная платформа/сервисы: известная реклама → Реклама, софт/обучение/комиссия отдельно.",
+      "restriction": "Click/клик как обычное слово/событие не merchant; счёт на пополнение не отдельная реальная операция.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF026",
+      "name": "МТС Маркетолог",
+      "forms": [
+        "МТС Маркетолог",
+        "МТС.Маркетолог",
+        "МТСМаркетолог",
+        "MTS Marketolog",
+        "MTS Marketing"
+      ],
+      "url": "https://support.mts.ru/mts_marketolog/chasto-sprashivayut/chto-takoye-mts-marketolog",
+      "source_status": "IDX",
+      "category_rule": "Установленный рекламный продукт/рассылки → Реклама, рабочий софт по предмету.",
+      "restriction": "Не мобильный тариф МТС и не МТС Банк; публикация/бесплатная функция/показ статистики не cash movement.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    },
+    {
+      "id": "OFF027",
+      "name": "Unisender",
+      "forms": [
+        "Unisender",
+        "Uni Sender",
+        "Uni-Sender",
+        "Юнисендер",
+        "Юни Сендер",
+        "Юни-Сендер",
+        "Юнисендера",
+        "Юнисендере",
+        "Унисендер"
+      ],
+      "url": "https://www.unisender.com/",
+      "source_status": "REF_DIG086",
+      "category_rule": "Тот же DIG086: тариф рассылок → Сервисы для работы, конкретная заказанная реклама/подрядчик по предмету.",
+      "restriction": "Sender/отправитель не бренд; не получать содержание базы/писем/телефоны клиентов в AI для классификации.",
+      "disposition": "SOURCE_PROFILE_DOCUMENTED_NOT_BANK_ALIAS",
+      "runtime_activated": false
+    }
+  ],
+  "runtime_changes": false,
+  "paid_model_calls": 0,
+  "product_tests": "NOT_RUN",
+  "eligibility_precedence": "This versioned decision ledger overrides earlier inactivity caused ONLY by unresolved PEND/source. It never overrides user verified facets, actual financial kind/role, exclusions, ownership or independent alias/context restrictions. Category transitions are explicit below; no runtime change."
+}

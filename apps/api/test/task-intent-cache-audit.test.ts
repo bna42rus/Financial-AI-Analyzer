@@ -38,8 +38,11 @@ async function syntheticExport() {
     ledgerHeadSha256: observedIntentRun.ledgerHeadSha256, paidCalls: 0, records };
 }
 
-test('diagnostic files leave the frozen executable binding exactly unchanged', async () => {
-  assert.equal((await intentTrialBinding()).sha256, observedIntentRun.bindingSha256);
+test('the new runtime does not impersonate the frozen historical diagnostic binding', async () => {
+  // This release intentionally changes shared privacy/source code. Historical
+  // evidence retains its original identity and cannot be relabelled as a new run.
+  assert.equal(observedIntentRun.bindingSha256,'0167d21fd279fa1df5cac60df29fa86f6966a164f270dff5e636cf6cb0e1e4fa');
+  assert.notEqual((await intentTrialBinding()).sha256, observedIntentRun.bindingSha256);
 });
 
 test('evidence, lexical validator, closed schema and field-specific errors retain different paths and codes', () => {

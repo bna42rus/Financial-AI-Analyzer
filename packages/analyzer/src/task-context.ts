@@ -1,7 +1,7 @@
 import { object, choice, uuid } from '../../finance-core/src/model.ts';
 import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 import type { OperationsFilter } from '../../finance-core/src/operations.ts';
-import { parseTool } from './registry.ts';
+import { queryMetrics, queryGroupings, queryComparisons, parseTool } from './registry.ts';
 import type { Query } from './registry.ts';
 
 export const taskContextVersion = 'analyzer-task-context/1';
@@ -93,8 +93,8 @@ export function parseTaskBinding(value: unknown): TaskBinding {
   if (r.kind === 'new') { object(r, ['kind']); return { kind: 'new' }; }
   if (r.kind === 'reference') { object(r, ['kind', 'handle']); if (typeof r.handle !== 'string' || !/^t(?:[1-9]\d?|100)$/.test(r.handle)) return invalid('TASK_REFERENCE_INVALID'); return { kind: 'reference', handle: r.handle }; }
   const kind = choice(r.kind, ['nearest', 'unique', 'ordinal']); object(r, kind === 'ordinal' ? ['kind', 'metric', 'comparison', 'index'] : ['kind', 'metric', 'comparison']);
-  const metric = r.metric === null ? null : choice(r.metric, ['expenses', 'income', 'attention']);
-  const comparison = r.comparison === null ? null : choice(r.comparison, ['none', 'previous_same']);
+  const metric = r.metric === null ? null : choice(r.metric, queryMetrics);
+  const comparison = r.comparison === null ? null : choice(r.comparison, queryComparisons);
   if (kind === 'ordinal') { const index = revision(r.index); if (index < 1 || index > 100) return invalid(); return { kind, index, metric, comparison }; }
   return { kind, metric, comparison };
 }
@@ -159,11 +159,11 @@ export function resolveTaskDecision(rawBook: TaskBook, currentScope: TaskScope, 
     if (e.op !== 'set') return invalid(); return choice(e.value, values);
   };
   if (!previous && rawDecision.metric.op === 'keep') return { status: 'clarification', reason: 'metric_required' };
-  const metric = scalar(rawDecision.metric, ['expenses', 'income', 'attention'], previous?.query.metric ?? 'expenses');
+  const metric = scalar(rawDecision.metric, queryMetrics, previous?.query.metric ?? 'expenses');
   // An existing presentation wins over a metric's INITIAL default. Otherwise
   // changing only a date would reset an attention total/table to operations.
-  const grouping = scalar(rawDecision.grouping, ['none', 'category', 'operation'], previous?.query.grouping ?? (metric === 'attention' ? 'operation' : 'none'));
-  const comparison = scalar(rawDecision.comparison, ['none', 'previous_same'], previous?.query.comparison ?? 'none');
+  const grouping = scalar(rawDecision.grouping, queryGroupings, previous?.query.grouping ?? (metric === 'attention' ? 'operation' : 'none'));
+  const comparison = scalar(rawDecision.comparison, queryComparisons, previous?.query.comparison ?? 'none');
   let query: Query;
   try { query = parseTool({ name: 'query_finances', metric, grouping, comparison, filter: parseOperationsFilter(filter) }) as Query; }
   catch { return { status: 'clarification', reason: 'condition_conflict' }; }

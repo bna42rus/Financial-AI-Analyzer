@@ -1,3 +1,7 @@
+import {BenchmarkFailure} from '../src/benchmark-transport.ts';
+import {assistantFailureText,assistantErrorCode,assistantCapabilityText,knownAssistantFailureText} from '../../../packages/analyzer/src/assistant-feedback.ts';
+import {CostError} from '../../../packages/analyzer/src/cost.ts';
+import {HttpError} from '../src/types.ts';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { assistantVersion, parseAssistantPlan, profileCalendar, compileAssistantPlan, cleanAssistantQuestion } from '../../../packages/analyzer/src/assistant-plan.ts';
@@ -16,13 +20,13 @@ const plan = (changes: unknown[], mode = 'new') => ({ version: assistantVersion,
 function harness() {
   let conversation = emptyConversation(scope), calls: CompletionInput[] = [], catalogs = 0, calculations = 0, currentGlobal = structuredClone(global), currentNow = new Date('2026-10-15T22:30:00Z');
   const journals = new Map<string, AssistantJournal>(), requests = new Map<string, AssistantRequest>();
-  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog } = {}) => {
+  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; modelError?:Error; reserveError?:Error; settleHook?:(journal:AssistantJournal)=>Promise<void>; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog; prepareChange?: AssistantServices['prepareChange'] } = {}) => {
     if (options.global) currentGlobal = options.global; if (options.now) currentNow = options.now;
     const request: AssistantRequest = requests.get(trialId(n)) ?? { requestId: trialId(n), scope, conversation: structuredClone(conversation), global: currentGlobal, dataRevision: '1', question, now: currentNow, timezone: options.timezone ?? calendar.timezone };
     requests.set(request.requestId, request);
     let index = 0; let lastPlan: unknown;
     const model: AssistantModel = { bound: { inputTokens: 131072, outputTokens: 1200, modelVersion: 'synthetic' }, async complete(input, before) {
-      calls.push(input); await before(); if (options.failure) throw Error('SYNTHETIC_TIMEOUT');
+      calls.push(input); await before(); if(options.modelError) throw options.modelError; if (options.failure) throw Error('SYNTHETIC_TIMEOUT');
       let value: any;
       if (input.phase === 'check_changes') {
         const next = replies[index] as any;
@@ -32,9 +36,9 @@ function harness() {
       } else { value = replies[index++]; if (['understand', 'repair'].includes(input.phase)) lastPlan = value; }
       return { value, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } };
     } };
-    const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() {}, async settle() {} } as AssistantJournal;
+    const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() { if(options.reserveError) throw options.reserveError; }, async settle() { await options.settleHook?.(journal); } } as AssistantJournal;
     journals.set(request.requestId, journal);
-    const services: AssistantServices = { async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
+    const services: AssistantServices = { prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
       async calculate(query, actualCalendar) { calculations++; assert.equal(actualCalendar.timezone, request.timezone); return trialResult(query); },
       render(_query, result) { return 'Проверенный расчёт: ' + JSON.stringify((result as any).totals); }, async commit(input) { conversation = input.conversation; } };
     return runAssistant(request, model, journal, services);
@@ -418,16 +422,18 @@ test('an unrelated clause never excuses an unresolved financial condition in a m
   assert.equal(h.state.book.nodes.length, 0);
 });
 
-test('selected-period availability is absent without bounded UI dates, and unresolved selection blocks calculation', async () => {
-  const h = harness(), candidate = { ...plan([set('metric', 'expenses')]), topic: 'mixed' };
-  const reply = await h.execute(662, 'Расходы за выбранный период и погода.', [candidate,
-    { plan: candidate, conditions: [
-      { text: 'выбранный период', scope: 'financial', covered: false },
-      { text: 'погода', scope: 'unrelated', covered: false },
-    ] },
-  ], { global: { revision: 1, filter: {}, touched: { period: 1 } } });
-  assert.equal(reply.status, 'clarification'); assert.equal(h.calculations, 0);
-  for (const call of h.calls) assert.deepEqual((call.input as any).selectedContext, { period: false });
+test('all history and one-sided UI periods are available; use_current removes stale chat bounds without inventing dates', async () => {
+  for(const filter of [{},{from:'2026-09-01'},{through:'2026-09-30'}]){
+    const h=harness();
+    await h.execute(6620,'Расходы в августе 2026',[plan([set('metric','expenses'),set('period','август 2026')])]);
+    const candidate=plan([{field:'period',op:'use_current'}],'continue');
+    const reply=await h.execute(6621,'Сколько я потратил за выбранный период?',[candidate,
+      {plan:candidate,conditions:[{text:'выбранный период',scope:'financial',covered:true}]},
+    ],{global:{revision:1,filter,touched:{period:1}}});
+    assert.equal(reply.status,'query');assert.equal(h.calculations,2);
+    assert.equal(reply.query!.filter.from,filter.from);assert.equal(reply.query!.filter.through,filter.through);
+    for(const call of h.calls)assert.deepEqual((call.input as any).selectedContext,{period:true});
+  }
 });
 
 test('only the exact reserved period marker canonicalizes to use_current, without resetting other task groups', async () => {
@@ -445,3 +451,121 @@ test('only the exact reserved period marker canonicalizes to use_current, withou
   assert.equal(reply.query!.grouping, 'category'); assert.equal(reply.query!.comparison, 'previous_same');
   assert.equal(h.state.book.nodes[1]!.parent, trialId(663));
 });
+
+
+test('calculator route returns code-computed cents, records the exact model and replays with no catalog or financial query',async()=>{
+ const h=harness(),p={version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{kind:'loan',principalRubles:'100',annualRatePercent:'12',months:1,payment:'annuity'}};
+ const result=await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[p]);
+ assert.equal(result.code,'FINANCIAL_CALCULATION');assert.equal(result.calculation?.kind,'loan');if(result.calculation?.kind==='loan')assert.equal(result.calculation.totalPaidMinor,'10100');
+ assert.equal(h.calls.length,2);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);assert.equal(h.state.book.nodes.length,0);
+ assert.deepEqual(await h.execute(978,'Рассчитай аннуитет 100 рублей, 12% годовых, 1 месяц',[]),result);assert.equal(h.calls.length,2);
+});
+test('a natural change is a persisted proposal after completeness review and never a calculation or implicit write',async()=>{
+ const h=harness();let prepared=0;const proposal={version:'cashneuro-change-proposal/1' as const,intent:{kind:'account' as const,id:trialId(1),patch:{name:'Моя карта'}},title:'Переименовать счёт',description:['Моя карта'],sourceAnswerId:null};
+ const p={version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'account',name:'Карта',patch:{name:'Моя карта'}}};
+ const reply=await h.execute(979,'Назови счёт Карта — Моя карта',[p],{prepareChange:async(_c,source)=>{prepared++;assert.equal(source,null);return proposal;}});
+ assert.equal(reply.code,'CHANGE_PROPOSED');assert.deepEqual(reply.proposal,proposal);assert.equal(reply.modelCalls,2);assert.equal(prepared,1);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);assert.equal(h.state.book.nodes.length,0);
+ assert.deepEqual(await h.execute(979,'Назови счёт Карта — Моя карта',[]),reply);assert.equal(prepared,1);
+});
+test('incomplete or unresolved natural changes never prepare a mutation or widen the previous answer',async()=>{
+ const h=harness();let prepared=0;const p={version:assistantVersion,topic:'personal_finance',action:'propose_change',change:{kind:'answer_operations',patch:{comment:'Для проверки'}}};
+ const blocked=await h.execute(980,'Пометь операции после зарплаты',[p,{plan:p,conditions:[{text:'Дата зарплаты неизвестна',scope:'financial',covered:false}]}],{prepareChange:async()=>{prepared++;throw Error('UNEXPECTED');}});
+ assert.equal(blocked.status,'clarification');assert.equal(prepared,0);
+ const missing=await h.execute(981,'Пометь операции этого ответа',[p],{prepareChange:async()=>{throw Error('ASSISTANT_CHANGE_SCOPE_REQUIRED');}});assert.equal(missing.status,'clarification');assert.equal(missing.proposal,undefined);
+});
+
+test('a basic exact question uses the current saved filters without a model call',async()=>{
+ const h=harness(),category=trialId(11);
+ const result=await h.execute(201,'Сколько я потратил за выбранный период?',[],{global:{...global,filter:{...global.filter,categoryIds:[category]}}});
+ assert.equal(result.status,'query');assert.equal(result.modelCalls,0);assert.equal(h.calls.length,0);
+ assert.equal(result.query?.filter.from,global.filter.from);assert.deepEqual(result.query?.filter.categoryIds,[category]);
+});
+
+
+test('capability questions are free, truthful and never create proposals or replace the last calculation', async () => {
+  const h=harness();
+  await h.execute(5000,'Сколько я потратил за выбранный период',[]);
+  const before=structuredClone(h.state.book);
+  for(const [n,question] of ['Что ты умеешь?','А умеешь ли ты рассчитать кредит?','сможешь создать бюджет?'].entries()){
+    const reply=await h.execute(5001+n,question,[]);
+    assert.equal(reply.code,'ASSISTANT_CAPABILITIES');assert.equal(reply.modelCalls,0);
+    assert.equal(reply.proposal,undefined);assert.deepEqual(h.state.book,before);
+    assert.deepEqual(reply.usage,[]);
+  }
+  assert.equal(h.calls.length,0);
+  assert.match(assistantCapabilityText('сможешь создать бюджет?',true)!,/после|подтвержден/);
+  assert.match(assistantCapabilityText('сможешь создать бюджет?',false)!,/не подключен|не подключён/);
+});
+
+test('concrete budget and calculation requests still use tools instead of capability replies', async () => {
+  for(const q of ['Создай бюджет на продукты 10к в месяц','можешь создать бюджет на продукты 10000 в месяц?', 'можешь рассчитать кредит 100000 под 20%?', 'А умеешь ли ты рассчитать кредит 100000 на год?']) assert.equal(assistantCapabilityText(q,true),null,q);
+  assert.match(assistantCapabilityText('А умеешь ли ты выдать кредит?',true)!,/нет.*инструмента/);
+  assert.match(assistantCapabilityText('Умеешь ли ты перевести деньги?',true)!,/нет.*инструмента/);
+});
+
+test('quota, service cap and pending receipts retain distinct causes when dispatch is rejected', async () => {
+  for(const error of [new CostError('AI_USER_COST_EXHAUSTED'),new CostError('AI_PROJECT_COST_EXHAUSTED'),new HttpError(409,'AI_COST_RECONCILIATION_REQUIRED')]){
+    const h=harness();const reply=await h.execute(5010,'Посчитай расходы',[plan([set('metric','expenses')])],{reserveError:error});
+    assert.equal(reply.status,'error');assert.equal(reply.code,error.code);assert.equal(reply.modelCalls,0);assert.deepEqual(reply.usage,[]);
+    assert.equal(reply.text,assistantFailureText(error.code));assert.doesNotMatch(reply.text,/из-за технической ошибки/);
+    assert.equal(h.journals.get(trialId(5010))!.receipt.calls.length,0);
+  }
+  assert.match(assistantFailureText('AI_USER_COST_EXHAUSTED'),/лимита.*недостаточно/i);
+  assert.match(assistantFailureText('AI_PROJECT_COST_EXHAUSTED'),/ограничение сервиса/);
+  assert.match(assistantFailureText('AI_COST_RECONCILIATION_REQUIRED'),/стоимость предыдущего/);
+  assert.match(assistantFailureText('ALLOWANCE_COST_PENDING'),/не сообщение об исчерпании/);
+});
+
+test('public errors never expose exceptions or claim a guessed cause or a free failed call',()=>{
+  const secret='token=PRIVATE secret response';
+  assert.equal(assistantErrorCode(new Error(secret)),'ASSISTANT_INTERNAL_ERROR');
+  assert.equal(assistantErrorCode({code:'AI_QUOTA_EXHAUSTED',message:secret}),'AI_QUOTA_EXHAUSTED');
+  const text=assistantFailureText(assistantErrorCode(new Error(secret)));
+  assert.match(text,/Точная причина пока не установлена/);assert.doesNotMatch(text,/PRIVATE|бесплат|не списан/);
+  assert.match(assistantFailureText('ASSISTANT_DELIVERY_UNKNOWN'),/стоимость не подтверждены/);
+});
+
+
+test('known transport failures explain the observed cause and keep unknown cost holds intact',async()=>{
+  for(const [code,networkCode,responsePhase,expected] of [
+    ['BENCH_IDENTITY_DENIED_HTTP_401',undefined,undefined,/отклонил авторизацию/],
+    ['BENCH_PROVIDER_FAILURE_HTTP_429',undefined,undefined,/ограничение провайдера/],
+    ['BENCH_PROVIDER_FAILURE_HTTP_503',undefined,undefined,/на своей стороне/],
+    ['BENCH_DELIVERY_UNKNOWN','TIMEOUT',undefined,/не ответил за отведенное|не ответил за отведённое/],
+    ['BENCH_DELIVERY_UNKNOWN','EAI_AGAIN',undefined,/соединение/],
+    ['BENCH_RESPONSE_INVALID',undefined,'USAGE',/не подтвердил данные/],
+  ] as const){
+    const error=new BenchmarkFailure(code);if(networkCode)error.networkCode=networkCode;if(responsePhase)error.responsePhase=responsePhase;
+    const h=harness();const reply=await h.execute(5011,'Посчитай расходы',[],{modelError:error});
+    assert.equal(reply.code,'ASSISTANT_DELIVERY_UNKNOWN');assert.match(reply.text,expected);assert.match(reply.text,/стоимость не подтверждены/);
+    assert.equal(h.journals.get(trialId(5011))!.receipt.calls[0]!.state,'unknown');
+    assert.equal(reply.modelCalls,1);assert.deepEqual(reply.usage,[]);
+  }
+});
+
+test('missing HTTP error codes preserve ordinary API fallbacks',()=>{assert.equal(knownAssistantFailureText(undefined),undefined);assert.equal(knownAssistantFailureText(null),undefined);assert.equal(knownAssistantFailureText({}),undefined);});
+
+
+test('usage is durable before settlement, and a retry of settlement never calls the model again',async()=>{
+  const h=harness();let attempts=0;
+  const reply=await h.execute(5020,'Поясни финансовый термин',[{version:assistantVersion,topic:'ambiguous',action:'clarification',clarification:'Укажите термин, чтобы объяснить именно его.'}],{settleHook:async(journal)=>{
+    assert.deepEqual(journal.receipt.calls[0]!.usage,{inputTokens:100,outputTokens:50,modelVersion:'synthetic'});
+    if(++attempts===1)throw Error('SYNTHETIC_SETTLEMENT_INTERRUPTED');
+  }});
+  assert.equal(attempts,2);assert.equal(h.calls.length,1);assert.equal(reply.modelCalls,1);assert.equal(reply.usage.length,1);
+});
+
+test('questions about current filter dates use the authenticated snapshot without model calls',async()=>{
+  const h=harness();let index=5030;
+  for(const question of ['какой период в фильтрах сейчас стоит','Какие даты выбраны в общих фильтрах?','Покажи период в фильтрах','Какой сейчас выбран период?']){
+    const reply=await h.execute(index++,question,[],{global:{revision:1,filter:{from:'2026-11-01',through:'2026-11-23'},touched:{}}});
+    assert.equal(reply.code,'ASSISTANT_FILTER_CONTEXT');assert.equal(reply.modelCalls,0);assert.deepEqual(reply.usage,[]);
+    assert.match(reply.text,/01.11.2026.*23.11.2026/);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);
+  }
+  const all=await h.execute(index++,'Какой период в фильтрах?',[],{global:{revision:2,filter:{},touched:{}}});assert.match(all.text,/вся загруженная история/);
+  const open=await h.execute(index++,'Какой период в фильтрах?',[],{global:{revision:3,filter:{from:'2026-11-01'},touched:{}}});assert.match(open.text,/без конечной даты/);
+  const single=await h.execute(index++,'Какой период в фильтрах?',[],{global:{revision:4,filter:{from:'2026-11-23',through:'2026-11-23'},touched:{}}});assert.match(single.text,/23.11.2026/);
+  assert.equal(h.calls.length,0);
+});
+
+test('a provider 403 does not invent an invalid API key as the cause',()=>{const text=assistantFailureText('ASSISTANT_DELIVERY_UNKNOWN',{code:'BENCH_IDENTITY_DENIED_HTTP_403'});assert.match(text,/Точная причина запрета.*не установлена/);assert.doesNotMatch(text,/неверный ключ|отклонил авторизацию/);});

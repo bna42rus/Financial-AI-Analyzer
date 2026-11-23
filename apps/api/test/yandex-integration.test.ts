@@ -44,6 +44,8 @@ beforeEach(async()=>{
  const login=await server.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'first@example.test',password},headers:{origin:config.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200,login.body);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');
  account=randomUUID();await within(async db=>{const s=await financeView(db,'first');category=s.categories.find(c=>c.name==='Продукты'&&c.parentId===null)!.id;await acceptAccount(db,'first',importEpoch(s),{id:account,bankId:'tbank',systemName:'Synthetic Analyzer account',type:'bank_account'});await syntheticOperations(db,'first',2,account,category);});
  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,access_end,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('first',date_trunc('milliseconds',clock_timestamp()-interval '1 day')+interval '456 microseconds',NULL,'Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10}')");
+  // Monetary dispatch requires an actual active paid allowance window.
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id=$1",['first']);
 });
 
 const costPolicy={projectId:'staging/finance/http-tests',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:'1000',price:{version:'synthetic-800',currency:'RUB' as const,inputRubPerMillion:'800',outputRubPerMillion:'800'}};
@@ -107,10 +109,10 @@ test('unlisted verified accounts and expired entitlement cannot dispatch to the 
 test('clarification plans complete without charging a customer quota unit',async()=>{
  const id=await chat();behavior='clarification';const r=await request('/finance/analyzer-query',body(id));assert.equal(r.statusCode,200,r.body);assert.equal(r.json().answer.mode,'clarification');assert.equal(r.json().quota.used,0);assert.equal(r.json().quota.reserved,0);assert.equal(calls.length,2);assert.ok((await pg.owner.query('SELECT state FROM commerce.analyzer_request')).rows.every(row=>row.state==='completed'));
 });
-test('ambiguous planner delivery retains one quota reservation and cannot be silently retried',async()=>{
+test('ambiguous planner delivery cannot be retried, and a separate synthetic request is not blocked by the legacy counter',async()=>{
  await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":1}' WHERE user_id='first'");const id=await chat(),payload=body(id);behavior='timeout-plan';const r=await request('/finance/analyzer-query',payload);assert.equal(r.statusCode,409,r.body);assert.equal(r.json().code,'AI_DELIVERY_UNKNOWN');assert.ok(!r.body.includes('secret'));assert.equal(calls.length,2);
  const q=await within(db=>analyzerQuota(db,'first',true));assert.equal(q.used,0);assert.equal(q.reserved,1);assert.equal(q.remaining,0);assert.equal((await request('/finance/analyzer-query',payload)).json().code,'AI_DELIVERY_UNKNOWN');assert.equal(calls.length,2);
- behavior='normal';const next=await request('/finance/analyzer-query',body(id));assert.equal(next.statusCode,429,next.body);assert.equal(next.json().code,'AI_QUOTA_EXHAUSTED');assert.equal(calls.length,3);
+ behavior='normal';const next=await request('/finance/analyzer-query',body(id));assert.equal(next.statusCode,200,next.body);assert.equal(next.json().answer.mode,'ai');assert.equal(calls.length,4);
 });
 test('received response survives financial rollback; cache retry bills original precise anchor and period',async()=>{
  const id=await chat(),payload=body(id);await pg.owner.query("CREATE FUNCTION finance.fail_yandex_message() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'synthetic failure';END $$;CREATE TRIGGER fail_yandex_message BEFORE INSERT ON finance.analyzer_message FOR EACH ROW EXECUTE FUNCTION finance.fail_yandex_message()");
@@ -118,8 +120,8 @@ test('received response survives financial rollback; cache retry bills original 
  assert.equal(calls.length,2);const reserved=(await pg.owner.query("SELECT anchor_at::text AS anchor,period_start::text AS period,state FROM commerce.analyzer_request WHERE step='plan'")).rows[0];assert.equal(reserved.state,'received');
  await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=anchor_at-interval '2 months' WHERE user_id='first'");const retry=await request('/finance/analyzer-query',payload);assert.equal(retry.statusCode,200,retry.body);assert.equal(calls.length,2);const billed=(await pg.owner.query('SELECT anchor_at::text AS anchor,period_start::text AS period FROM commerce.analyzer_usage')).rows[0];assert.deepEqual(billed,{anchor:reserved.anchor,period:reserved.period});assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'1');
 });
-test('simultaneous requests serialize the last customer quota unit without a metadata connection deadlock',async()=>{
- await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":1}' WHERE user_id='first'");const id=await chat();const rs=await Promise.all([request('/finance/analyzer-query',body(id)),request('/finance/analyzer-query',body(id))]);assert.deepEqual(rs.map(r=>r.statusCode).sort(),[200,429]);assert.equal(calls.filter(c=>!c.gate).length,1);assert.equal((await within(db=>analyzerQuota(db,'first',true))).used,1);
+test('simultaneous requests ignore the legacy request cap without a metadata connection deadlock',async()=>{
+ await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":1}' WHERE user_id='first'");const id=await chat();const rs=await Promise.all([request('/finance/analyzer-query',body(id)),request('/finance/analyzer-query',body(id))]);assert.deepEqual(rs.map(r=>r.statusCode).sort(),[200,200]);assert.equal(calls.filter(c=>!c.gate).length,2);assert.equal((await within(db=>analyzerQuota(db,'first',true))).used,2);
 });
 test('daily cap counts both stages, refusals and uncertain outcomes; chat deletion does not refund attempts',async()=>{
  const id=await chat();for(let i=0;i<30;i++)await pg.owner.query("INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,model,error_code) VALUES('first',$1,'gate',$2,$3,$4,$5)",[randomUUID(),'a'.repeat(64),i%2?'failed':'unknown',modelUri,i%2?'AI_IDENTITY_DENIED':'AI_DELIVERY_UNKNOWN']);

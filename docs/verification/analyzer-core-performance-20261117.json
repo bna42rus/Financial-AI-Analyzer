@@ -1,0 +1,86 @@
+{
+  "environment": "ephemeral local Node 24 container, synthetic rows; same script and corpus; three warm samples are descriptive, not production SLO proof",
+  "optimization": "Skip dictionary alias recognition only when search is empty",
+  "before": {
+    "version": 1,
+    "paidModelCalls": 0,
+    "costRub": "0",
+    "scope": "local synthetic CPU core only; no database, browser or model; promise batches share one JS thread",
+    "samplesPerSize": 4,
+    "results": [
+      {
+        "operations": 100,
+        "firstMs": 86.01,
+        "warmP50Ms": 11.41,
+        "warmP95Ms": 54.78
+      },
+      {
+        "operations": 10000,
+        "firstMs": 1030.58,
+        "warmP50Ms": 989.71,
+        "warmP95Ms": 1215.84
+      },
+      {
+        "operations": 100000,
+        "firstMs": 10813.31,
+        "warmP50Ms": 10828.13,
+        "warmP95Ms": 11248.02
+      }
+    ],
+    "batches": [
+      {
+        "sessions": 1,
+        "totalMs": 1159.02
+      },
+      {
+        "sessions": 5,
+        "totalMs": 5724.14
+      },
+      {
+        "sessions": 20,
+        "totalMs": 22712.58
+      }
+    ]
+  },
+  "after": {
+    "version": 1,
+    "paidModelCalls": 0,
+    "costRub": "0",
+    "scope": "local synthetic CPU core only; no database, browser or model; promise batches share one JS thread",
+    "samplesPerSize": 4,
+    "results": [
+      {
+        "operations": 100,
+        "firstMs": 19.89,
+        "warmP50Ms": 3.46,
+        "warmP95Ms": 3.79
+      },
+      {
+        "operations": 10000,
+        "firstMs": 118.86,
+        "warmP50Ms": 123.65,
+        "warmP95Ms": 150.16
+      },
+      {
+        "operations": 100000,
+        "firstMs": 740.72,
+        "warmP50Ms": 713.09,
+        "warmP95Ms": 731.33
+      }
+    ],
+    "batches": [
+      {
+        "sessions": 1,
+        "totalMs": 33.83
+      },
+      {
+        "sessions": 5,
+        "totalMs": 118.22
+      },
+      {
+        "sessions": 20,
+        "totalMs": 527.53
+      }
+    ]
+  }
+}

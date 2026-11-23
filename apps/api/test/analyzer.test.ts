@@ -1,5 +1,6 @@
 import {test,before,after,beforeEach} from 'node:test';
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {randomUUID,randomBytes} from 'node:crypto';
 import type {PoolClient} from 'pg';
 import {postgresFixture} from './postgres.ts';
@@ -28,7 +29,7 @@ test('conversation context is never transferable by forged ID or from another te
 test('provider output is closed, user scope and semantics cannot be widened, quota stays unchanged on failure',async()=>{const id=await chat();for(const tool of [{name:'sql',query:'SELECT 1'},{name:'query_finances',metric:'income',filter:{}},{name:'query_finances',metric:'expenses',filter:{includeExcluded:true}}]){planOverride=tool;const r=await query(id,'Мои расходы',{},ai);assert.equal(r.statusCode,400,r.body);}assert.equal((await within(db=>analyzerQuota(db,'first'))).used,0);assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_message')).rows[0].n,'0');});
 test('provider requires owned references before any outbound plan call',async()=>{const id=await chat();const r=await query(id,'Мои расходы',{filter:{accountIds:[randomUUID()]}},ai);assert.equal(r.statusCode,409,r.body);assert.equal(calls,0);});
 test('quota charges successful test adapter once, exact retry returns stored outcome and reuse is rejected',async()=>{const chatId=await chat(),id=randomUUID(),body={id,chatId,text:'Мои расходы',filter:{}};const first=await request('/finance/analyzer-query',body,ai);assert.equal(first.statusCode,200,first.body);const retry=await request('/finance/analyzer-query',body,ai);assert.deepEqual(retry.json(),first.json());assert.equal(calls,1);assert.equal(first.json().quota.used,1);assert.equal(first.json().answer.provider.version,'fixture/1');assert.equal((await request('/finance/analyzer-query',{...body,text:'Мои доходы'},ai)).statusCode,409);});
-test('concurrent last-quota requests serialize; exhaustion leaves deterministic tools, Review and old chats readable',async()=>{await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":1}' WHERE user_id='first'");const id=await chat();const rs=await Promise.all([query(id,'Мои расходы',{},ai),query(id,'Мои доходы',{},ai)]);assert.deepEqual(rs.map(r=>r.statusCode).sort(),[200,429]);assert.equal(calls,1);const state=await request('/finance/analyzer-state',{chatId:id});assert.equal(state.statusCode,200);assert.equal(state.json().quota.warning,100);assert.equal((await query(id)).statusCode,200);assert.equal((await request('/finance/review-sessions',{})).statusCode,200);});
+test('legacy request count does not block concurrent requests; deterministic tools, Review and chats remain readable',async()=>{await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":1}' WHERE user_id='first'");const id=await chat();const rs=await Promise.all([query(id,'Мои расходы',{},ai),query(id,'Мои доходы',{},ai)]);assert.deepEqual(rs.map(r=>r.statusCode).sort(),[200,200]);assert.equal(calls,2);const state=await request('/finance/analyzer-state',{chatId:id});assert.equal(state.statusCode,200);assert.equal(state.json().quota.warning,100);assert.equal((await query(id)).statusCode,200);assert.equal((await request('/finance/review-sessions',{})).statusCode,200);});
 test('quota warnings at 80 and 95, changing policy and early extension retain current usage',async()=>{await pg.owner.query("UPDATE commerce.access_cycle SET quota_policy='{\"source\":\"override\",\"limit\":20}' WHERE user_id='first'");const id=await chat();for(let i=0;i<16;i++)assert.equal((await query(id,'Мои расходы',{},ai)).statusCode,200);assert.equal((await within(db=>analyzerQuota(db,'first'))).warning,80);for(let i=0;i<3;i++)assert.equal((await query(id,'Мои расходы',{},ai)).statusCode,200);assert.equal((await within(db=>analyzerQuota(db,'first'))).warning,95);await pg.owner.query("UPDATE commerce.access_cycle SET calendar_months=calendar_months+1 WHERE user_id='first'");assert.equal((await within(db=>analyzerQuota(db,'first'))).used,19);});
 test('quota grid preserves original Moscow day and time after month-end clamp',async()=>{await pg.owner.query("UPDATE commerce.access_cycle SET anchor_at=(((date_trunc('year',clock_timestamp() AT TIME ZONE 'Europe/Moscow')-interval '1 year')+interval '1 month'-interval '1 day'+interval '13 hours') AT TIME ZONE 'Europe/Moscow') WHERE user_id='first'");const c=(await pg.owner.query("SELECT anchor_at,clock_timestamp() AS now FROM commerce.access_cycle WHERE user_id='first'")).rows[0];const q=await within(db=>analyzerQuota(db,'first'));const anchor=new Date(c.anchor_at),n=(new Date(c.now).getUTCFullYear()-anchor.getUTCFullYear())*12+new Date(c.now).getUTCMonth()-anchor.getUTCMonth();const candidates=(await pg.owner.query("SELECT ((anchor_at AT TIME ZONE timezone)+make_interval(months=>$1)) AT TIME ZONE timezone AS current,((anchor_at AT TIME ZONE timezone)+make_interval(months=>$1+1)) AT TIME ZONE timezone AS next FROM commerce.access_cycle WHERE user_id='first'",[n])).rows[0];if(candidates.current<=c.now){assert.equal(q.periodStart,candidates.current.toISOString());assert.equal(q.resetAt,candidates.next.toISOString());}assert.ok(Date.parse(q.periodStart!)<=c.now.getTime());assert.ok(Date.parse(q.resetAt!)>c.now.getTime());});
 test('preview is immutable fixed scope, commit reports action, retry and Undo use shared finance services',async()=>{const id=await chat(),q=await query(id),actionId=randomUUID(),payload={actionId,tool:{name:'set_inclusion',answerId:q.json().id,value:'exclude'}};const p=await request('/finance/analyzer-propose',payload);assert.equal(p.statusCode,200,p.body);assert.equal((await within(db=>financeView(db,'first'))).summary.netExpensesMinor,'24690');assert.equal((await request('/finance/analyzer-propose',payload)).statusCode,200);const c=await request('/finance/commit',{actionId});assert.equal(c.statusCode,200,c.body);assert.equal(c.json().impact.details.selectedCount,2);assert.deepEqual((await request('/finance/commit',{actionId})).json(),c.json());const read=(await request('/finance/analyzer-state',{chatId:id})).json();assert.equal(read.chats[0].messages[0].outcome.status,'committed');await command({kind:'undo',id:randomUUID(),value:actionId});assert.equal((await within(db=>financeView(db,'first'))).summary.netExpensesMinor,'24690');});
@@ -61,4 +62,36 @@ test('explicit exclusion wrapper cannot change an operation outside the saved an
  const allowed=await request('/finance/analyzer-propose',{actionId:randomUUID(),tool:{...tool,intent:{...tool.intent,scope:{kind:'operations',operationIds:[ids[0]]}}}});
  assert.equal(allowed.statusCode,200,allowed.body);assert.equal(allowed.json().requiresConfirmation,true);
  assert.deepEqual(allowed.json().impact.affectedOperationIds,[ids[0]]);
+});
+
+
+test('legacy monthly allowance is corrected without erasing spend, pending reservations or purchased units',async()=>{
+ const requestId=randomUUID(),purchaseId=randomUUID();
+ await pg.owner.query("INSERT INTO access.request(id,email,data) VALUES($1,'synthetic-legacy@example.test','{}')",[purchaseId]);
+ await pg.owner.query(`INSERT INTO commerce.purchase(id,request_id,data,state,user_id,activated_at,access_end,timezone)
+  SELECT $1,$1,'{"tariff":{"id":"development-month","aiQuota":150}}','active',user_id,anchor_at,clock_timestamp()+interval '1 month',timezone
+  FROM commerce.access_cycle WHERE user_id='first'`,[purchaseId]);
+ await pg.owner.query("INSERT INTO commerce.access_paid_window SELECT user_id,activated_at,access_end,'calendar_months',150 FROM commerce.purchase WHERE id=$1",[purchaseId]);
+ await pg.owner.query("INSERT INTO commerce.ai_topup_order(user_id,id,units,price_minor,status,paid_at) VALUES('first',gen_random_uuid(),2000,6900,'paid',clock_timestamp())");
+ await pg.owner.query(`INSERT INTO commerce.ai_project_budget(project_id,period_start,period_end,limit_atoms) SELECT 'interface-test',anchor_at,clock_timestamp()+interval '1 month',1000000000000 FROM commerce.access_cycle WHERE user_id='first';
+  INSERT INTO commerce.ai_user_budget(user_id,anchor_at,period_start,limit_atoms) SELECT user_id,anchor_at,anchor_at,100000000000 FROM commerce.access_cycle WHERE user_id='first'`);
+ await pg.owner.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,model,period_start,anchor_at,usage_state)
+  SELECT user_id,$1,step,repeat('a',64),'completed','synthetic',anchor_at,anchor_at,'reported'
+  FROM commerce.access_cycle CROSS JOIN unnest(ARRAY['plan','gate','classification']) AS step WHERE user_id='first'`,[requestId]);
+ await pg.owner.query(`INSERT INTO commerce.ai_cost_reservation(user_id,request_id,step,project_id,project_period_start,anchor_at,period_start,price,quoted_input_tokens,quoted_output_tokens,quoted_model_version,reserved_atoms,settled_atoms,state)
+  SELECT user_id,request_id,step,'interface-test',anchor_at,anchor_at,period_start,'{}',50,10,'synthetic',23500000000,
+   CASE WHEN step='gate' THEN NULL ELSE 23450000000 END, CASE WHEN step='gate' THEN 'reserved' ELSE 'settled' END
+  FROM commerce.analyzer_request WHERE request_id=$1`,[requestId]);
+ await pg.owner.query(await readFile(new URL('../../../packages/database/migrations/0041_legacy_analyzer_allowance.sql',import.meta.url),'utf8'));
+ const state=await request('/finance/analyzer-state',{});
+ assert.equal(state.statusCode,200,state.body);
+ const budget=state.json().customerBudget;
+ assert.equal(budget.limit,10000);assert.equal(budget.remaining,5305);assert.equal(budget.extra,2000);
+ const lookup="SELECT commerce.restore_legacy_analyzer_allowance(encode(sha256(convert_to(email,'UTF8')),'hex')) AS result FROM identity.auth_user WHERE id='first'";
+ assert.equal((await pg.owner.query(lookup)).rows[0].result.status,'RESTORED');
+ const restored=(await request('/finance/analyzer-state',{})).json().customerBudget;
+ assert.equal(restored.limit,10000);assert.equal(restored.remaining,10000);assert.equal(restored.extra,2000);
+ assert.equal((await pg.owner.query(lookup)).rows[0].result.status,'ALREADY_RESTORED');
+ await assert.rejects(pg.finance.query("SELECT commerce.restore_legacy_analyzer_allowance(repeat('0',64))"),{code:'42501'});
+ assert.equal((await pg.owner.query('SELECT * FROM commerce.ai_cost_reservation WHERE request_id=$1',[requestId])).rowCount,3);
 });
