@@ -1,3 +1,4 @@
+import type {GlobalSnapshot} from './task-context.ts';
 /** Public reasons only: never expose provider payloads, stack traces or secrets. */
 const messages: Record<string, string> = {
   AI_USER_COST_EXHAUSTED: 'Лимита Анализатора недостаточно для этого запроса. Пополните лимит в «Аккаунте» или дождитесь его обновления.',
@@ -102,7 +103,8 @@ export function knownAssistantFailureText(code: unknown): string | undefined {
 export function assistantFailureText(code: string, transport?: {code: string;networkCode?:string;responsePhase?:string}): string {
   if (transport && ['ASSISTANT_DELIVERY_UNKNOWN','AI_DELIVERY_UNKNOWN','ASSISTANT_MODEL_ERROR','ASSISTANT_RESPONSE_INVALID'].includes(code)) {
     let reason: string | undefined;
-    if (/^BENCH_IDENTITY_DENIED_HTTP_(?:401|403)$/u.test(transport.code)) reason = 'Сервис модели отклонил подключение приложения. Поддержке нужно проверить настройки подключения.';
+    if (/^BENCH_IDENTITY_DENIED_HTTP_401$/u.test(transport.code)) reason = 'Сервис модели отклонил авторизацию приложения. Поддержке нужно проверить подключение.';
+    else if (/^BENCH_IDENTITY_DENIED_HTTP_403$/u.test(transport.code)) reason = 'Сервис модели запретил выполнение запроса. Точная причина запрета по сохранённым данным не установлена; нужна проверка прав доступа и ограничений запроса у провайдера.';
     else if (/^BENCH_PROVIDER_FAILURE_HTTP_429$/u.test(transport.code)) reason = 'Сервис модели ограничил обращения приложения. Это ограничение провайдера, а не сообщение об исчерпании вашего лимита.';
     else if (/^BENCH_PROVIDER_FAILURE_HTTP_5\d\d$/u.test(transport.code)) reason = 'Сервис модели вернул ошибку на своей стороне.';
     else if (/^BENCH_PROVIDER_FAILURE_HTTP_4\d\d$/u.test(transport.code)) reason = 'Сервис модели отклонил запрос приложения. Поддержке нужно проверить совместимость настроек запроса.';
@@ -117,6 +119,17 @@ export function assistantFailureText(code: string, transport?: {code: string;net
   if (known) return known;
   // A cause cannot be invented when the server has not established it.
   return 'Запрос не выполнен: сервер не смог завершить обработку. Точная причина пока не установлена. Обратитесь в поддержку и укажите код «' + assistantErrorCode(code) + '». Данные ошибки требуют проверки; изменение лимита без подтверждения причины не поможет.';
+}
+
+/** The UI snapshot is authoritative; this question requires no LLM or catalog. */
+export function assistantFilterContextText(question:string, global:GlobalSnapshot):string|null {
+  const q=question.toLocaleLowerCase('ru').replaceAll('ё','е').replace(/[?!.,]+$/u,'').replace(/\s+/gu,' ').trim();
+  if(!/(?:фильтр|выбран|выставлен|установлен)/u.test(q))return null;
+  const core=q.replace(/(?:^| )(?:а|сейчас|же|выбран|выбраны|стоит|стоят|выставлен|выставлены|установлен|установлены|задан|заданы|сверху|вверху|покажи|напомни|мне|пожалуйста)(?= |$)/gu,' ').replace(/\s+/gu,' ').trim();
+  if(!/^(?:какой период(?: в (?:общих |верхних )?фильтрах)?|какие даты(?: в (?:общих |верхних )?фильтрах)?|период в (?:общих |верхних )?фильтрах|с какой по какую дату(?: в (?:общих )?фильтрах| фильтры))$/u.test(core))return null;
+  const {from,through}=global.filter, date=(value:string)=>value.split('-').reverse().join('.');
+  const period=from&&through?(from===through?date(from):'с '+date(from)+' по '+date(through)+' включительно'):from?'с '+date(from)+' без конечной даты':through?'по '+date(through)+' включительно, без начальной даты':'вся загруженная история, без ограничения по датам';
+  return 'В общих фильтрах сейчас выбран период: '+period+'.';
 }
 
 /** Recognise information about capabilities, never turn a concrete request into help. */

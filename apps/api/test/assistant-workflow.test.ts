@@ -528,7 +528,7 @@ test('public errors never expose exceptions or claim a guessed cause or a free f
 
 test('known transport failures explain the observed cause and keep unknown cost holds intact',async()=>{
   for(const [code,networkCode,responsePhase,expected] of [
-    ['BENCH_IDENTITY_DENIED_HTTP_401',undefined,undefined,/отклонил подключение/],
+    ['BENCH_IDENTITY_DENIED_HTTP_401',undefined,undefined,/отклонил авторизацию/],
     ['BENCH_PROVIDER_FAILURE_HTTP_429',undefined,undefined,/ограничение провайдера/],
     ['BENCH_PROVIDER_FAILURE_HTTP_503',undefined,undefined,/на своей стороне/],
     ['BENCH_DELIVERY_UNKNOWN','TIMEOUT',undefined,/не ответил за отведенное|не ответил за отведённое/],
@@ -554,3 +554,18 @@ test('usage is durable before settlement, and a retry of settlement never calls 
   }});
   assert.equal(attempts,2);assert.equal(h.calls.length,1);assert.equal(reply.modelCalls,1);assert.equal(reply.usage.length,1);
 });
+
+test('questions about current filter dates use the authenticated snapshot without model calls',async()=>{
+  const h=harness();let index=5030;
+  for(const question of ['какой период в фильтрах сейчас стоит','Какие даты выбраны в общих фильтрах?','Покажи период в фильтрах','Какой сейчас выбран период?']){
+    const reply=await h.execute(index++,question,[],{global:{revision:1,filter:{from:'2026-11-01',through:'2026-11-23'},touched:{}}});
+    assert.equal(reply.code,'ASSISTANT_FILTER_CONTEXT');assert.equal(reply.modelCalls,0);assert.deepEqual(reply.usage,[]);
+    assert.match(reply.text,/01.11.2026.*23.11.2026/);assert.equal(h.catalogs,0);assert.equal(h.calculations,0);
+  }
+  const all=await h.execute(index++,'Какой период в фильтрах?',[],{global:{revision:2,filter:{},touched:{}}});assert.match(all.text,/вся загруженная история/);
+  const open=await h.execute(index++,'Какой период в фильтрах?',[],{global:{revision:3,filter:{from:'2026-11-01'},touched:{}}});assert.match(open.text,/без конечной даты/);
+  const single=await h.execute(index++,'Какой период в фильтрах?',[],{global:{revision:4,filter:{from:'2026-11-23',through:'2026-11-23'},touched:{}}});assert.match(single.text,/23.11.2026/);
+  assert.equal(h.calls.length,0);
+});
+
+test('a provider 403 does not invent an invalid API key as the cause',()=>{const text=assistantFailureText('ASSISTANT_DELIVERY_UNKNOWN',{code:'BENCH_IDENTITY_DENIED_HTTP_403'});assert.match(text,/Точная причина запрета.*не установлена/);assert.doesNotMatch(text,/неверный ключ|отклонил авторизацию/);});

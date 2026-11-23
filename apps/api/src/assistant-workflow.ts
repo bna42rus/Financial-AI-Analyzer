@@ -1,4 +1,4 @@
-import {assistantErrorCode,assistantFailureText,assistantCapabilityText} from '../../../packages/analyzer/src/assistant-feedback.ts';
+import {assistantErrorCode,assistantFailureText,assistantCapabilityText,assistantFilterContextText} from '../../../packages/analyzer/src/assistant-feedback.ts';
 import type {BudgetReadRequest,BudgetReadExecution} from '../../../packages/analyzer/src/budget-read.ts';
 import {bindReportValues,deriveReportFact,sectionFacts,narrativeSchema,renderNarrative} from '../../../packages/analyzer/src/report.ts';
 import type {ReportResult,ReportSection,ReportRequest} from '../../../packages/analyzer/src/report.ts';
@@ -153,8 +153,8 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
       if (!sent) throw new AssistantError('ASSISTANT_DISPATCH_NOT_RECORDED');
       knownUsage = completed.usage;
       Object.assign(journal.receipt.calls[index]!, {value:completed.value,usage:completed.usage});
-      await journal.persist(); // Write-ahead receipt BEFORE monetary settlement.
-      await journal.settle(index, completed.usage);
+      try { await journal.persist(); } // Prefer a durable receipt before settlement.
+      finally { await journal.settle(index, completed.usage); } // Also settle after deletion/revocation.
       Object.assign(journal.receipt.calls[index]!, { state: 'received', value: completed.value, usage: completed.usage }); await journal.persist();
       if (completed.usage.modelVersion !== model.bound.modelVersion || completed.usage.inputTokens > model.bound.inputTokens || completed.usage.outputTokens > model.bound.outputTokens) {
         Object.assign(journal.receipt.calls[index]!, { state: 'failed', code: 'ASSISTANT_PROVIDER_CHANGED' }); await journal.persist(); throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
@@ -174,8 +174,8 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
         const responseInvalid = error && typeof error === 'object' && 'responsePhase' in error && error.responsePhase === 'JSON';
         const changed = usage && (usage.modelVersion !== model.bound.modelVersion || usage.inputTokens > model.bound.inputTokens || usage.outputTokens > model.bound.outputTokens);
         const transport = transportDiagnostic(error);
-        Object.assign(journal.receipt.calls[index]!, { state: usage ? 'failed' : 'unknown', usage, ...(transport ? { transport } : {}), code: usage ? changed ? 'ASSISTANT_PROVIDER_CHANGED' : responseInvalid ? 'ASSISTANT_RESPONSE_INVALID' : 'ASSISTANT_MODEL_ERROR' : 'ASSISTANT_DELIVERY_UNKNOWN' }); await journal.persist();
-        await journal.settle(index, usage);
+        Object.assign(journal.receipt.calls[index]!, { state: usage ? 'failed' : 'unknown', usage, ...(transport ? { transport } : {}), code: usage ? changed ? 'ASSISTANT_PROVIDER_CHANGED' : responseInvalid ? 'ASSISTANT_RESPONSE_INVALID' : 'ASSISTANT_MODEL_ERROR' : 'ASSISTANT_DELIVERY_UNKNOWN' });
+        try { await journal.persist(); } finally { await journal.settle(index, usage); }
       }
       if (sent && journal.receipt.calls[index]!.state === 'unknown') throw new AssistantError('ASSISTANT_DELIVERY_UNKNOWN');
       if (sent && journal.receipt.calls[index]!.code === 'ASSISTANT_PROVIDER_CHANGED') throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
@@ -221,6 +221,8 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
     }
   }
   try {
+    const filterContext=journal.receipt.calls.length?null:assistantFilterContextText(r.question,global);
+    if(filterContext)return finish('answer','ASSISTANT_FILTER_CONTEXT',filterContext);
     const capability = journal.receipt.calls.length ? null : assistantCapabilityText(r.question, !!services.prepareChange, !!services.external);
     if (capability) return finish('answer', 'ASSISTANT_CAPABILITIES', capability);
     const exact=journal.receipt.calls.length?null:exactAssistantPlan(r.question);
