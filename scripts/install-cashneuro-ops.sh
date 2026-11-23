@@ -4,6 +4,11 @@ set -euo pipefail
 test "$(id -u)" = 0
 repo=${1:?repository path required}
 sha=${2:?exact commit required}
+confirmed_holds=${3:-}
+case "$confirmed_holds" in
+  ''|--confirmed-unbilled-existing-holds) ;;
+  *) exit 2 ;;
+esac
 [[ "$repo" = /home/finance-admin/cashneuro-staging-src ]]
 [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
 test "$(git -c safe.directory="$repo" -C "$repo" rev-parse "$sha^{commit}")" = "$sha"
@@ -55,8 +60,13 @@ echo '2/6: проверяем размещение и размеры баз.'
 cashneuro-ops storage
 echo '3/6: сверяем зависшие запросы с уже записанным фактическим usage.'
 cashneuro-ops diagnose --settle-recorded-usage
-echo '4/6: проверяем выбранный API-ключ без генерации.'
-cashneuro-ops probe-key
+if test "$confirmed_holds" = --confirmed-unbilled-existing-holds; then
+  echo 'Освобождаем только два прежних резерва, отсутствие списания по которым подтвердил владелец.'
+  cashneuro-ops resolve-confirmed-holds --confirm-provider-unbilled
+  cashneuro-ops diagnose
+fi
+echo '4/6: проверяем ранее установленный ключ Cloud.ru без генерации.'
+cashneuro-ops probe-cloudru
 echo '5/6: готовим зашифрованные копии в существующем S3.'
 if ! python3 - <<'CHECK_RESTIC'
 import re,subprocess

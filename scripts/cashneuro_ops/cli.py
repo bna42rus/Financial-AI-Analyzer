@@ -107,6 +107,8 @@ def main():
     hold = sub.add_parser('resolve-hold')
     hold.add_argument('request_id')
     hold.add_argument('--confirm-provider-unbilled', action='store_true')
+    confirmed = sub.add_parser('resolve-confirmed-holds')
+    confirmed.add_argument('--confirm-provider-unbilled', action='store_true')
     sub.add_parser('probe-cloudru')
     sub.add_parser('probe-key')
     sub.add_parser('benchmark')
@@ -138,6 +140,9 @@ def main():
                 diagnostics.inspect_accounting(args.settle_recorded_usage)
         elif args.command == 'resolve-hold':
             diagnostics.resolve_hold(args.request_id,args.confirm_provider_unbilled)
+        elif args.command == 'resolve-confirmed-holds':
+            with locked():
+                diagnostics.resolve_confirmed_holds(args.confirm_provider_unbilled)
         elif args.command == 'probe-cloudru':
             diagnostics.probe_cloudru()
         elif args.command == 'probe-key':

@@ -10,6 +10,14 @@ from .common import STATE, OpsError, database, emit, env_file, private_read, pri
 
 SOURCE = Path(__file__).resolve().parents[1] / 'source'
 
+# Owner explicitly confirmed these historical Staging calls were not billed.
+# UUID + exact original reservation identify the scope; never sweep future unknowns.
+CONFIRMED_UNBILLED_HOLDS = {
+    'e6b054ec-e6fb-4ae4-88e4-27a626159e45': '2225201920',
+    'c3d74b6a-e077-45b4-b996-cf865c802096': '2152001920',
+}
+CONFIRMED_PROJECT = 'staging/assistant-5859b601e6fd1b12c01bed1d'
+
 ACCOUNTING_SQL = """BEGIN READ ONLY;
 SET LOCAL statement_timeout='10s';
 SELECT json_build_object(
@@ -93,7 +101,7 @@ def inspect_accounting(settle_known=False):
     return result
 
 
-def resolve_hold(request_id, confirmed_unbilled=False):
+def resolve_hold(request_id, confirmed_unbilled=False, expected_atoms=None):
     """A separate explicit owner declaration; never invoked by setup or a timer."""
     if str(uuid.UUID(request_id)) != request_id:
         raise OpsError('REQUEST_ID_INVALID')
@@ -102,8 +110,25 @@ def resolve_hold(request_id, confirmed_unbilled=False):
     if not re.fullmatch(r'staging/[a-z0-9._/-]{1,70}', project):
         raise OpsError('RECOVERY_PROJECT_INVALID')
     db = database('staging')
-    row = json.loads(sql(db, "SELECT row_to_json(t) FROM (SELECT d.email,c.reserved_atoms::text FROM commerce.ai_cost_reservation c JOIN commerce.account_directory d USING(user_id) WHERE c.request_id='" + request_id + "' AND c.step='assistant_0' AND c.project_id='" + project + "')t;") or 'null')
-    if not row or row['email'].lower() not in [x.lower() for x in config.get('allowedEmails', [])]:
+    trusted_known = (expected_atoms is not None and CONFIRMED_UNBILLED_HOLDS.get(request_id) == expected_atoms
+                     and project == CONFIRMED_PROJECT)
+    if expected_atoms is not None and not trusted_known:
+        raise OpsError('CONFIRMED_HOLD_SCOPE_INVALID')
+    row = json.loads(sql(db, "SELECT row_to_json(t) FROM (SELECT d.email,c.reserved_atoms::text,c.state,c.settled_atoms::text,r.state AS request_state FROM commerce.ai_cost_reservation c JOIN commerce.account_directory d USING(user_id) JOIN commerce.analyzer_request r USING(user_id,request_id,step) WHERE c.request_id='" + request_id + "' AND c.step='assistant_0' AND c.project_id='" + project + "')t;") or 'null')
+    if not row:
+        if trusted_known:
+            result = {'requestId':request_id,'status':'NOT_FOUND_REQUIRES_REVIEW','paidCalls':0}
+            emit('operator-hold-reconciliation', **result)
+            return result
+        raise OpsError('HOLD_NOT_IN_CONFIGURED_TEST_SCOPE')
+    if expected_atoms is not None and row['reserved_atoms'] != expected_atoms:
+        raise OpsError('CONFIRMED_HOLD_AMOUNT_CHANGED')
+    # A repeated installation must not release/subtract an already released hold again.
+    if trusted_known and row['state'] == 'released' and row['settled_atoms'] == '0' and row['request_state'] == 'failed':
+        result = {'requestId':request_id,'status':'ALREADY_RELEASED','paidCalls':0}
+        emit('operator-hold-reconciliation', **result)
+        return result
+    if not trusted_known and row['email'].lower() not in [x.lower() for x in config.get('allowedEmails', [])]:
         raise OpsError('HOLD_NOT_IN_CONFIGURED_TEST_SCOPE')
     path = Path(__file__).resolve().parents[1] / 'reconcile-assistant-reservation-staging.py'
     spec = importlib.util.spec_from_file_location('operator_unbilled_reconciliation', path)
@@ -118,6 +143,16 @@ def resolve_hold(request_id, confirmed_unbilled=False):
         result = preview
     emit('operator-hold-reconciliation', paidCalls=0, ownerUnbilledDeclaration=confirmed_unbilled, **result)
     return result
+
+
+def resolve_confirmed_holds(confirmed_unbilled=False):
+    """Only the two exact UUID/amount pairs authorized by the owner on 24 Nov."""
+    results = [resolve_hold(request_id, confirmed_unbilled, expected_atoms=atoms)
+               for request_id, atoms in CONFIRMED_UNBILLED_HOLDS.items()]
+    emit('confirmed-holds-summary', ownerUnbilledDeclaration=confirmed_unbilled,
+         knownHoldsResolved=all(x.get('status') in ('RELEASED','ALREADY_RELEASED') for x in results),
+         requests=results, paidCalls=0)
+    return results
 
 
 def inspect_storage():
@@ -144,40 +179,5 @@ def probe_cloudru():
 
 
 def probe_key():
-    from .installation import prompt
-    choice = prompt('Какой ключ проверить: cloudru (установленный Cloud.ru) или claude (Anthropic)')
-    if choice == 'cloudru':
-        return probe_cloudru()
-    if choice != 'claude':
-        raise OpsError('PROVIDER_CHOICE_REQUIRED')
-    # Independent read-only credential check; does not change the application's provider.
-    import urllib.error
-    import urllib.request
-    path = Path('/etc/cashneuro/ai/anthropic-key-check.json')
-    key = json.loads(private_read(path)).get('apiKey') if path.exists() else prompt('Новый Anthropic API key: ', secret=True)
-    if not isinstance(key, str) or not re.fullmatch(r'[\x21-\x7e]{20,512}', key):
-        raise OpsError('ANTHROPIC_KEY_INVALID')
-    request = urllib.request.Request('https://api.anthropic.com/v1/models', headers={
-        'Authorization': 'Bearer ' + key, 'anthropic-version': '2026-10-21'})
-    class NoRedirect(urllib.request.HTTPRedirectHandler):
-        def redirect_request(self, *args, **kwargs):
-            return None
-    opener = urllib.request.build_opener(NoRedirect())
-    try:
-        with opener.open(request, timeout=12) as response:
-            raw = response.read(512 * 1024 + 1)
-            if len(raw) > 512 * 1024:
-                raise OpsError('PROVIDER_RESPONSE_TOO_LARGE')
-            value = json.loads(raw)
-            accepted = response.status == 200 and isinstance(value.get('data'), list)
-            status = response.status
-    except urllib.error.HTTPError as error:
-        status, accepted = error.code, False
-        error.close()
-    if accepted and not path.exists():
-        private_write(path, json.dumps({'apiKey': key}))
-    result = {'provider': 'anthropic', 'httpStatus': status, 'modelsEndpointAccepted': accepted,
-              'modelCalls': 0, 'applicationProviderChanged': False}
-    private_write(STATE / 'provider-key-check.json', json.dumps(result))
-    emit('provider-key', **result)
-    return result
+    """Compatibility alias: this installation uses the existing Cloud.ru key."""
+    return probe_cloudru()

@@ -322,23 +322,68 @@ class OperationsTests(unittest.TestCase):
             self.assertIn('MemoryMax=768M',(root/'cashneuro-backup@.service').read_text())
             self.assertIn('enable',run.call_args.args[0])
 
-    def test_anthropic_probe_is_read_only_redacted_and_does_not_change_application_provider(self):
-        from unittest.mock import MagicMock
-        key='synthetic-anthropic-key-only-for-tests'
-        response=MagicMock();response.__enter__.return_value=response
-        response.status=200;response.read.return_value=b'{"data":[]}'
-        opener=MagicMock();opener.open.return_value=response
-        output=io.StringIO()
-        with patch.object(installation,'prompt',side_effect=['claude',key]),\
-             patch.object(Path,'exists',return_value=False),patch.object(diagnostics,'private_write'),\
-             patch('urllib.request.build_opener',return_value=opener) as builder,contextlib.redirect_stdout(output):
+    def test_provider_check_uses_cloudru_without_asking_for_another_key(self):
+        with patch.object(installation,'prompt',side_effect=AssertionError('No provider prompt')),\
+             patch.object(diagnostics,'probe_cloudru',return_value={'provider':'cloud.ru','modelCalls':0}) as probe:
             result=diagnostics.probe_key()
-        request=opener.open.call_args.args[0]
-        self.assertEqual(request.get_method(),'GET');self.assertIsNone(request.data)
-        self.assertEqual(request.full_url,'https://api.anthropic.com/v1/models')
-        self.assertIsNone(builder.call_args.args[0].redirect_request())
-        self.assertNotIn(key,output.getvalue())
-        self.assertFalse(result['applicationProviderChanged']);self.assertEqual(result['modelCalls'],0)
+        probe.assert_called_once_with()
+        self.assertEqual(result['provider'],'cloud.ru')
+
+    def confirmed_fixture(self,state='unknown',atoms='2225201920'):
+        return {'email':'historical-owner@example.test','reserved_atoms':atoms,'state':state,
+                'settled_atoms':'0' if state=='released' else None,
+                'request_state':'failed' if state=='released' else 'unknown'}
+
+    def test_confirmed_hold_already_released_is_never_subtracted_again(self):
+        cfg={'cost':{'projectId':diagnostics.CONFIRMED_PROJECT},'allowedEmails':['current-owner@example.test']}
+        with patch.object(diagnostics,'private_read',return_value=json.dumps(cfg).encode()),\
+             patch.object(diagnostics,'database',return_value={}),\
+             patch.object(diagnostics,'sql',return_value=json.dumps(self.confirmed_fixture('released'))),\
+             patch('importlib.util.spec_from_file_location',side_effect=AssertionError('Already released')),\
+             contextlib.redirect_stdout(io.StringIO()):
+            result=diagnostics.resolve_hold('e6b054ec-e6fb-4ae4-88e4-27a626159e45',True,expected_atoms='2225201920')
+        self.assertEqual(result['status'],'ALREADY_RELEASED')
+
+    def test_confirmed_hold_changed_amount_aborts_before_attestation_or_mutation(self):
+        cfg={'cost':{'projectId':diagnostics.CONFIRMED_PROJECT},'allowedEmails':[]}
+        with patch.object(diagnostics,'private_read',return_value=json.dumps(cfg).encode()),\
+             patch.object(diagnostics,'database',return_value={}),\
+             patch.object(diagnostics,'sql',return_value=json.dumps(self.confirmed_fixture(atoms='2225201921'))),\
+             patch('importlib.util.spec_from_file_location',side_effect=AssertionError('No attestation')):
+            with self.assertRaisesRegex(common.OpsError,'CONFIRMED_HOLD_AMOUNT_CHANGED'):
+                diagnostics.resolve_hold('e6b054ec-e6fb-4ae4-88e4-27a626159e45',True,expected_atoms='2225201920')
+
+    def test_confirmed_batch_is_closed_to_two_exact_historical_requests(self):
+        with patch.object(diagnostics,'resolve_hold',return_value={'status':'READY'}) as resolve,contextlib.redirect_stdout(io.StringIO()):
+            diagnostics.resolve_confirmed_holds()
+        self.assertEqual(len(resolve.call_args_list),2)
+        self.assertEqual({x.args[0] for x in resolve.call_args_list},set(diagnostics.CONFIRMED_UNBILLED_HOLDS))
+        self.assertTrue(all(x.args[1] is False for x in resolve.call_args_list))
+        self.assertEqual({x.kwargs['expected_atoms'] for x in resolve.call_args_list},{'2225201920','2152001920'})
+
+    def test_confirmed_batch_applies_owner_declaration_only_when_explicit(self):
+        with patch.object(diagnostics,'resolve_hold',side_effect=[{'status':'ALREADY_RELEASED'},{'status':'RELEASED'}]) as resolve,contextlib.redirect_stdout(io.StringIO()):
+            diagnostics.resolve_confirmed_holds(True)
+        self.assertTrue(all(x.args[1] is True for x in resolve.call_args_list))
+
+    def test_confirmed_hold_preview_precedes_audit_and_apply(self):
+        from types import SimpleNamespace
+        events=[]
+        cfg={'cost':{'projectId':diagnostics.CONFIRMED_PROJECT},'allowedEmails':[]}
+        def query(email,request,atoms,apply=False):return 'APPLY' if apply else 'PREVIEW'
+        helper=SimpleNamespace(query=query,attest=lambda *a:events.append('audit'))
+        spec=SimpleNamespace(loader=SimpleNamespace(exec_module=lambda *a:None))
+        def sql(db,value):
+            if value=='PREVIEW':events.append('preview');return '{"status":"READY"}'
+            if value=='APPLY':events.append('apply');return '{"status":"RELEASED"}'
+            return json.dumps(self.confirmed_fixture())
+        with patch.object(diagnostics,'private_read',return_value=json.dumps(cfg).encode()),\
+             patch.object(diagnostics,'database',return_value={}),patch.object(diagnostics,'sql',side_effect=sql),\
+             patch('importlib.util.spec_from_file_location',return_value=spec),\
+             patch('importlib.util.module_from_spec',return_value=helper),contextlib.redirect_stdout(io.StringIO()):
+            result=diagnostics.resolve_hold('e6b054ec-e6fb-4ae4-88e4-27a626159e45',True,expected_atoms='2225201920')
+        self.assertEqual(events,['preview','audit','apply'])
+        self.assertEqual(result['status'],'RELEASED')
 
     def test_alert_is_throttled_before_any_network_send(self):
         with tempfile.TemporaryDirectory() as temporary:
