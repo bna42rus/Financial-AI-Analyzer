@@ -97,7 +97,7 @@ for (const mobile of [false, true]) test(`task HTTP UI: manual touches, lost ACK
     const generation = (await within(db => prepareFinance(db, 'task-browser'))).generation;
     const snap = await context.request.post(api + '/finance/analyzer-context', { headers: { origin: web }, data: { generation } }); assert.equal(snap.status(), 200);
     const changed = await context.request.post(api + '/finance/analyzer-context', { headers: { origin: web }, data: { generation, change: { id: randomUUID(), revision: (await snap.json()).revision, filter: {}, touched: ['period'] } } }); assert.equal(changed.status(), 200);
-    await send('Итог?'); await expect(page.getByRole('alert')).toContainText('Общие фильтры изменились'); assert.equal(calls, 6); assert.equal((await messages()).length, 3);
+    await send('Итог?'); await expect(page.getByRole('alert')).toContainText('Фильтры или условия задачи изменились'); assert.equal(calls, 6); assert.equal((await messages()).length, 3);
     await send('Итог?'); await count(4); await idle(); assert.equal(calls, 8);
 
     // Reload while the real HTTP handler waits on a synthetic provider. The
