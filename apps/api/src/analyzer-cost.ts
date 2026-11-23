@@ -1,11 +1,30 @@
 import {assertCustomerAiBudget,unitsPerMonth} from './customer-ai-budget.ts';
 import type { PoolClient } from 'pg';
 import { object } from '../../../packages/finance-core/src/model.ts';
-import { baseMonthlyCost, rubAmount, tokenPrice, tokenCost, CostError } from '../../../packages/analyzer/src/cost.ts';
+import { baseMonthlyCost, rubAmount, tokenPrice, tokenCost, usageTokens, CostError } from '../../../packages/analyzer/src/cost.ts';
 import type { TokenPrice, DispatchBound, Usage } from '../../../packages/analyzer/src/cost.ts';
 
 export type CostPolicy = { projectId: string; projectPeriodStart: string; projectPeriodEnd: string; projectLimitRub: string; price: TokenPrice };
 export type CostIdentity = { userId: string; requestId: string; step: 'gate' | 'plan' | 'assistant_0' | 'assistant_1' | 'assistant_2' | 'classification'; anchorAt: string; periodStart: string };
+
+/** Recover a provider usage receipt recorded before a crash/failed settlement.
+ * Unknown usage is deliberately untouched. Uses the original budget and price. */
+export async function reconcileRecordedAssistantCosts(db: PoolClient, userId: string): Promise<number> {
+  const rows = (await db.query(`SELECT c.request_id,c.step,a.receipt->'calls'->right(c.step,1)::int->'usage' AS usage
+    FROM commerce.ai_cost_reservation c JOIN finance.assistant_run a ON a.user_id=c.user_id AND a.request_id=c.request_id
+    WHERE c.user_id=$1 AND c.state IN ('reserved','unknown') AND c.step IN ('assistant_0','assistant_1','assistant_2')
+    AND jsonb_typeof(a.receipt->'calls'->right(c.step,1)::int->'usage')='object'
+    ORDER BY c.created_at,c.request_id,c.step LIMIT 30`, [userId])).rows;
+  for (const row of rows) {
+    const r = object(row.usage, ['inputTokens','outputTokens','modelVersion']);
+    if (typeof r.modelVersion !== 'string' || !/^[A-Za-z0-9._/-]{1,160}$/u.test(r.modelVersion)) throw new CostError('AI_USAGE_INVALID');
+    const usage = {inputTokens:usageTokens(r.inputTokens),outputTokens:usageTokens(r.outputTokens),modelVersion:r.modelVersion};
+    await settleCost(db,userId,row.request_id,row.step,usage);
+    await db.query(`UPDATE commerce.analyzer_request SET state=CASE WHEN EXISTS(SELECT 1 FROM finance.analyzer_task_request t WHERE t.user_id=$1 AND t.id=$2 AND t.state='pending') THEN 'received' ELSE 'completed' END,updated_at=clock_timestamp()
+      WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state IN ('sent','unknown','received')`, [userId,row.request_id,row.step]);
+  }
+  return rows.length;
+}
 export function costPolicy(value: unknown): CostPolicy {
   const r = object(value, ['projectId', 'projectPeriodStart', 'projectPeriodEnd', 'projectLimitRub', 'price']);
   if (typeof r.projectId !== 'string' || !/^[a-z0-9._/-]{1,80}$/.test(r.projectId) || typeof r.projectPeriodStart !== 'string' || typeof r.projectPeriodEnd !== 'string') throw new CostError('AI_BUDGET_CONFIGURATION_DENIED');

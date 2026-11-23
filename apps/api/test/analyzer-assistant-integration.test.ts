@@ -1,4 +1,4 @@
-import {reserveCost} from '../src/analyzer-cost.ts';
+import {reserveCost,reconcileRecordedAssistantCosts} from '../src/analyzer-cost.ts';
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash, generateKeyPairSync } from 'node:crypto';
@@ -446,4 +446,32 @@ test('program next-period budget is distinguishable from current actual and repo
  const reply=await run(b);assert.equal(reply.json().code,'CHANGE_PROPOSED',reply.body);const actionId=randomUUID(),p=reply.json().answer.proposal;const preview=await request('/finance/analyzer-propose',{actionId,tool:{name:'finance_action',answerId:b.id,intent:p.intent}});assert.equal(preview.statusCode,200,preview.body);assert.equal((await request('/finance/commit',{actionId})).statusCode,200);
  outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'budgets',label:'Бюджеты',request:{names:['Со следующего месяца']}}]}}];const result=await run({...b,id:randomUUID(),text:'Какой факт по этому бюджету?'});assert.equal(result.json().code,'FINANCIAL_REPORT',result.body);const item=result.json().answer.report.sections[0].budgets.items[0];assert.equal(item.indicator,null);assert.equal(item.upcomingLimit.limitMinor,'100000');
  outputs=[{version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'budgets',label:'Будущий факт',request:{names:['Со следующего месяца'],date:'2099-01-01'}}]}}];const future=await run({...b,id:randomUUID(),text:'Покажи фактические расходы по бюджету в будущем'});assert.ok(future.json().answer.report.sections[0].error,future.body);
+});
+
+
+test('recorded usage settles an interrupted hold once, while genuinely unknown usage stays reserved',async()=>{
+  const b=await body();behavior='timeout';
+  const response=await run(b);assert.equal(response.statusCode,200,response.body);
+  assert.equal(response.json().code,'ASSISTANT_DELIVERY_UNKNOWN');assert.equal(calls,1);
+  const db=await pg.owner.connect();
+  try{
+    await db.query('BEGIN');
+    assert.equal(await reconcileRecordedAssistantCosts(db,'first'),0);
+    const saved=(await db.query('SELECT workflow,receipt FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0];
+    // Reconstruct the durable write-ahead receipt at a crash boundary. The
+    // immutable final result is replaced only by this synthetic owner fixture.
+    delete saved.receipt.result;delete saved.receipt.conversation;
+    saved.receipt.calls[0].state='failed';saved.receipt.calls[0].code='ASSISTANT_MODEL_ERROR';
+    saved.receipt.calls[0].usage={inputTokens:500,outputTokens:50,modelVersion:'openai/gpt-oss-120b'};
+    await db.query('DELETE FROM finance.assistant_run WHERE user_id=$1 AND request_id=$2',['first',b.id]);
+    await db.query('INSERT INTO finance.assistant_run(user_id,request_id,workflow,receipt) VALUES($1,$2,$3,$4)',['first',b.id,saved.workflow,JSON.stringify(saved.receipt)]);
+    assert.equal(await reconcileRecordedAssistantCosts(db,'first'),1);
+    assert.equal(await reconcileRecordedAssistantCosts(db,'first'),0);
+    const cost=(await db.query('SELECT state,settled_atoms,reserved_atoms FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0];
+    assert.equal(cost.state,'settled');assert.ok(BigInt(cost.settled_atoms)>0n);assert.ok(BigInt(cost.settled_atoms)<BigInt(cost.reserved_atoms));
+    const recorded=(await db.query('SELECT state,usage_state,input_tokens FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2',['first',b.id])).rows[0];
+    assert.equal(recorded.state,'completed');assert.equal(recorded.usage_state,'reported');assert.equal(recorded.input_tokens,500);
+    assert.equal((await db.query('SELECT reserved_atoms FROM commerce.ai_user_budget WHERE user_id=$1',['first'])).rows[0].reserved_atoms,'0');
+    assert.equal(calls,1);await db.query('COMMIT');
+  }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
 });

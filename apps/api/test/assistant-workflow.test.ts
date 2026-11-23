@@ -20,7 +20,7 @@ const plan = (changes: unknown[], mode = 'new') => ({ version: assistantVersion,
 function harness() {
   let conversation = emptyConversation(scope), calls: CompletionInput[] = [], catalogs = 0, calculations = 0, currentGlobal = structuredClone(global), currentNow = new Date('2026-10-15T22:30:00Z');
   const journals = new Map<string, AssistantJournal>(), requests = new Map<string, AssistantRequest>();
-  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; modelError?:Error; reserveError?:Error; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog; prepareChange?: AssistantServices['prepareChange'] } = {}) => {
+  const execute = async (n: number, question: string, replies: unknown[], options: { failure?: boolean; modelError?:Error; reserveError?:Error; settleHook?:(journal:AssistantJournal)=>Promise<void>; global?: any; timezone?: string; now?: Date; catalog?: typeof trialCatalog; prepareChange?: AssistantServices['prepareChange'] } = {}) => {
     if (options.global) currentGlobal = options.global; if (options.now) currentNow = options.now;
     const request: AssistantRequest = requests.get(trialId(n)) ?? { requestId: trialId(n), scope, conversation: structuredClone(conversation), global: currentGlobal, dataRevision: '1', question, now: currentNow, timezone: options.timezone ?? calendar.timezone };
     requests.set(request.requestId, request);
@@ -36,7 +36,7 @@ function harness() {
       } else { value = replies[index++]; if (['understand', 'repair'].includes(input.phase)) lastPlan = value; }
       return { value, usage: { inputTokens: 100, outputTokens: 50, modelVersion: 'synthetic' } };
     } };
-    const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() { if(options.reserveError) throw options.reserveError; }, async settle() {} } as AssistantJournal;
+    const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() { if(options.reserveError) throw options.reserveError; }, async settle() { await options.settleHook?.(journal); } } as AssistantJournal;
     journals.set(request.requestId, journal);
     const services: AssistantServices = { prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
       async calculate(query, actualCalendar) { calculations++; assert.equal(actualCalendar.timezone, request.timezone); return trialResult(query); },
@@ -544,3 +544,13 @@ test('known transport failures explain the observed cause and keep unknown cost 
 });
 
 test('missing HTTP error codes preserve ordinary API fallbacks',()=>{assert.equal(knownAssistantFailureText(undefined),undefined);assert.equal(knownAssistantFailureText(null),undefined);assert.equal(knownAssistantFailureText({}),undefined);});
+
+
+test('usage is durable before settlement, and a retry of settlement never calls the model again',async()=>{
+  const h=harness();let attempts=0;
+  const reply=await h.execute(5020,'Поясни финансовый термин',[{version:assistantVersion,topic:'ambiguous',action:'clarification',clarification:'Укажите термин, чтобы объяснить именно его.'}],{settleHook:async(journal)=>{
+    assert.deepEqual(journal.receipt.calls[0]!.usage,{inputTokens:100,outputTokens:50,modelVersion:'synthetic'});
+    if(++attempts===1)throw Error('SYNTHETIC_SETTLEMENT_INTERRUPTED');
+  }});
+  assert.equal(attempts,2);assert.equal(h.calls.length,1);assert.equal(reply.modelCalls,1);assert.equal(reply.usage.length,1);
+});

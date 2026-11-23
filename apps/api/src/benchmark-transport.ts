@@ -44,6 +44,10 @@ export class BenchmarkFailure extends Error {
   networkCode?: string; elapsedMs?: number;
   constructor(code: string, usage?: Usage, fingerprint?: string) { super(code); this.code = code; this.usage = usage; this.fingerprint = fingerprint; }
 }
+const undispatchedErrors = new WeakSet<object>();
+export function definitelyNotDispatched(error: unknown): boolean {
+  return !!error && typeof error === 'object' && undispatchedErrors.has(error);
+}
 const networkCodes = ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'ENETUNREACH', 'EHOSTUNREACH', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_HEADERS_TIMEOUT', 'UND_ERR_SOCKET', 'CERT_HAS_EXPIRED', 'DEPTH_ZERO_SELF_SIGNED_CERT', 'UNABLE_TO_VERIFY_LEAF_SIGNATURE', 'TIMEOUT', 'ABORT', 'OTHER'];
 const parameters = ['max_completion_tokens', 'max_tokens', 'response_format', 'json_schema', 'messages', 'model', 'temperature'];
 const responsePhases = ['BODY', 'USAGE', 'DETAILS', 'MODEL', 'CHOICES', 'FINISH', 'ROLE', 'REFUSAL', 'TOOL_CALLS', 'FUNCTION_CALL', 'CONTENT', 'JSON'];
@@ -116,7 +120,8 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
     async complete(prompt, input, schema, reserve) {
       const body = requestBody(prompt, input, schema);
       if (Buffer.byteLength(body) > maximumRequestBytes) throw new BenchmarkFailure('BENCH_CONTEXT_LIMIT');
-      await reserve(); // durable reservation must precede every possible dispatch
+      try { await reserve(); } // durable reservation must precede every possible dispatch
+      catch(error) { if(error && typeof error==='object')undispatchedErrors.add(error); throw error; }
       const started = performance.now();
       const elapsed = () => Math.min(86400000, Math.max(0, Math.round(performance.now() - started)));
       let response: Response;

@@ -10,7 +10,7 @@ import {calculateFinancial,calculatorText} from '../../../packages/analyzer/src/
 import type {CalculatorResult} from '../../../packages/analyzer/src/calculators.ts';
 import {calculatorInstructions,extendedCalculatorInstructions,calculatorContextInstructions,financialSourceInstructions,reportInstructions,budgetReadInstructions,additionalPlanningInstructions,feeInstructions,sourceBoundaryInstructions,clockInstructions,periodFactInstructions} from '../../../packages/analyzer/src/assistant-plan.ts';
 import { createHash } from 'node:crypto';
-import { transportDiagnostic } from './benchmark-transport.ts';
+import { transportDiagnostic, definitelyNotDispatched } from './benchmark-transport.ts';
 import { isDeepStrictEqual } from 'node:util';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
 import { assistantDisplayText, explanationNeedsReview } from '../../../packages/analyzer/src/assistant-text.ts';
@@ -64,6 +64,7 @@ export type AssistantJournal = {
   receipt: RunReceipt; persist(): Promise<void>;
   reserve(index: number, bound: DispatchBound): Promise<void>;
   settle(index: number, usage?: Usage): Promise<void>;
+  releaseUnsent?(index: number): Promise<void>;
 };
 export type AssistantRequest = { requestId: string; scope: TaskScope; conversation: Conversation; global: GlobalSnapshot; dataRevision: string; question: string; now: Date; timezone: string };
 export type ExpectedAssistantState = { scope: TaskScope; head: string | null; turns: number; globalRevision: number; dataRevision: string; timezone: string };
@@ -128,33 +129,53 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
     if (index >= 3) throw new AssistantError('ASSISTANT_CALL_LIMIT');
     if (old) {
       if (old.fingerprint !== fingerprint || old.phase !== input.phase) throw new AssistantError('ASSISTANT_REQUEST_CHANGED');
+      // A received usage receipt can survive a process death before settlement.
+      // Settle the same receipt; never send another paid HTTP request.
+      if (old.usage) await journal.settle(index, old.usage);
+      if (old.usage && (old.usage.modelVersion!==model.bound.modelVersion || old.usage.inputTokens>model.bound.inputTokens || old.usage.outputTokens>model.bound.outputTokens)) {
+        old.state='failed'; old.code='ASSISTANT_PROVIDER_CHANGED'; await journal.persist(); throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
+      }
+      if (old.state === 'sent' && old.usage && Object.hasOwn(old,'value')) {
+        old.state='received'; await journal.persist();
+      }
       if (old.state === 'sent' || old.state === 'unknown') throw new AssistantError('ASSISTANT_DELIVERY_UNKNOWN');
       if (old.state === 'failed') throw new AssistantError(old.code ?? 'ASSISTANT_MODEL_ERROR');
       timings.calls.push({phase:input.phase,durationMs:0,replayed:true});
       return structuredClone(old.value);
     }
-    let sent = false; let knownUsage: Usage | undefined;
+    let sent = false, reservedHere = false; let knownUsage: Usage | undefined;
     try {
       const completed = await model.complete(input, async () => {
         if (sent) throw new AssistantError('ASSISTANT_DUPLICATE_DISPATCH');
-        await guard(); await journal.reserve(index, model.bound);
+        await guard(); await journal.reserve(index, model.bound); reservedHere=true;
         journal.receipt.calls.push({ fingerprint, phase: input.phase, state: 'sent' }); await journal.persist(); sent = true;
       });
       if (!sent) throw new AssistantError('ASSISTANT_DISPATCH_NOT_RECORDED');
-      knownUsage = completed.usage; await journal.settle(index, completed.usage);
+      knownUsage = completed.usage;
+      Object.assign(journal.receipt.calls[index]!, {value:completed.value,usage:completed.usage});
+      await journal.persist(); // Write-ahead receipt BEFORE monetary settlement.
+      await journal.settle(index, completed.usage);
       Object.assign(journal.receipt.calls[index]!, { state: 'received', value: completed.value, usage: completed.usage }); await journal.persist();
       if (completed.usage.modelVersion !== model.bound.modelVersion || completed.usage.inputTokens > model.bound.inputTokens || completed.usage.outputTokens > model.bound.outputTokens) {
         Object.assign(journal.receipt.calls[index]!, { state: 'failed', code: 'ASSISTANT_PROVIDER_CHANGED' }); await journal.persist(); throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
       }
       await guard(); return completed.value;
     } catch (error) {
+      if (reservedHere && definitelyNotDispatched(error) && journal.releaseUnsent) {
+        await journal.releaseUnsent(index);
+        const entry=journal.receipt.calls[index];
+        if(entry){entry.state='failed';entry.code='ASSISTANT_DISPATCH_NOT_STARTED';}
+        // Cancellation may forbid further conversation writes. Accounting
+        // cleanup above is independent and must still complete.
+        throw error;
+      }
       if (sent && journal.receipt.calls[index]!.state === 'sent') {
         const usage = knownUsage ?? (error && typeof error === 'object' && 'usage' in error ? (error as { usage?: Usage }).usage : undefined);
-        await journal.settle(index, usage);
         const responseInvalid = error && typeof error === 'object' && 'responsePhase' in error && error.responsePhase === 'JSON';
         const changed = usage && (usage.modelVersion !== model.bound.modelVersion || usage.inputTokens > model.bound.inputTokens || usage.outputTokens > model.bound.outputTokens);
         const transport = transportDiagnostic(error);
         Object.assign(journal.receipt.calls[index]!, { state: usage ? 'failed' : 'unknown', usage, ...(transport ? { transport } : {}), code: usage ? changed ? 'ASSISTANT_PROVIDER_CHANGED' : responseInvalid ? 'ASSISTANT_RESPONSE_INVALID' : 'ASSISTANT_MODEL_ERROR' : 'ASSISTANT_DELIVERY_UNKNOWN' }); await journal.persist();
+        await journal.settle(index, usage);
       }
       if (sent && journal.receipt.calls[index]!.state === 'unknown') throw new AssistantError('ASSISTANT_DELIVERY_UNKNOWN');
       if (sent && journal.receipt.calls[index]!.code === 'ASSISTANT_PROVIDER_CHANGED') throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');

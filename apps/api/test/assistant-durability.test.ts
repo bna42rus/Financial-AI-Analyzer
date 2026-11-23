@@ -8,7 +8,7 @@ import { withAssistantJournal } from '../src/assistant-journal.ts';
 import { withAssistantBudget, assistantBudgetVersion, remainingAssistantTrialBudget, checkAssistantPermit } from '../src/assistant-budget.ts';
 import type { AssistantPermit } from '../src/assistant-budget.ts';
 import { createCloudAssistantModel, compactAssistantSchema } from '../src/assistant-transport.ts';
-import { runAssistant } from '../src/assistant-workflow.ts';
+import { runAssistant,assistantRequestFingerprint } from '../src/assistant-workflow.ts';
 import type { AssistantRequest, AssistantServices } from '../src/assistant-workflow.ts';
 import { emptyConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { assistantVersion, assistantPlanSchema } from '../../../packages/analyzer/src/assistant-plan.ts';
@@ -202,4 +202,18 @@ test('wire schema references preserve the closed validator exactly and leave the
   assert.deepEqual(expand(compact), assistantPlanSchema);
   assert.equal(JSON.stringify(assistantPlanSchema), before);
   assert.ok(Buffer.byteLength(JSON.stringify(compact)) < Buffer.byteLength(before) * 0.6);
+});
+
+test('a failure after this reservation but before HTTP releases only this unsent hold',async()=>{
+  for(const point of ['new-reservation-persist','existing-request'] as const){
+    const r=request();let fetches=0,released=0,failPersist=true;
+    const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async()=>{fetches++;throw Error('HTTP_MUST_NOT_RUN');});
+    const journal={receipt:{fingerprint:assistantRequestFingerprint(r),calls:[]} as import('../src/assistant-workflow.ts').RunReceipt,
+      async reserve(){if(point==='existing-request')throw Error('AI_DELIVERY_UNKNOWN');},
+      async persist(){if(point==='new-reservation-persist'&&failPersist&&journal.receipt.calls.length){failPersist=false;throw Error('AI_REQUEST_CANCELLED');}},
+      async settle(){throw Error('UNSENT_MUST_NOT_BE_SETTLED_AS_UNKNOWN');},async releaseUnsent(){released++;}};
+    const result=await runAssistant(r,model,journal,services().s);
+    assert.equal(fetches,0);assert.equal(released,point==='new-reservation-persist'?1:0);
+    assert.equal(result.code,point==='new-reservation-persist'?'AI_REQUEST_CANCELLED':'AI_DELIVERY_UNKNOWN');
+  }
 });

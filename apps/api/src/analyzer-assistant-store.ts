@@ -21,7 +21,7 @@ import { prepareFinance } from './finance.ts';
 import { analyzerCycle, analyzerQuota, calculateAnalyzerQuery } from './analyzer.ts';
 import { assertReferences,operationsDataset } from './operations.ts';
 import { yandexCatalog } from './yandex-runtime.ts';
-import { reserveCost, settleCost } from './analyzer-cost.ts';
+import { reserveCost, settleCost, reconcileRecordedAssistantCosts } from './analyzer-cost.ts';
 import { stableJSON } from './finance-history.ts';
 import { HttpError } from './types.ts';
 
@@ -78,6 +78,7 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
     const request = { body, provider: provider.binding };
     const claim = await within(async db => {
       const { workspace, timezone } = await currentScope(db);
+      await reconcileRecordedAssistantCosts(db,userId);
       if ((await db.query('SELECT 1 FROM finance.analyzer_task_cancel WHERE user_id=$1 AND request_id=$2', [userId, id])).rowCount) throw new HttpError(409, 'AI_REQUEST_CANCELLED');
       const old = (await own(db)).rows[0];
       if (old) {
@@ -164,6 +165,13 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
           return changed;
         });
         if (violation) throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
+      },
+      async releaseUnsent(index) {
+        await within(async db=>{
+          await settleCost(db,userId,id,step(index),undefined,true);
+          await db.query(`UPDATE commerce.analyzer_request SET state='failed',usage_state='not_sent',updated_at=clock_timestamp()
+            WHERE user_id=$1 AND request_id=$2 AND step=$3`,[userId,id,step(index)]);
+        });
       },
     };
     await journal.persist();

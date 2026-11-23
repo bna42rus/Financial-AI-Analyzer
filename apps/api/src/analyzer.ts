@@ -1,4 +1,5 @@
 import {connectedDependencies} from '../../../packages/analyzer/src/dependencies.ts';
+import {reconcileRecordedAssistantCosts} from './analyzer-cost.ts';
 import {decorateAnalysis} from '../../../packages/analyzer/src/analysis.ts';
 import {financialTimezone} from './finance-profile.ts';
 import {randomUUID} from 'node:crypto';
@@ -31,6 +32,7 @@ export async function analyzerCycle(db:PoolClient,userId:string){
  anchor_at::text AS "anchorExact",(((anchor_at AT TIME ZONE timezone)+make_interval(months=>k)) AT TIME ZONE timezone)::text AS "startExact" FROM slot`,[userId])).rows[0];
 }
 export async function analyzerQuota(db:PoolClient,userId:string,journal=false):Promise<Quota>{
+ if(journal)await reconcileRecordedAssistantCosts(db,userId);
  const c=await analyzerCycle(db,userId);
  if(!c||!Number.isSafeInteger(c.quota_policy?.limit)||c.quota_policy.limit<0)return {available:false,limit:null,used:0,remaining:null,periodStart:null,resetAt:null,warning:null};
  // Preserve the canonical database timestamp: pg Date serialization truncates microseconds.
