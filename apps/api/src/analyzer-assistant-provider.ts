@@ -21,10 +21,11 @@ export const isAssistantProvider = (value: unknown): value is AssistantProvider 
  * The explicit fetcher receives a synthetic key; it must be a test transport. */
 export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, policy: Omit<CostPolicy, 'price'>, allowedEmails?:readonly string[]): AssistantProvider {
   if (typeof fetcher !== 'function') throw new Error('ASSISTANT_PROVIDER_CONFIGURATION_DENIED');
-  const model = createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher);
+  const credentials={apiKey:'synthetic-assistant-key-for-tests-only'};
+  const model = createCloudAssistantModel(credentials, fetcher);
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
   const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (email: string) => !allowedEmails||allowedEmails.includes(email.toLowerCase()), async authorizeDispatch(_db: PoolClient) {},
-    forRequest: (purpose: 'assistant'|'classification' = 'assistant') => createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher,purpose),
+    forRequest: (purpose: 'assistant'|'classification' = 'assistant') => createCloudAssistantModel(credentials, fetcher,purpose),
     binding: { workflow: assistantWorkflowVersion, plan: assistantVersion, bound: model.bound, cost } });
   providers.add(provider); return provider;
 }

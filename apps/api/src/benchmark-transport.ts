@@ -45,6 +45,10 @@ export class BenchmarkFailure extends Error {
   constructor(code: string, usage?: Usage, fingerprint?: string) { super(code); this.code = code; this.usage = usage; this.fingerprint = fingerprint; }
 }
 const undispatchedErrors = new WeakSet<object>();
+const expiredKeyErrors = new WeakSet<object>();
+export function providerKeyExpired(error:unknown):boolean {
+  return !!error && typeof error==='object' && expiredKeyErrors.has(error);
+}
 export function definitelyNotDispatched(error: unknown): boolean {
   return !!error && typeof error === 'object' && undispatchedErrors.has(error);
 }
@@ -141,6 +145,14 @@ export function createBenchmarkTransport(candidate: Candidate, credentials: unkn
               parts.push(part.value);
             }
             const text = Buffer.concat(parts).toString('utf8');
+            if([401,403].includes(response.status)){
+              let payload:any;try{payload=JSON.parse(text);}catch{/* Only canonical plain errors are accepted below. */}
+              const code=payload?.error?.code??payload?.code;
+              const message=payload?.error?.message??payload?.detail??payload?.message??text;
+              const knownCode=typeof code==='string'&&['api_key_expired','key_expired','token_expired','expired_api_key','expired_token'].includes(code.toLowerCase());
+              const knownMessage=typeof message==='string'&&/^(?:(?:the|provided|supplied|your) )?(?:api[ _-]?key|access[ _-]?token|token|credentials?)(?: is| has)? expired[.!]?$/iu.test(message.trim());
+              if(knownCode||knownMessage)expiredKeyErrors.add(failure);
+            }
             // Only fixed public parameter names survive; reflected keys/text do not.
             failure.referencedParameters = parameters.filter(name => text.includes(name));
           }

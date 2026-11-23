@@ -217,3 +217,25 @@ test('a failure after this reservation but before HTTP releases only this unsent
     assert.equal(result.code,point==='new-reservation-persist'?'AI_REQUEST_CANCELLED':'AI_DELIVERY_UNKNOWN');
   }
 });
+
+test('a canonical expired-key rejection releases its hold and stops repeated calls using that credential',async()=>{
+  const credentials={apiKey:'synthetic-key-1234567890123'};let calls=0,reserves=0,releases=0;
+  const fetcher:typeof fetch=async()=>{calls++;return new Response(JSON.stringify({error:{code:'API_KEY_EXPIRED',message:'API key expired'}}),{status:403});};
+  for(const n of [70,71]){
+    const r={...request(),requestId:id(n)},model=createCloudAssistantModel(credentials,fetcher);
+    const journal={receipt:{fingerprint:assistantRequestFingerprint(r),calls:[]} as import('../src/assistant-workflow.ts').RunReceipt,
+      async persist(){},async reserve(){reserves++;},async settle(){throw Error('EXPIRED_KEY_MUST_NOT_HOLD_UNKNOWN_COST');},
+      async releaseUnsent(_index:number,reason?:string){assert.equal(reason,'provider_key_expired');releases++;}};
+    const reply=await runAssistant(r,model,journal,services().s);
+    assert.equal(reply.code,'AI_PROVIDER_KEY_EXPIRED');assert.match(reply.text,/истек|истёк/);
+  }
+  assert.equal(calls,1);assert.equal(reserves,1);assert.equal(releases,1);
+  const valid=createCloudAssistantModel({apiKey:'another-synthetic-key-1234567890123'},async()=>{calls++;return wire(plan);});
+  const r={...request(),requestId:id(72)};
+  await withTemporaryJournal(r,valid);
+  async function withTemporaryJournal(r:AssistantRequest,model:ReturnType<typeof createCloudAssistantModel>){
+    const journal={receipt:{fingerprint:assistantRequestFingerprint(r),calls:[]} as import('../src/assistant-workflow.ts').RunReceipt,async persist(){},async reserve(){},async settle(){}};
+    await runAssistant(r,model,journal,services().s);
+  }
+  assert.ok(calls>1);
+});

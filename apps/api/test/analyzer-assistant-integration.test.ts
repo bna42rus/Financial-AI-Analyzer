@@ -36,6 +36,7 @@ const fetcher: typeof fetch = async (_url, options) => {
   assert.equal(Number(reserved), 1);
   await onDispatch?.();
   if (behavior === 'timeout') throw Error('synthetic-timeout');
+  if (behavior === 'key-expired') return new Response(JSON.stringify({error:{code:'API_KEY_EXPIRED',message:'API key expired'}}),{status:403});
   let value: any;
   if (input.candidate) {
     const next: any = outputs[0];
@@ -474,4 +475,17 @@ test('recorded usage settles an interrupted hold once, while genuinely unknown u
     assert.equal((await db.query('SELECT reserved_atoms FROM commerce.ai_user_budget WHERE user_id=$1',['first'])).rows[0].reserved_atoms,'0');
     assert.equal(calls,1);await db.query('COMMIT');
   }catch(error){await db.query('ROLLBACK');throw error;}finally{db.release();}
+});
+
+
+test('an expired key rejects before inference, releases the reservation and stops further dispatches',async()=>{
+  const b=await body();behavior='key-expired';
+  const first=await run(b);assert.equal(first.statusCode,200,first.body);assert.equal(first.json().code,'AI_PROVIDER_KEY_EXPIRED');assert.equal(calls,1);
+  const cost=(await pg.owner.query('SELECT state,settled_atoms,reported_input_tokens FROM commerce.ai_cost_reservation WHERE request_id=$1',[b.id])).rows[0];
+  assert.equal(cost.state,'released');assert.equal(cost.settled_atoms,'0');assert.equal(cost.reported_input_tokens,null);
+  const requestRow=(await pg.owner.query('SELECT state,usage_state,dispatched_at FROM commerce.analyzer_request WHERE request_id=$1',[b.id])).rows[0];
+  assert.equal(requestRow.state,'failed');assert.equal(requestRow.usage_state,'unknown');assert.ok(requestRow.dispatched_at);
+  const next=await run({...b,id:randomUUID()});assert.equal(next.statusCode,200,next.body);assert.equal(next.json().code,'AI_PROVIDER_KEY_EXPIRED');assert.equal(calls,1);
+  assert.equal((await pg.owner.query('SELECT reserved_atoms FROM commerce.ai_user_budget')).rows[0].reserved_atoms,'0');
+  assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
 });

@@ -1,6 +1,7 @@
-import { createBenchmarkTransport } from './benchmark-transport.ts';
-import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
+import { createBenchmarkTransport,providerKeyExpired } from './benchmark-transport.ts';
+import { assistantVersion,AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
 import type { AssistantModel, CompletionInput } from './assistant-workflow.ts';
+const expiredCredentials = new WeakSet<object>();
 
 /** Explicit credentials/fetch only. No environment key lookup or runtime
  * enablement. Reuses the existing strict HTTP/usage/unknown-delivery parser. */
@@ -19,10 +20,12 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
   Object.freeze(transport.bound);
   let running = false;
   return { bound: transport.bound, async complete(input, beforeDispatch) {
+    if(credentials && typeof credentials==='object' && expiredCredentials.has(credentials))throw new AssistantError('AI_PROVIDER_KEY_EXPIRED');
     if((input.protocol==='cashneuro-category-classification/4')!==(purpose==='classification'))throw Error('ASSISTANT_TRANSPORT_CHANGED');
     if(input.protocol!==undefined&&input.protocol!=='cashneuro-category-classification/4')throw Error('ASSISTANT_TRANSPORT_CHANGED');
     if (running) throw Error('ASSISTANT_CONCURRENT_DISPATCH'); running = true; expected = input;
     try { const r = await transport.complete(input.prompt, input.input, input.schema, beforeDispatch); return { value: r.value, usage: r.usage }; }
+    catch(error){if(providerKeyExpired(error)&&credentials&&typeof credentials==='object')expiredCredentials.add(credentials);throw error;}
     finally { expected = undefined; running = false; }
   } };
 }

@@ -10,7 +10,7 @@ import {calculateFinancial,calculatorText} from '../../../packages/analyzer/src/
 import type {CalculatorResult} from '../../../packages/analyzer/src/calculators.ts';
 import {calculatorInstructions,extendedCalculatorInstructions,calculatorContextInstructions,financialSourceInstructions,reportInstructions,budgetReadInstructions,additionalPlanningInstructions,feeInstructions,sourceBoundaryInstructions,clockInstructions,periodFactInstructions} from '../../../packages/analyzer/src/assistant-plan.ts';
 import { createHash } from 'node:crypto';
-import { transportDiagnostic, definitelyNotDispatched } from './benchmark-transport.ts';
+import { transportDiagnostic, definitelyNotDispatched,providerKeyExpired } from './benchmark-transport.ts';
 import { isDeepStrictEqual } from 'node:util';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
 import { assistantDisplayText, explanationNeedsReview } from '../../../packages/analyzer/src/assistant-text.ts';
@@ -64,7 +64,7 @@ export type AssistantJournal = {
   receipt: RunReceipt; persist(): Promise<void>;
   reserve(index: number, bound: DispatchBound): Promise<void>;
   settle(index: number, usage?: Usage): Promise<void>;
-  releaseUnsent?(index: number): Promise<void>;
+  releaseUnsent?(index: number, reason?:'provider_key_expired'): Promise<void>;
 };
 export type AssistantRequest = { requestId: string; scope: TaskScope; conversation: Conversation; global: GlobalSnapshot; dataRevision: string; question: string; now: Date; timezone: string };
 export type ExpectedAssistantState = { scope: TaskScope; head: string | null; turns: number; globalRevision: number; dataRevision: string; timezone: string };
@@ -161,6 +161,12 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
       }
       await guard(); return completed.value;
     } catch (error) {
+      if(reservedHere && providerKeyExpired(error) && journal.releaseUnsent){
+        const entry=journal.receipt.calls[index];
+        if(entry)Object.assign(entry,{state:'failed',code:'AI_PROVIDER_KEY_EXPIRED',transport:transportDiagnostic(error)});
+        try{await journal.persist();}finally{await journal.releaseUnsent(index,'provider_key_expired');}
+        throw new AssistantError('AI_PROVIDER_KEY_EXPIRED');
+      }
       if (reservedHere && definitelyNotDispatched(error) && journal.releaseUnsent) {
         await journal.releaseUnsent(index);
         const entry=journal.receipt.calls[index];
