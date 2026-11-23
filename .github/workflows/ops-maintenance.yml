@@ -1,0 +1,34 @@
+name: Operator maintenance
+on:
+  push:
+    branches: [feature/storage-backups-maintenance-20261123]
+    paths:
+      - 'scripts/cashneuro_ops/**'
+      - 'scripts/*cashneuro-ops*'
+      - 'scripts/update-staging-release.py'
+      - '.github/workflows/ops-maintenance.yml'
+  pull_request:
+    paths:
+      - 'scripts/cashneuro_ops/**'
+      - 'scripts/*cashneuro-ops*'
+      - 'scripts/update-staging-release.py'
+      - '.github/workflows/ops-maintenance.yml'
+permissions:
+  contents: read
+jobs:
+  maintenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Operator guards and failure orchestration
+        run: python3 -B scripts/test-cashneuro-ops.py -v
+      - name: Deployment and diagnostic regression tests
+        run: |
+          sudo "$(command -v python3)" -B scripts/test-update-staging-release.py
+          python3 -B scripts/test-install-assistant-staging.py
+          python3 -B scripts/test-diagnose-classification-staging.py
+      - name: Installer syntax
+        run: bash -n scripts/install-cashneuro-ops.sh

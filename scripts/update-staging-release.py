@@ -35,6 +35,25 @@ AUX_UNITS = ('cashneuro-staging-api@control.service', 'cashneuro-staging-mail@fi
              'cashneuro-staging-mail@control.service')
 
 
+def operator_maintenance(action):
+    """Use the independently installed operator tool under the existing install lock."""
+    executable = Path('/usr/local/bin/cashneuro-ops')
+    if not executable.exists():
+        return
+    info = executable.stat()
+    if info.st_uid != 0 or info.st_mode & 0o022 or not executable.is_file():
+        raise m.InstallationError('OPERATOR_TOOL_NOT_TRUSTED')
+    if action == 'backup':
+        print('Внешняя зашифрованная копия Staging перед изменениями.', flush=True)
+        m.run([executable, 'backup', 'staging', '--kind', 'predeploy', '--deployment-lock-held'], timeout=3600)
+    elif action == 'prune':
+        try:
+            m.run([executable, 'prune', '--apply', '--deployment-lock-held'], timeout=1800)
+        except Exception:
+            # Cleanup cannot turn a successful deployment into a rollback.
+            print('Релиз работает; очистка старых версий требует проверки cashneuro-ops status/prune.', flush=True)
+
+
 def auxiliary_dropin(unit):
     return Path('/etc/systemd/system') / (unit + '.d') / '99-z-cashneuro-release.conf'
 
@@ -385,6 +404,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
     release = m.BASE / 'backend-releases' / sha
     if release.exists():
         raise m.InstallationError('RELEASE_ALREADY_EXISTS_REQUIRES_REVIEW')
+    operator_maintenance('backup')
     backup = create_backup_directory(Path('/var/lib/cashneuro'), sha)
     # A failed renewal must not roll back to enabled but already expired keys.
     rollback_paused = pause_expired_ai(original_settings, old_dropin) if resume_ai and admission_expired(original_settings) else paused_dropin
@@ -550,6 +570,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         restore(backup)
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
+    operator_maintenance('prune')
     print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_active_preserved' if preserve_active_ai else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), **({'paymentWebhook': WEBHOOK_URL} if payment_webhook else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
 
 
