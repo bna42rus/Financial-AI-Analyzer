@@ -31,7 +31,7 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
  * The server keeps the original closed schema; no constraint is removed. */
 export function compactAssistantSchema(schema: unknown): unknown {
   const counts=new Map<string,number>(),nodes=new Map<string,any>();
-  const walk=(v:any)=>{if(!v||typeof v!=='object')return;if(Array.isArray(v)){v.forEach(walk);return;}if(v.type||v.anyOf){const key=JSON.stringify(v);if(key.length>=96){counts.set(key,(counts.get(key)??0)+1);nodes.set(key,v);}}Object.values(v).forEach(walk);};
+  const walk=(v:any)=>{if(!v||typeof v!=='object')return;if(Array.isArray(v)){v.forEach(walk);return;}if(typeof v.type==='string'||Array.isArray(v.anyOf)){const key=JSON.stringify(v);if(key.length>=96){counts.set(key,(counts.get(key)??0)+1);nodes.set(key,v);}}Object.values(v).forEach(walk);};
   walk(schema);
   const names=new Map([...counts].filter(([,count])=>count>1).map(([key],i)=>[key,'d'+(i+1)]));
   const convert=(v:any,definition?:string):any=>{if(!v||typeof v!=='object')return v;if(Array.isArray(v))return v.map(x=>convert(x));const key=JSON.stringify(v),name=names.get(key);if(name&&key!==definition)return {$ref:'#/$defs/'+name};return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,convert(x)]));};

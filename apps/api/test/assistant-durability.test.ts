@@ -203,3 +203,18 @@ test('wire schema references preserve the closed validator exactly and leave the
   assert.equal(JSON.stringify(assistantPlanSchema), before);
   assert.ok(Buffer.byteLength(JSON.stringify(compact)) < Buffer.byteLength(before) * 0.6);
 });
+
+test('schema compaction keeps property maps containing a type field as maps, not schema references',()=>{
+ const compact=compactAssistantSchema(assistantPlanSchema);
+ function visit(value:unknown){
+  if(!value||typeof value!=='object')return;
+  if(Array.isArray(value)){value.forEach(visit);return;}
+  const node=value as Record<string,unknown>,properties=node.properties;
+  if(properties&&typeof properties==='object'){
+   assert.notEqual(typeof (properties as Record<string,unknown>).$ref,'string');
+   for(const property of Object.values(properties))assert.equal(typeof property,'object');
+  }
+  Object.values(node).forEach(visit);
+ }
+ visit(compact);
+});
