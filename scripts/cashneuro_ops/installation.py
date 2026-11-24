@@ -1,10 +1,11 @@
 """Interactive private setup and idempotent systemd timers; no provider purchases."""
-import getpass
 import json
+import os
 from pathlib import Path
 import re
 import shutil
 import sys
+import termios
 
 from . import backups
 from .common import CONFIG, STATE, OpsError, emit, env_file, private_dir, private_write, run, settings
@@ -13,17 +14,56 @@ LIB = Path('/usr/local/lib/cashneuro-ops')
 
 
 def prompt(message, *, secret=False, default=None):
-    with open('/dev/tty', 'r') as reader, open('/dev/tty', 'w') as terminal:
+    # Mobile SSH clients can leave the TTY in raw/CR mode. Buffered text readline
+    # can wait indefinitely for another byte after CR. Normalize this one prompt,
+    # read bytes directly, and always restore the caller's terminal settings.
+    try:
+        fd = os.open('/dev/tty', os.O_RDWR | os.O_NOCTTY | os.O_CLOEXEC)
+    except OSError:
+        raise OpsError('INTERACTIVE_TERMINAL_REQUIRED') from None
+    original = None
+    try:
+        original = termios.tcgetattr(fd)
+        normal = original[:]
+        normal[6] = original[6][:]
+        normal[0] = (normal[0] | termios.ICRNL) & ~(termios.IGNCR | termios.INLCR)
+        normal[1] |= termios.OPOST | termios.ONLCR
+        normal[3] |= termios.ICANON | termios.ISIG
         if secret:
-            return getpass.getpass(message, stream=terminal)
-        terminal.write(message + (f' [{default}]' if default is not None else '') + ': ')
-        terminal.flush()
-        answer = reader.readline().strip()
-        if not answer and default is not None:
-            return default
-        if not answer:
-            raise OpsError('CONFIGURATION_VALUE_REQUIRED')
+            normal[3] &= ~(termios.ECHO | termios.ECHONL)
+        else:
+            normal[3] |= termios.ECHO
+        termios.tcsetattr(fd, termios.TCSANOW, normal)
+        label = message.rstrip().rstrip(':') + (f' [{default}]' if default is not None and not secret else '') + ': '
+        os.write(fd, label.encode('utf-8'))
+        value = bytearray()
+        while True:
+            char = os.read(fd, 1)
+            if not char:
+                raise OpsError('TERMINAL_INPUT_CLOSED')
+            if char in (b'\r', b'\n'):
+                break
+            value.extend(char)
+            if len(value) > 8192:
+                raise OpsError('TERMINAL_INPUT_TOO_LONG')
+        answer = value.decode('utf-8')
+        if not secret:
+            answer = answer.strip()
+            if not answer and default is not None:
+                return default
+            if not answer:
+                raise OpsError('CONFIGURATION_VALUE_REQUIRED')
         return answer
+    finally:
+        try:
+            if original is not None:
+                try:
+                    if secret:
+                        os.write(fd, b'\n')
+                finally:
+                    termios.tcsetattr(fd, termios.TCSANOW, original)
+        finally:
+            os.close(fd)
 
 
 def configure(replace=False):

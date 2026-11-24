@@ -4,11 +4,16 @@ set -euo pipefail
 test "$(id -u)" = 0
 repo=${1:?repository path required}
 sha=${2:?exact commit required}
-confirmed_holds=${3:-}
-case "$confirmed_holds" in
-  ''|--confirmed-unbilled-existing-holds) ;;
-  *) exit 2 ;;
-esac
+confirmed_holds=0
+resume_setup=0
+shift 2
+for option in "$@"; do
+  case "$option" in
+    --confirmed-unbilled-existing-holds) confirmed_holds=1 ;;
+    --resume-setup) resume_setup=1 ;;
+    *) exit 2 ;;
+  esac
+done
 [[ "$repo" = /home/finance-admin/cashneuro-staging-src ]]
 [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
 test "$(git -c safe.directory="$repo" -C "$repo" rev-parse "$sha^{commit}")" = "$sha"
@@ -54,14 +59,18 @@ chmod 755 /usr/local/bin/cashneuro-ops
 flock -u 9
 exec 9>&-
 
-echo '1/6: очищаем только неиспользуемые старые backend-релизы.'
-cashneuro-ops prune --apply
-echo '2/6: проверяем размещение и размеры баз.'
-cashneuro-ops storage
-echo '3/6: сверяем зависшие запросы с уже записанным фактическим usage.'
-cashneuro-ops diagnose --settle-recorded-usage
-if test "$confirmed_holds" = --confirmed-unbilled-existing-holds; then
-  echo 'Освобождаем только два прежних резерва, отсутствие списания по которым подтвердил владелец.'
+if test "$resume_setup" = 0; then
+  echo '1/6: очищаем только неиспользуемые старые backend-релизы.'
+  cashneuro-ops prune --apply
+  echo '2/6: проверяем размещение и размеры баз.'
+  cashneuro-ops storage
+  echo '3/6: сверяем зависшие запросы с уже записанным фактическим usage.'
+  cashneuro-ops diagnose --settle-recorded-usage
+else
+  echo 'Продолжаем после уже выполненной очистки и проверки баз.'
+fi
+if test "$confirmed_holds" = 1; then
+  echo 'Обрабатываем только прежние резервы, отсутствие списания по которым подтвердил владелец.'
   cashneuro-ops resolve-confirmed-holds --confirm-provider-unbilled
   cashneuro-ops diagnose
 fi

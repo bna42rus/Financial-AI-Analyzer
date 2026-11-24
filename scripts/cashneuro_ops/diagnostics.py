@@ -15,6 +15,7 @@ SOURCE = Path(__file__).resolve().parents[1] / 'source'
 CONFIRMED_UNBILLED_HOLDS = {
     'e6b054ec-e6fb-4ae4-88e4-27a626159e45': '2225201920',
     'c3d74b6a-e077-45b4-b996-cf865c802096': '2152001920',
+    '49fe5fc1-5a02-4559-9adc-cc91024a1c72': '2225201920',
 }
 CONFIRMED_PROJECT = 'staging/assistant-5859b601e6fd1b12c01bed1d'
 
@@ -146,7 +147,7 @@ def resolve_hold(request_id, confirmed_unbilled=False, expected_atoms=None):
 
 
 def resolve_confirmed_holds(confirmed_unbilled=False):
-    """Only the two exact UUID/amount pairs authorized by the owner on 24 Nov."""
+    """Only the exact historical UUID/amount pairs covered by the owner's declaration."""
     results = [resolve_hold(request_id, confirmed_unbilled, expected_atoms=atoms)
                for request_id, atoms in CONFIRMED_UNBILLED_HOLDS.items()]
     emit('confirmed-holds-summary', ownerUnbilledDeclaration=confirmed_unbilled,
@@ -171,8 +172,10 @@ ROLLBACK;"""))
 
 def probe_cloudru():
     helper = Path(__file__).resolve().parents[1] / 'diagnose-assistant-post-staging.py'
-    result = json.loads(run(['/usr/bin/python3', '-B', helper], timeout=25))
-    result = {'provider': 'cloud.ru', 'keyAcceptedAtCompletionEndpoint': result.get('reason') == 'INVALID_PAYLOAD_EXPECTED', **result}
+    result = json.loads(run(['/usr/bin/python3', '-B', helper], timeout=45))
+    reason = result.get('reason')
+    accepted = True if reason == 'INVALID_PAYLOAD_EXPECTED' else False if reason in ('KEY_EXPIRED','KEY_INACTIVE','CREDENTIAL_REJECTED','ACCESS_DENIED') else None
+    result = {'provider': 'cloud.ru', 'keyAcceptedAtCompletionEndpoint': accepted, **result}
     private_write(STATE / 'provider-key-check.json', json.dumps(result))
     emit('provider-key', **result)
     return result

@@ -329,6 +329,13 @@ class OperationsTests(unittest.TestCase):
         probe.assert_called_once_with()
         self.assertEqual(result['provider'],'cloud.ru')
 
+    def test_unclassified_422_is_inconclusive_not_an_invalid_key(self):
+        value={'httpStatus':422,'reason':'UNCLASSIFIED_PROVIDER_REJECTION','modelCalls':0}
+        with patch.object(diagnostics,'run',return_value=json.dumps(value).encode()),\
+             patch.object(diagnostics,'private_write'),contextlib.redirect_stdout(io.StringIO()):
+            result=diagnostics.probe_cloudru()
+        self.assertIsNone(result['keyAcceptedAtCompletionEndpoint'])
+
     def confirmed_fixture(self,state='unknown',atoms='2225201920'):
         return {'email':'historical-owner@example.test','reserved_atoms':atoms,'state':state,
                 'settled_atoms':'0' if state=='released' else None,
@@ -353,18 +360,81 @@ class OperationsTests(unittest.TestCase):
             with self.assertRaisesRegex(common.OpsError,'CONFIRMED_HOLD_AMOUNT_CHANGED'):
                 diagnostics.resolve_hold('e6b054ec-e6fb-4ae4-88e4-27a626159e45',True,expected_atoms='2225201920')
 
-    def test_confirmed_batch_is_closed_to_two_exact_historical_requests(self):
+    def test_confirmed_batch_is_closed_to_exact_historical_requests(self):
         with patch.object(diagnostics,'resolve_hold',return_value={'status':'READY'}) as resolve,contextlib.redirect_stdout(io.StringIO()):
             diagnostics.resolve_confirmed_holds()
-        self.assertEqual(len(resolve.call_args_list),2)
+        self.assertEqual(len(resolve.call_args_list),3)
         self.assertEqual({x.args[0] for x in resolve.call_args_list},set(diagnostics.CONFIRMED_UNBILLED_HOLDS))
         self.assertTrue(all(x.args[1] is False for x in resolve.call_args_list))
         self.assertEqual({x.kwargs['expected_atoms'] for x in resolve.call_args_list},{'2225201920','2152001920'})
 
     def test_confirmed_batch_applies_owner_declaration_only_when_explicit(self):
-        with patch.object(diagnostics,'resolve_hold',side_effect=[{'status':'ALREADY_RELEASED'},{'status':'RELEASED'}]) as resolve,contextlib.redirect_stdout(io.StringIO()):
+        with patch.object(diagnostics,'resolve_hold',side_effect=[{'status':'ALREADY_RELEASED'},{'status':'ALREADY_RELEASED'},{'status':'RELEASED'}]) as resolve,contextlib.redirect_stdout(io.StringIO()):
             diagnostics.resolve_confirmed_holds(True)
         self.assertTrue(all(x.args[1] is True for x in resolve.call_args_list))
+
+    def terminal_case(self,raw=False,ending=b'\r',cancel=False):
+        import pty,select,signal,sys,termios,time
+        directory=str(Path(__file__).resolve().parent)
+        program=f'''
+import sys,termios
+sys.path.insert(0,{directory!r})
+from cashneuro_ops.installation import prompt
+if {raw!r}:
+    a=termios.tcgetattr(0);a[0]&=~termios.ICRNL;a[3]&=~(termios.ICANON|termios.ISIG);termios.tcsetattr(0,termios.TCSANOW,a)
+before=termios.tcgetattr(0)
+try:
+    first=prompt('First',default='1')
+    print('FIRST='+first,flush=True)
+    password=prompt('Secret',secret=True)
+    print('SECRET_MATCH='+str(password=='synthetic-hidden-value'),flush=True)
+except KeyboardInterrupt:
+    print('INTERRUPTED',flush=True)
+finally:
+    print('RESTORED='+str(before==termios.tcgetattr(0)),flush=True)
+'''
+        pid,fd=pty.fork()
+        if pid==0:
+            os.execl(sys.executable,sys.executable,'-u','-c',program)
+        output=bytearray()
+        def until(marker):
+            deadline=time.monotonic()+3
+            while marker not in output and time.monotonic()<deadline:
+                if select.select([fd],[],[],0.1)[0]:
+                    try:
+                        data=os.read(fd,8192)
+                    except OSError:
+                        break
+                    if not data:break
+                    output.extend(data)
+            self.assertIn(marker,output)
+        try:
+            until(b'First [1]: ')
+            if cancel:
+                os.write(fd,b'\x03');until(b'RESTORED=True')
+                self.assertIn(b'INTERRUPTED',output)
+            else:
+                os.write(fd,b'1'+ending);until(b'Secret: ')
+                os.write(fd,b'synthetic-hidden-value'+ending);until(b'RESTORED=True')
+                self.assertIn(b'FIRST=1',output)
+                self.assertIn(b'SECRET_MATCH=True',output)
+                self.assertNotIn(b'synthetic-hidden-value',output)
+        finally:
+            try:os.kill(pid,signal.SIGKILL)
+            except ProcessLookupError:pass
+            os.waitpid(pid,0);os.close(fd)
+
+    def test_terminal_enter_normal_mode_advances_and_secrets_are_hidden(self):
+        self.terminal_case()
+
+    def test_terminal_enter_raw_mobile_mode_advances_and_restores_original_settings(self):
+        self.terminal_case(raw=True)
+
+    def test_terminal_line_feed_is_accepted(self):
+        self.terminal_case(raw=True,ending=b'\n')
+
+    def test_terminal_control_c_in_raw_mode_restores_original_settings(self):
+        self.terminal_case(raw=True,cancel=True)
 
     def test_confirmed_hold_preview_precedes_audit_and_apply(self):
         from types import SimpleNamespace

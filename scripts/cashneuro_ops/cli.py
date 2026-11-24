@@ -163,6 +163,9 @@ def main():
                 private_write(path, json.dumps(value))
             emit('alert-resolved', ok=True)
         success(operation_name(args))
+    except KeyboardInterrupt:
+        emit('STOP', code='CANCELLED_BY_OPERATOR', paidCalls=0)
+        raise SystemExit(130)
     except Exception as error:
         code = str(error) if isinstance(error, OpsError) and re.fullmatch('[A-Z0-9_]{1,100}', str(error)) else 'MAINTENANCE_FAILED'
         emit('STOP', code=code, paidCalls=0)

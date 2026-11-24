@@ -40,7 +40,26 @@ try {
  else if(/project.*(?:block|disable|not.found)|service.*not.enabled/u.test(text))reason='PROJECT_OR_SERVICE_UNAVAILABLE';
  else if(/invalid.*(?:api.key|token|credential)|(?:api.key|token).*invalid|key.*not.found|unauthoriz|unauthentic/u.test(text))reason='CREDENTIAL_REJECTED';
  else if(/permission|forbidden|access.denied|not.allowed|недостаточно.*прав/u.test(text))reason='ACCESS_DENIED';
- console.log(JSON.stringify({probe:'completion-endpoint-invalid-payload/1',httpStatus:r.status,reason,modelCalls:0}));
+ // A catalog lookup is useful connectivity/model evidence, not a paid inference
+ // and not proof that a valid completion request will be accepted.
+ const catalog={catalogHttpStatus:null,catalogRequestSucceeded:false,gptOss120bAvailable:null};
+ try{
+  const response=await fetch('https://foundation-models.api.cloud.ru/v1/models',{
+   headers:{authorization:'Bearer '+key},redirect:'error',signal:AbortSignal.timeout(12000)
+  });
+  catalog.catalogHttpStatus=response.status;
+  if(response.ok){
+   const cr=response.body?.getReader();let size=0,parts=[];
+   if(!cr)throw Error();
+   try{while(true){const part=await cr.read();if(part.done)break;size+=part.value.length;if(size>524288)throw Error();parts.push(part.value);}}finally{await cr.cancel();}
+   const data=JSON.parse(Buffer.concat(parts).toString('utf8'));
+   catalog.catalogRequestSucceeded=Array.isArray(data.data);
+   catalog.gptOss120bAvailable=Array.isArray(data.data)&&data.data.some(x=>x.id==='openai/gpt-oss-120b');
+  }else{await response.body?.cancel();}
+ }catch(error){catalog.catalogCheckError=error?.name==='TimeoutError'?'TIMEOUT':'CONNECTION_OR_RESPONSE_FAILED';}
+ let providerErrorEnvelope=[];
+ try{const body=JSON.parse(value);if(body&&typeof body==='object')providerErrorEnvelope=['error','errors','detail','message','code','type','status'].filter(k=>Object.hasOwn(body,k));}catch{}
+ console.log(JSON.stringify({probe:'completion-endpoint-invalid-payload/1',httpStatus:r.status,reason,providerErrorEnvelope,...catalog,modelCalls:0}));
 }catch(e){
  console.log(JSON.stringify({probe:'completion-endpoint-invalid-payload/1',reason:e?.name==='TimeoutError'?'TIMEOUT':'CONNECTION_OR_CONFIG_FAILED',modelCalls:0}));
  process.exitCode=1;
@@ -52,7 +71,7 @@ if __name__ == '__main__':
     if os.geteuid() != 0:
         raise SystemExit('Run this inspection with sudo')
     result = subprocess.run(['/usr/bin/node', '--input-type=module', '-'], input=PROBE,
-                            text=True, capture_output=True, timeout=18, check=False)
+                            text=True, capture_output=True, timeout=35, check=False)
     try:
         report = json.loads(result.stdout)
     except ValueError:
