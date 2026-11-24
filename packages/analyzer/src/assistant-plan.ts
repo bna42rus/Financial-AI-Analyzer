@@ -1,3 +1,4 @@
+import {assistantDisplayText} from './assistant-text.ts';
 import {buildReportSchema,parseReport} from './report.ts';
 import type {ReportRequest} from './report.ts';
 import {financialSourceSchema,parseFinancialSourceRequest} from './financial-sources.ts';
@@ -58,6 +59,7 @@ export const assistantPlanSchema = closed({
   calculation: calculationSchema,
   change: assistantChangeSchema,
   needsFreshSources: { type: 'boolean' },
+  explanation: {type:'string',minLength:1,maxLength:4000},
 }, ['version', 'topic', 'action']);
 
 export const reportRequestSchema=buildReportSchema(assistantPlanSchema.properties);
@@ -89,7 +91,7 @@ export function cleanAssistantQuestion(value: unknown): string {
 }
 export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 'clear' | 'use_current'; value?: unknown; source?: string };
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
-  action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; comparisonReference?:string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean };
+  action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; comparisonReference?:string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean; explanation?:string };
 export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:string,variant?:number)=>CalculatorInput|undefined): AssistantPlan {
   if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
@@ -123,6 +125,7 @@ export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:s
   if (p.context && ((p.context.mode === 'reference') !== (p.context.reference !== undefined))) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   // This routing hint is only consumed by explain. In other actions a boolean
   // default is harmless; it must not trigger a paid structure repair.
+  if(p.explanation!==undefined){if(p.action!=='explain')throw new AssistantError('ASSISTANT_PLAN_INVALID');p.explanation=assistantDisplayText(p.explanation,4000);}
   if (p.action !== 'explain') delete p.needsFreshSources;
   const seen = new Set<string>();
   for (const c of p.changes ?? []) {
@@ -293,11 +296,12 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
 }
 
 export const assistantPrompt = [
-  'Ты финансовый помощник CashNeuro. Верни один JSON plan по schema. Не отвечай текстом, не считай деньги, не пиши SQL/UUID и не исполняй действия.',
+  'Ты финансовый помощник CashNeuro. Верни один JSON plan по schema. Не добавляй текст вне JSON, не считай деньги, не пиши SQL/UUID и не исполняй действия.',
   'Вопросы о твоих возможностях относятся к финансовому помощнику: это справка, а не просьба выполнить действие. Не предлагай сохранить бюджет/правило по одному вопросу «умеешь ли». Доступны расчеты, отчеты по операциям, проверенные источники ЦБ, подготовка изменений через propose_change; сохранение требует подтверждения. Не обещай платежи, переводы денег, одобрение кредита или любые инструменты вне schema. Если задача не поддерживается, clarification должна назвать конкретно неподдерживаемое условие и доступную альтернативу; если не хватает данных — перечислить, каких именно и зачем. Не называй нехватку данных технической ошибкой и не шути о сбоях, долгах, лимитах и потерях денег.',
   'topic: personal_finance=личные операции; general_finance=общие знания; financial_guidance=советы, накопления, экономия; mixed=финансовая и посторонняя части; ambiguous=смысл неясен; unrelated=совсем постороннее. Ключевая ставка и инфляция финансовые; корм для белки в расходах финансовый; цвет белки unrelated. В mixed работай с финансовой частью.',
   'action: read для личных расчётов; explain для общих финансов; propose_change для изменения (только предложение, без исполнения); unsupported для отсутствующего инструмента; clarification для настоящей неоднозначности; redirect только unrelated. У ambiguous action=clarification, у unrelated action=redirect.',
   'context и changes существуют ТОЛЬКО при action=read. В explain/redirect/clarification/unsupported/propose_change полностью пропускай оба поля, даже если пустые. В read changes — только новые указания текущего question, не полное состояние задачи.',
+  'При explain сразу заполни explanation: готовое краткое качественное объяснение по вопросу и истории, без чисел, ссылок, текущих ставок и вымышленных личных фактов. Не требуй параметры для объяснения понятия. Расчеты и сравнение личных сумм выполняются calculate/report, а не explanation. Это позволяет ответить одним вызовом.',
   'needsFreshSources используется только для explain: true только если вопрос требует сегодняшних/актуальных чисел, ставок, курсов, цен или новостей. Объяснение механизма, понятия, влияния инфляции на покупательную способность, принципов накопления или условного примера НЕ требует свежего источника: false. Само упоминание экономики или накоплений не делает сведения текущими. В остальных действиях поле пропускай. Не выдумывай сегодняшний показатель.',
   'Для read context обязателен: new самостоятельный новый вопрос; continue смысловое продолжение, даже при смене расходов на доходы; reference явный возврат (reference=фраза из просьбы); pending продолжение неуспешной просьбы. При явном отказе от предыдущей просьбы или новом расчёте с нуля передай context={mode:new,restart:true}. Сам по себе выбор предложенной категории не новый расчёт. Не определяй связь по одному слову А. История помечает неподтверждённые просьбы, это не готовые параметры.',
   'changes — только явно изменённое. field metric из query_finances; grouping total/category_totals/operation_list или доступные группы; comparison из query_finances. op=set/clear/use_current; source пропускай для текущей просьбы. Формат grouping: total=один общий итог; category_totals=итоги по категориям; operation_list=список отдельных операций, каждая отдельной строкой. Это формат результата. «Каждую операцию отдельно» всегда operation_list, общий итог total. Пропуск поля сохраняет условие, не обнуляет. Не выдумывай без сравнения, не дублируй attention в metric и фильтре.',

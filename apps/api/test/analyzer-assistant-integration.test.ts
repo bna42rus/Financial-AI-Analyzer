@@ -1,4 +1,6 @@
 import {reserveCost} from '../src/analyzer-cost.ts';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash, generateKeyPairSync } from 'node:crypto';
@@ -113,11 +115,21 @@ test('profile timezone has no Moscow fallback and an invalid or missing profile 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_task_request')).rows[0].n, '0');
 });
 
+test('read-only cost diagnostic separates one run from monthly totals and reports actual token receipts',async()=>{
+ const b=await body();outputs=[plan([set('metric','expenses')])];const answer=await run(b);assert.equal(answer.statusCode,200,answer.body);
+ const settings={realm:'staging/finance',monthly:{limitRub:'100'},allowedEmails:['first@example.test'],cost:{projectId:'test/assistant-integration'}};
+ const code="import importlib.util,json,sys; s=importlib.util.spec_from_file_location('cost',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.query(json.loads(sys.stdin.read()),json.loads(sys.argv[2])))";
+ const sql=execFileSync('python3',['-B','-c',code,fileURLToPath(new URL('../../../scripts/diagnose-analyzer-cost-staging.py',import.meta.url)),JSON.stringify([b.id])],{input:JSON.stringify(settings),encoding:'utf8'});
+ const results:any=await pg.owner.query(sql),report=(Array.isArray(results)?results:[results]).flatMap((r:any)=>r.rows).find((r:any)=>r.json_build_object)?.json_build_object;
+ assert.equal(report.version,'analyzer-cost-diagnostic/1');assert.equal(report.paidCalls,0);assert.equal(report.requests.length,1);assert.equal(report.requests[0].calls,2);assert.equal(report.requests[0].inputTokens,1000);assert.equal(report.requests[0].outputTokens,100);
+ assert.equal(report.requests[0].spentAtoms,'21960000');assert.equal(report.spentAtoms,'21960000');assert.equal(report.heldAtoms,'0');assert.ok(report.requests[0].timings);assert.equal(calls,2,'Diagnosis must not dispatch');
+});
+
 test('off-topic is free, ordinary AI explanation consumes one unit and neither reads the financial catalog', async () => {
   const b = await body(); outputs = [{ version: assistantVersion, topic: 'unrelated', action: 'redirect' }];
   const off = await run({ ...b, text: 'Почему белка рыжая?' }); assert.equal(off.statusCode, 200, off.body); assert.equal(off.json().answer.mode, 'redirect');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
   outputs = [{ version: assistantVersion, topic: 'general_finance', action: 'explain' }, { text: 'Инфляция уменьшает покупательную способность денег.' }];
-  const explained = await run({ ...b, id: randomUUID(), text: 'Объясни инфляцию.' }); assert.equal(explained.statusCode, 200, explained.body); assert.equal(explained.json().answer.mode, 'ai'); assert.equal(calls, 3);
+  const explained = await run({ ...b, id: randomUUID(), text: 'Объясни связь ликвидности и сроков обязательств.' }); assert.equal(explained.statusCode, 200, explained.body); assert.equal(explained.json().answer.mode, 'ai'); assert.equal(calls, 3);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
   assert.equal((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation.turns.length, 2);
   for (const input of outgoing) assert.equal('catalog' in input, false);

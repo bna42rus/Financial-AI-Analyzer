@@ -6,7 +6,6 @@ import { monthlyPeriod, monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatc
 import { checkAssistantStagingSettings, assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
 import { monthlyClassificationAdmission } from '../src/classification-admission.ts';
 import { createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
-import {syntheticTariffPdf} from './fixtures/synthetic-tariff-pdf.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
 
 const at = new Date('2026-11-01T13:34:00Z');
@@ -70,7 +69,7 @@ test('tariff freshness refreshes automatically once for concurrent calls, retain
   fail = false; await guard(); assert.equal(checks, 3);
 });
 
-test('monthly provider drops trial call/expiry guards, rolls periods without restart and rejects an unverifiable tariff before a model POST', async () => {
+test('monthly provider rolls periods without expiry or tariff network dependencies', async () => {
   const metadata = { id: 'openai/gpt-oss-120b', context_length: 131072, max_model_len: 131072 };
   const old = legacy(); old.modelMetadataSha256 = createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
   const settings = monthlyClassificationAdmission(old, totals, 'd'.repeat(64), at);
@@ -89,34 +88,24 @@ test('monthly provider drops trial call/expiry guards, rolls periods without res
   now = new Date('2026-12-01T00:00:00Z');
   assert.equal(provider.policy.projectPeriodStart, '2026-11-30T21:00:00.000Z');
   let reserved = false;
-  await assert.rejects(provider.forRequest().complete({ phase: 'understand', prompt: 'Synthetic', input: {}, schema: {} }, async () => { reserved = true; }), /TARIFF_DOCUMENT_CHANGED/);
-  assert.equal(posts, 0); assert.equal(gets, 2); assert.equal(reserved, false);
+  await assert.rejects(provider.forRequest().complete({ phase: 'understand', prompt: 'Synthetic', input: {}, schema: {} }, async () => { reserved = true; }), /BENCH_DELIVERY_UNKNOWN/);
+  assert.equal(posts, 1); assert.equal(gets, 1); assert.equal(reserved, true);
 });
 
-test('monthly dispatch verifies the current PDF before reserving at new rates and retains historical quotes and the 100 RUB cap',async()=>{
+test('monthly assistant and classification use configured prices and never fetch the tariff',async()=>{
  const metadata={id:'openai/gpt-oss-120b',context_length:131072,max_model_len:131072};
  const old=legacy();old.modelMetadataSha256=createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
  const settings=monthlyClassificationAdmission(old,totals,'d'.repeat(64),at),before=structuredClone(settings);
  const pool={async query(sql:string){return {rows:sql.includes('current_user')?[{role:'finance_api',name:'finance_staging'}]:[]};}} as unknown as Pool;
- let priceChanged=false,invalid=false,posts=0;
- const fetcher:typeof fetch=async(url,options)=>{
+ let posts=0,tariffGets=0;
+ const fetcher:typeof fetch=async(url)=>{
   if(String(url).endsWith('/models'))return new Response(JSON.stringify({data:[metadata]}));
-  if(String(url)===assistantTariffSource){
-   assert.equal(new Headers(options?.headers).get('authorization'),null);
-   return new Response(invalid?'invalid tariff':syntheticTariffPdf(priceChanged?'24,40':'15,86',priceChanged?'122,00':'61,00'));
-  }
+  if(String(url)===assistantTariffSource){tariffGets++;throw Error('PDF_MUST_NOT_BE_FETCHED');}
   posts++;return new Response(JSON.stringify({model:metadata.id,choices:[{finish_reason:'stop',message:{role:'assistant',content:'{}',tool_calls:[]}}],usage:{prompt_tokens:10,completion_tokens:2,total_tokens:12}}));
  };
- const provider=await createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at);
- const quotes:typeof old.cost.price[]=[];
- const send=()=>provider.forRequest().complete({phase:'understand',prompt:'Synthetic',input:{},schema:{}},async()=>{
-  quotes.push(structuredClone(provider.policy.price));assert.equal(provider.policy.projectLimitRub,'100');
- });
- await send();priceChanged=true;await send();
- assert.equal(posts,2);assert.equal(quotes[0]!.inputRubPerMillion,'15.86');assert.equal(quotes[1]!.inputRubPerMillion,'24.4');
- assert.equal(quotes[0]!.outputRubPerMillion,'61');assert.equal(quotes[1]!.outputRubPerMillion,'122');
- assert.equal(tokenCost(quotes[0]!,1_000_000,0),15_860_000_000n);
- assert.deepEqual(settings,before);
- invalid=true;await assert.rejects(send(),/TARIFF_DOCUMENT_CHANGED/);
- assert.equal(posts,2);assert.equal(quotes.length,2);
+ let clock=at;const provider=await createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>clock);
+ const send=(purpose:'assistant'|'classification')=>provider.forRequest(purpose).complete({phase:'understand',prompt:'Synthetic',input:{},schema:{},...(purpose==='classification'?{protocol:'cashneuro-category-classification/4' as const}:{})},async()=>{assert.deepEqual(provider.policy.price,old.cost.price);assert.equal(provider.policy.projectLimitRub,'100');});
+ await send('assistant');clock=new Date('2026-12-15T12:00:00Z');await send('assistant');await send('classification');
+ assert.equal(posts,3);assert.equal(tariffGets,0);assert.deepEqual(settings,before);
+ assert.equal(tokenCost(provider.policy.price,1_000_000,0),15_860_000_000n);
 });

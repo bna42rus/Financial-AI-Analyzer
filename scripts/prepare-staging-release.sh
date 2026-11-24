@@ -28,7 +28,7 @@ git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
 python3 -B "$build/scripts/test-install-assistant-staging.py" > /dev/null
 sudo /usr/bin/python3 -B "$build/scripts/install-tariff-extractor.py"
 api_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-api-origin)
-(cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && pnpm --filter @finance/api exec node --import tsx ../../scripts/verify-cloud-tariff.mjs && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")
+(cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")
 if "$full_staging"; then
   control_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-control-origin)
   (cd "$build" && VITE_API_ORIGIN="$control_origin" VITE_FINANCE_ORIGIN="$api_origin" node scripts/build-connected-web.mjs control "$sha")

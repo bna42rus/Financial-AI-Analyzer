@@ -158,3 +158,23 @@ test('derive-only AI continuation restores checked calculator dependencies from 
  await h.turn('Расходы за октябрь 2026',null);
  const stale=await h.turn('Вычти прежние результаты',derive);assert.equal(stale.code,'REPORT_REFERENCE_INVALID');assert.equal(stale.report,undefined);
 });
+
+test('plain concept explanations are free, retain pending loan context and never answer a hidden calculation',async()=>{
+ const {localFinancialExplanation}=await import('../../../packages/analyzer/src/financial-explanations.ts');
+ const h=harness();await h.turn('Кредит 420 тысяч, 19,5%, на 4 года',plan('clarification',{clarification:'Какой тип платежа?'}));
+ const pending=h.state.pendingMessageId;
+ for(const q of ['А в чем разница, как узнать это?','Чем аннуитетный отличается от дифференцированного?','А в чем разница между аннуитетным и дифференцированным, как узнать какой у меня?']){
+  const r=await h.turn(q,null);assert.equal(r.code,'FINANCIAL_EXPLANATION',q);assert.equal(r.modelCalls,0);assert.equal(h.state.pendingMessageId,pending);assert.match(r.text,/договор/);assert.match(r.text,/основн/);
+ }
+ const chosen=await h.turn('Дифференцированный',plan('calculate',{calculation:loan}));assert.deepEqual(chosen.calculation!.input,loan);
+ for(const q of ['Что такое капитализация?','Объясни инфляцию.','Что означает основной долг?'])assert.ok(localFinancialExplanation(q,h.state),q);
+ for(const q of ['Что такое инфляция сейчас в России?','Что такое аннуитетный и рассчитай 500000 на 5 лет','Объясни капитализацию и мои расходы','Что такое инфляция and show my expenses','Что такое погода?','Что такое переплата по моему кредиту в рублях?'])assert.equal(localFinancialExplanation(q,h.state),null,q);
+});
+
+test('a qualitative AI answer in the plan completes in one call with the same numeric and privacy checks',async()=>{
+ const h=harness();const r=await h.turn('Объясни связь ликвидности и сроков обязательств',plan('explain',{explanation:'Ликвидность показывает, насколько быстро актив можно превратить в доступные деньги. Срок обязательства определяет, когда эти деньги понадобятся.'}));
+ assert.equal(r.code,'FINANCIAL_EXPLANATION');assert.equal(r.modelCalls,1);assert.match(r.text,/Ликвидность/);
+ const corrected=await h.turn('Объясни влияние комиссий',plan('explain',{explanation:'Комиссия 5% снижает доходность.'}),'Комиссии уменьшают чистый результат.');
+ assert.equal(corrected.code,'FINANCIAL_EXPLANATION');assert.equal(corrected.modelCalls,2);assert.doesNotMatch(corrected.text,/\d|%/u);
+ assert.throws(()=>parseAssistantPlan(plan('clarification',{explanation:'Недопустимое скрытое поле'})),/PLAN_INVALID/);
+});

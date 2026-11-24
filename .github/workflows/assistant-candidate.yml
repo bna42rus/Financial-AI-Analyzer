@@ -196,6 +196,8 @@ jobs:
           python3 scripts/test-staging-gate-config.py
           node --test scripts/test-staging-gate.mjs
           python3 scripts/test-diagnose-classification-staging.py
+          python3 scripts/test-diagnose-analyzer-cost-staging.py
+          pnpm --filter @finance/api exec tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution Bundler --strict --allowImportingTsExtensions --skipLibCheck --types node ../../scripts/check-analyzer-live.ts ../../scripts/analyzer-live-cases.ts
           sudo /usr/bin/python3 -B scripts/test-authorize-assistant-staging-calls.py
           bash -n scripts/prepare-staging-release.sh
           bash -n scripts/check-analyzer-live.sh
