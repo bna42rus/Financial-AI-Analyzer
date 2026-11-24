@@ -206,9 +206,15 @@ class OperationsTests(unittest.TestCase):
             def query(db,value,**kwargs):
                 if db['container']=='live-container':return '["finance_api","control_api"]'
                 return '10' if 'count(*)' in value else '1'
+            def command(args,**kwargs):
+                commands.append(args)
+                if args[:2]==['docker','inspect']:return b'{"Running":true}'
+                if args[-2:]==['cat','/proc/1/comm']:return b'postgres\n'
+                return b''
             with patch.object(backups,'STATE',state),patch.object(backups,'locked',contextlib.nullcontext),\
                  patch.object(backups,'database',return_value=live),patch.object(backups,'restic',side_effect=restic),\
-                 patch.object(backups,'sql',side_effect=query),patch.object(backups,'run',side_effect=lambda args,**kw:commands.append(args) or b''),\
+                 patch.object(backups,'sql',side_effect=query),patch.object(backups,'run',side_effect=command),\
+                 patch.object(common,'run',side_effect=command),patch.object(common,'sql',side_effect=query),\
                  patch.object(backups,'journal',return_value={'erased':[],'currentWorkspaces':[]}),\
                  patch.object(backups,'read_journal_source',return_value={'workspaces':[]}),\
                  patch.object(backups,'cleanup_isolated_container') as cleanup,contextlib.redirect_stdout(io.StringIO()):
@@ -219,10 +225,28 @@ class OperationsTests(unittest.TestCase):
             mount=create[create.index('--mount')+1]
             self.assertIn(str(state/'restore-test'/'staging'),mount)
             self.assertNotIn('/var/lib/docker',mount)
+            self.assertIn('PGDATA=/var/lib/postgresql',create)
             cleanup.assert_called_once()
             self.assertTrue(cleanup.call_args.args[0].startswith('cashneuro-restore-'))
             self.assertFalse(result['publicAccess']);self.assertFalse(result['productionRestoreAuthorized'])
             self.assertFalse((state/'restore-test'/'staging').exists())
+
+    def test_isolated_postgres_waits_for_final_server_and_stops_on_exit_or_oom(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            queries=[];comm=iter([b'bash\n',b'postgres\n'])
+            def command(args,**kwargs):
+                if args[:2]==['docker','inspect']:return b'{"Running":true}'
+                if args[-2:]==['cat','/proc/1/comm']:return next(comm)
+                return b''
+            with patch.object(common,'run',side_effect=command),patch.object(common,'sql',side_effect=lambda *a,**k:queries.append(a) or '1'),\
+                 patch.object(common.time,'sleep'),contextlib.redirect_stdout(io.StringIO()):
+                common.start_isolated_postgres('cashneuro-restore-'+'a'*16,root/'ready','sha256:synthetic','cashneuro_restore')
+            self.assertEqual(len(queries),1)
+            for suffix,state,code in [('exit',b'{"Running":false}','ISOLATED_POSTGRES_EXITED'),('oom',b'{"Running":false,"OOMKilled":true}','ISOLATED_POSTGRES_OOM')]:
+                with patch.object(common,'run',side_effect=[b'',state]),contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaisesRegex(common.OpsError,code):
+                        common.start_isolated_postgres('cashneuro-restore-'+'a'*16,root/suffix,'sha256:synthetic','cashneuro_restore')
 
     def backup_case(self, kind='daily', fault=None):
         with tempfile.TemporaryDirectory() as temporary:

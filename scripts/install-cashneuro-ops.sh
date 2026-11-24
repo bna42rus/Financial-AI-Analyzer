@@ -90,7 +90,7 @@ then
   apt-get update
   DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends restic
 fi
-cashneuro-ops setup
+cashneuro-ops setup </dev/tty
 echo '6/6: проверяем итоговый статус после копирования, восстановления и замера.'
 cashneuro-ops status
 df -h /

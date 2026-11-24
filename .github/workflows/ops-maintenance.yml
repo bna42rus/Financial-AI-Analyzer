@@ -32,3 +32,7 @@ jobs:
           python3 -B scripts/test-diagnose-classification-staging.py
       - name: Installer syntax
         run: bash -n scripts/install-cashneuro-ops.sh
+      - name: Real isolated PostgreSQL 18 restore and synthetic sizing
+        run: |
+          docker pull postgres:18
+          sudo "$(command -v python3)" -B scripts/test-cashneuro-ops-postgres.py

@@ -13,9 +13,8 @@ import re
 import secrets
 import shutil
 import stat
-import time
 
-from .common import CONFIG, ENVIRONMENTS, STATE, OpsError, cleanup_isolated_container, database, emit, locked, private_dir, private_read, private_write, run, settings, sql
+from .common import CONFIG, ENVIRONMENTS, STATE, OpsError, cleanup_isolated_container, database, emit, locked, private_dir, private_read, private_write, run, settings, sql, start_isolated_postgres
 
 BACKUP_LOCK = Path('/run/lock/cashneuro-backup.lock')
 HOST = 'cashneuro'
@@ -286,20 +285,7 @@ def restore_test(config, environment):
                 if shutil.disk_usage(root).free < int(manifest['databaseBytes']) * 2 + 512 * 1024**2:
                     raise OpsError('RESTORE_DISK_HEADROOM_LOW')
                 # No network, published ports, restart policy, live volumes or application workers.
-                (root / 'pgdata').mkdir(mode=0o700)
-                run(['docker', 'run', '-d', '--name', container, '--network', 'none', '--memory', '512m', '--cpus', '0.5',
-                     '--label', 'cashneuro.restore-test=true', '--mount', 'type=bind,src=' + str(root / 'pgdata') + ',dst=/var/lib/postgresql',
-                     '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_USER=cashneuro_restore',
-                     '--pull', 'never', live['image']], timeout=60)
-                test = {'container': container, 'owner': 'cashneuro_restore', 'database': 'postgres'}
-                for attempt in range(30):
-                    try:
-                        sql(test, 'SELECT 1;', timeout=3)
-                        break
-                    except OpsError:
-                        if attempt == 29:
-                            raise OpsError('RESTORE_POSTGRES_NOT_READY') from None
-                        time.sleep(1)
+                test = start_isolated_postgres(container, root / 'pgdata', live['image'], 'cashneuro_restore')
                 roles = json.loads(sql(live, "SELECT COALESCE(json_agg(rolname),'[]'::json) FROM pg_roles WHERE rolname !~ '^pg_' AND rolname<>'cashneuro_restore';"))
                 for role in roles:
                     sql(test, 'CREATE ROLE "' + role.replace('"', '""') + '";')

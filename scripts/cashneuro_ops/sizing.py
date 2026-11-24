@@ -9,9 +9,8 @@ from pathlib import Path
 import re
 import secrets
 import shutil
-import time
 
-from .common import STATE, OpsError, cleanup_isolated_container, database, emit, locked, private_dir, private_write, run, sql
+from .common import STATE, OpsError, cleanup_isolated_container, database, emit, locked, private_dir, private_write, run, sql, start_isolated_postgres
 
 SEED = r"""
 SET statement_timeout='120s';
@@ -83,19 +82,7 @@ def benchmark():
             raise OpsError('PREVIOUS_BENCHMARK_REQUIRES_REVIEW')
         container = 'cashneuro-sizing-' + secrets.token_hex(8)
         try:
-            (root / 'pgdata').mkdir(mode=0o700)
-            run(['docker', 'run', '-d', '--name', container, '--network', 'none', '--memory', '512m', '--cpus', '0.5',
-                 '--label', 'cashneuro.synthetic-sizing=true', '--mount', 'type=bind,src=' + str(root / 'pgdata') + ',dst=/var/lib/postgresql',
-                 '-e', 'POSTGRES_HOST_AUTH_METHOD=trust', '-e', 'POSTGRES_USER=cashneuro_sizing', '--pull', 'never', live['image']])
-            db = {'container': container, 'owner': 'cashneuro_sizing', 'database': 'postgres'}
-            for attempt in range(30):
-                try:
-                    sql(db, 'SELECT 1;', timeout=3)
-                    break
-                except OpsError:
-                    if attempt == 29:
-                        raise OpsError('BENCHMARK_POSTGRES_NOT_READY') from None
-                    time.sleep(1)
+            db = start_isolated_postgres(container, root / 'pgdata', live['image'], 'cashneuro_sizing')
             before = int(sql(db, 'SELECT pg_database_size(current_database());'))
             emit('synthetic-sizing', status='GENERATING', operations=5000, analyzerRequests=500)
             sql(db, SEED, timeout=180)

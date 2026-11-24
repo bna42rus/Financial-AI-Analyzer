@@ -8,6 +8,7 @@ import re
 import stat
 import subprocess
 import tempfile
+import time
 
 STATE = Path('/var/lib/cashneuro-ops')
 CONFIG = Path('/etc/cashneuro/backup/ops.json')
@@ -165,3 +166,41 @@ def cleanup_isolated_container(name):
     if not isinstance(labels, dict) or labels.get(label) != 'true':
         raise OpsError('ISOLATED_CONTAINER_LABEL_MISMATCH')
     run(['docker', 'rm', '-f', ids[0]], timeout=60)
+
+
+def start_isolated_postgres(name, pgdata, image, owner):
+    """An empty private mount is PGDATA itself, including on PostgreSQL 18+."""
+    purpose = 'restore' if owner == 'cashneuro_restore' else 'sizing' if owner == 'cashneuro_sizing' else None
+    if purpose is None or not re.fullmatch('cashneuro-' + purpose + '-[a-f0-9]{16}', name):
+        raise OpsError('ISOLATED_CONTAINER_NAME_INVALID')
+    pgdata = Path(pgdata)
+    pgdata.mkdir(mode=0o700)
+    # The image chowns PGDATA before dropping root. With the image's nested
+    # default, a root-owned 0700 mount remains an inaccessible parent directory.
+    run(['docker', 'run', '-d', '--name', name, '--network', 'none', '--memory', '512m', '--cpus', '0.5',
+         '--label', 'cashneuro.restore-test=true' if purpose == 'restore' else 'cashneuro.synthetic-sizing=true',
+         '--mount', 'type=bind,src=' + str(pgdata) + ',dst=/var/lib/postgresql',
+         '-e', 'PGDATA=/var/lib/postgresql', '-e', 'POSTGRES_HOST_AUTH_METHOD=trust',
+         '-e', 'POSTGRES_USER=' + owner, '--pull', 'never', image], timeout=60)
+    db = {'container': name, 'owner': owner, 'database': 'postgres'}
+    deadline = time.monotonic() + 120
+    next_report = 0
+    while time.monotonic() < deadline:
+        if time.monotonic() >= next_report:
+            emit('isolated-postgres-starting', purpose=purpose)
+            next_report = time.monotonic() + 10
+        state = json.loads(run(['docker', 'inspect', '--format', '{{json .State}}', name], timeout=5))
+        if state.get('OOMKilled'):
+            raise OpsError('ISOLATED_POSTGRES_OOM')
+        if not state.get('Running'):
+            raise OpsError('ISOLATED_POSTGRES_EXITED')
+        try:
+            # The entrypoint starts a temporary server during initdb; only use
+            # the final server after it has exec'ed postgres as PID 1.
+            if run(['docker', 'exec', name, 'cat', '/proc/1/comm'], timeout=5).strip() == b'postgres':
+                if sql(db, 'SELECT 1;', timeout=5).strip() == '1':
+                    return db
+        except OpsError:
+            pass
+        time.sleep(1)
+    raise OpsError('ISOLATED_POSTGRES_NOT_READY')
