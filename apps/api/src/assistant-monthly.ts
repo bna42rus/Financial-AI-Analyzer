@@ -18,11 +18,11 @@ export function monthlyPeriod(now: Date) {
 export function monthlyPolicy(original: CostPolicy, authorization: MonthlyAuthorization, now: Date): CostPolicy {
   return { ...original, ...monthlyPeriod(now), projectLimitRub: authorization.limitRub };
 }
-export function monthlyTariffGuard(checkedAt: string, verify: () => Promise<{ checkedAt: string }>, now: () => Date) {
+export function monthlyTariffGuard(checkedAt: string, verify: () => Promise<{ checkedAt: string }>, now: () => Date, maxAgeMs = 86400000) {
   let checked = Date.parse(checkedAt), pending: Promise<void> | undefined;
   return async () => {
     const at = now().getTime();
-    if (Number.isFinite(checked) && at >= checked && at - checked < 86400000) return;
+    if (Number.isFinite(checked) && at >= checked && at - checked < maxAgeMs) return;
     pending ??= verify().then(value => {
       const stamp = Date.parse(value.checkedAt), current = now().getTime();
       if (!Number.isFinite(stamp) || stamp > current || current - stamp >= 86400000) throw new AssistantError('ASSISTANT_TARIFF_STALE');

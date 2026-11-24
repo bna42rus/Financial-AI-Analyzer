@@ -12,7 +12,7 @@ import { costPolicy } from './analyzer-cost.ts';
 import type { CostPolicy } from './analyzer-cost.ts';
 import { monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch, authorizeMonthlyDispatch, monthlyBudgetState } from './assistant-monthly.ts';
 import type { MonthlyBudgetState } from './assistant-monthly.ts';
-import { verifyClassificationTariff } from './classification-tariff.ts';
+import { classificationTariffVerifier } from './classification-tariff.ts';
 
 export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
 const providers = new WeakSet<object>();
@@ -42,7 +42,14 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
   const metadata = await inspectCloudTaskModel(credentials,fetcher);
   if (metadata.modelMetadataSha256 !== settings.modelMetadataSha256 || metadata.numericMetadata.context_length !== 131072 || metadata.numericMetadata.max_model_len !== 131072) throw new AssistantError('ASSISTANT_MODEL_CHANGED');
   const model = createCloudAssistantModel(credentials,fetcher), snapshot = structuredClone(settings);
-  const refreshTariff = monthlyTariffGuard(settings.tariffCheckedAt, () => verifyClassificationTariff(fetcher, now), now);
+  let currentPrice = settings.cost.price;
+  const verifyTariff = classificationTariffVerifier(fetcher, now);
+  const refreshTariff = monthlyTariffGuard('', async () => {
+    const verified = await verifyTariff();
+    if (!verified.price) throw new AssistantError('CLASSIFICATION_TARIFF_DOCUMENT_INVALID');
+    currentPrice = verified.price;
+    return verified;
+  }, now, 0);
   const requestModel = (purpose: 'assistant'|'classification' = 'assistant') => {
     const result = createCloudAssistantModel(credentials,fetcher,purpose);
     if (!settings.monthly) return result;
@@ -50,7 +57,7 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
   };
   const provider: AssistantProvider = Object.freeze({ pool,environment:'staging' as const, model,
     costPeriod: settings.monthly ? 'project' as const : undefined,
-    get policy() { return settings.monthly ? monthlyPolicy(settings.cost, settings.monthly, now()) : settings.cost; },
+    get policy() { return settings.monthly ? monthlyPolicy({ ...settings.cost, price: currentPrice }, settings.monthly, now()) : settings.cost; },
     allowed: (email: string) => settings.allowedEmails.includes(email.toLowerCase()),
     async budgetState(db: PoolClient) { return settings.monthly ? monthlyBudgetState(db, provider.policy) : undefined; },
     forRequest: requestModel,

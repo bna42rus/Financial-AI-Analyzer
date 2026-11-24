@@ -35,7 +35,7 @@ test('a fresh checked document works on later days and stale, future or foreign 
 test('tariff preflight makes only a fixed public GET, rejects changed documents and never follows an error into a completion',async()=>{
  let gets=0;
  const fetcher:typeof fetch=async(url,options)=>{gets++;assert.equal(String(url),'https://cdn.cloud.ru/docs/legal/tariffs/evolution/current-version/foundation-models.pdf');assert.equal(options?.method,'GET');assert.equal(options?.redirect,'error');assert.ok(!('authorization' in (options?.headers??{})));return new Response('%PDF-modified');};
- await assert.rejects(verifyClassificationTariff(fetcher),/TARIFF_DOCUMENT_CHANGED/);assert.equal(gets,1);
+ await assert.rejects(verifyClassificationTariff(fetcher),/TARIFF_EXTRACTION_FAILED/);assert.equal(gets,1);
  await assert.rejects(verifyClassificationTariff(async()=>new Response('private provider text',{status:503})),/TARIFF_UNAVAILABLE/);
  await assert.rejects(verifyClassificationTariff(async()=>{throw Error('private network detail');}),/TARIFF_UNAVAILABLE/);
  await assert.rejects(verifyClassificationTariff(async()=>new Response('%PDF-'+ 'x'.repeat(2097152))),/TARIFF_DOCUMENT_INVALID/);
@@ -48,7 +48,7 @@ test('monthly smoke refresh reaches the public tariff endpoint before any model 
   assert.equal(new Headers(options?.headers).get('authorization'),null);return new Response('%PDF-modified');
  },async()=>assert.fail('Tariff responses are not archived'),()=>undefined);
  const refresh=monthlyTariffGuard('2026-10-23T10:00:00Z',()=>verifyClassificationTariff(fetcher,()=>now),()=>now);
- await assert.rejects(refresh(),/CLASSIFICATION_TARIFF_DOCUMENT_CHANGED/);
+ await assert.rejects(refresh(),/CLASSIFICATION_TARIFF_EXTRACTION_FAILED/);
  await assert.rejects(fetcher(url,{method:'GET',redirect:'error',headers:{Authorization:'Bearer synthetic-secret'}}),/CLASSIFICATION_SYNTHETIC_ONLY/);
  await assert.rejects(fetcher(url+'?alternate=1',{method:'GET',redirect:'error'}),/CLASSIFICATION_SYNTHETIC_ONLY/);
  await assert.rejects(fetcher(url,{method:'GET',redirect:'follow'}),/CLASSIFICATION_SYNTHETIC_ONLY/);

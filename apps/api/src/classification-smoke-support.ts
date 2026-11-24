@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {assistantTariffSource,checkAssistantStagingSettings} from './analyzer-assistant-settings.ts';
 import {digest} from './classification-plan.ts';
 import type {Pool,PoolClient} from 'pg';
-import {classificationTariffDocumentSha256} from './classification-tariff.ts';
+import {isClassificationTariffVerification} from './classification-tariff.ts';
 import type {ClassificationTariffVerification} from './classification-tariff.ts';
 
 export type PilotTotals={calls:number;spentAtoms:string;reservedAtoms:string;blocked:boolean};
@@ -21,7 +21,8 @@ export function continuedClassificationSettings(raw:unknown,totals:PilotTotals,s
  const r=raw as Record<string,any>;
  const historical=new Date(Math.max(Date.parse(r?.tariffCheckedAt),Date.parse(r?.cost?.projectPeriodStart))+1);
  const old=checkAssistantStagingSettings(raw,historical),at=now.getTime(),checked=Date.parse(tariff?.checkedAt);
- if(!Number.isFinite(checked)||tariff.documentSha256!==classificationTariffDocumentSha256||at<checked||at-checked>=86400000)throw Error('CLASSIFICATION_TARIFF_VERIFICATION_REQUIRED');
+ if(!Number.isFinite(checked)||!isClassificationTariffVerification(tariff)||at<checked||at-checked>=86400000)throw Error('CLASSIFICATION_TARIFF_VERIFICATION_REQUIRED');
+ if(tariff.price&&(tariff.price.inputRubPerMillion!==old.cost.price.inputRubPerMillion||tariff.price.outputRubPerMillion!==old.cost.price.outputRubPerMillion))throw Error('CLASSIFICATION_TARIFF_PRICE_CHANGED');
  if(at<Date.parse(old.expiresAt))throw Error('CLASSIFICATION_CONTINUATION_NOT_AVAILABLE');
  if(!Number.isSafeInteger(totals.calls)||totals.calls<0||![totals.spentAtoms,totals.reservedAtoms].every(n=>/^(0|[1-9]\d{0,29})$/.test(n)))throw Error('CLASSIFICATION_ACCOUNTING_INVALID');
  if(totals.blocked||BigInt(totals.reservedAtoms)!==0n)throw Error('CLASSIFICATION_RECONCILIATION_REQUIRED');
