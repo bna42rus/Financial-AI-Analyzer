@@ -171,6 +171,57 @@ test('failed first request stays in cleaned history and can be reinterpreted wit
   assert.equal(JSON.stringify(sent).includes('arbitrary'), false); assert.equal(JSON.stringify(sent).includes('50000000-'), false);
 });
 
+test('a complete retry after a tariff failure repairs a nonexistent continuation in the existing review call', async () => {
+  const h = harness(), question = 'Подсчитай мои расходы за сентябрь 2026 года';
+  const failed = await h.execute(922, question, [], { reserveError: new HttpError(503, 'CLASSIFICATION_TARIFF_DOCUMENT_CHANGED') });
+  assert.equal(failed.status, 'error'); assert.equal(failed.modelCalls, 0); assert.equal(h.state.book.nodes.length, 0);
+  const edits = [set('metric', 'expenses'), set('period', 'сентябрь 2026 года')];
+  const reply = await h.execute(923, question, [plan(edits, 'continue'), { plan: plan(edits), conditions: [] }]);
+  assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 2);
+  assert.equal(reply.query!.filter.from, '2026-09-01'); assert.equal(reply.query!.filter.through, '2026-09-30');
+  const review = h.calls.findLast(c => c.phase === 'check_changes')!.input as any;
+  assert.equal(review.candidateContextIssue, 'successful_task_missing');
+  assert.deepEqual(review.contextAvailability, { successfulTask: false, pendingRequest: true, categoryChoice: false });
+  assert.equal(review.pendingRequest.status, 'error');
+  assert.equal(h.state.book.nodes.length, 1); assert.equal(h.state.book.nodes[0]!.parent, null);
+  const followup = await h.execute(924, 'Теперь по категориям', [plan([set('grouping', 'category_totals')], 'continue')]);
+  assert.equal(followup.status, 'query'); assert.equal(followup.query!.filter.from, '2026-09-01');
+  assert.equal(followup.query!.grouping, 'category');
+  assert.equal((h.calls.findLast(c => c.phase === 'check_changes')!.input as any).candidateContextIssue, null);
+});
+
+test('review reconstructs a failed request for a real follow-up instead of silently resetting its conditions', async () => {
+  const h = harness();
+  await h.execute(925, 'Расходы на продукты за сентябрь 2026 года', [], { reserveError: new HttpError(503, 'CLASSIFICATION_TARIFF_UNAVAILABLE') });
+  const reply = await h.execute(926, 'Теперь по категориям', [plan([set('grouping', 'category_totals')], 'continue'), {
+    plan: plan([set('metric', 'expenses', 'h1'), set('period', 'сентябрь 2026 года', 'h1'),
+      set('categories', { names: ['продукты'] }, 'h1'), set('grouping', 'category_totals')], 'pending'), conditions: [],
+  }]);
+  assert.equal(reply.status, 'query'); assert.equal(reply.modelCalls, 2);
+  assert.equal(reply.query!.filter.from, '2026-09-01'); assert.deepEqual(reply.query!.filter.categoryIds, [trialId(10)]);
+  assert.equal(reply.query!.grouping, 'category'); assert.equal(h.state.book.nodes[0]!.parent, null);
+});
+
+test('an invalid reviewed binding is a model error with no financial access, automatic retry or fake task', async () => {
+  for (const [mode, changes, issue] of [
+    ['continue', [set('metric', 'expenses')], 'successful_task_missing'],
+    ['pending', [set('metric', 'expenses')], 'pending_request_missing'],
+  ] as const) {
+    const h = harness();
+    const reply = await h.execute(927, 'Подсчитай расходы', [plan([...changes], mode)]);
+    assert.equal(reply.status, 'error'); assert.equal(reply.code, 'ASSISTANT_PLAN_INVALID');
+    assert.equal(reply.modelCalls, 2); assert.equal(h.catalogs, 0); assert.equal(h.calculations, 0);
+    assert.equal(h.state.book.nodes.length, 0);
+    assert.equal((h.calls.findLast(c => c.phase === 'check_changes')!.input as any).candidateContextIssue, issue);
+  }
+  const h = harness();
+  await h.execute(928, 'Расходы за сентябрь 2026 года', [], { reserveError: new HttpError(503, 'CLASSIFICATION_TARIFF_UNAVAILABLE') });
+  const reply = await h.execute(929, 'Теперь по категориям', [plan([set('grouping', 'category_totals')], 'pending')]);
+  assert.equal(reply.status, 'error'); assert.equal(reply.code, 'ASSISTANT_PLAN_INVALID');
+  assert.equal((h.calls.findLast(c => c.phase === 'check_changes')!.input as any).candidateContextIssue, 'pending_metric_missing');
+  assert.equal(h.catalogs, 0); assert.equal(h.calculations, 0);
+});
+
 test('two failed messages can be reinterpreted together without losing the first period or the second threshold', async () => {
   const h = harness(), bad = { broken: true };
   await h.execute(980, 'Траты за сентябрь 2026', [bad, bad]);

@@ -25,7 +25,7 @@ jobs:
           pnpm --filter @finance/api exec tsc --noEmit
           pnpm run check:web
       - name: Check tariff updates, historical billing and dispatch guards without paid calls
-        run: pnpm --filter @finance/api exec node --import tsx --test test/classification-tariff.test.ts test/classification-smoke-support.test.ts test/assistant-monthly.test.ts test/classification-admission.test.ts test/analyzer-cost-policy.test.ts test/assistant-workflow.test.ts test/assistant-durability.test.ts test/analyzer-assistant-settings.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test test/classification-tariff.test.ts test/classification-smoke-support.test.ts test/assistant-monthly.test.ts test/classification-admission.test.ts test/analyzer-cost-policy.test.ts test/assistant-workflow.test.ts test/assistant-durability.test.ts test/analyzer-assistant-settings.test.ts test/assistant-report.test.ts ../../packages/analyzer/test/task-context.test.ts
       - name: Check immutable Staging update and installer syntax
         run: |
           sudo "$(command -v python3)" -B scripts/test-update-staging-release.py
