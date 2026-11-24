@@ -196,8 +196,8 @@ test('wire schema references preserve the closed validator exactly and leave the
   const expand = (value: any): any => {
     if (!value || typeof value !== 'object') return value;
     if (Array.isArray(value)) return value.map(expand);
-    if (value.$ref) return expand(compact.properties[value.$ref.replace('#/properties/', '')]);
-    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, expand(v)]));
+    if (value.$ref) return expand(value.$ref.slice(2).split('/').reduce((node:any,key:string)=>node[key],compact));
+    return Object.fromEntries(Object.entries(value).filter(([k])=>k!=='$defs').map(([k, v]) => [k, expand(v)]));
   };
   assert.deepEqual(expand(compact), assistantPlanSchema);
   assert.equal(JSON.stringify(assistantPlanSchema), before);

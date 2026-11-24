@@ -9,6 +9,7 @@ import {assistantChangeSchema,parseAssistantChange} from './assistant-changes.ts
 import type {AssistantChange} from './assistant-changes.ts';
 import {calculatorSchema,parseCalculatorInput} from './calculators.ts';
 import type {CalculatorInput} from './calculators.ts';
+import type {Query} from './registry.ts';
 import { assertClosedSchema } from './closed-schema.ts';
 import { taskProposalSchema } from './task-protocol.ts';
 import { periodLiteral } from './task-literals.ts';
@@ -38,11 +39,14 @@ const sets = oldEdits.filter(s => s.properties.op.enum[0] === 'set').map(s => {
   const { quote: _quote, ...properties } = s.properties;
   return closed({ ...properties, source }, Object.keys(properties));
 });
+// A continuation carries only explicit edits. The authenticated server supplies
+// omitted fields from its validated snapshot, never from model-generated text.
+const calculationSchema={anyOf:[...calculatorSchema.anyOf,...calculatorSchema.anyOf.map(s=>closed({...s.properties,from:{type:'string',pattern:'^(active|h(?:[1-9][0-9]?|100))$'},variant:{type:'integer',minimum:1,maximum:5}},['kind','from']))]};
 export const assistantPlanSchema = closed({
   version: enumeration([assistantVersion]),
   topic: enumeration(['personal_finance', 'general_finance', 'financial_guidance', 'mixed', 'ambiguous', 'unrelated']),
   action: enumeration(['read', 'explain', 'calculate', 'report', 'external', 'propose_change', 'unsupported', 'clarification', 'redirect']),
-  context: closed({ mode: enumeration(['new', 'continue', 'reference', 'pending']), reference: text, restart: { type: 'boolean' } }, ['mode']),
+  context: closed({ mode: enumeration(['new', 'continue', 'reference', 'pending']), reference: text, comparisonReference:{type:'string',pattern:'^h(?:[1-9][0-9]?|100)$'}, restart: { type: 'boolean' } }, ['mode']),
   changes: { type: 'array', maxItems: 64, items: { anyOf: [
     ...Object.entries(scalars).map(([field, values]) => closed({ field: enumeration([field]), op: enumeration(['set']), value: enumeration(values), source }, ['field', 'op', 'value'])),
     ...sets,
@@ -51,7 +55,7 @@ export const assistantPlanSchema = closed({
   options: analysisOptionsSchema,
   clarification: {type:'string',minLength:1,maxLength:700},
   external:financialSourceSchema,
-  calculation: calculatorSchema,
+  calculation: calculationSchema,
   change: assistantChangeSchema,
   needsFreshSources: { type: 'boolean' },
 }, ['version', 'topic', 'action']);
@@ -85,12 +89,21 @@ export function cleanAssistantQuestion(value: unknown): string {
 }
 export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 'clear' | 'use_current'; value?: unknown; source?: string };
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
-  action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean };
-export function parseAssistantPlan(value: unknown): AssistantPlan {
+  action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; comparisonReference?:string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean };
+export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:string,variant?:number)=>CalculatorInput|undefined): AssistantPlan {
   if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   try { assertClosedSchema(value, assistantPlanSchema); } catch { throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID'); }
   const p = structuredClone(value) as AssistantPlan;
+  const materialize=(raw:CalculatorInput,deferred=false):CalculatorInput=>{
+    if(!('from'in raw))return deferred?raw:parseCalculatorInput(raw);
+    const {from,variant,...patch}=raw as unknown as {from:string;variant?:number;kind:string};
+    const base=resolveCalculation?.(from,variant);
+    if(!base||base.kind!==patch.kind)throw new AssistantError('ASSISTANT_CALCULATION_CONTEXT_INVALID');
+    return deferred?{...base,...patch} as CalculatorInput:parseCalculatorInput({...base,...patch});
+  };
+  if(p.calculation)p.calculation=materialize(p.calculation);
+  if(p.report)for(const step of p.report.steps)if(step.kind==='calculate')step.calculation=materialize(step.calculation,true);
   const personal = ['personal_finance', 'mixed'].includes(p.topic), read = p.action === 'read';
   if (p.topic === 'unrelated' && p.action !== 'redirect' || p.topic === 'ambiguous' && p.action !== 'clarification' ||
       p.action === 'redirect' && p.topic !== 'unrelated' || read && !personal || p.action === 'propose_change' && !personal ||
@@ -124,7 +137,7 @@ export function parseAssistantPlan(value: unknown): AssistantPlan {
   return p;
 }
 
-export type SourceContext = { calendar: Calendar; global: GlobalSnapshot; pending?: boolean };
+export type SourceContext = { calendar: Calendar; global: GlobalSnapshot; pending?: boolean;taskHandle?:string;query?:Query };
 type CompilerInput = { plan: AssistantPlan; book: TaskBook; scope: TaskScope; global: GlobalSnapshot; messageId: string; calendar: Calendar;
   sources?: Record<string, SourceContext>; pendingSource?: string };
 export type PreparedAssistant = ReturnType<typeof resolveTaskDecision> | { status: 'unsupported'; reason: string } |
@@ -136,14 +149,23 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
   if (p.action !== 'read') throw new AssistantError('ASSISTANT_READ_PLAN_REQUIRED');
   let binding: TaskBinding;
   if (p.context!.mode === 'reference') {
+    const handle=input.sources?.[p.context!.reference!]?.taskHandle;
+    if(/^h(?:[1-9][0-9]?|100)$/u.test(p.context!.reference!)){
+      if(!handle)return {status:'clarification',reason:'task_reference_unclear'};
+      binding={kind:'reference',handle};
+    }else{
     const b = intentBinding({ relevance: 'financial', action: 'read', reference: p.context!.reference });
     if (!b || b.kind === 'new') return { status: 'clarification', reason: 'task_reference_unclear' };
     // A vague explicit reference does not grant permission to select the last
     // of several independent matching tasks. Latest/previous is explicit.
     binding = b.kind === 'nearest' && !/(?:последн|предыдущ|latest|previous)/iu.test(p.context!.reference!) ? { ...b, kind: 'unique' } : b;
+    }
   } else binding = p.context!.mode === 'new' || p.context!.mode === 'pending' ? { kind: 'new' } : { kind: 'nearest', metric: null, comparison: null };
   const keep = { op: 'keep' } as const;
-  const decision: TaskDecision = { binding, metric: keep, grouping: keep, comparison: keep, edits: [] };
+  const comparisonQuery=p.context!.comparisonReference?input.sources?.[p.context!.comparisonReference]?.query:undefined;
+  if(p.context!.comparisonReference&&(!comparisonQuery?.filter.from||!comparisonQuery.filter.through))return {status:'clarification',reason:'comparison_period_required'};
+  if(comparisonQuery&&p.changes?.some(c=>c.field==='comparison'&&c.value!=='custom'))throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  const decision: TaskDecision = { binding, metric: keep, grouping: keep, comparison: comparisonQuery?{op:'set',value:'custom'}:keep, edits: [] };
   let baseGlobal = global;
   if (p.context!.mode === 'pending') {
     const pending = input.pendingSource && input.sources?.[input.pendingSource];
@@ -257,7 +279,8 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
   const resolved=resolveTaskDecision(book,input.scope,p.context!.mode==='pending'?{...global,filter:{...global.filter,...baseGlobal.filter}}:global,decision,input.messageId);
   if(resolved.status==='resolved'){
     const inherited=resolved.inheritedFrom?book.nodes.find(n=>n.messageId===resolved.inheritedFrom)?.query.options:undefined;
-    const options=p.options??inherited;
+    const comparisonPeriod=comparisonQuery?{from:comparisonQuery.filter.from!,through:comparisonQuery.filter.through!}:undefined;
+    const options=p.options||inherited||comparisonPeriod?{...inherited,...p.options,...(comparisonPeriod?{comparisonPeriod}:{})}:undefined;
     if(resolved.query.comparison==='custom'&&!options?.comparisonPeriod)return {status:'clarification',reason:'comparison_period_required'};
     if(options){resolved.query.options=structuredClone(options);const f=resolved.query.filter;
       if(options.dateBasis)f.calendarBasis=options.dateBasis;
@@ -294,7 +317,9 @@ export const calculatorInstructions = 'calculate: только расчёт по
 
 export const extendedCalculatorInstructions='Дополнительные калькуляторы: loan_capacity — сумма кредита под платёж, ставка/срок обязательны; loan_term — срок по сумме/ставке/платежу; savings_goal — взнос к цели за срок (initialRubles может быть 0); goal_term — срок к цели по взносам; refinance — два кредита с известными ставками/сроками/разовыми расходами; affordability — цена покупки, доступные деньги, доход, расходы, резерв, горизонт; reserve — месячные расходы и выбранное число месяцев; percentage — процент от суммы. Все суммы в рублях десятичными строками. Если параметров нет — clarification с конкретным вопросом; не выдумывай ставку, страховку, остаток, период, комиссию или личный доход. Не называй модели одобрением, официальной ПСК, договорным графиком или гарантированной доходностью. Для льготного периода кредитки нужны условия договора/выписки, не подменяй аннуитетом.';
 
-export const calculatorContextInstructions='activeCalculation и history.calculation — проверенные снимки введённых условий. В продолжении калькулятора сохраняй все их неизменённые параметры и меняй только явно названные. Не теряй досрочные платежи/изменения ставок/расходы рефинансирования. Новый независимый вопрос не наследует условия старого расчёта. Числа результата вычислит сервер. Составную просьбу не объявляй выполненной одним действием: если инструменты не выполняют часть, перечисли её явно.';
+export const calculatorContextInstructions='activeCalculation, activeCalculations и history.calculation — проверенные снимки введённых условий. activeCalculations хранит несколько последних сценариев для сравнения. В продолжении сохраняй неизменённые параметры, меняй только явно названные; понимай опечатки по смыслу. Короткий выбор типа платежа или подтверждение отвечает на последнее уточнение и продолжает исходный расчет. Не теряй досрочные платежи/изменения ставок/расходы рефинансирования. Для еще не выполненного расчета восстанови известные параметры из pendingRequest и history; clarification нужна только для действительно неизвестного параметра. Вопрос о понятии или разнице типов — explain, а не повторный запрос типа; он не отменяет ожидающий расчет. После выбора типа — calculate. «А другой тип?» — calculate с теми же суммой, ставкой и сроком. Несколько вариантов и вопрос, что выгоднее, — report с повторными calculate и derive difference по interest/total_paid и narration:short; не qualitative explain. Не называй выгоду без численного сравнения. Калькулятор loan возвращает ПОЛНЫЙ помесячный график: paymentMinor, principalMinor, interestMinor, extraMinor, closingMinor; интерфейс умеет показывать график платежей и их состава. Для просьбы показать график пересчитай тот же сценарий; не проси внешние данные и не утверждай, что доступны только итоги. Отсутствие досрочных платежей или смены ставки означает обычный сценарий, а не необходимость спрашивать о них. Новый независимый вопрос не наследует старый расчет. Результаты вычислит сервер; context/changes в calculate/report/explain не добавляй.';
+
+export const conversationInstructions='ПРОДОЛЖЕНИЕ КАЛЬКУЛЯТОРА: в calculation укажи kind прежнего калькулятора, from:active или hN и только измененные поля. Сервер сохранит все остальные параметры. Если источник содержит несколько calculate, укажи variant:номер от первого в activeCalculations/history.report. Для обычного графика без новых условий достаточно kind/from. Для двух типов кредита два calculate с from и payment. Нельзя менять неупомянутые параметры; новые независимые расчеты передавай полностью без from. КОНТЕКСТ ДИАЛОГА: history содержит вопросы, ответы на уточнения, проверенные параметры и task.period. Поясняющий вопрос — самостоятельный explain с учетом предыдущего обсуждения, а не отказ от исходной задачи. Короткое подтверждение связывай с последним вопросом помощника; не требуй заново уже известные параметры. Технические ref hN нужны ТОЛЬКО внутри плана, никогда не пиши их пользователю. В read можно точно выбрать успешную задачу context:{mode:reference,reference:hN}; UUID не передаются. Сравнение двух названных ранее периодов с одинаковыми остальными условиями: выбери более поздний как основной через reference:hN, другой через comparisonReference:hN в context. Сервер возьмет точные даты из сохраненных условий, не требуй их повторно и не копируй даты в changes. При разных остальных условиях используй report с двумя read, каждый со своим reference. Короткие «сравни их», «что выгоднее», «на сколько отличается» относятся к ближайшим подходящим сценариям, а не к произвольной старой задаче. Сравнивай проверенные результаты через инструменты, не считай в тексте модели. Для нескольких кредитных вариантов activeCalculations и history позволяют повторить calculate и derive; type explain используется только для понятий. Сам по себе формат графика/таблицы не делает расчет недоступным. Уточняй только настоящую неоднозначность, не теряй сохраненные условия.';
 
 export const financialSourceInstructions='Актуальные внешние факты: action=external, external.kind=key_rate (официальная ключевая ставка), currency (ISO-код валюты, дата и необязательная сумма для пересчета), official_guidance (tax_deposits, tax_deductions, deposit_insurance, credit_insurance, investment_risks). Только заданные первичные источники; URL/SQL не передаются. Дата в YYYY-MM-DD, в будущем факт не известен. Официальный курс не равен курсу обмена банка. Справочная страница не подтверждает индивидуальную применимость налоговой нормы. Личные документы, статус, период и условия договора уточняются отдельно. Внешние действия/платежи не выполняются.';
 

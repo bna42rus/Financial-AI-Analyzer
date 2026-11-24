@@ -1,5 +1,6 @@
 /** Public reasons only: never expose provider payloads, stack traces or secrets. */
 const messages: Record<string, string> = {
+  ASSISTANT_CALCULATION_CONTEXT_INVALID:'Не удалось однозначно выбрать расчёт из истории. Уточните, какой из предыдущих вариантов нужно продолжить.',
   CLASSIFICATION_TARIFF_DOCUMENT_CHANGED: 'Не удалось подтвердить действующий тариф Анализатора. Запрос к модели не отправлен. Попробуйте позже или обратитесь в поддержку.',
   CLASSIFICATION_TARIFF_DOCUMENT_INVALID: 'Не удалось однозначно прочитать действующие цены Анализатора. Запрос к модели не отправлен. Попробуйте позже или обратитесь в поддержку.',
   CLASSIFICATION_TARIFF_UNAVAILABLE: 'Источник тарифов Анализатора временно недоступен. Запрос к модели не отправлен. Попробуйте позже.',

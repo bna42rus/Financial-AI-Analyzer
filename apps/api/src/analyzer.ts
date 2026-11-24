@@ -120,11 +120,15 @@ export async function analyzerQuery(db:PoolClient,userId:string,value:unknown,ad
  return {id,answer,quota:await analyzerQuota(db,userId,!!yandex)};
 }
 export async function analyzerPropose(db:PoolClient,userId:string,value:unknown){
- const r=object(value,['actionId','tool']),actionId=uuid(r.actionId),tool=parseTool(r.tool);if(tool.name==='query_finances')throw new TypeError('INVALID_ACTION');
+ const r=object(value,['actionId','tool','replacesActionId']),actionId=uuid(r.actionId),tool=parseTool(r.tool),replacesActionId=r.replacesActionId===undefined?undefined:uuid(r.replacesActionId);if(tool.name==='query_finances')throw new TypeError('INVALID_ACTION');
  // Lock and authorization also protect direct internal invocation, not only HTTP routing.
  const state=await prepareFinance(db,userId);
  const message=(await db.query('SELECT answer,action_id FROM finance.analyzer_message WHERE user_id=$1 AND id=$2',[userId,tool.answerId])).rows[0];if(!message?.answer.query&&!message?.answer.proposal)throw new HttpError(404,'NOT_FOUND');
- if(message.action_id&&message.action_id!==actionId)throw new HttpError(409,'ACTION_REUSED');
+ if(message.action_id&&message.action_id!==actionId){
+  if(replacesActionId!==message.action_id)throw new HttpError(409,'ACTION_REUSED');
+  const previous=(await db.query('SELECT status,intent FROM finance.action WHERE user_id=$1 AND id=$2',[userId,replacesActionId])).rows[0];
+  if(previous?.status!=='previewed'||previous.intent.analyzer?.tool?.answerId!==tool.answerId)throw new HttpError(409,'ACTION_REUSED');
+ }else if(replacesActionId&&message.action_id!==actionId)throw new HttpError(409,'ACTION_REUSED');
  const existing=(await db.query('SELECT *,expires_at>clock_timestamp() AS fresh FROM finance.action WHERE user_id=$1 AND id=$2',[userId,actionId])).rows[0];
  if(existing){
   if(stableJSON(existing.intent.analyzer?.tool)!==stableJSON(tool))throw new HttpError(409,'ACTION_REUSED');
@@ -162,6 +166,7 @@ export async function analyzerPropose(db:PoolClient,userId:string,value:unknown)
  await db.query("UPDATE finance.action SET intent=jsonb_set(intent,'{analyzer}',$3::jsonb) WHERE user_id=$1 AND id=$2",[userId,actionId,JSON.stringify({tool,confirmation,registryVersion})]);
  // New dependencies include linked operations affected outside the original question period.
  if(preview.impact.affectedOperationIds.length)await db.query('INSERT INTO finance.analyzer_dependency(user_id,message_id,transaction_id) SELECT $1,$2,unnest($3::uuid[]) ON CONFLICT DO NOTHING',[userId,tool.answerId,preview.impact.affectedOperationIds]);
+ if(replacesActionId)await db.query("UPDATE finance.action SET expires_at=LEAST(expires_at,clock_timestamp()) WHERE user_id=$1 AND id=$2 AND status='previewed'",[userId,replacesActionId]);
  await db.query('UPDATE finance.analyzer_message SET action_id=$3 WHERE user_id=$1 AND id=$2',[userId,tool.answerId,actionId]);
  return {...preview,generation:state.generation,requiresConfirmation:confirmation};
 }

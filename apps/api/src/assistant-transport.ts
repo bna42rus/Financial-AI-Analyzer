@@ -27,18 +27,15 @@ export function createCloudAssistantModel(credentials: unknown, fetcher: typeof 
   } };
 }
 
-/** Lossless local references share the exact same closed schemas between a
- * direct action and report steps. Server validation uses the original schema. */
+/** Deduplicate identical schema nodes, including calculator continuations.
+ * The server keeps the original closed schema; no constraint is removed. */
 export function compactAssistantSchema(schema: unknown): unknown {
-  const root = structuredClone(schema) as any;
-  const share = (plan: any, path: string) => {
-    const p = plan?.properties, variants = p?.report?.properties?.steps?.items?.anyOf;
-    if (!Array.isArray(variants)) return;
-    for (const variant of variants) for (const field of ['context','changes','options','calculation','external','change']) {
-      if (variant.properties?.[field] === p[field]) variant.properties[field] = { $ref: path + '/properties/' + field };
-    }
-  };
-  share(root, '#');
-  share(root?.properties?.plan, '#/properties/plan');
+  const counts=new Map<string,number>(),nodes=new Map<string,any>();
+  const walk=(v:any)=>{if(!v||typeof v!=='object')return;if(Array.isArray(v)){v.forEach(walk);return;}if(v.type||v.anyOf){const key=JSON.stringify(v);if(key.length>=96){counts.set(key,(counts.get(key)??0)+1);nodes.set(key,v);}}Object.values(v).forEach(walk);};
+  walk(schema);
+  const names=new Map([...counts].filter(([,count])=>count>1).map(([key],i)=>[key,'d'+(i+1)]));
+  const convert=(v:any,definition?:string):any=>{if(!v||typeof v!=='object')return v;if(Array.isArray(v))return v.map(x=>convert(x));const key=JSON.stringify(v),name=names.get(key);if(name&&key!==definition)return {$ref:'#/$defs/'+name};return Object.fromEntries(Object.entries(v).map(([k,x])=>[k,convert(x)]));};
+  const root=convert(schema);
+  if(names.size)root.$defs=Object.fromEntries([...names].map(([key,name])=>[name,convert(nodes.get(key),key)]));
   return root;
 }
