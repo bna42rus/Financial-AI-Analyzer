@@ -16,7 +16,7 @@ import { isDeepStrictEqual } from 'node:util';
 import { object, uuid } from '../../../packages/finance-core/src/model.ts';
 import { assistantDisplayText, explanationNeedsReview } from '../../../packages/analyzer/src/assistant-text.ts';
 import { bindCategoryChoice, collapseCategoryDraft } from '../../../packages/analyzer/src/assistant-choice.ts';
-import { assistantVersion, profileCalendar, parseAssistantPlan, compileAssistantPlan, assistantPlanSchema, cleanAssistantQuestion, AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
+import { assistantVersion, profileCalendar, parseAssistantPlan, normalizeAssistantPlan, compileAssistantPlan, assistantPlanSchema, cleanAssistantQuestion, AssistantError } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { parseConversation, conversationInput, appendConversation, conversationCalculation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import type { CategoryChoice, Conversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import type { TaskScope, GlobalSnapshot } from '../../../packages/analyzer/src/task-context.ts';
@@ -236,6 +236,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
           pendingRequest: context.input.pendingRequest, selectedContext, contextAvailability, candidateContextIssue: contextIssue(plan), candidate: plan,
           history: context.input.history },
       }, value => {
+        if(value&&typeof value==='object'&&!Array.isArray(value)&&'plan'in value)value={...value,plan:normalizeAssistantPlan(value.plan)};
         assertClosedSchema(value, reviewSchema);
         const result = value as { plan: unknown; conditions: { text: string; scope: 'financial' | 'unrelated'; covered: boolean }[] };
         const reviewedPlan = parsePlan(result.plan);

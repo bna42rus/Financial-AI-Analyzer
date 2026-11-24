@@ -17,14 +17,70 @@ const set=(field:string,value:unknown)=>({field,op:'set',value});
 function harness(){
  const scope={ownerId:'synthetic-context-owner',chatId:randomUUID(),chatEpoch:randomUUID(),generation:randomUUID()},global={revision:0,filter:{},touched:{}};
  let state=emptyConversation(scope);const calls:CompletionInput[]=[],queries:Query[]=[];
- return {get state(){return state;},scope,calls,queries,async turn(question:string,candidate:unknown,explanation='Объяснение финансового понятия.'){
+ return {get state(){return state;},scope,calls,queries,async turn(question:string,candidate:unknown,explanation='Объяснение финансового понятия.',reviewCandidate=candidate){
   const request:AssistantRequest={requestId:randomUUID(),scope,global,conversation:structuredClone(state),dataRevision:'1',question,timezone:calendar.timezone,now:new Date('2026-11-24T12:00:00Z')};
-  const model:AssistantModel={bound:{modelVersion:'synthetic-context',inputTokens:131072,outputTokens:2400},async complete(input,before){calls.push(input);await before();return {value:input.phase==='check_changes'?{plan:candidate,conditions:[]}:input.phase==='explain'?{text:explanation}:candidate,usage:{modelVersion:'synthetic-context',inputTokens:100,outputTokens:50}};}};
+  const model:AssistantModel={bound:{modelVersion:'synthetic-context',inputTokens:131072,outputTokens:2400},async complete(input,before){calls.push(input);await before();return {value:input.phase==='check_changes'?{plan:reviewCandidate,conditions:[]}:input.phase==='explain'?{text:explanation}:candidate,usage:{modelVersion:'synthetic-context',inputTokens:100,outputTokens:50}};}};
   const journal:AssistantJournal={receipt:{fingerprint:assistantRequestFingerprint(request),calls:[]},async persist(){},async reserve(){},async settle(){}};
   const services:AssistantServices={async guard(){},async catalog(){throw Error('No private catalog needed');},async authorizeQuery(){},async calculate(q){queries.push(q);return calculateWidget(parseWidget({id:randomUUID(),name:'Синтетический расчёт',metrics:[q.metric],grouping:q.grouping,filter:q.filter,comparison:q.comparison==='custom'?{kind:'custom',...q.options?.comparisonPeriod}:{kind:q.comparison},chart:'table'}),structuredClone(trialRows),trialCatalog,{},request.now,request.timezone);},render(){return 'Проверенный результат.';},async commit(p){state=parseConversation(p.conversation,scope);}};
   return runAssistant(request,model,journal,services);
  }};
 }
+test('independent calculators tolerate only a redundant empty new context without paid repairs',async()=>{
+ for(const input of [loan,{kind:'deposit',principalRubles:'120000',annualRatePercent:'12',months:18,capitalization:true,monthlyAdditionRubles:'3000'},{kind:'percentage',baseRubles:'84000',percent:'17.5'}]){
+  const h=harness(),candidate=plan('calculate',{calculation:input,context:{mode:'new'},changes:[]}),before=structuredClone(candidate);
+  const result=await h.turn(input.kind==='loan'?'Рассчитай дифференцированный вариант':'Расчёт по заданным условиям',candidate);assert.equal(result.code,'FINANCIAL_CALCULATION');assert.deepEqual(result.calculation!.input,input);assert.equal(result.modelCalls,2);assert.deepEqual(candidate,before);
+ }
+ const h=harness(),input={...loan,prepayments:[{month:6,amountRubles:'20000',strategy:'reduce_term'}]},candidate=plan('calculate',{calculation:input});
+ const r=await h.turn('Дифференцированный расчёт с досрочным погашением',candidate,undefined,{...candidate,context:{mode:'new'}});
+ assert.equal(r.code,'FINANCIAL_CALCULATION');assert.deepEqual(r.calculation!.input,input);assert.equal(r.modelCalls,2);
+});
+
+test('normalization never erases meaningful edits, bindings, write scopes or unexpected fields',()=>{
+ const p=plan('calculate',{calculation:loan});
+ for(const fields of [
+  {context:{mode:'continue'}},{context:{mode:'reference',reference:'h1'}},{context:{mode:'pending'}},
+  {context:{mode:'new',restart:true}},{context:{mode:'new'},changes:[set('metric','income')]},
+  {context:{mode:'new'},sql:'SELECT'},{context:{mode:'new'},changes:[{field:'amount',op:'clear'}]},
+ ])assert.throws(()=>parseAssistantPlan({...p,...fields}));
+ assert.throws(()=>parseAssistantPlan(plan('calculate',{context:{mode:'new'},calculation:{kind:'loan',from:'active'}}),()=>loan));
+ assert.throws(()=>parseAssistantPlan(plan('propose_change',{context:{mode:'new'},change:{kind:'create_counterparty',name:'Тестовый'}})));
+});
+
+test('misplaced report narration is presentation-only; conflicting styles and extra fields still fail',async()=>{
+ const h=harness(),report={steps:[{kind:'calculate',label:'Первый',calculation:loan}]};
+ const r=await h.turn('Отдельный расчёт кредита',plan('report',{report,narration:'short'}));
+ assert.equal(r.code,'FINANCIAL_REPORT');assert.equal(r.modelCalls,2);assert.deepEqual(r.report!.sections[0]!.calculation!.input,loan);
+ assert.throws(()=>parseAssistantPlan(plan('report',{report:{...report,narration:'detailed'},narration:'short'})));
+ assert.throws(()=>parseAssistantPlan(plan('calculate',{calculation:loan,narration:'short'})));
+});
+
+test('amount synonyms preserve exact cents and never discard unknown conditions or turn strict bounds inclusive',async()=>{
+ const {assistantAmountLiteral}=await import('../../../packages/analyzer/src/assistant-money.ts');
+ for(const expression of ['крупнее 1500 рублей','более 1500 рублей','выше 1500 рублей'])assert.equal(assistantAmountLiteral(expression,'absolute_operation').amountFrom,'150001');
+ for(const expression of ['мельче 1500 рублей','ниже 1500 рублей'])assert.equal(assistantAmountLiteral(expression,'absolute_operation').amountThrough,'149999');
+ for(const expression of ['не ниже 1500 рублей','не мельче 1500 рублей'])assert.equal(assistantAmountLiteral(expression,'absolute_operation').amountFrom,'150000');
+ assert.equal(assistantAmountLiteral('не крупнее 1500 рублей','absolute_operation').amountThrough,'150000');
+ assert.equal(assistantAmountLiteral('ниже -100,50 рублей','signed_operation').amountThrough,'-10051');
+ for(const expression of ['выше 1500 рублей включительно','крупнее 1500 рублей кроме продуктов','примерно 1500 рублей'])assert.throws(()=>assistantAmountLiteral(expression,'absolute_operation'));
+ const h=harness(),r=await h.turn('Расходы с указанным порогом',plan('read',{context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','category_totals'),set('period','октябрь 2026 года'),set('amount',{basis:'absolute_operation',expression:'крупнее 1500 рублей'})]}));
+ assert.equal(r.code,'FINANCIAL_QUERY');assert.equal(r.query!.filter.from,'2026-10-01');assert.equal(r.query!.filter.amountFrom,'150001');assert.equal(r.query!.grouping,'category');
+});
+
+test('archive replay checks calculator metadata and monetary literals without a model or access to financial records',async()=>{
+ const {checkArchivedPlans}=await import('../../../scripts/check-analyzer-archive.ts');
+ const {extendedCases}=await import('../../../scripts/analyzer-live-cases.ts');
+ const examples=await extendedCases(async()=>({chatId:randomUUID(),chatEpoch:randomUUID()}));
+ const inputs:Record<string,unknown>={
+  'loan-prepayment':{kind:'loan',principalRubles:'270000',annualRatePercent:'18',months:36,payment:'annuity',prepayments:[{month:6,amountRubles:'20000',strategy:'reduce_term'}]},
+  'deposit-compound-additions':{kind:'deposit',principalRubles:'120000',annualRatePercent:'12',months:18,capitalization:true,monthlyAdditionRubles:'3000'},
+  'percentage-decimal':{kind:'percentage',baseRubles:'84000',percent:'17.5'},
+ };
+ const read=plan('read',{context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','category_totals'),set('period','октябрь 2026 года'),set('amount',{basis:'absolute_operation',expression:'более 1500 рублей'})]});
+ const rows=[...Object.entries(inputs).map(([name,calculation])=>({name,question:examples.find(c=>c.name===name)!.text,calls:[{phase:'understand',state:'received',value:plan('calculate',{calculation,context:{mode:'new'}})}]})),{name:'multiple-read-conditions',question:examples.find(c=>c.name==='multiple-read-conditions')!.text,calls:[{phase:'understand',state:'received',value:read},{phase:'check_changes',state:'received',value:{plan:read,conditions:[]}}]}];
+ assert.ok((await checkArchivedPlans(rows)).every(r=>r.passed));
+ const wrong=structuredClone(rows);wrong[0]!.question='Не диагностический вопрос';assert.equal((await checkArchivedPlans(wrong))[0]!.code,'ARCHIVE_CASE_MISMATCH');
+ const unsupported=structuredClone(rows);(unsupported[3]!.calls[1]!.value as any).plan.changes[3].value.expression='примерно 1500 рублей';assert.equal((await checkArchivedPlans(unsupported))[3]!.code,'TASK_AMOUNT_EXPRESSION_UNSUPPORTED');
+});
 test('pending calculator survives a concept question, then success clears pending and later explanations preserve conditions',async()=>{
  const h=harness();
  await h.turn('Кредит 420 тысяч, 19,5%, на 4 года',plan('clarification',{clarification:'Какой тип платежа: аннуитетный или дифференцированный?'}));

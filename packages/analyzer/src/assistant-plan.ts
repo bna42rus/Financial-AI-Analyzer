@@ -92,9 +92,28 @@ export function cleanAssistantQuestion(value: unknown): string {
 export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 'clear' | 'use_current'; value?: unknown; source?: string };
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
   action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; comparisonReference?:string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean; explanation?:string };
+
+/** Canonicalize presentation placement and redundant scope-free defaults only.
+ * Never discard a financial edit, a historical binding or a write scope. The
+ * complete closed schema and semantic checks still run on the result. */
+export function normalizeAssistantPlan(value:unknown):unknown{
+  if(!value||typeof value!=='object'||Array.isArray(value))return value;
+  const p=structuredClone(value) as Record<string,any>;
+  const independent=(c:any)=>c&&typeof c==='object'&&!Array.isArray(c)&&!('from'in c);
+  const pure=p.action==='calculate'&&independent(p.calculation)||p.action==='report'&&Array.isArray(p.report?.steps)&&p.report.steps.every((s:any)=>s.kind==='derive'||s.kind==='calculate'&&independent(s.calculation));
+  if(pure&&(p.changes===undefined||Array.isArray(p.changes)&&p.changes.length===0)){
+    if(p.context&&typeof p.context==='object'&&Object.keys(p.context).length===1&&p.context.mode==='new')delete p.context;
+    if(p.changes?.length===0)delete p.changes;
+  }
+  if(p.action==='report'&&p.report&&typeof p.report==='object'&&!Array.isArray(p.report)&&['short','simple','detailed'].includes(p.narration)&&(p.report.narration===undefined||p.report.narration===p.narration)){
+    p.report.narration=p.narration;delete p.narration;
+  }
+  return p;
+}
 export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:string,variant?:number,selector?:Partial<CalculatorInput>)=>CalculatorInput|undefined): AssistantPlan {
   if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
+  value=normalizeAssistantPlan(value);
   try { assertClosedSchema(value, assistantPlanSchema); } catch { throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID'); }
   const p = structuredClone(value) as AssistantPlan;
   const materialize=(raw:CalculatorInput,deferred=false):CalculatorInput=>{

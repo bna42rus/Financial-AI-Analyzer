@@ -80,7 +80,7 @@ test('operations cashflow cannot be laundered into a confirmed starting balance 
 test('real HTTP serialization fits both the extended plan and its independent completeness schema',async()=>{
  const plan={version:assistantVersion,topic:'personal_finance',action:'read',context:{mode:'new'},changes:[change('metric','expenses'),change('grouping','merchant')]},h=harness(plan);let calls=0;
  const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async(_url,init)=>{
-  calls++;const body=JSON.parse(String(init?.body));assert.ok(Buffer.byteLength(String(init?.body))<40000);assert.match(body.messages[0].content,/Output contract in TypeScript notation/);const input=JSON.parse(body.messages[1].content),value=input.candidate?{plan,conditions:[]}:plan;
+  calls++;const body=JSON.parse(String(init?.body));assert.ok(Buffer.byteLength(String(init?.body))<62000);assert.match(body.messages[0].content,/JSON Schema:/);const input=JSON.parse(body.messages[1].content),value=input.candidate?{plan,conditions:[]}:plan;
   return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:500,completion_tokens:100,total_tokens:600},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify(value)}}]}));
  });
  const reply=await runAssistant(h.request,model,h.journal,h.services);assert.equal(reply.code,'FINANCIAL_QUERY');assert.equal(calls,2);

@@ -59,3 +59,37 @@ model call or retry failures. Run after deployment with a small positive
 question can finish above it under the unchanged server cap. A real run is still
 required to accept model understanding, billed token reduction and latency;
 offline results alone do not establish these.
+
+# Archived regression correction: 25 November
+
+The 3a75a476 real run regressed: four failures among fourteen sent questions,
+with two dependent cases skipped; cost 2.496373760 RUB. The compact type guide
+is retired in favor of ordinary lossless JSON Schema. Concise planning
+instructions and safe definition deduplication remain. Input byte reduction is
+therefore smaller than the previous 57%; that percentage is no longer a claim
+about the active transport. No new model cost or latency is claimed here.
+
+Archived metadata showed redundant root context `{mode:new}` on independent
+calculator plans, including a correct candidate broken by the completeness
+reviewer, and misplaced root narration that caused a paid repair. A bounded
+canonicalizer removes only an empty new context/empty changes on independent
+calculators or pure calculator/derive reports and relocates nonconflicting
+report narration. Historical bindings, nonempty edits, restart flags, write
+scopes and unknown fields still fail the original closed/semantic validation.
+Both initial and reviewed plans pass through this normalization.
+
+The amount parser now recognizes complete strict/inclusive comparator synonyms
+(e.g. более/крупнее/выше and ниже/мельче); all thresholds remain integer cents.
+It does not remove unknown qualifiers. The fourth real failure's literal was
+not present in the metadata-only diagnostic, so its correction requires an
+archived-plan check rather than assuming all financial conditions were correct.
+
+`check-analyzer-archive.py` accepts up to five named synthetic smoke request IDs
+on stdin, reads only those Staging receipts and sends them to a local offline
+checker. The checker first verifies each archived question against the fixed
+smoke catalog, then parses the original candidates/reviews and checks their
+calculator results or compiled filters against existing acceptance assertions.
+It neither imports a model provider nor queries financial operations, writes
+data, settles reservations or resets a budget. Raw archived values are never
+printed. Its output validates archived plans, not fresh model understanding.
+A future live regression must be separate and bounded, after archive checks pass.
