@@ -98,7 +98,7 @@ test('HTTP route uses the current DB, persists context/usage and replays after s
   const follow = await run(next); assert.equal(follow.statusCode, 200, follow.body); assert.equal(follow.json().answer.query.filter.amountFrom, '10000'); assert.equal(follow.json().answer.query.grouping, 'category'); assert.equal(calls, 2, 'Grouping-only continuation reuses the checked conditions without a model call');
   const stored = (await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation;
   parseConversation(stored, stored.book.scope); assert.equal(stored.book.nodes[1].parent, b.id);
-  assert.equal(Number((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n), 2);
+  assert.equal(Number((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n), 1, 'The grouping-only continuation makes no model call and consumes no paid unit');
   const restarted = await createServer({ ...config, assistantProvider: provider() });
   try { const replay = await run(next, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), follow.json()); assert.equal(calls, 2); } finally { await restarted.close(); }
   for (const input of outgoing) { const text = JSON.stringify(input); assert.equal(text.includes(account), false); assert.equal(text.includes('first@example.test'), false); }

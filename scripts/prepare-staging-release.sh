@@ -24,6 +24,8 @@ test "$(pnpm --version)" = 11.25.0
 build=$(mktemp -d /tmp/cashneuro-connected-build-XXXXXXXX)
 trap 'rm -rf -- "$build"' EXIT
 git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
+# Reject an incompatible health/persistence protocol before any Staging changes.
+python3 -B "$build/scripts/test-install-assistant-staging.py"
 sudo /usr/bin/python3 -B "$build/scripts/install-tariff-extractor.py"
 api_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-api-origin)
 (cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && pnpm --filter @finance/api exec node --import tsx ../../scripts/verify-cloud-tariff.mjs && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")

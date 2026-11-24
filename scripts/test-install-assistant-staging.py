@@ -1,5 +1,6 @@
 import importlib.util
 import json
+import re
 import os
 import pty
 import io
@@ -16,6 +17,21 @@ spec.loader.exec_module(m)
 
 
 class InstallationTests(unittest.TestCase):
+    def test_health_contract_accepts_the_actual_candidate_runtime_protocol(self):
+        source = (Path(__file__).resolve().parent.parent / 'apps/api/src/assistant-workflow.ts').read_text()
+        versions = re.findall(r"export const assistantWorkflowVersion = '([^']+)'", source)
+        self.assertEqual(len(versions), 1)
+        payload = {'status': 'ok', 'profile': 'finance', 'assistant': versions[0]}
+        # Read the candidate's real exported version, rather than a synthetic
+        # hardcoded version that could hide a deploy/rollback incompatibility.
+        with patch.object(m.urllib.request, 'urlopen') as request:
+            request.return_value.__enter__.return_value = io.StringIO(json.dumps(payload))
+            self.assertTrue(m.health(True), 'Current runtime would trigger API_HEALTH_FAILED')
+        for assistant in [None, 'cashneuro-assistant-workflow/unknown']:
+            with patch.object(m.urllib.request, 'urlopen') as request:
+                request.return_value.__enter__.return_value = io.StringIO(json.dumps({**payload, 'assistant': assistant}))
+                self.assertFalse(m.health(True))
+
     def test_forward_auth_response_matcher_preserves_the_site_root(self):
         config={'routes':[{'match':[{'host':['test.cashneuro.ru']}], 'handle':[
             {'handler':'reverse_proxy','handle_response':[{'match':{'status_code':[2]},'routes':[{'handle':[{'handler':'static_response','status_code':204}]}]}]},

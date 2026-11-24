@@ -50,7 +50,9 @@ export function exactAssistantPlan(question:string){
   {field:'metric',op:'set',value:entry[0]},{field:'grouping',op:'set',value:entry[1]},{field:'comparison',op:'set',value:entry[2]},{field:'period',op:'use_current'},
  ]});
 }
-export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/8';
+// Persistence and health protocol, not a release counter. These compatible
+// planning fixes keep existing receipts and the deployed health contract valid.
+export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/7';
 export type Phase = 'understand' | 'repair' | 'check_changes' | 'categories' | 'explain';
 export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown; protocol?: 'cashneuro-category-classification/4' };
 export type ModelReply = { value: unknown; usage: Usage };
