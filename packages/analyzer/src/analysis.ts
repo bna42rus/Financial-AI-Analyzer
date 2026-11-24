@@ -21,7 +21,8 @@ export function parseAnalysisOptions(raw:unknown):AnalysisOptions{
  if(r.comparisonPeriod){for(const date of Object.values(r.comparisonPeriod))dateFact({precision:'day',date});if(r.comparisonPeriod.from>r.comparisonPeriod.through)throw new TypeError('ANALYSIS_PERIOD_INVALID');}
  return r;
 }
-export type AnalysisResult={version:'cashneuro-analysis/1';statistic:NonNullable<AnalysisOptions['statistic']>;unit:'money'|'count';value:string|null;sum:string;count:number;mean:string|null;median:string|null;minimum:string|null;maximum:string|null;notes:string[];missingTemporalCount?:number;previousValue?:string|null;savings?:{label:string;baseMinor:string;reductionPercent:number;savingMinor:string;filter:Query['filter']}[];recurring?:{merchant:string;count:number;totalMinor:string;typicalMinor:string;firstDate:string;lastDate:string;intervalDays:number|null;regular:boolean;filter:Query['filter']}[]};
+export type GroupChange={label:string;difference:string;filter:Query['filter']};
+export type AnalysisResult={version:'cashneuro-analysis/1';statistic:NonNullable<AnalysisOptions['statistic']>;unit:'money'|'count';value:string|null;sum:string;count:number;mean:string|null;median:string|null;minimum:string|null;maximum:string|null;notes:string[];comparison?:{previousValue:string;difference:string;largestIncrease?:GroupChange;largestDecrease?:GroupChange};missingTemporalCount?:number;previousValue?:string|null;savings?:{label:string;baseMinor:string;reductionPercent:number;savingMinor:string;filter:Query['filter']}[];recurring?:{merchant:string;count:number;totalMinor:string;typicalMinor:string;firstDate:string;lastDate:string;intervalDays:number|null;regular:boolean;filter:Query['filter']}[]};
 const rounded=(n:bigint,d:bigint)=>n<0n?-((-n+d/2n)/d):(n+d/2n)/d;
 const median=(a:bigint[])=>a.length%2?a[(a.length-1)/2]!:rounded(a[a.length/2-1]!+a[a.length/2]!,2n);
 export const countMetric=(m:Metric)=>m==='attention'||m==='operation_count';
@@ -71,6 +72,21 @@ export function decorateAnalysis(query:Query,rows:OperationRow[],catalog:Operati
   const current=analyzeFinancialRows({...query,comparison:'none',options:{statistic:stat}},rows,catalog,{...result,filter:p.filter,comparisonFilter:null,totals:p.values});
   p.values={...p.values,[query.metric]:current.value??'0'};
   if(p.previousFilter){const previous=analyzeFinancialRows({...query,comparison:'none',options:{statistic:stat}},rows,catalog,{...result,filter:p.previousFilter,comparisonFilter:null,totals:p.previous});p.previous={...p.previous,[query.metric]:previous.value??'0'};}
+ }
+ if(result.comparisonFilter&&analysis.value!==null){
+  const previous=analysis.previousValue===undefined?result.previousTotals[query.metric]??'0':analysis.previousValue;
+  if(previous!==null){
+   analysis.comparison={previousValue:previous,difference:(BigInt(analysis.value)-BigInt(previous)).toString()};
+   if(analysis.statistic==='sum'&&!['none','operation','time'].includes(query.grouping)){
+    // The complete server-side groups include comparison-only buckets and
+    // groups outside the chart's top-N. Never infer maxima from a preview.
+    const points=result.tablePoints??(result.points.length===result.groupCount?result.points:[]);
+    for(const p of points){const difference=BigInt(p.values[query.metric]??'0')-BigInt(p.previous[query.metric]??'0'),change={label:p.label,difference:difference.toString(),filter:p.filter};
+     if(difference>0n&&(!analysis.comparison.largestIncrease||difference>BigInt(analysis.comparison.largestIncrease.difference)))analysis.comparison.largestIncrease=change;
+     if(difference<0n&&(!analysis.comparison.largestDecrease||difference<BigInt(analysis.comparison.largestDecrease.difference)))analysis.comparison.largestDecrease=change;
+    }
+   }
+  }
  }
  return analysis;
 }

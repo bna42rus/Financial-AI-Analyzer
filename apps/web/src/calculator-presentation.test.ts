@@ -26,3 +26,10 @@ describe('calculator presentation',()=>{
   const same=render('1200');expect(same).toContain('Проценты за весь срок');expect(same).toContain('Наименьшая сумма процентов — «Дифференцированный»');expect(same).toContain('0,03 ₽');expect(render('2400')).not.toContain('Наименьшая сумма процентов');
  });
 });
+
+it('shows comparison differences and the largest changes in a public answer',async()=>{
+ const {AnalyzerAnalysis}=await import('./AnalyzerAnalysis');
+ const value={version:'cashneuro-analysis/1' as const,statistic:'sum' as const,unit:'money' as const,value:'16000',sum:'16000',count:2,mean:'8000',median:null,minimum:'6000',maximum:'10000',notes:[],comparison:{previousValue:'18000',difference:'-2000',largestIncrease:{label:'Beta',difference:'6000',filter:{}},largestDecrease:{label:'Gamma',difference:'-9000',filter:{}}}};
+ const content=text(renderToStaticMarkup(createElement(AnalyzerAnalysis,{value,onOpen:()=>{}})));
+ expect(content).toContain('Изменение относительно периода сравнения: −20 ₽');expect(content).toContain('Наибольший рост — Beta : +60 ₽');expect(content).toContain('Наибольшее снижение — Gamma : −90 ₽');
+});
