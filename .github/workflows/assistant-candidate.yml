@@ -54,6 +54,10 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the bounded tariff PDF reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Start isolated PostgreSQL 18
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Verify category continuity and review fields offline
@@ -110,6 +114,10 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the bounded tariff PDF reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Install only the pinned compiler and Node types
         run: npm install --prefix "$RUNNER_TEMP/assistant-typecheck" --no-save --ignore-scripts typescript@7.0.2 @types/node@24.19.1
       - name: Strict types for the candidate and its import closure
@@ -241,6 +249,10 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the bounded tariff PDF reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Start isolated PostgreSQL 18 without a shared Docker registry
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Check Staging configuration without credentials or paid calls

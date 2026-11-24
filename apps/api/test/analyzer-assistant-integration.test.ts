@@ -19,6 +19,7 @@ import { createTestAssistantProvider, createStagingAssistantProvider } from '../
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { monthlyPeriod } from '../src/assistant-monthly.ts';
+import {syntheticTariffPdf} from './fixtures/synthetic-tariff-pdf.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, config: Config;
 let cookie: string, generation: string, account: string, operationIds: string[], calls = 0, outputs: unknown[], outgoing: any[], behavior = 'normal';
@@ -268,7 +269,11 @@ async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@e
     cost:{projectId:monthly ? 'staging/assistant-monthly' : 'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
       price:{version:'test-staging',currency:'RUB',inputRubPerMillion:'15.86',outputRubPerMillion:'61'}},
   };
-  const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => String(url).endsWith('/models') ? new Response(JSON.stringify({data:[metadata]})) : fetcher(url,options),raw.sourceSha256,clock);
+  const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => {
+    if(String(url).endsWith('/models'))return new Response(JSON.stringify({data:[metadata]}));
+    if(String(url)===assistantTariffSource&&options?.method==='GET')return new Response(syntheticTariffPdf(),{headers:{'content-type':'application/pdf'}});
+    return fetcher(url,options);
+  },raw.sourceSha256,clock);
   assert.equal(JSON.stringify(provider.binding).includes(raw.apiKey),false); assert.equal(JSON.stringify(provider.binding).includes(allowedEmails[0]!),false);
   const dir=await mkdtemp(join(tmpdir(),'assistant-staging-kms-'));t.after(()=>rm(dir,{recursive:true,force:true}));
   const realm='staging/finance',rsa=generateKeyPairSync('rsa',{modulusLength:2048}),auth=join(dir,'auth.json'),wrapped=join(dir,'wrapped.json');
