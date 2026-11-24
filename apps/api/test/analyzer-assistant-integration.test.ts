@@ -95,12 +95,12 @@ test('HTTP route uses the current DB, persists context/usage and replays after s
   const b = await body(); outputs = [plan([set('metric', 'expenses'), set('amount', { basis: 'absolute_operation', expression: 'от 100 до 200 рублей' })])];
   const first = await run(b); assert.equal(first.statusCode, 200, first.body); assert.equal(first.json().answer.result.totals.expenses, '24690'); assert.equal(calls, 2);
   const next = { ...b, id: randomUUID(), text: 'А по категориям?' }; outputs = [plan([set('grouping', 'category_totals')], 'continue')];
-  const follow = await run(next); assert.equal(follow.statusCode, 200, follow.body); assert.equal(follow.json().answer.query.filter.amountFrom, '10000'); assert.equal(follow.json().answer.query.grouping, 'category'); assert.equal(calls, 4);
+  const follow = await run(next); assert.equal(follow.statusCode, 200, follow.body); assert.equal(follow.json().answer.query.filter.amountFrom, '10000'); assert.equal(follow.json().answer.query.grouping, 'category'); assert.equal(calls, 2, 'Grouping-only continuation reuses the checked conditions without a model call');
   const stored = (await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation;
   parseConversation(stored, stored.book.scope); assert.equal(stored.book.nodes[1].parent, b.id);
   assert.equal(Number((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n), 2);
   const restarted = await createServer({ ...config, assistantProvider: provider() });
-  try { const replay = await run(next, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), follow.json()); assert.equal(calls, 4); } finally { await restarted.close(); }
+  try { const replay = await run(next, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), follow.json()); assert.equal(calls, 2); } finally { await restarted.close(); }
   for (const input of outgoing) { const text = JSON.stringify(input); assert.equal(text.includes(account), false); assert.equal(text.includes('first@example.test'), false); }
   const cost = (await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows[0]; assert.ok(BigInt(cost.spent_atoms) > 0n); assert.equal(cost.reserved_atoms, '0');
 });
@@ -170,7 +170,7 @@ test('a profile or UI change during HTTP invalidates the calculation without dis
   const before = (await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation;
   outputs = [plan([set('grouping', 'category_totals')], 'continue')];
   onDispatch = async () => { onDispatch = undefined; assert.equal((await request('/finance/assistant-profile', { timezone: 'America/Los_Angeles' })).statusCode, 200); };
-  const failed = await run({ ...b, id: randomUUID(), text: 'А по категориям?' }); assert.equal(failed.statusCode, 409, failed.body);
+  const failed = await run({ ...b, id: randomUUID(), text: 'Пожалуйста, покажи расходы по категориям' }); assert.equal(failed.statusCode, 409, failed.body);
   assert.deepEqual((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation, before);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
 });

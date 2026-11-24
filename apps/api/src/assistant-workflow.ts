@@ -1,4 +1,4 @@
-import {localReadPlan,localCalculatorPlan} from '../../../packages/analyzer/src/local-plan.ts';
+import {localReadPlan,localCalculatorPlan,localLoanPlan,completeLoanPayment,restoreReportDependencies} from '../../../packages/analyzer/src/local-plan.ts';
 import {assistantErrorCode,assistantFailureText,assistantCapabilityText} from '../../../packages/analyzer/src/assistant-feedback.ts';
 import type {BudgetReadRequest,BudgetReadExecution} from '../../../packages/analyzer/src/budget-read.ts';
 import {bindReportValues,deriveReportFact,sectionFacts,narrativeSchema,renderNarrative} from '../../../packages/analyzer/src/report.ts';
@@ -50,7 +50,7 @@ export function exactAssistantPlan(question:string){
   {field:'metric',op:'set',value:entry[0]},{field:'grouping',op:'set',value:entry[1]},{field:'comparison',op:'set',value:entry[2]},{field:'period',op:'use_current'},
  ]});
 }
-export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/7';
+export const assistantWorkflowVersion = 'cashneuro-assistant-workflow/8';
 export type Phase = 'understand' | 'repair' | 'check_changes' | 'categories' | 'explain';
 export type CompletionInput = { phase: Phase; prompt: string; input: unknown; schema: unknown; protocol?: 'cashneuro-category-classification/4' };
 export type ModelReply = { value: unknown; usage: Usage };
@@ -118,7 +118,10 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
   let cursor = 0, personalPending = false;
   let categoryChoice: CategoryChoice | null = null;
   const context = conversationInput(state, r.scope, r.question, calendar);
-  const parsePlan=(value:unknown)=>parseAssistantPlan(value,(source,variant)=>conversationCalculation(state,source,variant));
+  const parsePlan=(value:unknown)=>{
+    const parse=(candidate:unknown)=>parseAssistantPlan(candidate,(source,variant)=>conversationCalculation(state,source,variant));
+    try{return parse(value);}catch(error){if(codeOf(error)!=='REPORT_REFERENCE_INVALID')throw error;return parse(restoreReportDependencies(value,state));}
+  };
   // Expose availability, never the actual financial filters or identifiers.
   // The compiler alone applies the authenticated UI snapshot.
   // A validated UI snapshot always defines a period: absent bounds mean all
@@ -218,7 +221,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
   try {
     const capability = journal.receipt.calls.length ? null : assistantCapabilityText(r.question, !!services.prepareChange, !!services.external);
     if (capability) return finish('answer', 'ASSISTANT_CAPABILITIES', capability);
-    const exact=journal.receipt.calls.length?null:exactAssistantPlan(r.question)??(services.localReads===false?null:localReadPlan(r.question,state,calendar)??localCalculatorPlan(r.question,state));
+    const exact=journal.receipt.calls.length?null:exactAssistantPlan(r.question)??(services.localReads===false?null:localReadPlan(r.question,state,calendar)??localLoanPlan(r.question)??localCalculatorPlan(r.question,state));
     let plan = exact??await validatedCall({ phase: 'understand', prompt: assistantPrompt + '\n' + calculatorInstructions + '\n' + extendedCalculatorInstructions + '\n' + calculatorContextInstructions + '\n' + conversationInstructions + '\n' + financialSourceInstructions + '\n' + reportInstructions + '\n' + budgetReadInstructions + '\n' + additionalPlanningInstructions + '\n' + feeInstructions + '\n' + sourceBoundaryInstructions + '\n' + clockInstructions + '\n' + periodFactInstructions + '\n' + assistantChangeInstructions + '\n' + manageInstructions + '\n' + rememberInstructions, input: { ...context.input, selectedContext }, schema: assistantPlanSchema }, parsePlan);
     let incompleteConditions = false,missingConditions:string[]=[];
     if (!exact&&(plan.action === 'read' || plan.action === 'calculate' || plan.action === 'report' || plan.action === 'external' || plan.action === 'propose_change' || plan.action === 'explain' && plan.needsFreshSources)) {
@@ -241,6 +244,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
       missingConditions=reviewed.conditions.filter(c=>!c.covered&&c.scope==='financial').map(c=>c.text);
       incompleteConditions = reviewed.conditions.some(c => !c.covered && (c.scope === 'financial' || plan.topic !== 'mixed'));
     }
+    if(!incompleteConditions)plan=completeLoanPayment(plan,r.question,state);
     personalPending = plan.topic!=='unrelated' && ['read', 'propose_change', 'unsupported', 'clarification'].includes(plan.action);
     if (['read','report','external','propose_change'].includes(plan.action) && incompleteConditions) return finish('clarification', 'CONDITION_UNCLEAR', 'Нужно уточнить: '+(missingConditions.length?missingConditions.join('; '):'условие финансового расчёта')+'. Без этого нельзя правильно выбрать операции или параметры расчёта.');
     if (plan.topic === 'unrelated') return finish('redirect', 'UNRELATED', 'С этим вопросом не помогу: мои инструменты предназначены для финансов, а запрошенная задача к ним не относится. Могу разобрать расходы, бюджет или накопления.');

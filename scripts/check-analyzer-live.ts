@@ -30,12 +30,12 @@ try{
   {name:'group-followup',chat:dates,text:'А по категориям?',check:query('10','category')},
   {name:'month-followup',chat:dates,text:'А за сентябрь?',check:query('09','category')},
   {name:'compare-followup',chat:dates,text:'Сравни эти два месяца. Где расходы выросли сильнее всего?',check:a=>query('10','category')(a)&&a.query.comparison==='custom'&&a.query.options.comparisonPeriod.from==='2026-09-01'},
-  {name:'loan-question',chat:loan,text:'Кредит 500000 рублей на 5 лет под 22% годовых. Сколько платить в месяц?',check:a=>a?.mode==='clarification'||a?.report?.sections.filter((s:any)=>s.calculation?.kind==='loan').length>=2},
+  {name:'loan-question',chat:loan,text:'Кредит 500000 рублей на 5 лет под 22% годовых. Сколько платить в месяц?',check:a=>a?.mode==='clarification'||a?.report?.sections.some((s:any)=>calc('annuity')({calculation:s.calculation}))&&a.report.sections.some((s:any)=>calc('differentiated')({calculation:s.calculation}))},
   {name:'explain-followup',chat:loan,text:'А в чем разница между аннуитетным и дифференцированным, как узнать какой у меня?',check:a=>a?.mode==='ai'&&/аннуитет/iu.test(a.text)&&/дифференц/iu.test(a.text)&&/договор|график|выписк|банк/iu.test(a.text)},
   {name:'choose-payment',chat:loan,text:'Дифференцированный',check:calc('differentiated')},
   {name:'switch-payment',chat:loan,text:'А ануитентный?',check:calc('annuity')},
   {name:'compare-loans',chat:loan,text:'Покажи аннуитетный и дифференцированный при ставке 25%, остальные условия сохрани',check:a=>a?.report?.sections.some((s:any)=>calc('annuity','25')({calculation:s.calculation}))&&a.report.sections.some((s:any)=>calc('differentiated','25')({calculation:s.calculation}))},
-  {name:'which-cheaper',chat:loan,text:'Что выгоднее в итоге и на сколько рублей?',check:a=>a?.report?.sections.some((s:any)=>calc('annuity','25')({calculation:s.calculation}))&&a.report.sections.some((s:any)=>calc('differentiated','25')({calculation:s.calculation}))},
+  {name:'which-cheaper',chat:loan,text:'Что выгоднее в итоге и на сколько рублей?',check:a=>{const sections=a?.report?.sections??[],annuity=sections.find((s:any)=>calc('annuity','25')({calculation:s.calculation}))?.calculation,differentiated=sections.find((s:any)=>calc('differentiated','25')({calculation:s.calculation}))?.calculation;return !!annuity&&!!differentiated&&sections.some((s:any)=>s.derived?.unit==='money'&&s.derived.value===(BigInt(annuity.interestMinor)-BigInt(differentiated.interestMinor)).toString());}},
   {name:'payment-chart',chat:loan,text:'У дифференцированного покажи график платежей с основным долгом и процентами, условия сохрани',check:a=>calc('differentiated','25')(a)||a?.report?.sections.some((s:any)=>calc('differentiated','25')({calculation:s.calculation}))},
  ];
  for(const c of cases){

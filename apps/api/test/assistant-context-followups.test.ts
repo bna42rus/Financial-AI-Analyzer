@@ -41,7 +41,7 @@ test('pending calculator survives a concept question, then success clears pendin
 test('explicit patches preserve every unspecified calculator condition across different amounts, rates, deposits and prepayments',async()=>{
  for(const principalRubles of ['125000','960000','2500000']){
   const h=harness(),input:LoanInput={...loan,principalRubles,prepayments:[{month:5,amountRubles:'18000',strategy:'reduce_term'}],rateChanges:[{month:8,annualRatePercent:'17'}]};
-  await h.turn('Первый сценарий',plan('calculate',{calculation:input}));
+  await h.turn('Первый дифференцированный сценарий',plan('calculate',{calculation:input}));
   const result=await h.turn('Тогда ставку 23,75',plan('calculate',{calculation:{kind:'loan',from:'active',annualRatePercent:'23.75'}}));
   assert.deepEqual(result.calculation!.input,{...input,annualRatePercent:'23.75'});
  }
@@ -50,7 +50,7 @@ test('explicit patches preserve every unspecified calculator condition across di
  const result=await h.turn('А без неё?',plan('calculate',{calculation:{kind:'deposit',from:'active',capitalization:false}}));assert.deepEqual(result.calculation!.input,{...input,capitalization:false});
 });
 test('two scenarios remain available after explanation and comparison is computed using checked calculator results',async()=>{
- const h=harness();await h.turn('Рассчитай кредит',plan('calculate',{calculation:loan}));
+ const h=harness();await h.turn('Рассчитай дифференцированный кредит',plan('calculate',{calculation:loan}));
  const scenarios=plan('report',{report:{steps:[{kind:'calculate',label:'Аннуитет',calculation:{kind:'loan',from:'active',payment:'annuity'}},{kind:'calculate',label:'Дифференцированный',calculation:{kind:'loan',from:'active',payment:'differentiated'}}]}});
  const first=await h.turn('Покажи оба вида',scenarios);assert.equal(first.report!.sections.length,2);
  await h.turn('Что означает переплата?',plan('explain'));
@@ -72,9 +72,9 @@ test('two historical periods can be compared exactly after grouping, a date chan
  const serialized=JSON.stringify(check);assert.equal(serialized.includes(h.scope.chatId),false);assert.equal(serialized.includes(h.scope.generation),false);
 });
 test('a request for the same schedule preserves the exact rows without an additional narration call',async()=>{
- const h=harness();const initial=await h.turn('Посчитай кредит',plan('calculate',{calculation:loan}));
+ const h=harness();const initial=await h.turn('Посчитай дифференцированный кредит',plan('calculate',{calculation:loan}));
  const graph=await h.turn('Покажи платежи с основным долгом и процентами, условия сохрани',plan('calculate',{calculation:{kind:'loan',from:'active'}}));
- assert.deepEqual(graph.calculation,initial.calculation);assert.equal(graph.modelCalls,2);
+ assert.deepEqual(graph.calculation,initial.calculation);assert.equal(graph.modelCalls,0);
  assert.doesNotMatch(calculatorText(graph.calculation!),/Экономия/);
 });
 test('internal history handles never reach a public clarification or trigger a paid numeric-text repair',async()=>{
@@ -99,4 +99,62 @@ test('fast reads never ignore an unrecognized condition or route an unrelated qu
  const {localReadPlan}=await import('../../../packages/analyzer/src/local-plan.ts');const h=harness();
  for(const q of ['Сколько я потратил за октябрь на продукты?','Расходы за октябрь кроме такси','Расходы за октябрь больше 500 рублей','Доходы за октябрь только на одном счете','Сколько я потратил за октябрь и удали операции','Какая погода за октябрь?'])assert.equal(localReadPlan(q,h.state,calendar),null,q);
  for(const month of ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'])assert.ok(localReadPlan('Сколько я потратил за '+month+' 2026 года?',h.state,calendar));
+});
+
+test('complete loan input without a payment type shows both checked schedules instead of guessing',async()=>{
+ for(const [question,principal,rate,months]of [
+  ['Кредит 500000 рублей на 5 лет под 22% годовых. Сколько платить в месяц?','500000','22',60],
+  ['Рассчитай кредит 1,25 млн рублей под 18,75% на 3 года','1250000','18.75',36],
+  ['Кредит 240 тысяч рублей на 18 месяцев ставка 0%','240000','0',18],
+ ] as const){
+  const h=harness(),r=await h.turn(question,null);assert.equal(r.code,'FINANCIAL_REPORT');assert.equal(r.modelCalls,0);
+  const values=r.report!.sections.flatMap(s=>s.calculation?.kind==='loan'?[s.calculation]:[]);
+  assert.deepEqual(values.map(c=>c.input.payment),['annuity','differentiated']);
+  for(const c of values){assert.equal(BigInt(c.principalMinor),BigInt(principal)*100n);assert.equal(c.input.annualRatePercent,rate);assert.equal(c.input.months,months);}
+ }
+});
+
+test('loan choices, rate changes, numerical comparison and payment chart reuse checked scenarios without AI',async()=>{
+ const h=harness();await h.turn('Кредит 780000 рублей на 4 года под 17% годовых. Сколько платить в месяц?',null);
+ await h.turn('А в чем разница?',plan('explain'),'Аннуитетный платёж одинаковый, дифференцированный уменьшается.');
+ const chosen=await h.turn('Дифференцированный',null);assert.equal(chosen.calculation!.kind,'loan');
+ const changed=await h.turn('А ануитентный?',null);assert.equal((changed.calculation!.input as LoanInput).payment,'annuity');
+ const both=await h.turn('Покажи аннуитетный и дифференцированный при ставке 25%, остальные условия сохрани',null);
+ assert.equal(both.code,'FINANCIAL_REPORT');assert.equal(both.modelCalls,0);
+ const cheaper=await h.turn('Что выгоднее в итоге и на сколько рублей?',null);assert.equal(cheaper.code,'FINANCIAL_REPORT');assert.equal(cheaper.modelCalls,0);
+ const [a,b]=cheaper.report!.sections;assert.equal(a!.calculation!.kind,'loan');assert.equal(b!.calculation!.kind,'loan');
+ if(a!.calculation!.kind==='loan'&&b!.calculation!.kind==='loan')assert.equal(cheaper.report!.sections[2]!.derived!.value,(BigInt(a!.calculation!.interestMinor)-BigInt(b!.calculation!.interestMinor)).toString());
+ const chart=await h.turn('У дифференцированного покажи график платежей с основным долгом и процентами, условия сохрани',null);
+ assert.equal(chart.code,'FINANCIAL_CALCULATION');assert.equal(chart.modelCalls,0);assert.equal(chart.calculation!.kind,'loan');
+ if(chart.calculation?.kind==='loan')assert.deepEqual(chart.calculation.input,{kind:'loan',principalRubles:'780000.00',annualRatePercent:'25',months:48,payment:'differentiated'});
+});
+
+test('loan shortcuts do not discard unknown conditions, differing scenario inputs, or new unresolved requests',async()=>{
+ const {localLoanPlan,localCalculatorPlan}=await import('../../../packages/analyzer/src/local-plan.ts');
+ for(const q of ['Кредит 500000 рублей на 5 лет под 22% с комиссией 3000 рублей','Кредит 500000 рублей на 5 лет под 22% с ежедневным начислением','Кредит 500000 рублей на 5 лет под 22% и досрочно по 10000','Кредит 500000 рублей на 5 лет под 22% и удали операции'])assert.equal(localLoanPlan(q),null,q);
+ const h=harness(),input:LoanInput={...loan,prepayments:[{month:4,amountRubles:'9000',strategy:'reduce_term'}],rateChanges:[{month:10,annualRatePercent:'15'}]};
+ await h.turn('Исходный дифференцированный сценарий',plan('calculate',{calculation:input}));
+ for(const q of ['Что выгоднее с учетом страховки?','Покажи график с комиссией','Аннуитетный, но на два года','Ставка 15% и комиссия 500'])assert.equal(localCalculatorPlan(q,h.state),null,q);
+ const change=await h.turn('Ставка 21%',null);assert.deepEqual(change.calculation!.input,{...input,annualRatePercent:'21'});
+ await h.turn('Другой кредит, но пока неизвестна сумма',plan('clarification',{clarification:'Какая сумма нового кредита?'}));
+ assert.equal(localCalculatorPlan('Аннуитетный',h.state),null);
+ const other=harness();await other.turn('Два разных кредита',plan('report',{report:{steps:[{kind:'calculate',label:'Первый',calculation:loan},{kind:'calculate',label:'Второй',calculation:{...loan,principalRubles:'900000',payment:'annuity'}}]}}));
+ assert.equal(localCalculatorPlan('Что выгоднее?',other.state),null);
+});
+
+test('AI cannot silently choose a payment type in a new non-template loan request',async()=>{
+ const h=harness();const r=await h.turn('Прикинь выплаты по кредиту: сумма 900000 рублей, срок 3 года, ставка 14%.',plan('calculate',{calculation:{...loan,principalRubles:'900000',annualRatePercent:'14',months:36,payment:'annuity'}}));
+ assert.equal(r.code,'FINANCIAL_REPORT');assert.equal(r.report!.sections.filter(s=>s.calculation?.kind==='loan').length,2);
+ assert.deepEqual(r.report!.sections.slice(0,2).map(s=>(s.calculation!.input as LoanInput).payment),['annuity','differentiated']);
+});
+
+test('derive-only AI continuation restores checked calculator dependencies from the immediately prior report',async()=>{
+ const h=harness();await h.turn('Два кредитных сценария',plan('report',{report:{steps:[{kind:'calculate',label:'Аннуитет',calculation:{...loan,payment:'annuity'}},{kind:'calculate',label:'Дифференцированный',calculation:loan}]}}));
+ const derive=plan('report',{report:{steps:[{kind:'derive',label:'Разница переплаты',operation:'difference',left:'s1.interest',right:{ref:'s2.interest'}}]}});
+ const result=await h.turn('Сопоставь переплату по рассчитанным вариантам',derive);
+ assert.equal(result.code,'FINANCIAL_REPORT');assert.equal(result.report!.sections.length,3);assert.ok(BigInt(result.report!.sections[2]!.derived!.value)>0n);assert.equal(result.modelCalls,2);
+ // A later financial query changes the active task. Do not import stale loan
+ // dependencies just because their local reference names happen to match.
+ await h.turn('Расходы за октябрь 2026',null);
+ const stale=await h.turn('Вычти прежние результаты',derive);assert.equal(stale.code,'REPORT_REFERENCE_INVALID');assert.equal(stale.report,undefined);
 });
