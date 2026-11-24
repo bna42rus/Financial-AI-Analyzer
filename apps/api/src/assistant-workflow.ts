@@ -122,7 +122,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
   let categoryChoice: CategoryChoice | null = null;
   const context = conversationInput(state, r.scope, r.question, calendar);
   const parsePlan=(value:unknown)=>{
-    const parse=(candidate:unknown)=>parseAssistantPlan(candidate,(source,variant)=>conversationCalculation(state,source,variant));
+    const parse=(candidate:unknown)=>parseAssistantPlan(candidate,(source,variant,selector)=>conversationCalculation(state,source,variant,selector));
     try{return parse(value);}catch(error){if(codeOf(error)!=='REPORT_REFERENCE_INVALID')throw error;return parse(restoreReportDependencies(value,state));}
   };
   // Expose availability, never the actual financial filters or identifiers.
@@ -222,6 +222,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
     }
   }
   try {
+    if(/^(?:покажи|выдай|дай|открой|получи)(?:\s|$)/iu.test(r.question)&&/чуж[а-я]*/iu.test(r.question)&&/данн|операц|счет|счёт|выписк|банковск/iu.test(r.question))return finish('unsupported','FOREIGN_DATA_UNAVAILABLE','Чужие финансовые данные недоступны. Могу анализировать только операции вашего аккаунта.');
     const capability = journal.receipt.calls.length ? null : assistantCapabilityText(r.question, !!services.prepareChange, !!services.external);
     if (capability) return finish('answer', 'ASSISTANT_CAPABILITIES', capability);
     const definition=journal.receipt.calls.length||services.localReads===false?null:localFinancialExplanation(r.question,state);

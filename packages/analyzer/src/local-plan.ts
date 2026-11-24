@@ -8,12 +8,15 @@ import type {LoanInput} from './calculators.ts';
 const month='(?:январ[ьяе]|феврал[ьяе]|март[ае]?|апрел[ьяе]|ма[йяе]|июн[ьяе]|июл[ьяе]|август[ае]?|сентябр[ьяе]|октябр[ьяе]|ноябр[ьяе]|декабр[ьяе])';
 const period='(?:'+month+'(?: (?:20\\d{2})(?: года)?)?|сегодня|вчера|(?:прошлый|предыдущий|текущий|этот) месяц|(?:прошлую|предыдущую|текущую|эту) неделю|(?:прошлый|предыдущий|текущий|этот) год|последние \\d{1,3} (?:дня|дней|месяца|месяцев)|выбранный период|этот период)';
 const dateOnly=new RegExp('^(?:а |и )?(?:за|в) ('+period+')$','u');
-const grouped=/^(?:а |и )?(?:(?:разбей|покажи|раздели) )?по (категориям|подкатегориям|счетам|банкам|магазинам|месяцам)$/u;
-const comparison=/^(?:(?:а |и )?сравни (?:эти |последние )?(?:два |оба )?(?:месяца|периода|их|их между собой))(?:[.,;]? (?:где|в каких категориях) (?:(?:расходы|траты) (?:выросли|увеличились)|(?:выросли|увеличились) (?:расходы|траты))(?: (?:сильнее|больше) всего)?)?$/u;
+const grouped=/^(?:а |и )?(?:(?:разбей|покажи|раздели|разложи) (?:ту же сумму |их )?)?по (категориям|подкатегориям|счетам|банкам|магазинам|месяцам)$/u;
+const comparison=/^(?:а |и )?(?:сравни|сопоставь) (?:(?:эти|последние|последних|два|оба) ){0,3}(?:месяца|периода|их(?: между собой)?)(?: из (?:нашего )?(?:разговора|диалога))?(?:[.,;]? (?:(?:где|в каких категориях) (?:(?:расходы|траты) (?:выросли|увеличились)|(?:выросли|увеличились) (?:расходы|траты))(?: (?:сильнее|больше) всего)?|по каким категориям рост))?$/u;
+const operationFormat=/^(?:не (?:категории|группы)[:;,]? )?(?:покажи|перечисли|выведи) (?:каждую операцию отдельно|все операции отдельно|список операций)$/u;
+const clearAmount=/^(?:сними|убери|удали) (?:только )?(?:ограничение|фильтр) по сумме$/u;
+const metricFollowup=/^(?:а |и |теперь )(?:покажи )?(доходы|расходы)(?:,? (?:прежний|тот же) период (?:оставь|сохрани))?$/u;
 const standalone=new RegExp('^(?:(сколько я (?:потратил[а]?|заработал[а]?)|(?:покажи |посчитай )?(?:мои )?(?:расходы|траты|доходы))(?: (?:за|в) ('+period+'))?(?: по (категориям|подкатегориям|счетам|банкам|магазинам|месяцам))?)$','u');
 const groups:Record<string,string>={категориям:'category_totals',подкатегориям:'subcategory',счетам:'account',банкам:'bank',магазинам:'merchant',месяцам:'time'};
 export function localReadPlan(question:string,state:Conversation,_calendar:Calendar):AssistantPlan|null{
- const text=question.normalize('NFKC').toLocaleLowerCase('ru').replaceAll('ё','е').replace(/\s+/gu,' ').replace(/[?.!]+$/u,'').trim();
+ let text=question.normalize('NFKC').toLocaleLowerCase('ru').replaceAll('ё','е').replace(/\s+/gu,' ').replace(/[?.!]+$/u,'').trim();
  const full=standalone.exec(text);
  const make=(context:unknown,changes:unknown[])=>parseAssistantPlan({version:assistantVersion,topic:'personal_finance',action:'read',context,changes});
  const set=(field:string,value:unknown)=>({field,op:'set',value});
@@ -21,7 +24,12 @@ export function localReadPlan(question:string,state:Conversation,_calendar:Calen
  const latest=state.turns.findLast(t=>t.status==='query'||t.calculation||t.report?.request.steps.some(s=>s.kind==='calculate'));
  if(latest?.status!=='query'||latest.calculation||latest.report?.request.steps.some(s=>s.kind==='calculate'))return null;
  const pending=state.turns.find(t=>t.messageId===state.pendingMessageId);
- if(pending){const p=pending.question.toLocaleLowerCase('ru').replace(/[?.!]+$/u,'').trim();if(!dateOnly.test(p)&&!grouped.test(p)&&!comparison.test(p)&&!standalone.test(p))return null;}
+ if(pending){const p=pending.question.toLocaleLowerCase('ru').replace(/[?.!]+$/u,'').trim();if(!dateOnly.test(p)&&!grouped.test(p)&&!comparison.test(p)&&!standalone.test(p)&&!operationFormat.test(p)&&!clearAmount.test(p)&&!metricFollowup.test(p))return null;}
+ const inheritedYear=state.book.nodes.at(-1)?.query.filter.from?.slice(0,4);
+ if(inheritedYear&&new RegExp('^(?:а |и )?за '+month+' того же года$','u').test(text))text=text.replace('того же года',inheritedYear);
+ if(operationFormat.test(text))return make({mode:'continue'},[set('grouping','operation_list')]);
+ if(clearAmount.test(text))return make({mode:'continue'},[{field:'amount',op:'clear'}]);
+ const metric=metricFollowup.exec(text);if(metric)return make({mode:'continue'},[set('metric',metric[1]==='доходы'?'income':'expenses')]);
  const date=dateOnly.exec(text);if(date){const p=date[1]!;if(['выбранный период','этот период'].includes(p))return make({mode:'continue'},[{field:'period',op:'use_current'}]);const year=state.book.nodes.at(-1)?.query.filter.from?.slice(0,4),literal=new RegExp('^'+month+'$','u').test(p)&&year?p+' '+year:p;return make({mode:'continue'},[set('period',literal)]);}
  const group=grouped.exec(text);if(group)return make({mode:'continue'},[set('grouping',groups[group[1]!])]);
  if(comparison.test(text)){
@@ -100,6 +108,7 @@ export function localCalculatorPlan(question:string,state:Conversation):Assistan
  if(!last||last.status==='query'&&!last.report?.request.steps.some(s=>s.kind==='calculate'))return null;
  if(last.report?.request.steps.some(s=>s.kind!=='calculate'&&s.kind!=='derive'))return null;
  const inputs=last.calculation?[last.calculation]:last.report?.request.steps.filter(s=>s.kind==='calculate').map(s=>s.calculation)??[];
+ if(inputs.length===1&&inputs[0]?.kind==='deposit'&&/^(?:если )?(?:без капитализации|с капитализацией)(?:[?.!;,]? (?:остальное оставь|остальные условия сохрани))?$/u.test(text))return parseAssistantPlan({version:assistantVersion,topic:'general_finance',action:'calculate',calculation:{...inputs[0],capitalization:!text.includes('без')}});
  const loans=inputs.filter((c):c is LoanInput=>c.kind==='loan');if(!loans.length||inputs.length!==loans.length)return null;
  // A new pending request may refer to different conditions, even if an older
  // calculation exists. Let the full planner resolve it instead of skipping it.
@@ -111,16 +120,20 @@ export function localCalculatorPlan(question:string,state:Conversation):Assistan
   if(calculatorRublesMinor(ordered[0]!.principalRubles)!==calculatorRublesMinor(ordered[1]!.principalRubles))return null;
   return loanPlan(ordered);
  }
- let rest=text,rate:string|undefined;
+ let rest=text,rate:string|undefined,months:number|undefined;
+ const counts:Record<string,number>={один:1,два:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,десять:10};
+ rest=rest.replace(/(?:срок (?:сделай|измени на)|сроком|на) (\d{1,3}|один|два|три|четыре|пять|шесть|семь|восемь|девять|десять) (лет|года?|месяц(?:а|ев)?)/u,(_m,n:string,unit:string)=>{months=(counts[n]??Number(n))*(unit.startsWith('месяц')?1:12);return ' ';});
+ rest=rest.replace(/ставк[ау] (?:нулевая|нулевую)/u,()=>{rate='0';return ' ';});
  rest=rest.replace(/(?:при ставке|со ставкой|ставка|ставку) ([0-9]+(?:[.,][0-9]{1,2})?)\s*%/u,(_m,n:string)=>{rate=n.replace(',','.');return ' ';});
  const selected=new Set<LoanInput['payment']>();
  rest=rest.replace(/[а-я]+/gu,w=>{const p=paymentWord(w);if(p){selected.add(p);return ' ';}return w;});
+ rest=rest.replace(/(?:остальное оставь|больше ничего не меняй|сумму и процент не трогай|с теми же вводными|все прочее то же)/gu,' ');
  const graph=/график|платежи|платежей/u.test(rest);
  rest=rest.replace(/(?:остальные )?условия (?:сохрани|те же)/gu,' ').replace(/основным долгом/gu,' ').replace(/основной долг/gu,' ').replace(/процентами|проценты/gu,' ')
-  .replace(/(?:^| )(?:(?:покажи|рассчитай|посчитай|для|у|и|с|платеж|платежи|платежей|график|состав|оба|вида|варианта)(?: |$))+/gu,' ').replace(/[.,;:]/gu,' ').trim();
- if(rest||(!selected.size&&!rate&&!graph))return null;
+  .replace(/(?:^| )(?:(?:покажи|рассчитай|посчитай|сделай|оставь|теперь|а|для|у|и|с|платеж|платежи|платежей|график|состав|оба|вида|варианта)(?: |$))+/gu,' ').replace(/[.,;:]/gu,' ').trim();
+ if(rest||(!selected.size&&!rate&&!months&&!graph))return null;
  const signature=(c:typeof loans[number])=>JSON.stringify(Object.fromEntries(Object.entries(c).filter(([k])=>k!=='payment').sort(([a],[b])=>a.localeCompare(b))));
  if(loans.some(c=>signature(c)!==signature(loans[0]!)))return null;
  const payments=selected.size?[...selected]:[...new Set(loans.map(c=>c.payment))];
- try{return loanPlan(payments.sort((a,b)=>a===b?0:a==='annuity'?-1:1).map(payment=>({...loans[0]!,payment,...(rate?{annualRatePercent:rate}:{})})));}catch{return null;}
+ try{return loanPlan(payments.sort((a,b)=>a===b?0:a==='annuity'?-1:1).map(payment=>({...loans[0]!,payment,...(rate?{annualRatePercent:rate}:{}),...(months?{months}:{})})));}catch{return null;}
 }

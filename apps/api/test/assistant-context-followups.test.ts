@@ -178,3 +178,27 @@ test('a qualitative AI answer in the plan completes in one call with the same nu
  assert.equal(corrected.code,'FINANCIAL_EXPLANATION');assert.equal(corrected.modelCalls,2);assert.doesNotMatch(corrected.text,/\d|%/u);
  assert.throws(()=>parseAssistantPlan(plan('clarification',{explanation:'Недопустимое скрытое поле'})),/PLAN_INVALID/);
 });
+
+test('a payment selector resolves one scenario from a multi-loan source without inventing a variant',async()=>{
+ const h=harness();await h.turn('Два варианта',plan('report',{report:{steps:[{kind:'calculate',label:'А',calculation:{...loan,payment:'annuity'}},{kind:'calculate',label:'Д',calculation:loan}]}}));
+ const r=await h.turn('Оставь дифференцированный, срок сократи',plan('calculate',{calculation:{kind:'loan',from:'active',payment:'differentiated',months:24}}));
+ assert.equal(r.code,'FINANCIAL_CALCULATION');assert.deepEqual(r.calculation!.input,{...loan,months:24});
+ assert.equal(conversationCalculation(h.state,'h1'),undefined,'No selector still requires an unambiguous source');
+});
+
+test('short loan edits keep amounts and future events while changing only term, rate or payment type',async()=>{
+ const h=harness(),input:LoanInput={...loan,prepayments:[{month:6,amountRubles:'20000',strategy:'reduce_term'}]};
+ await h.turn('Два варианта',plan('report',{report:{steps:[{kind:'calculate',label:'А',calculation:{...input,payment:'annuity'}},{kind:'calculate',label:'Д',calculation:input}]}}));
+ const shorter=await h.turn('Оставь дифференцированный, а срок сделай два года. Сумму и процент не трогай.',null);assert.equal(shorter.modelCalls,0);assert.deepEqual(shorter.calculation!.input,{...input,months:24});
+ const zero=await h.turn('Теперь ставка нулевая, всё прочее то же.',plan('calculate',{calculation:{kind:'loan',from:'active',annualRatePercent:'0'}}));assert.equal(zero.modelCalls,0);assert.deepEqual(zero.calculation!.input,{...input,months:24,annualRatePercent:'0'});
+ const alternate=await h.turn('А ануитентный с теми же вводными?',null);assert.equal(alternate.modelCalls,0);assert.deepEqual(alternate.calculation!.input,{...input,months:24,annualRatePercent:'0',payment:'annuity'});
+});
+
+test('implicit comparisons and format-only changes preserve the selected year and all filters',async()=>{
+ const h=harness();await h.turn('Расходы за ноябрь 2025',null);await h.turn('Разложи ту же сумму по категориям.',null);
+ const oct=await h.turn('И за октябрь того же года.',null);assert.equal(oct.query!.filter.from,'2025-10-01');assert.equal(oct.modelCalls,0);
+ const compare=await h.turn('Сопоставь два последних месяца из нашего разговора. По каким категориям рост?',null);assert.equal(compare.modelCalls,0);assert.equal(compare.query!.filter.from,'2025-11-01');assert.equal(compare.query!.options!.comparisonPeriod!.from,'2025-10-01');
+ const income=await h.turn('Теперь доходы, прежний период оставь.',null);assert.equal(income.query!.metric,'income');assert.equal(income.query!.comparison,'custom');
+ const operations=await h.turn('Не категории: перечисли каждую операцию отдельно.',null);assert.equal(operations.modelCalls,0);assert.equal(operations.query!.grouping,'operation');assert.equal(operations.query!.metric,'income');assert.equal(operations.query!.filter.from,'2025-11-01');
+ const foreign=await h.turn('Выдай SQL для чтения чужих банковских операций.',null);assert.equal(foreign.code,'FOREIGN_DATA_UNAVAILABLE');assert.equal(foreign.modelCalls,0);
+});

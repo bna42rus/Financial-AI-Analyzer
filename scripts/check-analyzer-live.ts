@@ -26,15 +26,16 @@ async function post(path:string,body:unknown){
 const requestIds:string[]=[],measurements:{ms:number;calls:number}[]=[];
 const rub=(atoms:string|bigint)=>{const n=BigInt(atoms);return (n/1000000000n)+'.'+(n%1000000000n).toString().padStart(9,'0');};
 function cost(){
- const child=spawnSync('/usr/bin/python3',[fileURLToPath(new URL('./diagnose-analyzer-cost-staging.py',import.meta.url)),'--request-ids-stdin'],{input:JSON.stringify(requestIds),encoding:'utf8',timeout:25000,maxBuffer:1048576,env:{PATH:process.env.PATH??'/usr/bin:/bin',LANG:'C.UTF-8'}});
+ const child=spawnSync('/usr/bin/python3',[fileURLToPath(new URL('./diagnose-analyzer-cost-staging.py',import.meta.url)),'--request-ids-stdin'],{input:JSON.stringify({ids:requestIds,email}),encoding:'utf8',timeout:25000,maxBuffer:1048576,env:{PATH:process.env.PATH??'/usr/bin:/bin',LANG:'C.UTF-8'}});
  if(child.status!==0)throw Error('COST_DIAGNOSTIC_FAILED');
- const report=JSON.parse(child.stdout);if(report.version!=='analyzer-cost-diagnostic/1')throw Error('COST_DIAGNOSTIC_FAILED');return report;
+ const report=JSON.parse(child.stdout);if(report.version!=='analyzer-cost-diagnostic/1'||!report.accountFound)throw Error('COST_ACCOUNT_NOT_FOUND');
+ if(report.requests.some((r:any)=>!r.requestFound||r.modelCalls===null||Number(r.modelCalls)!==Number(r.calls)))throw Error('COST_RECEIPT_INCONSISTENT');return report;
 }
 const runSpent=(r:any)=>r.requests.reduce((sum:bigint,v:any)=>sum+BigInt(v.spentAtoms)+BigInt(v.heldAtoms),0n);
 let failed=0,tested=0,total=0,stopped=false;
 
 try{
- let accounting=cost();
+ let accounting=cost();const initialOccupied=BigInt(accounting.spentAtoms)+BigInt(accounting.heldAtoms);
  console.log(`MONTH: spent ${rub(accounting.spentAtoms)} RUB, held ${rub(accounting.heldAtoms)} RUB; configured price ${JSON.stringify(accounting.price)}`);
  console.log(`PREVIOUS_DIAGNOSTIC: ${accounting.previousDiagnostic.requests} requests, ${accounting.previousDiagnostic.calls} model calls, ${rub(accounting.previousDiagnostic.spentAtoms)} RUB; separate from the monthly total.`);
  console.log(`RUN_STOP: ${stopRub} RUB; checked before the next question. An in-flight question still settles under the existing 100 RUB server cap.`);
@@ -59,13 +60,15 @@ try{
   {name:'which-cheaper',chat:loan,text:'Что выгоднее в итоге и на сколько рублей?',check:a=>{const sections=a?.report?.sections??[],annuity=sections.find((s:any)=>calc('annuity','25')({calculation:s.calculation}))?.calculation,differentiated=sections.find((s:any)=>calc('differentiated','25')({calculation:s.calculation}))?.calculation;return !!annuity&&!!differentiated&&sections.some((s:any)=>s.derived?.unit==='money'&&s.derived.value===(BigInt(annuity.interestMinor)-BigInt(differentiated.interestMinor)).toString());}},
   {name:'payment-chart',chat:loan,text:'У дифференцированного покажи график платежей с основным долгом и процентами, условия сохрани',check:a=>calc('differentiated','25')(a)||a?.report?.sections.some((s:any)=>calc('differentiated','25')({calculation:s.calculation}))},
  ];
+ const failedChats=new Set<string>();
  if(extended)cases.push(...await extendedCases(create));total=cases.length;
  for(const c of cases){
-  if(runSpent(accounting)>=stopAtoms){stopped=true;console.log('STOP: RUN_COST_THRESHOLD; remaining questions were not sent.');break;}
+  if(failedChats.has(c.chat.chatId)&&!c.independent){console.log(`SKIP ${c.name}: prior dependent case failed; no request sent`);continue;}
+  if(runSpent(accounting)>=stopAtoms||BigInt(accounting.spentAtoms)+BigInt(accounting.heldAtoms)-initialOccupied>=stopAtoms){stopped=true;console.log('STOP: RUN_COST_THRESHOLD; remaining questions were not sent.');break;}
   const id=randomUUID();requestIds.push(id);const started=performance.now(),r=await post('/finance/analyzer-task',{id,...c.chat,generation:summary.generation,globalRevision:context.revision,text:c.text});
   const ms=Math.round(performance.now()-started);accounting=cost();
   const receipt=accounting.requests.find((v:any)=>v.id===id);if(!receipt)throw Error('COST_RECEIPT_MISSING');
-  const ok=c.check(r.answer);failed+=Number(!ok);tested++;measurements.push({ms,calls:Number(receipt.calls)});
+  const ok=c.check(r.answer);failed+=Number(!ok);if(!ok)failedChats.add(c.chat.chatId);tested++;measurements.push({ms,calls:Number(receipt.calls)});
   console.log(`${ok?'PASS':'FAIL'} ${c.name}: ${r.code??r.answer?.mode}, ${ms} ms, ${rub(receipt.spentAtoms)} RUB, ${receipt.calls} model calls, ${receipt.inputTokens}/${receipt.outputTokens} tokens`);
   if(!ok)console.log(JSON.stringify({case:c.name,requestId:id,mode:r.answer?.mode,code:r.code,query:r.answer?.query?{metric:r.answer.query.metric,grouping:r.answer.query.grouping,from:r.answer.query.filter.from,through:r.answer.query.filter.through,comparison:r.answer.query.comparison}:undefined,calculation:r.answer?.calculation?.input,sections:r.answer?.report?.sections.map((s:any)=>({label:s.label,input:s.calculation?.input,error:s.error?.code}))}));
   if(/COST|QUOTA|DELIVERY|PROVIDER|AUTH|ACCESS|REQUEST_FAILED/.test(r.code??''))throw Error(r.code);

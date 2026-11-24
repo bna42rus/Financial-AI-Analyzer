@@ -88,8 +88,11 @@ export function appendConversation(state: Conversation, scope: TaskScope, turn: 
 function completedTask(t:ConversationTurn){return t.status==='query'||t.status==='answer'&&['FINANCIAL_CALCULATION','FINANCIAL_REPORT','CHANGE_PROPOSED'].includes(t.code);}
 function taskSummary(node:TaskNode){const q=node.query;return {metric:q.metric,grouping:assistantGrouping[q.grouping],comparison:q.comparison,period:{...(q.filter.from?{from:q.filter.from}:{}),...(q.filter.through?{through:q.filter.through}:{})},...(q.options?{options:q.options}:{})};}
 
-export function conversationCalculation(state:Conversation,source:string,variant?:number):CalculatorInput|undefined{
+export function conversationCalculation(state:Conversation,source:string,variant?:number,selector?:Partial<CalculatorInput>):CalculatorInput|undefined{
   const turn=source==='active'?state.turns.findLast(t=>t.calculation||t.report?.request.steps.some(s=>s.kind==='calculate')):/^h(?:100|[1-9][0-9]?)$/u.test(source)?state.turns[Number(source.slice(1))-1]:undefined;
   const values=turn?.calculation?[turn.calculation]:turn?.report?.request.steps.filter(s=>s.kind==='calculate').map(s=>s.calculation)??[];
-  return variant?values[variant-1]:values.length===1?values[0]:undefined;
+  if(variant)return values[variant-1];
+  if(values.length===1)return values[0];
+  if(selector?.kind==='loan'&&selector.payment){const matches=values.filter(v=>v.kind==='loan'&&v.payment===selector.payment);if(matches.length===1)return matches[0];}
+  return undefined;
 }

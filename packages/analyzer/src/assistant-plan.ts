@@ -92,7 +92,7 @@ export function cleanAssistantQuestion(value: unknown): string {
 export type PlanChange = { field: Condition | keyof typeof scalars; op: 'set' | 'clear' | 'use_current'; value?: unknown; source?: string };
 export type AssistantPlan = { version: typeof assistantVersion; topic: 'personal_finance' | 'general_finance' | 'financial_guidance' | 'mixed' | 'ambiguous' | 'unrelated';
   action: 'read' | 'explain' | 'calculate' | 'report' | 'external' | 'propose_change' | 'unsupported' | 'clarification' | 'redirect'; context?: { mode: 'new' | 'continue' | 'reference' | 'pending'; reference?: string; comparisonReference?:string; restart?: boolean }; changes?: PlanChange[]; options?:AnalysisOptions; report?:ReportRequest; clarification?:string; external?:FinancialSourceRequest; calculation?: CalculatorInput; change?: AssistantChange; needsFreshSources?: boolean; explanation?:string };
-export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:string,variant?:number)=>CalculatorInput|undefined): AssistantPlan {
+export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:string,variant?:number,selector?:Partial<CalculatorInput>)=>CalculatorInput|undefined): AssistantPlan {
   if (value === undefined) throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID');
   if ((JSON.stringify(value)?.length ?? Infinity) > 32768) throw new AssistantError('ASSISTANT_PLAN_INVALID');
   try { assertClosedSchema(value, assistantPlanSchema); } catch { throw new AssistantError('ASSISTANT_PLAN_SHAPE_INVALID'); }
@@ -100,7 +100,7 @@ export function parseAssistantPlan(value: unknown, resolveCalculation?:(source:s
   const materialize=(raw:CalculatorInput,deferred=false):CalculatorInput=>{
     if(!('from'in raw))return deferred?raw:parseCalculatorInput(raw);
     const {from,variant,...patch}=raw as unknown as {from:string;variant?:number;kind:string};
-    const base=resolveCalculation?.(from,variant);
+    const base=resolveCalculation?.(from,variant,patch as Partial<CalculatorInput>);
     if(!base||base.kind!==patch.kind)throw new AssistantError('ASSISTANT_CALCULATION_CONTEXT_INVALID');
     return deferred?{...base,...patch} as CalculatorInput:parseCalculatorInput({...base,...patch});
   };

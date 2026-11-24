@@ -118,10 +118,12 @@ test('profile timezone has no Moscow fallback and an invalid or missing profile 
 test('read-only cost diagnostic separates one run from monthly totals and reports actual token receipts',async()=>{
  const b=await body();outputs=[plan([set('metric','expenses')])];const answer=await run(b);assert.equal(answer.statusCode,200,answer.body);
  const settings={realm:'staging/finance',monthly:{limitRub:'100'},allowedEmails:['first@example.test'],cost:{projectId:'test/assistant-integration'}};
- const code="import importlib.util,json,sys; s=importlib.util.spec_from_file_location('cost',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.query(json.loads(sys.stdin.read()),json.loads(sys.argv[2])))";
+ await pg.owner.query("UPDATE identity.auth_user SET email='FIRST@EXAMPLE.TEST' WHERE id='first'");
+ const code="import importlib.util,json,sys; s=importlib.util.spec_from_file_location('cost',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.query(json.loads(sys.stdin.read()),json.loads(sys.argv[2]),account_email='first@example.test'))";
  const sql=execFileSync('python3',['-B','-c',code,fileURLToPath(new URL('../../../scripts/diagnose-analyzer-cost-staging.py',import.meta.url)),JSON.stringify([b.id])],{input:JSON.stringify(settings),encoding:'utf8'});
  const results:any=await pg.owner.query(sql),report=(Array.isArray(results)?results:[results]).flatMap((r:any)=>r.rows).find((r:any)=>r.json_build_object)?.json_build_object;
  assert.equal(report.version,'analyzer-cost-diagnostic/1');assert.equal(report.paidCalls,0);assert.equal(report.requests.length,1);assert.equal(report.requests[0].calls,2);assert.equal(report.requests[0].inputTokens,1000);assert.equal(report.requests[0].outputTokens,100);
+ assert.equal(report.accountFound,true);assert.equal(report.requests[0].requestFound,true);assert.equal(report.requests[0].modelCalls,2);
  assert.equal(report.requests[0].spentAtoms,'21960000');assert.equal(report.spentAtoms,'21960000');assert.equal(report.heldAtoms,'0');assert.ok(report.requests[0].timings);assert.equal(calls,2,'Diagnosis must not dispatch');
 });
 

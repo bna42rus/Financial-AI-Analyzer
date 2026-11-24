@@ -33,6 +33,10 @@ class CostTests(unittest.TestCase):
         self.assertIn("'previousDiagnostic'",text)
         self.assertIn('reported_input_tokens',text)
         self.assertIn('owners',text)
+        self.assertIn('commerce.account_directory',text)
+        self.assertIn('lower(email)',text)
+        self.assertIn("'accountFound'",text)
+        self.assertIn("'requestFound'",text)
 
     def test_invalid_scope_or_ids_cannot_be_interpolated(self):
         for ids in [["';DROP TABLE example"], ['a']*129]:
@@ -42,13 +46,14 @@ class CostTests(unittest.TestCase):
             with self.assertRaises(ValueError):m.query(settings,[])
 
     def test_output_contains_only_costs_and_public_prices_not_the_private_configuration(self):
-        report={'version':'analyzer-cost-diagnostic/1','paidCalls':0,'spentAtoms':'20000000000','heldAtoms':'0','requests':[]}
+        report={'version':'analyzer-cost-diagnostic/1','accountFound':True,'paidCalls':0,'limitAtoms':'100000000000','spentAtoms':'20000000000','heldAtoms':'0','previousDiagnostic':{'spentAtoms':'3123000000'},'requests':[]}
         output=io.StringIO()
         with patch.object(m.os,'geteuid',return_value=0),patch.object(m.sys,'argv',['cost']),patch.object(Path,'lstat',return_value=types.SimpleNamespace(st_mode=stat.S_IFREG|0o600,st_uid=0,st_size=100)),patch.object(Path,'read_text',return_value=json.dumps(self.settings())),patch.object(m.account,'database',return_value='synthetic-container'),patch.object(m.account,'run',return_value=json.dumps(report)) as run,contextlib.redirect_stdout(output):
             m.main()
         self.assertNotIn('SYNTHETIC_SECRET',output.getvalue())
         self.assertNotIn('synthetic@example.test',output.getvalue())
         self.assertEqual(json.loads(output.getvalue())['price'],self.settings()['cost']['price'])
+        self.assertEqual(json.loads(output.getvalue())['summaryRub'],{'previousRun':'3.123000000','monthSpent':'20.000000000','held':'0.000000000','available':'80.000000000'})
         self.assertIn('finance_staging',run.call_args.args[0][-1])
         self.assertTrue(run.call_args.args[1].startswith('BEGIN READ ONLY;'))
 
