@@ -23,3 +23,39 @@ The default live suite contains the original eleven checks plus twenty-three var
 Expanded live run a138ec59: 28/34. Basic scenarios were fast and model-free; the credit explanation took 111 ms. Three loan failures followed an unresolved payment variant; the other failures concerned implicit period comparison, operation-list continuation and foreign-data refusal. More critically, the diagnostic selected the configured account by case-sensitive auth email, returned empty per-request costs, and failed to enforce its stop threshold while the monthly project balance increased. Corrections use the actual runner account through the case-insensitive account directory, require account/task existence and agreement between durable model-call count and cost receipts, and use monthly spending growth as a conservative additional stop condition. The latest diagnostic run is identified from its first chat so all eight chats are included. The next server action is a read-only reconciliation of existing receipts, with no model POSTs.
 
 Explicit payment selectors now resolve an unambiguous saved scenario without requiring the model to invent a numeric variant. Bounded term/rate/type, date, comparison and presentation edits preserve the same checked inputs and query conditions. Unknown conditions still use the full planner. Dependent live checks are skipped after a failed prerequisite; unrelated boundary cases remain independent. Expanded live acceptance after these corrections is pending.
+# Repeated model input: 24 November follow-up
+
+The owner requested lower latency and cost after the real extended run spent
+5.158192940 RUB with model p50 7,233 ms and p95 18,778 ms. The existing monthly
+100 RUB cap, settled costs, unknown-delivery reservations and configured tariff
+remain unchanged. No external tariff refresh is reintroduced.
+
+Both planner and independent completeness reviewer now share concise English
+semantic instructions; output remains Russian. Every registry action is still
+available: no keyword-selected subset of financial capabilities is sent. The
+original closed JSON Schema remains the server-side authority. Since the model
+endpoint already received that schema as plain system text in JSON-object mode,
+its model-facing description now uses compact type declarations, optional keys,
+aliases and explicit JSON Schema constraints. An independent round-trip reader
+in the tests reconstructs the full schema, including every bound and required
+key. Unknown schema vocabulary falls back to the complete JSON Schema;
+classification retains its previous representation.
+
+The planner's static system content decreased from 79,320 to 34,422 UTF-8 bytes
+(57%). This measures serialized input, not billed tokens, actual cost or latency.
+The independent review call, authorization, validation, financial arithmetic,
+dispatch reservations and actual usage settlement remain active. Short, purely
+loan-calculation reports use their existing checked summaries/comparison table
+instead of an additional narration call. Detailed and mixed reports still get
+narration. Recovery consumes a previously dispatched narration receipt rather
+than stranding it. Conversational monthly questions with an explicit historical
+year use the bounded local grammar; unrecognized extra conditions fall through.
+
+`CASHNEURO_SMOKE_SUITE=efficiency` selects 16 existing questions covering the
+formerly expensive model paths, exact condition assertions, context retention,
+the historical-month failure and finance/access boundaries. It does not force a
+model call or retry failures. Run after deployment with a small positive
+`CASHNEURO_SMOKE_STOP_RUB`; the threshold is checked between questions, so a sent
+question can finish above it under the unchanged server cap. A real run is still
+required to accept model understanding, billed token reduction and latency;
+offline results alone do not establish these.

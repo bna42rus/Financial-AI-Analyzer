@@ -95,6 +95,15 @@ test('fast monthly continuation preserves an explicitly selected older year',asy
  const h=harness();await h.turn('Сколько я потратил за февраль 2025 года?',null);const r=await h.turn('А за январь?',null);assert.equal(r.query!.filter.from,'2025-01-01');assert.equal(r.modelCalls,0);assert.equal(h.calls.length,0);
 });
 
+test('conversational monthly questions preserve explicit years and never drop extra conditions',async()=>{
+ for(const prefix of ['Меня интересует, ','Подскажи, ','Скажи, ']){
+  const h=harness(),r=await h.turn(prefix+'сколько денег ушло на расходы в ноябре 2025 года.',null);
+  assert.equal(r.query?.filter.from,'2025-11-01');assert.equal(r.query?.filter.through,'2025-11-30');assert.equal(r.modelCalls,0);
+ }
+ const {localReadPlan}=await import('../../../packages/analyzer/src/local-plan.ts'),h=harness();
+ for(const suffix of [' кроме продуктов',' только наличными',' и удали их',' на счету Ивана'])assert.equal(localReadPlan('Меня интересует, сколько денег ушло на расходы в ноябре 2025 года'+suffix,h.state,calendar),null);
+});
+
 test('fast reads never ignore an unrecognized condition or route an unrelated question',async()=>{
  const {localReadPlan}=await import('../../../packages/analyzer/src/local-plan.ts');const h=harness();
  for(const q of ['Сколько я потратил за октябрь на продукты?','Расходы за октябрь кроме такси','Расходы за октябрь больше 500 рублей','Доходы за октябрь только на одном счете','Сколько я потратил за октябрь и удали операции','Какая погода за октябрь?'])assert.equal(localReadPlan(q,h.state,calendar),null,q);

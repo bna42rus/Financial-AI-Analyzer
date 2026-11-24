@@ -7,7 +7,7 @@ import { createHash } from 'node:crypto';
 import { withAssistantJournal } from '../src/assistant-journal.ts';
 import { withAssistantBudget, assistantBudgetVersion, remainingAssistantTrialBudget, checkAssistantPermit } from '../src/assistant-budget.ts';
 import type { AssistantPermit } from '../src/assistant-budget.ts';
-import { createCloudAssistantModel, compactAssistantSchema } from '../src/assistant-transport.ts';
+import { createCloudAssistantModel, compactAssistantSchema, assistantSchemaGuide } from '../src/assistant-transport.ts';
 import { runAssistant } from '../src/assistant-workflow.ts';
 import type { AssistantRequest, AssistantServices } from '../src/assistant-workflow.ts';
 import { emptyConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
@@ -217,4 +217,33 @@ test('schema compaction keeps property maps containing a type field as maps, not
   Object.values(node).forEach(visit);
  }
  visit(compact);
+});
+
+test('the smaller model type contract round-trips without losing any closed-schema constraint',()=>{
+ const before=JSON.stringify(assistantPlanSchema),guide=assistantSchemaGuide(assistantPlanSchema);
+ assert.ok(guide.startsWith('Output contract'));assert.ok(guide.length<42874*.57);
+ // An independent reader reconstructs the full JSON Schema from the wire text,
+ // including required/optional keys, every union, alias and numeric constraint.
+ const tokens=guide.slice(guide.indexOf('type Output=')).match(/"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|[a-zA-Z_$][a-zA-Z_$0-9]*|[{}[\]():;?,=<>|]/gu)!;
+ let i=0;const take=(expected?:string)=>{const v=tokens[i++];assert.ok(v!==undefined);if(expected!==undefined)assert.equal(v,expected);return v;};
+ const read=():any=>{
+  const token=take();
+  if(token==='('){const parts=[read()];while(tokens[i]==='|'){take('|');parts.push(read());}take(')');return parts.every(p=>p.type==='string'&&p.enum)?{type:'string',enum:parts.flatMap(p=>p.enum)}:{anyOf:parts};}
+  if(token==='{'){
+   const properties:Record<string,unknown>={},required:string[]=[];
+   while(tokens[i]!=='}'){const key=JSON.parse(take());let optional=false;if(tokens[i]==='?'){take('?');optional=true;}take(':');properties[key]=read();if(!optional)required.push(key);if(tokens[i]!=='}')take(';');}take('}');
+   return {type:'object',additionalProperties:false,properties,required};
+  }
+  if(token==='Array'){take('<');const items=read();take('>');return {type:'array',items};}
+  if(token==='With'){
+   take('<');const node=read();take(',');const at=i;take('{');while(tokens[i]!=='}')take();take('}');const constraints=JSON.parse(tokens.slice(at,i).join(''));take('>');return {...node,...constraints};
+  }
+  if(token.startsWith('"'))return {type:'string',enum:[JSON.parse(token)]};
+  if(['string','number','integer','boolean','null'].includes(token))return {type:token};
+  assert.match(token,/^d\d+$/u);return {$ref:token};
+ };
+ const aliases=new Map<string,any>();while(i<tokens.length){take('type');const name=take();take('=');aliases.set(name,read());take(';');}
+ const expand=(v:any):any=>Array.isArray(v)?v.map(expand):v&&typeof v==='object'?v.$ref?expand(aliases.get(v.$ref)):Object.fromEntries(Object.entries(v).map(([k,x])=>[k,k==='required'?[...(x as string[])].sort():expand(x)])):v;
+ assert.deepEqual(expand(aliases.get('Output')),expand(assistantPlanSchema));assert.equal(JSON.stringify(assistantPlanSchema),before);
+ const unknown={type:'string',format:'date'};assert.ok(assistantSchemaGuide(unknown).startsWith('JSON Schema:'));assert.match(assistantSchemaGuide(unknown),/"format":"date"/);
 });

@@ -48,3 +48,11 @@ export async function focusedCases(create:(title:string)=>Promise<LiveChat>):Pro
   pick('operation-list-format'),pick('foreign-data-boundary'),
  ];
 }
+
+/** Compare the formerly expensive paths and their context/condition guards.
+ * Reuses the same questions and exact assertions as the baseline; no retries
+ * and no synthetic force-model bypass of normal production routing. */
+export async function efficiencyCases(create:(title:string)=>Promise<LiveChat>):Promise<LiveCase[]>{
+ const names=new Set(['loan-free-wording','loan-shorter-term','loan-prepayment','loan-preserve-prepayment','older-year-wording','group-implicit-context','month-same-old-year','compare-implicit-old-periods','multiple-read-conditions','deposit-compound-additions','deposit-preserve-conditions','percentage-decimal','non-template-concept','missing-parameters','unrelated-boundary','foreign-data-boundary']);
+ const selected=(await extendedCases(create)).filter(c=>names.has(c.name));if(selected.length!==names.size)throw Error('EFFICIENCY_CASE_MISSING');return selected;
+}

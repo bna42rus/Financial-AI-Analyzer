@@ -17,6 +17,9 @@ const standalone=new RegExp('^(?:(сколько я (?:потратил[а]?|з�
 const groups:Record<string,string>={категориям:'category_totals',подкатегориям:'subcategory',счетам:'account',банкам:'bank',магазинам:'merchant',месяцам:'time'};
 export function localReadPlan(question:string,state:Conversation,_calendar:Calendar):AssistantPlan|null{
  let text=question.normalize('NFKC').toLocaleLowerCase('ru').replaceAll('ё','е').replace(/\s+/gu,' ').replace(/[?.!]+$/u,'').trim();
+ // Remove only a closed conversational prefix and metric synonym; the full
+ // remaining expression must still match, so extra conditions cannot vanish.
+ text=text.replace(/^(?:меня интересует,? |подскажи,? |скажи,? )/u,'').replace(/^сколько денег ушло на расходы/u,'расходы');
  const full=standalone.exec(text);
  const make=(context:unknown,changes:unknown[])=>parseAssistantPlan({version:assistantVersion,topic:'personal_finance',action:'read',context,changes});
  const set=(field:string,value:unknown)=>({field,op:'set',value});

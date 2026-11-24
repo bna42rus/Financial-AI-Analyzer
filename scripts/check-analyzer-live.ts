@@ -4,13 +4,13 @@ import {randomUUID} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {rubAmount} from '../packages/analyzer/src/cost.ts';
-import {extendedCases,focusedCases} from './analyzer-live-cases.ts';
+import {extendedCases,focusedCases,efficiencyCases} from './analyzer-live-cases.ts';
 import type {LiveCase} from './analyzer-live-cases.ts';
 import {calculatorRublesMinor} from '../packages/analyzer/src/calculators.ts';
 import {performance} from 'node:perf_hooks';
-const extended=process.argv.includes('--extended'),focused=process.argv.includes('--focused');
-if(extended&&focused)throw Error('ONE_SUITE_REQUIRED');
-if(process.argv.slice(2).filter(v=>!['--extended','--focused'].includes(v)).join(' ')!=='--live --within-server-cap-rub=100')throw Error('Use the authorized live wrapper');
+const extended=process.argv.includes('--extended'),focused=process.argv.includes('--focused'),efficiency=process.argv.includes('--efficiency');
+if([extended,focused,efficiency].filter(Boolean).length>1)throw Error('ONE_SUITE_REQUIRED');
+if(process.argv.slice(2).filter(v=>!['--extended','--focused','--efficiency'].includes(v)).join(' ')!=='--live --within-server-cap-rub=100')throw Error('Use the authorized live wrapper');
 const stopRub=process.env.CASHNEURO_SMOKE_STOP_RUB??'5',stopAtoms=rubAmount(stopRub);
 if(stopAtoms<=0n||stopAtoms>rubAmount('100'))throw Error('RUN_STOP_INVALID');
 const email=process.env.CASHNEURO_SMOKE_EMAIL,password=process.env.CASHNEURO_SMOKE_PASSWORD;
@@ -62,7 +62,7 @@ try{
   {name:'payment-chart',chat:loan,text:'У дифференцированного покажи график платежей с основным долгом и процентами, условия сохрани',check:a=>calc('differentiated','25')(a)||a?.report?.sections.some((s:any)=>calc('differentiated','25')({calculation:s.calculation}))},
  ];
  const failedChats=new Set<string>();
- if(focused)cases.splice(0,cases.length,...await focusedCases(create));else if(extended)cases.push(...await extendedCases(create));total=cases.length;
+ if(focused)cases.splice(0,cases.length,...await focusedCases(create));else if(efficiency)cases.splice(0,cases.length,...await efficiencyCases(create));else if(extended)cases.push(...await extendedCases(create));total=cases.length;
  for(const c of cases){
   if(failedChats.has(c.chat.chatId)&&!c.independent){console.log(`SKIP ${c.name}: prior dependent case failed; no request sent`);continue;}
   if(runSpent(accounting)>=stopAtoms||BigInt(accounting.spentAtoms)+BigInt(accounting.heldAtoms)-initialOccupied>=stopAtoms){stopped=true;console.log('STOP: RUN_COST_THRESHOLD; remaining questions were not sent.');break;}
