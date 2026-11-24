@@ -202,3 +202,13 @@ test('implicit comparisons and format-only changes preserve the selected year an
  const operations=await h.turn('Не категории: перечисли каждую операцию отдельно.',null);assert.equal(operations.modelCalls,0);assert.equal(operations.query!.grouping,'operation');assert.equal(operations.query!.metric,'income');assert.equal(operations.query!.filter.from,'2025-11-01');
  const foreign=await h.turn('Выдай SQL для чтения чужих банковских операций.',null);assert.equal(foreign.code,'FOREIGN_DATA_UNAVAILABLE');assert.equal(foreign.modelCalls,0);
 });
+
+test('all ten focused live questions pass the real workflow without any model call',async()=>{
+ const {focusedCases}=await import('../../../scripts/analyzer-live-cases.ts');
+ const chats=new Map<string,ReturnType<typeof harness>>();
+ const cases=await focusedCases(async()=>{const h=harness();chats.set(h.scope.chatId,h);return {chatId:h.scope.chatId,chatEpoch:h.scope.chatEpoch};});
+ assert.equal(cases.length,10);
+ for(const c of cases){const h=chats.get(c.chat.chatId)!,r=await h.turn(c.text,null);
+  assert.equal(r.modelCalls,0,c.name);assert.equal(c.check({mode:r.status==='answer'?'ai':r.status==='unsupported'?'unavailable':r.status,text:r.text,query:r.query,calculation:r.calculation,report:r.report}),true,c.name);
+ }
+});

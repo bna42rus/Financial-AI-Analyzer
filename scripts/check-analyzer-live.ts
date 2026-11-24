@@ -4,12 +4,13 @@ import {randomUUID} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {rubAmount} from '../packages/analyzer/src/cost.ts';
-import {extendedCases} from './analyzer-live-cases.ts';
+import {extendedCases,focusedCases} from './analyzer-live-cases.ts';
 import type {LiveCase} from './analyzer-live-cases.ts';
 import {calculatorRublesMinor} from '../packages/analyzer/src/calculators.ts';
 import {performance} from 'node:perf_hooks';
-const extended=process.argv.includes('--extended');
-if(process.argv.slice(2).filter(v=>v!=='--extended').join(' ')!=='--live --within-server-cap-rub=100')throw Error('Use the authorized live wrapper');
+const extended=process.argv.includes('--extended'),focused=process.argv.includes('--focused');
+if(extended&&focused)throw Error('ONE_SUITE_REQUIRED');
+if(process.argv.slice(2).filter(v=>!['--extended','--focused'].includes(v)).join(' ')!=='--live --within-server-cap-rub=100')throw Error('Use the authorized live wrapper');
 const stopRub=process.env.CASHNEURO_SMOKE_STOP_RUB??'5',stopAtoms=rubAmount(stopRub);
 if(stopAtoms<=0n||stopAtoms>rubAmount('100'))throw Error('RUN_STOP_INVALID');
 const email=process.env.CASHNEURO_SMOKE_EMAIL,password=process.env.CASHNEURO_SMOKE_PASSWORD;
@@ -61,15 +62,16 @@ try{
   {name:'payment-chart',chat:loan,text:'У дифференцированного покажи график платежей с основным долгом и процентами, условия сохрани',check:a=>calc('differentiated','25')(a)||a?.report?.sections.some((s:any)=>calc('differentiated','25')({calculation:s.calculation}))},
  ];
  const failedChats=new Set<string>();
- if(extended)cases.push(...await extendedCases(create));total=cases.length;
+ if(focused)cases.splice(0,cases.length,...await focusedCases(create));else if(extended)cases.push(...await extendedCases(create));total=cases.length;
  for(const c of cases){
   if(failedChats.has(c.chat.chatId)&&!c.independent){console.log(`SKIP ${c.name}: prior dependent case failed; no request sent`);continue;}
   if(runSpent(accounting)>=stopAtoms||BigInt(accounting.spentAtoms)+BigInt(accounting.heldAtoms)-initialOccupied>=stopAtoms){stopped=true;console.log('STOP: RUN_COST_THRESHOLD; remaining questions were not sent.');break;}
   const id=randomUUID();requestIds.push(id);const started=performance.now(),r=await post('/finance/analyzer-task',{id,...c.chat,generation:summary.generation,globalRevision:context.revision,text:c.text});
   const ms=Math.round(performance.now()-started);accounting=cost();
   const receipt=accounting.requests.find((v:any)=>v.id===id);if(!receipt)throw Error('COST_RECEIPT_MISSING');
-  const ok=c.check(r.answer);failed+=Number(!ok);if(!ok)failedChats.add(c.chat.chatId);tested++;measurements.push({ms,calls:Number(receipt.calls)});
+  const ok=c.check(r.answer)&&(!focused||Number(receipt.calls)===0);failed+=Number(!ok);if(!ok)failedChats.add(c.chat.chatId);tested++;measurements.push({ms,calls:Number(receipt.calls)});
   console.log(`${ok?'PASS':'FAIL'} ${c.name}: ${r.code??r.answer?.mode}, ${ms} ms, ${rub(receipt.spentAtoms)} RUB, ${receipt.calls} model calls, ${receipt.inputTokens}/${receipt.outputTokens} tokens`);
+  if(focused&&Number(receipt.calls)>0)throw Error('FOCUSED_UNEXPECTED_MODEL_CALL');
   if(!ok)console.log(JSON.stringify({case:c.name,requestId:id,mode:r.answer?.mode,code:r.code,query:r.answer?.query?{metric:r.answer.query.metric,grouping:r.answer.query.grouping,from:r.answer.query.filter.from,through:r.answer.query.filter.through,comparison:r.answer.query.comparison}:undefined,calculation:r.answer?.calculation?.input,sections:r.answer?.report?.sections.map((s:any)=>({label:s.label,input:s.calculation?.input,error:s.error?.code}))}));
   if(/COST|QUOTA|DELIVERY|PROVIDER|AUTH|ACCESS|REQUEST_FAILED/.test(r.code??''))throw Error(r.code);
  }

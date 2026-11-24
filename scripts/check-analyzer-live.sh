@@ -17,7 +17,7 @@ if [[ -z "$smoke_email" ]]; then read -r -p 'Email аккаунта CashNeuro: '
 if [[ -z "$smoke_password" ]]; then read -r -s -p 'Пароль аккаунта: ' smoke_password; printf '\n'; fi
 suite=${CASHNEURO_SMOKE_SUITE:-extended}
 extra=()
-case "$suite" in extended) extra+=(--extended);; basic) ;; *) echo 'Unknown test suite'; exit 2;; esac
+case "$suite" in focused) extra+=(--focused);; extended) extra+=(--extended);; basic) ;; *) echo 'Unknown test suite'; exit 2;; esac
 cd -- "$repo/apps/api"
 status=0
 CASHNEURO_SMOKE_EMAIL="$smoke_email" CASHNEURO_SMOKE_PASSWORD="$smoke_password" node --import tsx ../../scripts/check-analyzer-live.ts --live --within-server-cap-rub=100 "${extra[@]}" || status=$?
