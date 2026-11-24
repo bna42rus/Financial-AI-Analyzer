@@ -1,3 +1,4 @@
+import {localReadPlan,localCalculatorPlan} from '../../../packages/analyzer/src/local-plan.ts';
 import {assistantErrorCode,assistantFailureText,assistantCapabilityText} from '../../../packages/analyzer/src/assistant-feedback.ts';
 import type {BudgetReadRequest,BudgetReadExecution} from '../../../packages/analyzer/src/budget-read.ts';
 import {bindReportValues,deriveReportFact,sectionFacts,narrativeSchema,renderNarrative} from '../../../packages/analyzer/src/report.ts';
@@ -68,6 +69,7 @@ export type AssistantJournal = {
 export type AssistantRequest = { requestId: string; scope: TaskScope; conversation: Conversation; global: GlobalSnapshot; dataRevision: string; question: string; now: Date; timezone: string };
 export type ExpectedAssistantState = { scope: TaskScope; head: string | null; turns: number; globalRevision: number; dataRevision: string; timezone: string };
 export type AssistantServices = {
+  localReads?:boolean;
   guard(expected: ExpectedAssistantState): Promise<void>;
   catalog(): Promise<Catalog>;
   resultDependencies?(result:unknown):string[];
@@ -216,7 +218,7 @@ export async function runAssistant(raw: AssistantRequest, model: AssistantModel,
   try {
     const capability = journal.receipt.calls.length ? null : assistantCapabilityText(r.question, !!services.prepareChange, !!services.external);
     if (capability) return finish('answer', 'ASSISTANT_CAPABILITIES', capability);
-    const exact=journal.receipt.calls.length?null:exactAssistantPlan(r.question);
+    const exact=journal.receipt.calls.length?null:exactAssistantPlan(r.question)??(services.localReads===false?null:localReadPlan(r.question,state,calendar)??localCalculatorPlan(r.question,state));
     let plan = exact??await validatedCall({ phase: 'understand', prompt: assistantPrompt + '\n' + calculatorInstructions + '\n' + extendedCalculatorInstructions + '\n' + calculatorContextInstructions + '\n' + conversationInstructions + '\n' + financialSourceInstructions + '\n' + reportInstructions + '\n' + budgetReadInstructions + '\n' + additionalPlanningInstructions + '\n' + feeInstructions + '\n' + sourceBoundaryInstructions + '\n' + clockInstructions + '\n' + periodFactInstructions + '\n' + assistantChangeInstructions + '\n' + manageInstructions + '\n' + rememberInstructions, input: { ...context.input, selectedContext }, schema: assistantPlanSchema }, parsePlan);
     let incompleteConditions = false,missingConditions:string[]=[];
     if (!exact&&(plan.action === 'read' || plan.action === 'calculate' || plan.action === 'report' || plan.action === 'external' || plan.action === 'propose_change' || plan.action === 'explain' && plan.needsFreshSources)) {

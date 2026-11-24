@@ -36,7 +36,7 @@ test('pending calculator survives a concept question, then success clears pendin
  await h.turn('Объясни основной долг',plan('explain'));
  const next=await h.turn('А ануитентный?',plan('calculate',{calculation:{kind:'loan',from:'active',payment:'annuity'}}));
  assert.equal(next.calculation!.kind,'loan');assert.deepEqual(next.calculation!.input,{...loan,payment:'annuity'});
- const check=h.calls.findLast(c=>c.phase==='check_changes')!.input as any;assert.equal(check.history.length,4);assert.equal(check.activeCalculation.principalRubles,loan.principalRubles);
+ const check=conversationInput(h.state,h.scope,'Продолжение',calendar).input;assert.equal(check.history.length,5);assert.equal((check.activeCalculation as LoanInput).principalRubles,loan.principalRubles);assert.equal(next.modelCalls,0);
 });
 test('explicit patches preserve every unspecified calculator condition across different amounts, rates, deposits and prepayments',async()=>{
  for(const principalRubles of ['125000','960000','2500000']){
@@ -68,7 +68,7 @@ test('two historical periods can be compared exactly after grouping, a date chan
  await h.turn('Что такое категория расходов?',plan('explain'));
  const result=await h.turn('Сравни эти два месяца, где выросли расходы?',plan('read',{context:{mode:'reference',reference:'h2',comparisonReference:'h3'},changes:[]}));
  assert.equal(result.code,'FINANCIAL_QUERY');assert.equal(result.query!.grouping,'category');assert.equal(result.query!.filter.from,'2026-10-01');assert.equal(result.query!.comparison,'custom');assert.deepEqual(result.query!.options!.comparisonPeriod,{from:'2026-09-01',through:'2026-09-30'});
- const check=h.calls.findLast(c=>c.phase==='check_changes')!.input as any;assert.equal(check.history[1].task.period.from,'2026-10-01');assert.equal(check.history[2].task.period.from,'2026-09-01');
+ const check=conversationInput(h.state,h.scope,'Продолжение',calendar).input;assert.equal(check.history[1]!.task!.period.from,'2026-10-01');assert.equal(check.history[2]!.task!.period.from,'2026-09-01');assert.equal(result.modelCalls,0);
  const serialized=JSON.stringify(check);assert.equal(serialized.includes(h.scope.chatId),false);assert.equal(serialized.includes(h.scope.generation),false);
 });
 test('a request for the same schedule preserves the exact rows without an additional narration call',async()=>{
@@ -81,4 +81,22 @@ test('internal history handles never reach a public clarification or trigger a p
  const h=harness();const r=await h.turn('А в чем разница?',plan('explain'),'Как обсуждали в h4 и h12, проценты начисляются на остаток долга.');
  assert.equal(r.code,'FINANCIAL_EXPLANATION');assert.doesNotMatch(r.text,/\bh\d+\b/);assert.equal(r.modelCalls,2);
  const bad=await h.turn('Сравни с другим чатом',plan('read',{context:{mode:'reference',reference:'h99'},changes:[]}));assert.notEqual(bad.status,'query');assert.equal(h.queries.length,0);
+});
+
+test('ordinary monthly questions and short continuations calculate without a model and preserve the original year',async()=>{
+ const h=harness();
+ for(const [text,from,group]of [['Сколько я потратил за октябрь 2026 года?','2026-10-01','none'],['А по категориям?','2026-10-01','category'],['А за сентябрь?','2026-09-01','category'],['Сравни эти два месяца. Где расходы выросли сильнее всего?','2026-10-01','category']]){
+  const r=await h.turn(text!,null);assert.equal(r.code,'FINANCIAL_QUERY');assert.equal(r.query!.filter.from,from);assert.equal(r.query!.grouping,group);assert.equal(r.modelCalls,0);
+ }
+ assert.equal(h.calls.length,0);
+});
+
+test('fast monthly continuation preserves an explicitly selected older year',async()=>{
+ const h=harness();await h.turn('Сколько я потратил за февраль 2025 года?',null);const r=await h.turn('А за январь?',null);assert.equal(r.query!.filter.from,'2025-01-01');assert.equal(r.modelCalls,0);assert.equal(h.calls.length,0);
+});
+
+test('fast reads never ignore an unrecognized condition or route an unrelated question',async()=>{
+ const {localReadPlan}=await import('../../../packages/analyzer/src/local-plan.ts');const h=harness();
+ for(const q of ['Сколько я потратил за октябрь на продукты?','Расходы за октябрь кроме такси','Расходы за октябрь больше 500 рублей','Доходы за октябрь только на одном счете','Сколько я потратил за октябрь и удали операции','Какая погода за октябрь?'])assert.equal(localReadPlan(q,h.state,calendar),null,q);
+ for(const month of ['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'])assert.ok(localReadPlan('Сколько я потратил за '+month+' 2026 года?',h.state,calendar));
 });

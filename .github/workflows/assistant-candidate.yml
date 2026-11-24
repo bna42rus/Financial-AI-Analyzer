@@ -198,6 +198,7 @@ jobs:
           python3 scripts/test-diagnose-classification-staging.py
           sudo /usr/bin/python3 -B scripts/test-authorize-assistant-staging-calls.py
           bash -n scripts/prepare-staging-release.sh
+          bash -n scripts/check-analyzer-live.sh
           bash -n scripts/run-classification-check.sh
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare

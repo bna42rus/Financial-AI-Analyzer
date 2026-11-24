@@ -38,7 +38,7 @@ function harness() {
     } };
     const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() { if(options.reserveError) throw options.reserveError; }, async settle() {} } as AssistantJournal;
     journals.set(request.requestId, journal);
-    const services: AssistantServices = { prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
+    const services: AssistantServices = { localReads:false,prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
       async calculate(query, actualCalendar) { calculations++; assert.equal(actualCalendar.timezone, request.timezone); return trialResult(query); },
       render(_query, result) { return 'Проверенный расчёт: ' + JSON.stringify((result as any).totals); }, async commit(input) { conversation = input.conversation; } };
     return runAssistant(request, model, journal, services);

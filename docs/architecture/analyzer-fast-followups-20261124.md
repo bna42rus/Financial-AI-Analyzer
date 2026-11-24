@@ -1,0 +1,11 @@
+# Analyzer follow-up and latency corrections
+
+Owner requested only “Как рассчитано” and “Открыть в Операциях” in read-answer footers, instant reuse of already loaded chats, faster simple answers, and an automated real-provider test within the existing 100 RUB monthly project cap.
+
+A closed local grammar now handles plain income/expense month queries, grouping-only and period-only continuations, and comparison of the last two compatible resolved periods. Unrecognized words/conditions fall through to the normal AI planner. Bare month continuations preserve the earlier explicit year. A payment-type choice, including bounded spelling variation, reuses validated loan inputs only when the source is unambiguous. All local plans still use the ordinary closed compiler, current-data calculation, authorization, revision and persistence gates. No model call or independent model-cost reservation is needed for these plans.
+
+The authenticated workspace retains the Analyzer instance after first visit. Hidden instances stop background screen refreshes and close overlays; logout/revocation removes the workspace. Generation changes remount the instance. Initial duplicate search requests are removed. A bounded five-chat in-memory cache immediately shows previously loaded conversations while revalidating, and drops removed chats or changed epochs. No persistent browser storage is added. The Analyzer requests the compact workspace summary; Review loads its own scoped queue.
+
+Removed the three read-answer footer actions and the generic answer editor. Explicit natural-language change proposals retain the existing confirmation flow. The previous REQUEST_FAILED editor path is no longer exposed by a read answer.
+
+`scripts/check-analyzer-live.sh` verifies the existing Staging 100 RUB project-cap configuration, takes one normal login with hidden password input, and runs eleven questions through the actual authenticated HTTP runtime. It uses the existing ledger and admission rules, does not reset any budget or reservation, does not retry unknown delivery, changes no financial data, and retains two diagnostic chats. Output contains PASS/FAIL, elapsed time and safe failure details. On failure it also invokes the existing sanitized per-account diagnosis. Real-provider acceptance is not claimed until this command passes on the server.
