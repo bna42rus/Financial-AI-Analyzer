@@ -80,11 +80,9 @@ def configure(replace=False):
     def secret_value(name,label):
         value = prompt(label + (' (Enter — сохранённое значение): ' if previous else ': '), secret=True)
         return value or previous.get(name, '')
-    quota = prompt('Фактический установленный объём вашего S3-бакета в ГБ (тариф не меняется)', default=str(previous.get('quotaBytes',1_000_000_000)//1_000_000_000))
-    if not re.fullmatch('[1-9][0-9]{0,4}', quota):
-        raise OpsError('BACKUP_QUOTA_INVALID')
     config = {'version': 'cashneuro-ops/1', 'endpoint': 'https://s3.twcstorage.ru',
-              'quotaBytes': int(quota) * 1000**3, 'bucket': prompt('Имя существующего приватного S3-бакета', default=previous.get('bucket')),
+              'capacityWarningBytes': previous.get('capacityWarningBytes',10_000_000_000),
+              'bucket': prompt('Имя существующего приватного S3-бакета', default=previous.get('bucket')),
               'accessKey': secret_value('accessKey','S3 Access Key'), 'secretKey': secret_value('secretKey','S3 Secret Key'),
               'password': secret_value('password','Пароль резервных архивов (от 20 символов; для существующих репозиториев тот же пароль)'),
               'alertEmail': prompt('Ваш email для уведомлений об ошибках', default=previous.get('alertEmail') or default_email or None),

@@ -6,19 +6,19 @@ from pathlib import Path
 import re
 import sys
 
-from . import backups, diagnostics, installation, releases, sizing
+from . import backups, capacity, diagnostics, installation, releases, sizing
 from .common import CONFIG, STATE, OpsError, emit, locked, private_dir, private_read, private_write, require_root, settings
 
 
 def state():
-    report = {'configured': CONFIG.exists(), 'backups': {}, 'restoreTests': {}}
+    report = {'configured': CONFIG.exists(), 'backups': {}, 'restoreTests': {}, 'capacityStopEnabled':False}
     for environment in ('staging', 'production'):
         for prefix, key in [('backup-', 'backups'), ('restore-test-', 'restoreTests')]:
             path = STATE / (prefix + environment + '.json')
             report[key][environment] = json.loads(private_read(path)) if path.exists() else None
     failure = STATE / 'last-failure.json'
     report['lastFailure'] = json.loads(private_read(failure)) if failure.exists() else None
-    for filename,key in [('provider-key-check.json','providerKeyCheck'),('synthetic-sizing.json','syntheticSizing')]:
+    for filename,key in [('provider-key-check.json','providerKeyCheck'),('synthetic-sizing.json','syntheticSizing'),('storage-capacity.json','storageCapacity'),('storage-last-alert.json','storageGrowthAlert')]:
         path = STATE / filename
         report[key] = json.loads(private_read(path)) if path.exists() else None
     return report
@@ -42,6 +42,7 @@ def scheduled(name):
     config = backups.validate_config(settings())
     if name == 'production':
         backups.backup(config, 'production', 'daily')
+        capacity.monitor(config)
     elif name in ('restore-production', 'restore-staging'):
         backups.restore_test(config, name.removeprefix('restore-'))
     elif name == 'journal':
@@ -52,6 +53,7 @@ def scheduled(name):
                     emit('deletion-journal', environment=environment, erasedAccounts=len(result['erased']),
                          trackedGenerations=len(result['generations']))
     elif name == 'watchdog':
+        capacity.monitor(config)
         watchdog(config)
     else:
         raise OpsError('SCHEDULE_INVALID')
@@ -102,6 +104,7 @@ def main():
     configure.add_argument('--replace', action='store_true')
     sub.add_parser('status')
     sub.add_parser('storage')
+    sub.add_parser('capacity')
     diag = sub.add_parser('diagnose')
     diag.add_argument('--settle-recorded-usage', action='store_true')
     hold = sub.add_parser('resolve-hold')
@@ -135,6 +138,8 @@ def main():
             emit('maintenance-status', **state())
         elif args.command == 'storage':
             diagnostics.inspect_storage()
+        elif args.command == 'capacity':
+            capacity.monitor(backups.validate_config(settings()))
         elif args.command == 'diagnose':
             with locked():
                 diagnostics.inspect_accounting(args.settle_recorded_usage)
@@ -150,7 +155,9 @@ def main():
         elif args.command == 'benchmark':
             sizing.benchmark()
         elif args.command == 'backup':
-            backups.backup(backups.validate_config(settings()), args.environment, args.kind, already_locked=args.deployment_lock_held)
+            config = backups.validate_config(settings())
+            backups.backup(config, args.environment, args.kind, already_locked=args.deployment_lock_held)
+            capacity.monitor(config)
         elif args.command == 'restore-test':
             backups.restore_test(backups.validate_config(settings()), args.environment)
         elif args.command == 'scheduled':

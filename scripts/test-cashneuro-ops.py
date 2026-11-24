@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from cashneuro_ops import backups, cli, common, diagnostics, installation, releases, sizing
+from cashneuro_ops import backups, capacity, cli, common, diagnostics, installation, releases, sizing
 
 
 def config():
@@ -116,7 +116,7 @@ class OperationsTests(unittest.TestCase):
     def test_backup_configuration_and_endpoint_are_closed(self):
         self.assertEqual(backups.validate_config(config()),config())
         for field,value in [('endpoint','http://s3.twcstorage.ru'),('endpoint','https://attacker.invalid'),
-                            ('bucket','../other'),('quotaBytes',True),('quotaBytes',1),('password','short')]:
+                            ('bucket','../other'),('capacityWarningBytes',True),('capacityWarningBytes',1),('password','short')]:
             with self.subTest(field=field,value=value),self.assertRaises(common.OpsError):
                 backups.validate_config({**config(),field:value})
 
@@ -248,7 +248,7 @@ class OperationsTests(unittest.TestCase):
                     with self.assertRaisesRegex(common.OpsError,code):
                         common.start_isolated_postgres('cashneuro-restore-'+'a'*16,root/suffix,'sha256:synthetic','cashneuro_restore')
 
-    def backup_case(self, kind='daily', fault=None):
+    def backup_case(self, kind='daily', fault=None, legacy_quota=10_000_000_000, repository_bytes=0):
         with tempfile.TemporaryDirectory() as temporary:
             state=Path(temporary)/'state';state.mkdir(mode=0o700)
             calls=[];manifest={}
@@ -257,8 +257,8 @@ class OperationsTests(unittest.TestCase):
                 return b''
             def restic(cfg,env,args,**kwargs):
                 calls.append(args)
-                if args[0]=='stats':return b'{"total_size":0}'
-                if args[0]=='snapshots':return b'[]'
+                if args[0]=='stats':return json.dumps({'total_size':repository_bytes}).encode()
+                if args[0]=='snapshots':return b'[{"id":"abcdef12"}]' if repository_bytes else b'[]'
                 if args[0]=='backup':
                     manifest.update(json.loads((kwargs['cwd']/'manifest.json').read_text()))
                     if fault=='upload':raise common.OpsError('UPLOAD_FAILED')
@@ -271,14 +271,107 @@ class OperationsTests(unittest.TestCase):
                  patch.object(backups,'sql',side_effect=['1000000','[]']),patch.object(backups,'run',side_effect=command),\
                  patch.object(backups,'copy_configuration'),patch.object(backups,'restic',side_effect=restic),\
                  contextlib.redirect_stdout(io.StringIO()):
+                cfg={**config(),'quotaBytes':legacy_quota}
                 if fault:
-                    with self.assertRaises(common.OpsError):backups.backup(config(),'production',kind)
-                else:backups.backup(config(),'production',kind)
+                    with self.assertRaises(common.OpsError):backups.backup(cfg,'production',kind)
+                else:backups.backup(cfg,'production',kind)
             self.assertFalse((state/'work'/'production').exists())
             return calls
 
     def test_failed_upload_does_not_forget_old_snapshots(self):
         self.assertFalse(any(x[0]=='forget' for x in self.backup_case(fault='upload')))
+
+    def test_backup_continues_above_legacy_one_gb_and_ten_gb_caps_and_keeps_rotation(self):
+        for legacy in (1_000_000_000,10_000_000_000):
+            calls=self.backup_case(legacy_quota=legacy,repository_bytes=100_000_000_000)
+            self.assertTrue(any(x[0]=='backup' for x in calls))
+            self.assertTrue(any(x[0]=='forget' and '--prune' in x for x in calls))
+            self.assertFalse(any(x[0]=='stats' for x in calls))
+
+    def test_s3_get_signature_matches_official_aws_list_objects_vector(self):
+        # https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-header-based-auth.html
+        from datetime import datetime,timezone
+        result=capacity.signed_get('AKIAIOSFODNN7EXAMPLE','wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY',
+                                  'examplebucket.s3.amazonaws.com','/','max-keys=2&prefix=J',
+                                  datetime(2013,5,24,tzinfo=timezone.utc),'us-east-1')
+        self.assertTrue(result['Authorization'].endswith('Signature=34b48302e7b5fa45bde8084f4b7868a86f0a534bc59db6670ed5711ef69dc6f7'))
+
+    def test_s3_measurement_sums_every_page_without_printing_object_names(self):
+        pages=[b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Contents><Key>private-name</Key><Size>8200000000</Size></Contents><IsTruncated>true</IsTruncated><NextContinuationToken>a+/b=</NextContinuationToken></ListBucketResult>',
+               b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Contents><Size>1000000000</Size></Contents><IsTruncated>false</IsTruncated></ListBucketResult>']
+        with patch.object(capacity,'list_page',side_effect=pages) as page:
+            measured=capacity.current_objects(config())
+        self.assertEqual(measured['currentObjectBytes'],9_200_000_000)
+        self.assertEqual(measured['currentObjects'],2)
+        self.assertEqual(page.call_args_list[1].args[1],'a+/b=')
+        self.assertFalse(measured['includesPreviousVersions'])
+        self.assertNotIn('private-name',json.dumps(measured))
+
+    def test_s3_monitor_pins_get_endpoint_encodes_cursor_and_never_follows_redirects(self):
+        import time
+        from types import SimpleNamespace
+        for status in (200,301,403):
+            response=SimpleNamespace(status=status,read1=unittest.mock.Mock(side_effect=[b'xml',b'']))
+            connection=unittest.mock.Mock();connection.getresponse.return_value=response
+            with patch.object(capacity.http.client,'HTTPSConnection',return_value=connection) as https:
+                if status==200:self.assertEqual(capacity.list_page(config(),'a+/b=',time.monotonic()+10),b'xml')
+                else:
+                    with self.assertRaisesRegex(common.OpsError,'S3_SIZE_CHECK_UNAVAILABLE'):
+                        capacity.list_page(config(),'a+/b=',time.monotonic()+10)
+            self.assertEqual(https.call_args.args[0],'s3.twcstorage.ru')
+            method,target=connection.request.call_args.args
+            self.assertEqual(method,'GET')
+            self.assertIn('continuation-token=a%2B%2Fb%3D',target)
+            self.assertNotIn(config()['secretKey'],target)
+            connection.close.assert_called_once()
+
+    def test_s3_monitor_rejects_invalid_sizes_and_repeated_pagination_tokens(self):
+        for page in (b'<ListBucketResult><Contents><Size>-1</Size></Contents><IsTruncated>false</IsTruncated></ListBucketResult>',
+                     b'<ListBucketResult><IsTruncated>true</IsTruncated><NextContinuationToken>repeat</NextContinuationToken></ListBucketResult>'):
+            with patch.object(capacity,'list_page',return_value=page):
+                with self.assertRaises(common.OpsError):capacity.current_objects(config())
+
+    def test_growth_alerts_escalate_without_blocking_backups_or_suppressing_failure_alerts(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);root.chmod(0o700)
+            output=io.StringIO()
+            with patch.object(capacity,'STATE',root),patch.object(capacity,'locked',contextlib.nullcontext),\
+                 patch.object(capacity,'current_objects',side_effect=[{'currentObjectBytes':n} for n in (2_000_000_000,8_100_000_000,8_100_000_000,9_100_000_000,10_100_000_000)]),\
+                 patch.object(backups,'alert') as alert,contextlib.redirect_stdout(output):
+                cfg={**config(),'quotaBytes':1_000_000_000}
+                results=[capacity.monitor(cfg) for _ in range(5)]
+            self.assertEqual([x['warningLevel'] for x in results],[0,80,80,90,100])
+            self.assertTrue(all(not x['capacityStopEnabled'] for x in results))
+            self.assertEqual(alert.call_count,3)
+            self.assertFalse((root/'last-alert.json').exists())
+            self.assertNotIn(config()['secretKey'],output.getvalue())
+
+    def test_capacity_network_failure_preserves_last_measurement_and_does_not_raise(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);root.chmod(0o700)
+            common.private_write(root/'storage-capacity.json','{"currentObjectBytes":123,"measurementAvailable":true}')
+            with patch.object(capacity,'STATE',root),patch.object(capacity,'locked',contextlib.nullcontext),\
+                 patch.object(capacity,'current_objects',side_effect=RuntimeError('synthetic-private-error')),\
+                 patch.object(backups,'alert') as alert,contextlib.redirect_stdout(io.StringIO()) as output:
+                self.assertIsNone(capacity.monitor(config()))
+            record=json.loads((root/'storage-capacity.json').read_text())
+            self.assertEqual(record['currentObjectBytes'],123)
+            self.assertFalse(record['measurementAvailable'])
+            self.assertIn('"backupNotBlocked": true',output.getvalue())
+            self.assertNotIn('synthetic-private-error',output.getvalue())
+            alert.assert_not_called()
+
+    def test_failed_growth_mail_is_recorded_and_throttled_independently(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);root.chmod(0o700)
+            with patch.object(capacity,'STATE',root),patch.object(capacity,'locked',contextlib.nullcontext),\
+                 patch.object(capacity,'current_objects',return_value={'currentObjectBytes':9_100_000_000}),\
+                 patch.object(backups,'alert',side_effect=RuntimeError('smtp unavailable')) as alert,\
+                 contextlib.redirect_stdout(io.StringIO()):
+                first=capacity.monitor(config());second=capacity.monitor(config())
+            self.assertTrue(first['measurementAvailable'] and second['measurementAvailable'])
+            self.assertFalse(json.loads((root/'storage-last-alert.json').read_text())['accepted'])
+            alert.assert_called_once()
 
     def test_failed_readback_does_not_forget_old_snapshots(self):
         self.assertFalse(any(x[0]=='forget' for x in self.backup_case(fault='verify')))

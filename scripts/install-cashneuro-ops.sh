@@ -6,14 +6,17 @@ repo=${1:?repository path required}
 sha=${2:?exact commit required}
 confirmed_holds=0
 resume_setup=0
+tools_only=0
 shift 2
 for option in "$@"; do
   case "$option" in
     --confirmed-unbilled-existing-holds) confirmed_holds=1 ;;
     --resume-setup) resume_setup=1 ;;
+    --update-tools-only) tools_only=1 ;;
     *) exit 2 ;;
   esac
 done
+if test "$tools_only" = 1 && test "$confirmed_holds" = 1; then exit 2; fi
 [[ "$repo" = /home/finance-admin/cashneuro-staging-src ]]
 [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
 test "$(git -c safe.directory="$repo" -C "$repo" rev-parse "$sha^{commit}")" = "$sha"
@@ -58,6 +61,13 @@ WRAPPER
 chmod 755 /usr/local/bin/cashneuro-ops
 flock -u 9
 exec 9>&-
+
+if test "$tools_only" = 1; then
+  echo 'Инструменты обновлены: остановка копирования по объёму S3 отключена.'
+  cashneuro-ops capacity
+  cashneuro-ops status
+  exit 0
+fi
 
 if test "$resume_setup" = 0; then
   echo '1/6: очищаем только неиспользуемые старые backend-релизы.'

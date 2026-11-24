@@ -30,9 +30,11 @@ def validate_config(value):
         secret = value.get(name)
         if not isinstance(secret, str) or not 16 <= len(secret) <= 4096 or '\x00' in secret or '\n' in secret:
             raise OpsError('BACKUP_CREDENTIAL_INVALID')
-    quota = value.get('quotaBytes')
-    if not isinstance(quota, int) or isinstance(quota, bool) or not 1000**3 <= quota <= 20000 * 1000**3:
-        raise OpsError('BACKUP_QUOTA_INVALID')
+    # Legacy quotaBytes is intentionally ignored: S3 capacity never blocks a
+    # fresh backup. This reference controls notifications only.
+    reference = value.get('capacityWarningBytes', 10_000_000_000)
+    if type(reference) is not int or not 1000**3 <= reference <= 20000 * 1000**3:
+        raise OpsError('BACKUP_WARNING_REFERENCE_INVALID')
     if value.get('policy') != {'productionDaily': 7, 'predeploy': 2, 'stagingPredeploy': 2}:
         raise OpsError('BACKUP_POLICY_CHANGED')
     return value
@@ -230,13 +232,7 @@ def backup(config, environment, kind, *, already_locked=False):
                             'services': run(['systemctl', 'show', 'cashneuro-' + environment + '-*', '-p', 'Id', '-p', 'WorkingDirectory']).decode(),
                             'recovery': 'Isolated restore + independent deletion-journal check required before public start. KMS RSA access recovered separately.'}
                 private_write(root / 'manifest.json', json.dumps(manifest, sort_keys=True))
-                # A declared quota is a guard, never a purchase or bucket auto-upgrade.
-                existing = json.loads(restic(config, environment, ['snapshots', '--json']))
-                raw = json.loads(restic(config, environment, ['stats', '--mode', 'raw-data', '--json'])) if existing else {'total_size': 0}
                 estimate = sum(p.stat().st_size for p in root.rglob('*') if p.is_file())
-                # Split the configured bucket cap across both DB and both journal repositories.
-                if int(raw.get('total_size', 0)) + estimate * 2 + 32 * 1024**2 > config['quotaBytes'] // 2:
-                    raise OpsError('BACKUP_DECLARED_CAPACITY_LOW')
                 emit('backup-upload', environment=environment, archiveBytes=estimate)
                 output = restic(config, environment, ['backup', '--json', '--host', HOST, '--tag', kind, '.'], cwd=root)
                 sid = snapshot_id(output)
@@ -319,7 +315,7 @@ def restore_test(config, environment):
                 shutil.rmtree(root)
 
 
-def alert(config, code):
+def alert(config, code, *, capacity=None):
     """One operational email to the configured owner, no database/provider details."""
     import smtplib
     import ssl
@@ -331,8 +327,16 @@ def alert(config, code):
     message = EmailMessage()
     message['From'] = 'CashNeuro <notifications@cashneuro.ru>'
     message['To'] = recipient
-    message['Subject'] = 'CashNeuro: ошибка резервного копирования'
-    message.set_content('Автоматическая проверка резервных копий завершилась ошибкой ' + code + '.\nПроверьте sudo cashneuro-ops status. Данные и ключи в это письмо не включаются.')
+    if capacity is None:
+        message['Subject'] = 'CashNeuro: ошибка резервного копирования'
+        message.set_content('Автоматическая проверка резервных копий завершилась ошибкой ' + code + '.\nПроверьте sudo cashneuro-ops status. Данные и ключи в это письмо не включаются.')
+    else:
+        message['Subject'] = 'CashNeuro: растёт объём хранилища S3'
+        message.set_content('Текущие объекты в S3 занимают %.2f ГБ. Ориентир уведомлений: %.2f ГБ.\n'
+                            'Копирование продолжается, ротация старых копий действует.\n'
+                            'Замер не включает предыдущие версии объектов и незавершённые multipart-загрузки.\n'
+                            'Проверьте потребление и стоимость в панели Timeweb.\n'
+                            % (capacity['currentObjectBytes'] / 1_000_000_000, capacity['warningReferenceBytes'] / 1_000_000_000))
     with smtplib.SMTP_SSL('postbox.cloud.yandex.net', 465, timeout=10, context=ssl.create_default_context()) as smtp:
         smtp.login(secret['username'], secret['password'])
         smtp.send_message(message)
