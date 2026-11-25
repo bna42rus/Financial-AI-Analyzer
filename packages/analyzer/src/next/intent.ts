@@ -58,7 +58,7 @@ type Envelope<A extends string,P> = {version:typeof intentVersion; action:A; bin
 export type SimpleIntent =
   | Envelope<'read',{metric:Query['metric']|null; grouping:Query['grouping']|null; comparison:Query['comparison']|null; conditions:ConditionEdit[]; options:AnalysisOptions}>
   | Envelope<'calculate',CalculationParameters>
-  | Envelope<'compare',{scenarios:string[]; criterion:'interest'|'total_paid'|'payment'|'net_return'; objective:'min'|'max'}>
+  | Envelope<'compare',{scenarios:string[]; criterion:'interest'|'total_paid'|'payment'|'net_return'|'value'; objective:'min'|'max'}>
   | Envelope<'explain',{subject:{kind:'concept'; question:string}|{kind:'result'; handle:string}}>
   | Envelope<'advise',{goal:string; constraints:string[]; evidence:string[]}>
   | Envelope<'propose',AssistantChange>
@@ -72,7 +72,7 @@ const envelope = (action:string, parameters:unknown) => closed({version:en([inte
 const simpleSchemas = [
   envelope('read',closed({metric:nullable(en(queryMetrics)), grouping:nullable(en(queryGroupings)), comparison:nullable(en(queryComparisons)), conditions:list(conditionEditSchema,32), options:analysisOptionsSchema})),
   envelope('calculate',calculationSchema),
-  envelope('compare',closed({scenarios:list(alias,6,2), criterion:en(['interest','total_paid','payment','net_return']), objective:en(['min','max'])})),
+  envelope('compare',closed({scenarios:list(alias,6,2), criterion:en(['interest','total_paid','payment','net_return','value']), objective:en(['min','max'])})),
   envelope('explain',closed({subject:{anyOf:[closed({kind:en(['concept']),question:text}),closed({kind:en(['result']),handle:alias})]}})),
   envelope('advise',closed({goal:text, constraints:list(text,20), evidence:list(alias,20)})),
   envelope('propose',assistantChangeSchema),
