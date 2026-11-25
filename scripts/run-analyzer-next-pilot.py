@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--source', required=True)
     parser.add_argument('--sha', required=True)
     parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
+    parser.add_argument('--suite', choices=['basic', 'additional'], default='basic')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--live', action='store_true')
     mode.add_argument('--replay-only', action='store_true', help='Never dispatch a model request; require all saved replies')
@@ -92,7 +93,7 @@ def main():
         if json.loads(private(target / 'source-ready.json')) != {'sha': args.sha}:
             raise RuntimeError('PILOT_SOURCE_INCOMPLETE')
         print('PRECHECK: offline contracts, context, complete dialogs and comparison regressions.', flush=True)
-        checks = ['next-contract', 'next-period', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression']
+        checks = ['next-contract', 'next-period', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression', 'next-additional-pilot']
         checked = subprocess.run(['/usr/bin/node', '--test', *[str(source / 'packages/analyzer/test' / (name+'.test.ts')) for name in checks]], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
         if checked.returncode:
             raise RuntimeError('PILOT_OFFLINE_PRECHECK_FAILED')
@@ -115,7 +116,7 @@ def main():
             directory(journal_target)
             private(journal_target / 'run.json')
             print('Reusing the existing pilot receipts; '+('model dispatch disabled.' if args.replay_only else 'only missing replies may dispatch.'), flush=True)
-        payload = {'activeApi': api, 'directory': str(journal_target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0]}
+        payload = {'activeApi': api, 'directory': str(journal_target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0], 'suite': args.suite}
         result = subprocess.run(['/usr/bin/node', '--import', 'tsx', 'src/analyzer-next-pilot-main.ts', '--replay-only' if args.replay_only else '--live'], cwd=source / 'apps/api', input=json.dumps(payload), text=True, env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'production'})
         return result.returncode
 
