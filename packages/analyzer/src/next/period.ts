@@ -30,6 +30,9 @@ function literal(quote:string,date:string,previous:Period):Period{
  }
  return period;
 }
+export function isCompletePeriodLiteral(value:string,date:string):boolean{
+ if(!value||value.length>2000)return false;try{literal(value,date,{});return true;}catch{return false;}
+}
 export function periodExpression(expression:string,question:string,date:string,previous:Period={}):Period{
  if(!question||question.length>2000||!expression||expression.length>2000)fail('TASK_PERIOD_UNSUPPORTED');
  let proposed:Period|null;

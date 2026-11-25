@@ -14,6 +14,7 @@ import type {WidgetResult} from '../../../finance-core/src/overview.ts';
 import type {Catalog} from '../yandex-contract.ts';
 import {questionQuote} from '../task-literals.ts';
 import {periodExpression} from './period.ts';
+import {normalizeReadBinding} from './read-binding.ts';
 import {assistantAmountLiteral} from '../assistant-money.ts';
 import {calculateFinancial,parseCalculatorInput,calculatorRublesMinor} from '../calculators.ts';
 import type {LoanInput,CalculatorResult} from '../calculators.ts';
@@ -157,7 +158,10 @@ function prepareLoan(state:State,env:Environment,intent:Extract<Intent,{action:'
  return start(state,env,{kind:'loan',input,inputs},intent.presentation,parent);
 }
 export function prepareTask(state:State,env:Environment,raw:unknown):Preparation{
- check(state,env);const intent=parseIntent(raw);
+ check(state,env);let intent=parseIntent(raw);
+ const active=state.history.find(t=>t.handle===state.active);
+ try{intent=normalizeReadBinding(intent,active?.kind==='read'?active.node.query:null,env.question,env.date,!!(state.pending||state.running),{accounts:env.catalog.accounts.map(v=>v.name),categories:env.catalog.categories.map(v=>v.name),counterparties:env.catalog.counterparties.map(v=>v.name),merchant:active?.kind==='read'?(active.node.query.grouping==='merchant'?active.result.points.map(p=>p.label):active.node.query.filter.merchant?[active.node.query.filter.merchant]:[]):[]});}
+ catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
  if(state.history.some(t=>t.requestId===env.requestId)||state.running?.requestId===env.requestId)fail('TASK_REQUEST_REUSED');
  if(intent.action==='explain'){
   const historical=intent.parameters.subject.kind==='result'?lookup(state,intent.parameters.subject.handle).task:null;

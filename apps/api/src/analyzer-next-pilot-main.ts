@@ -20,6 +20,7 @@ import {parseIntent} from '../../../packages/analyzer/src/next/intent.ts';
 import {pilotCases,pilotSchema,pilotPrompt,pilotPreparationMatches,pilotOutcomeMatches} from '../../../packages/analyzer/src/next/pilot.ts';
 import {scope,account,catalog,rows} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
 import {calculateWidget,parseWidget} from '../../../packages/finance-core/src/overview.ts';
+import {sanitizeText} from '../../../packages/privacy/src/text.ts';
 import {stagingDatabase} from './runtime-key.ts';
 const rub=(n:bigint|string)=>{const v=BigInt(n);return `${v/1000000000n}.${(v%1000000000n).toString().padStart(9,'0')}`;};
 async function main(){
@@ -60,19 +61,20 @@ async function main(){
     const changed=await settleCost(db,cfg.userId,id,'assistant_0',usage);
     await db.query(`UPDATE commerce.analyzer_request SET state=$3,usage_state=$4,input_tokens=$5,output_tokens=$6,model_version=$7,updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='assistant_0'`,[cfg.userId,id,usage?'completed':'unknown',usage?'reported':'unknown',usage?.inputTokens??null,usage?.outputTokens??null,usage?.modelVersion??null]);return changed;
    });if(violation)throw Error('ASSISTANT_PROVIDER_CHANGED');}};
-   let receipt:RunReceipt|undefined,replayed=false,semantic=false;const started=performance.now();
+   let receipt:RunReceipt|undefined,replayed=false,semantic=false,reviewCode='',resolved='';const started=performance.now();
    const result=await withAssistantJournal(journalDirectory,request,accounting,async journal=>{
     receipt=journal.receipt;
     return session.run(environment,{async understand(modelInput){const r=await pilotModelCall(createCloudAssistantModel({apiKey:cfg.settings.apiKey},fetch,'assistant','cashneuro-intent-prototype/1'),journal,{phase:'understand',prompt:pilotPrompt,input:modelInput,schema:pilotSchema});replayed=r.replayed;return r.value;}},{
      current:()=>({scope,dataRevision:environment.dataRevision,accessRevision:environment.accessRevision}),
      async authorize(){if(!provider.allowed(cfg.email))throw Error('PILOT_ACCOUNT_DENIED');},
-     async review(_input,reply){try{semantic=reply.intent!==null&&(c.id!=='read-compare'||reply.intent.action==='compare'&&reply.intent.parameters.objective==='max')&&pilotPreparationMatches(c.id,prepareTask(session.snapshot(),environment,reply.intent));return semantic;}catch{return false;}},
+     async review(_input,reply){try{if(reply.intent===null)return false;const prepared=prepareTask(session.snapshot(),environment,reply.intent);resolved=prepared.status==='ready'?(prepared.task.kind==='read'?'read:'+(prepared.task.node.parent?'continue':'new'):prepared.task.kind):prepared.status;semantic=(c.id!=='read-compare'||reply.intent.action==='compare'&&reply.intent.parameters.objective==='max')&&pilotPreparationMatches(c.id,prepared);if(!semantic)reviewCode='PILOT_EXPECTATION_MISMATCH';return semantic;}catch(error){reviewCode=error instanceof Error&&/^(?:TASK|INVALID)_[A-Z_]{1,70}$/.test(error.message)?error.message:'PILOT_PREPARATION_FAILED';return false;}},
      tools:{async guard(){},async read(query){return calculateWidget(parseWidget({id:scope.chatId,name:'Синтетическая выборка',metrics:[query.metric],grouping:query.grouping,filter:query.filter,comparison:query.comparison==='custom'?{kind:'custom',...query.options?.comparisonPeriod}:{kind:query.comparison},chart:'table',topN:50}),rows,catalog,{},request.now,'Europe/Moscow',true);}},
     });
    });
    const ok=semantic&&(c.id==='loan-concept'?result.status==='explanation':result.status==='completed'&&pilotOutcomeMatches(c.id,result.outcome));tested++;if(ok)passed++;else failedChains.add(c.chain);
    const call=receipt?.calls[0],usage=call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{}
-   console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}`);
+   console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}`);
+   if(!ok){let details:unknown={invalid:true};try{const p=parseIntent((call?.value as any)?.intent);details={action:p.action,binding:p.binding,...(p.action==='read'||p.action==='compare'?{parameters:p.parameters}:{})};}catch{}console.log('DIAGNOSTIC '+c.id+' '+reviewCode+' '+sanitizeText(JSON.stringify(details)));}
    if(result.status==='failed'&&/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED)$/.test(result.code))break;
    const current=await budget();if(BigInt(current.month!.heldAtoms)>0n){console.log('STOP: unresolved cost hold; no retry');break;}
   }
