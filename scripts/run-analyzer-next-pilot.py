@@ -37,10 +37,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--source', required=True)
     parser.add_argument('--sha', required=True)
+    parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
     parser.add_argument('--live', action='store_true', required=True)
     args = parser.parse_args()
     if os.geteuid() != 0 or not re.fullmatch('[a-f0-9]{40}', args.sha):
         raise RuntimeError('PILOT_ROOT_SHA_REQUIRED')
+    if args.resume is not None and not re.fullmatch('[a-f0-9]{40}', args.resume):
+        raise RuntimeError('PILOT_RESUME_SHA_INVALID')
     repo = Path(args.source).resolve()
     if run(['git', '-c', 'safe.directory='+str(repo), '-C', str(repo), 'rev-parse', args.sha+'^{commit}'], text=True).strip() != args.sha:
         raise RuntimeError('PILOT_COMMIT_INVALID')
@@ -95,7 +98,15 @@ def main():
         owner = module.run(['docker', 'exec', '-i', module.database(), 'sh', '-c', 'exec psql -X -v ON_ERROR_STOP=1 -U "${POSTGRES_USER:-postgres}" -d finance_staging -Atq'], sql).splitlines()
         if len(owner) != 1 or not re.fullmatch('[A-Za-z0-9_-]{1,256}', owner[0]):
             raise RuntimeError('PILOT_ACCOUNT_NOT_UNIQUE')
-        payload = {'activeApi': api, 'directory': str(target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0]}
+        journal_target = target
+        if args.resume:
+            journal_target = BASE / args.resume
+            if not journal_target.is_dir():
+                raise RuntimeError('PILOT_RESUME_NOT_FOUND')
+            directory(journal_target)
+            private(journal_target / 'run.json')
+            print('Reusing the existing pilot receipts; only missing replies may dispatch.', flush=True)
+        payload = {'activeApi': api, 'directory': str(journal_target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0]}
         result = subprocess.run(['/usr/bin/node', '--import', 'tsx', 'src/analyzer-next-pilot-main.ts', '--live'], cwd=source / 'apps/api', input=json.dumps(payload), text=True, env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'production'})
         return result.returncode
 

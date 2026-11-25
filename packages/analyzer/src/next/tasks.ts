@@ -12,7 +12,8 @@ import type {OperationsFilter} from '../../../finance-core/src/operations.ts';
 import {uuid} from '../../../finance-core/src/model.ts';
 import type {WidgetResult} from '../../../finance-core/src/overview.ts';
 import type {Catalog} from '../yandex-contract.ts';
-import {periodLiteral,questionQuote} from '../task-literals.ts';
+import {questionQuote} from '../task-literals.ts';
+import {periodExpression} from './period.ts';
 import {assistantAmountLiteral} from '../assistant-money.ts';
 import {calculateFinancial,parseCalculatorInput,calculatorRublesMinor} from '../calculators.ts';
 import type {LoanInput,CalculatorResult} from '../calculators.ts';
@@ -108,19 +109,12 @@ function readBase(state:State,env:Environment,previous:ReadTask|null,pin:boolean
  return resolved.node;
 }
 function expressionEdit(field:Condition,expression:string,env:Environment,base:Query):ConditionEdit{
- questionQuote(expression,env.question);
+ if(field!=='period'&&field!=='postedPeriod')questionQuote(expression,env.question);
  let value:OperationsFilter;
  if(field==='period'||field==='postedPeriod'){
-  let date=env.date;
-  const literal=expression.normalize('NFKC').trim().replace(/^(?:за|в)\s+/u,'');
-  // Only a bare named month inherits the selected period's year. Relative dates
-  // still use today's calendar; a year spanning scope needs explicit choice.
-  const current=periodLiteral(expression,env.question,date),prior=field==='period'?base.filter.from:base.filter.postedFrom;
-  const through=field==='period'?base.filter.through:base.filter.postedThrough;
-  if(prior&&through&&/^\p{L}+$/u.test(literal)&&current.from?.endsWith('-01')&&current.from!==current.through){
-   if(prior.slice(0,4)!==through.slice(0,4))fail('TASK_PERIOD_YEAR_AMBIGUOUS');date=prior.slice(0,4)+'-01-01';
-  }
-  const period=periodLiteral(expression,env.question,date);
+  let period;
+  try{period=periodExpression(expression,env.question,env.date,{from:field==='period'?base.filter.from:base.filter.postedFrom,through:field==='period'?base.filter.through:base.filter.postedThrough});}
+  catch(error){if(error instanceof TypeError&&/^(?:TASK_|INVALID_)[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
   value=field==='period'?period:{postedFrom:period.from,postedThrough:period.through};
  }else if(field==='amount')value=assistantAmountLiteral(expression,'absolute_operation');
  else if(['accounts','categories','counterparties'].includes(field)){
