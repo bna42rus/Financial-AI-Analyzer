@@ -1,23 +1,11 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {facet} from '../../finance-core/src/model.ts';
 import {calculateWidget,parseWidget} from '../../finance-core/src/overview.ts';
-import type {OperationRow} from '../../finance-core/src/operations.ts';
 import {emptyState,prepareTask,executeTask,finishTask,taskProjection} from '../src/next/tasks.ts';
 import type {State,Environment,Prepared,Preparation} from '../src/next/tasks.ts';
 import {intentVersion} from '../src/next/intent.ts';
 
-const id=(n:number)=>'20000000-0000-4000-8000-'+String(n).padStart(12,'0');
-const scope={ownerId:'synthetic-owner',chatId:id(1),chatEpoch:id(2),generation:id(3)};
-const account=id(4),food=id(5),taxi=id(6);
-const catalog={accounts:[{id:account,name:'Учебный счёт',bankId:'tbank',type:'bank_account' as const,analyticsEnabled:true,defaultVisible:true,loanMode:null}],
- categories:[{id:food,name:'Продукты',parentId:null,role:'expense' as const,hidden:false},{id:taxi,name:'Такси',parentId:null,role:'expense' as const,hidden:false}],counterparties:[]};
-function row(n:number,date:string,categoryId:string,amountMinor:string):OperationRow{
- return {id:id(n),date:{precision:'day',date},accountId:account,amountMinor,analyticsRole:'expense',decompositionActive:false,reviewReasons:[],unresolvedMinor:'0',neutralMinor:'0',excludedMinor:'0',
-  parts:[{id:id(n+100),componentId:null,allocationId:null,amountMinor,role:'expense',categoryId,subcategoryId:null,basis:[],included:true}],
-  classification:{kind:facet('purchase'),role:facet('expense'),category:facet(categoryId),subcategory:facet(null),merchant:facet('Учебный магазин'),counterparty:facet(null)},comment:''};
-}
-const rows=[row(10,'2025-09-10',food,'-10000'),row(11,'2025-09-11',taxi,'-2000'),row(12,'2025-10-10',food,'-15000'),row(13,'2025-10-11',taxi,'-1800')];
+import {id,scope,account,food,taxi,catalog,rows} from './fixtures/next-finances.ts';
 const envelope=(action:string,parameters:unknown,binding:unknown={mode:'new'},format='auto')=>({version:intentVersion,action,binding,parameters,presentation:{format,detail:'normal'}});
 const keep={mode:'continue',conditions:'merge_ui'},pin={mode:'continue',conditions:'pin'};
 const read=(metric:string|null='expenses',conditions:unknown[]=[],binding:unknown={mode:'new'},grouping:string|null=null)=>envelope('read',{metric,grouping,comparison:null,conditions,options:{}},binding);
