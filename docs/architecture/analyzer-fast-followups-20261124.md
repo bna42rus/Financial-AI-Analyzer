@@ -93,3 +93,12 @@ It neither imports a model provider nor queries financial operations, writes
 data, settles reservations or resets a budget. Raw archived values are never
 printed. Its output validates archived plans, not fresh model understanding.
 A future live regression must be separate and bounded, after archive checks pass.
+
+The remaining archived read failed because its period was the complete ISO
+interval `2026-10-01/2026-10-31`, not because of its supported `>1500` amount.
+The assistant compiler now maps a whole ISO day/day slash interval to its
+existing inclusive date range grammar for both operation and posted periods.
+The original calendar validation rejects impossible dates and reversed ranges;
+trailing conditions or additional separators are never discarded. Legacy task
+literal/evidence contracts remain unchanged. The offline regression fixture
+uses both exact observed literals so this failure is reproduced without AI.

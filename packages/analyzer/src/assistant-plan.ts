@@ -233,7 +233,10 @@ export function compileAssistantPlan(input: CompilerInput, catalog: Catalog): Pr
       if (c.op !== 'set') { applied.set(field, { field, op: c.op }); continue; }
       let value: OperationsFilter;
       if (field === 'period' || field === 'postedPeriod') {
-        const period = periodLiteral(c.value, String(c.value), sourceCalendar.currentDate);
+        // ISO interval notation is equivalent to the existing inclusive range.
+        // Match the whole expression; calendar validity/order remain server checks.
+        const expression=String(c.value).normalize('NFKC').trim().replace(/^(\d{4}-\d{2}-\d{2})\s*\/\s*(\d{4}-\d{2}-\d{2})$/u,'$1 по $2');
+        const period = periodLiteral(expression, expression, sourceCalendar.currentDate);
         value = field === 'period' ? period : { postedFrom: period.from, postedThrough: period.through };
       } else if (field === 'amount') {
         const v = c.value as { basis: string; expression: string };

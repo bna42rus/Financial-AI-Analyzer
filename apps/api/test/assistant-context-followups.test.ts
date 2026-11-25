@@ -75,11 +75,23 @@ test('archive replay checks calculator metadata and monetary literals without a 
   'deposit-compound-additions':{kind:'deposit',principalRubles:'120000',annualRatePercent:'12',months:18,capitalization:true,monthlyAdditionRubles:'3000'},
   'percentage-decimal':{kind:'percentage',baseRubles:'84000',percent:'17.5'},
  };
- const read=plan('read',{context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','category_totals'),set('period','октябрь 2026 года'),set('amount',{basis:'absolute_operation',expression:'более 1500 рублей'})]});
+ const read=plan('read',{context:{mode:'new'},changes:[set('metric','expenses'),set('grouping','category_totals'),set('period','2026-10-01/2026-10-31'),set('amount',{basis:'absolute_operation',expression:'>1500'})]});
  const rows=[...Object.entries(inputs).map(([name,calculation])=>({name,question:examples.find(c=>c.name===name)!.text,calls:[{phase:'understand',state:'received',value:plan('calculate',{calculation,context:{mode:'new'}})}]})),{name:'multiple-read-conditions',question:examples.find(c=>c.name==='multiple-read-conditions')!.text,calls:[{phase:'understand',state:'received',value:read},{phase:'check_changes',state:'received',value:{plan:read,conditions:[]}}]}];
  assert.ok((await checkArchivedPlans(rows)).every(r=>r.passed));
  const wrong=structuredClone(rows);wrong[0]!.question='Не диагностический вопрос';assert.equal((await checkArchivedPlans(wrong))[0]!.code,'ARCHIVE_CASE_MISMATCH');
  const unsupported=structuredClone(rows);(unsupported[3]!.calls[1]!.value as any).plan.changes[3].value.expression='примерно 1500 рублей';assert.equal((await checkArchivedPlans(unsupported))[3]!.code,'TASK_AMOUNT_EXPRESSION_UNSUPPORTED');
+});
+
+test('ISO slash intervals preserve inclusive calendar bounds for operation and posted periods',async()=>{
+ for(const [from,through]of [['2026-10-01','2026-10-31'],['2024-02-01','2024-02-29'],['2025-02-01','2025-02-28'],['2025-12-31','2026-01-01'],['2026-06-07','2026-06-07']]){
+  for(const field of ['period','postedPeriod']){
+   const h=harness(),r=await h.turn('Итог за указанный диапазон',plan('read',{context:{mode:'new'},changes:[set('metric','expenses'),set(field,from+' / '+through)]}));
+   assert.equal(r.code,'FINANCIAL_QUERY');assert.equal(r.query!.filter[field==='period'?'from':'postedFrom'],from);assert.equal(r.query!.filter[field==='period'?'through':'postedThrough'],through);assert.equal(r.modelCalls,2);
+  }
+ }
+ for(const expression of ['2025-02-01/2025-02-29','2026-10-31/2026-10-01','2026-10-01/2026-10-31/2026-11-01','2026-10-01/2026-10-31 кроме пятниц','2026-10-01/после зарплаты']){
+  const h=harness(),r=await h.turn('Итог за указанный диапазон',plan('read',{context:{mode:'new'},changes:[set('metric','expenses'),set('period',expression)]}));assert.notEqual(r.code,'FINANCIAL_QUERY');assert.equal(h.queries.length,0);
+ }
 });
 test('pending calculator survives a concept question, then success clears pending and later explanations preserve conditions',async()=>{
  const h=harness();
