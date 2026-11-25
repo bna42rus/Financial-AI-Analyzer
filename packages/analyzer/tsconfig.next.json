@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "types": []
   },
-  "files": ["src/next/intent.ts", "src/next/tasks.ts", "src/next/workflow.ts"]
+  "files": ["src/next/intent.ts", "src/next/tasks.ts", "src/next/workflow.ts", "src/next/pilot.ts"]
 }

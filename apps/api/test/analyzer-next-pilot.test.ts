@@ -1,0 +1,61 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createCloudAssistantModel} from '../src/assistant-transport.ts';
+import {pilotModelCall} from '../src/analyzer-next-pilot-call.ts';
+import type {AssistantJournal,AssistantModel,CompletionInput} from '../src/assistant-workflow.ts';
+import {pilotSchema,pilotPrompt,pilotCases,pilotPreparationMatches} from '../../../packages/analyzer/src/next/pilot.ts';
+import {assistantVersion} from '../../../packages/analyzer/src/assistant-plan.ts';
+import {intentSchema,intentVersion} from '../../../packages/analyzer/src/next/intent.ts';
+import {prepareTask,emptyState} from '../../../packages/analyzer/src/next/tasks.ts';
+import {scope,catalog,account,id} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
+const usage={modelVersion:'synthetic-pilot-model',inputTokens:100,outputTokens:50};
+const input:CompletionInput={phase:'understand',prompt:'Synthetic prompt',input:{question:'Синтетический кредит'},schema:{type:'object'}};
+function harness(){
+ const events:string[]=[],journal:AssistantJournal={receipt:{fingerprint:'f'.repeat(64),calls:[]},async reserve(){events.push('reserve');},async settle(_index,value){events.push(value?'settle':'hold');},async persist(){events.push('persist');}};
+ const model:AssistantModel={bound:{modelVersion:usage.modelVersion,inputTokens:1000,outputTokens:500},async complete(_input,before){await before();events.push('http');return {value:{synthetic:true},usage};}};return {journal,model,events};
+}
+test('paid adapter reserves and persists before dispatch, settles reported usage, then replays without another call',async()=>{
+ const h=harness();const first=await pilotModelCall(h.model,h.journal,input);assert.equal(first.replayed,false);assert.deepEqual(h.events,['reserve','persist','http','settle','persist']);
+ h.events.length=0;const second=await pilotModelCall(h.model,h.journal,input);assert.equal(second.replayed,true);assert.deepEqual(h.events,[]);assert.deepEqual(second.value,first.value);
+ await assert.rejects(pilotModelCall(h.model,h.journal,{...input,prompt:'changed'}),/ASSISTANT_REQUEST_CHANGED/);
+});
+test('unknown delivery retains its reservation and cannot retry on rerun',async()=>{
+ const h=harness();h.model.complete=async(_input,before)=>{await before();throw Error('private transport detail');};
+ await assert.rejects(pilotModelCall(h.model,h.journal,input),/ASSISTANT_DELIVERY_UNKNOWN/);assert.equal(h.journal.receipt.calls[0]?.state,'unknown');assert.ok(h.events.includes('hold'));h.events.length=0;
+ await assert.rejects(pilotModelCall(h.model,h.journal,input),/ASSISTANT_DELIVERY_UNKNOWN/);assert.deepEqual(h.events,[]);
+});
+test('invalid JSON with known usage is billed once and marked failed instead of releasing the hold for free',async()=>{
+ const h=harness();h.model.complete=async(_input,before)=>{await before();throw Object.assign(Error('private response text'),{usage,responsePhase:'JSON'});};
+ await assert.rejects(pilotModelCall(h.model,h.journal,input));assert.equal(h.journal.receipt.calls[0]?.state,'failed');assert.ok(h.events.includes('settle'));assert.ok(!h.events.includes('hold'));h.events.length=0;
+ await assert.rejects(pilotModelCall(h.model,h.journal,input));assert.deepEqual(h.events,[]);
+});
+test('reservation denial prevents HTTP; changed provider usage is settled before rejection',async()=>{
+ const h=harness();h.journal.reserve=async()=>{throw Error('PILOT_RUN_COST_LIMIT');};await assert.rejects(pilotModelCall(h.model,h.journal,input),/PILOT_RUN_COST_LIMIT/);assert.ok(!h.events.includes('http'));
+ const changed=harness();changed.model.complete=async(_input,before)=>{await before();return {value:{},usage:{...usage,outputTokens:501}};};
+ await assert.rejects(pilotModelCall(changed.model,changed.journal,input),/ASSISTANT_PROVIDER_CHANGED/);assert.equal(changed.journal.receipt.calls[0]?.state,'failed');assert.ok(changed.events.includes('settle'));
+});
+test('pilot schema contains only four tool families and loan calculation; source contract stays unchanged',()=>{
+ const variants=(pilotSchema.anyOf[0]!.properties.intent as any).anyOf;
+ assert.deepEqual(variants.map((s:any)=>s.properties.action.enum[0]),['read','calculate','compare','explain']);
+ const calculators=variants.find((s:any)=>s.properties.action.enum[0]==='calculate').properties.parameters.anyOf;assert.equal(calculators.length,1);assert.equal(calculators[0].properties.calculator.enum[0],'loan');
+ assert.ok((intentSchema as any).anyOf.some((s:any)=>s.properties.action.enum[0]==='propose'));assert.equal(pilotCases.length,8);assert.ok(!pilotPrompt.includes('300000'));assert.ok(!pilotPrompt.includes('16800'));
+});
+test('semantic oracle accepts equivalent money formats but rejects invented prepayments and wrong terms',()=>{
+ const env={scope,requestId:id(700),question:'300000.00 19,00% 36 месяцев',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ const edits=[{field:'principalRubles',op:'set',value:'300000.00',quote:'300000.00'},{field:'annualRatePercent',op:'set',value:'19,00',quote:'19,00%'},{field:'months',op:'set',value:36,quote:'36 месяцев'}];
+ const intent={version:intentVersion,action:'calculate',binding:{mode:'new'},parameters:{calculator:'loan',edits},presentation:{format:'auto',detail:'normal'}};
+ assert.equal(pilotPreparationMatches('loan-new',prepareTask(emptyState(scope),env,intent)),true);
+ const extra=structuredClone(intent);extra.parameters.edits.push({field:'prepayments',op:'set',value:[{month:6,amountRubles:'1000',strategy:'reduce_term'}],quote:'300000.00'} as any);
+ assert.equal(pilotPreparationMatches('loan-new',prepareTask(emptyState(scope),env,extra)),false);
+});
+
+test('experimental protocol is explicit and cannot change the normal assistant protocol',async()=>{
+ for(const experimental of [undefined,'cashneuro-intent-prototype/1'] as const){
+  let body:any;
+  const fetcher:typeof fetch=async(_url,options)=>{body=JSON.parse(String(options?.body));throw Error('synthetic offline stop');};
+  const model=createCloudAssistantModel({apiKey:'synthetic-pilot-key-never-live'},fetcher,'assistant',experimental);
+  await assert.rejects(model.complete(input,async()=>{}));
+  assert.ok(body.messages[0].content.startsWith('Protocol '+(experimental??assistantVersion)+'\n'));
+ }
+ assert.throws(()=>createCloudAssistantModel({apiKey:'synthetic-pilot-key-never-live'},fetch,'classification','cashneuro-intent-prototype/1'));
+});

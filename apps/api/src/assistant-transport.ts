@@ -4,12 +4,13 @@ import type { AssistantModel, CompletionInput } from './assistant-workflow.ts';
 
 /** Explicit credentials/fetch only. No environment key lookup or runtime
  * enablement. Reuses the existing strict HTTP/usage/unknown-delivery parser. */
-export function createCloudAssistantModel(credentials: unknown, fetcher: typeof fetch, purpose: 'assistant'|'classification' = 'assistant'): AssistantModel {
+export function createCloudAssistantModel(credentials: unknown, fetcher: typeof fetch, purpose: 'assistant'|'classification' = 'assistant', experimentalProtocol?:'cashneuro-intent-prototype/1'): AssistantModel {
+  if(experimentalProtocol!==undefined&&(experimentalProtocol!=='cashneuro-intent-prototype/1'||purpose!=='assistant'))throw Error('ASSISTANT_TRANSPORT_CHANGED');
   let expected: CompletionInput | undefined;
   const transport = createBenchmarkTransport('cloud-oss', credentials, fetcher, 'empty-tools', (_candidate, bound, prompt, input, schema) => {
     if (!expected || prompt !== expected.prompt || input !== expected.input || schema !== expected.schema) throw Error('ASSISTANT_TRANSPORT_CHANGED');
     return JSON.stringify({ model: bound.modelVersion, messages: [
-      { role: 'system', content: 'Protocol ' + (expected.protocol??assistantVersion) + '\n' + prompt + '\n' + ('JSON Schema:\n'+JSON.stringify(compactAssistantSchema(schema))) },
+      { role: 'system', content: 'Protocol ' + (expected.protocol??experimentalProtocol??assistantVersion) + '\n' + prompt + '\n' + ('JSON Schema:\n'+JSON.stringify(compactAssistantSchema(schema))) },
       { role: 'user', content: JSON.stringify(input) },
     ], temperature: 0, stream: false, n: 1, max_completion_tokens: bound.outputTokens, response_format: { type: 'json_object' } });
   }, 90000, purpose === 'assistant' ? 98304 : 65536);
