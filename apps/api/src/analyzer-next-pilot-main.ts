@@ -24,7 +24,8 @@ import {sanitizeText} from '../../../packages/privacy/src/text.ts';
 import {stagingDatabase} from './runtime-key.ts';
 const rub=(n:bigint|string)=>{const v=BigInt(n);return `${v/1000000000n}.${(v%1000000000n).toString().padStart(9,'0')}`;};
 async function main(){
- if(process.getuid?.()!==0||process.argv.slice(2).join(' ')!=='--live')throw Error('PILOT_ROOT_LIVE_REQUIRED');
+ const mode=process.argv.slice(2).join(' '),replayOnly=mode==='--replay-only';
+ if(process.getuid?.()!==0||!['--live','--replay-only'].includes(mode))throw Error('PILOT_ROOT_LIVE_REQUIRED');
  let input='';for await(const chunk of process.stdin){input+=chunk.toString();if(input.length>262144)throw Error('PILOT_INPUT_TOO_LARGE');}
  const cfg=JSON.parse(input);
  if(!/^\/srv\/cashneuro\/staging\/backend-releases\/[a-f0-9]{40}\/apps\/api$/.test(cfg.activeApi)||!/^\/var\/lib\/cashneuro\/analyzer-next-pilot\/[a-f0-9]{40}$/.test(cfg.directory))throw Error('PILOT_PATH_INVALID');
@@ -43,13 +44,13 @@ async function main(){
   const transaction=async<T>(action:(db:import('pg').PoolClient)=>Promise<T>)=>{const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[cfg.userId]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}};
   const runCost=async(db:import('pg').PoolClient)=>BigInt((await db.query(`SELECT COALESCE(sum(CASE WHEN state IN ('settled','released') THEN settled_atoms ELSE reserved_atoms END),0)::text AS n FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=ANY($2::uuid[])`,[cfg.userId,manifest.ids])).rows[0].n);
   const budget=()=>transaction(async db=>({month:await provider.budgetState!(db),run:await runCost(db)}));
-  const before=await budget();console.log(`PILOT: 8 synthetic turns; run ceiling 10 RUB; existing monthly cap preserved. MONTH_AVAILABLE ${rub(before.month!.remainingAtoms)} RUB`);
+  const before=await budget();console.log(`PILOT: 8 synthetic turns; ${replayOnly?'replay only, dispatch disabled':'run ceiling 10 RUB'}; existing monthly cap preserved. MONTH_AVAILABLE ${rub(before.month!.remainingAtoms)} RUB`);
   const sessions={loan:new PrototypeSession(scope),read:new PrototypeSession(scope)},failedChains=new Set<string>();let tested=0,passed=0,skipped=0,newReservations=0;
   for(const [index,c]of pilotCases.entries()){
    if(failedChains.has(c.chain)){skipped++;continue;}
    const session=sessions[c.chain],requestId=manifest.ids[index],environment={scope,requestId,question:c.question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
    const request:AssistantRequest={requestId,scope,question:c.question,global:environment.global,conversation:emptyConversation(scope),dataRevision:environment.dataRevision,timezone:'Europe/Moscow',now:new Date('2026-11-25T12:00:00Z')};
-   const accounting:AssistantAccounting={async reserve(id,call,bound){if(call!==0)throw Error('PILOT_ONE_CALL_ONLY');await transaction(async db=>{
+   const accounting:AssistantAccounting={async reserve(id,call,bound){if(replayOnly)throw Error('PILOT_REPLAY_MISSING');if(call!==0)throw Error('PILOT_ONE_CALL_ONLY');await transaction(async db=>{
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['cloud-task-dispatch:'+cfg.userId]);
     if((await db.query('SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3',[cfg.userId,id,'assistant_0'])).rowCount)throw Error('ASSISTANT_DELIVERY_UNKNOWN');
     const policy=provider.policy;await provider.prepareDispatch!(db,policy);
@@ -64,7 +65,7 @@ async function main(){
    let receipt:RunReceipt|undefined,replayed=false,semantic=false,reviewCode='',resolved='';const started=performance.now();
    const result=await withAssistantJournal(journalDirectory,request,accounting,async journal=>{
     receipt=journal.receipt;
-    return session.run(environment,{async understand(modelInput){const r=await pilotModelCall(createCloudAssistantModel({apiKey:cfg.settings.apiKey},fetch,'assistant','cashneuro-intent-prototype/1'),journal,{phase:'understand',prompt:pilotPrompt,input:modelInput,schema:pilotSchema});replayed=r.replayed;return r.value;}},{
+    return session.run(environment,{async understand(modelInput){const r=await pilotModelCall(createCloudAssistantModel({apiKey:cfg.settings.apiKey},fetch,'assistant','cashneuro-intent-prototype/1'),journal,{phase:'understand',prompt:pilotPrompt,input:modelInput,schema:pilotSchema},replayOnly?'replay_only':'allow');replayed=r.replayed;return r.value;}},{
      current:()=>({scope,dataRevision:environment.dataRevision,accessRevision:environment.accessRevision}),
      async authorize(){if(!provider.allowed(cfg.email))throw Error('PILOT_ACCOUNT_DENIED');},
      async review(_input,reply){try{if(reply.intent===null)return false;const prepared=prepareTask(session.snapshot(),environment,reply.intent);resolved=prepared.status==='ready'?(prepared.task.kind==='read'?'read:'+(prepared.task.node.parent?'continue':'new'):prepared.task.kind):prepared.status;semantic=(c.id!=='read-compare'||reply.intent.action==='compare'&&reply.intent.parameters.objective==='max')&&pilotPreparationMatches(c.id,prepared);if(!semantic)reviewCode='PILOT_EXPECTATION_MISMATCH';return semantic;}catch(error){reviewCode=error instanceof Error&&/^(?:TASK|INVALID)_[A-Z_]{1,70}$/.test(error.message)?error.message:'PILOT_PREPARATION_FAILED';return false;}},
@@ -78,7 +79,7 @@ async function main(){
    if(result.status==='failed'&&/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED)$/.test(result.code))break;
    const current=await budget();if(BigInt(current.month!.heldAtoms)>0n){console.log('STOP: unresolved cost hold; no retry');break;}
   }
-  const after=await budget();console.log(`RESULT ${passed}/${tested}; skipped ${skipped}; new reservations ${newReservations}; RUN_TOTAL ${rub(after.run)} RUB; MONTH_AVAILABLE ${rub(after.month!.remainingAtoms)} RUB; MONTH_HELD ${rub(after.month!.heldAtoms)} RUB; no financial data changed`);
+  const after=await budget();console.log(`RESULT ${passed}/${tested}; skipped ${skipped}; new reservations ${newReservations}; NEW_COST ${rub(after.run-before.run)} RUB; RUN_TOTAL ${rub(after.run)} RUB; MONTH_AVAILABLE ${rub(after.month!.remainingAtoms)} RUB; MONTH_HELD ${rub(after.month!.heldAtoms)} RUB; no financial data changed`);
   if(passed!==8)process.exitCode=1;
  }finally{await pool.end();}
 }

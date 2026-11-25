@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {AssistantError} from '../../../packages/analyzer/src/assistant-plan.ts';
 import type {AssistantJournal,AssistantModel,CompletionInput} from './assistant-workflow.ts';
 import type {Usage} from '../../../packages/analyzer/src/cost.ts';
-export async function pilotModelCall(model:AssistantModel,journal:AssistantJournal,input:CompletionInput){
+export async function pilotModelCall(model:AssistantModel,journal:AssistantJournal,input:CompletionInput,dispatch:'allow'|'replay_only'='allow'){
  const fingerprint=createHash('sha256').update(JSON.stringify(input)).digest('hex'),old=journal.receipt.calls[0];
  if(old){
   if(old.fingerprint!==fingerprint||old.phase!==input.phase)throw new AssistantError('ASSISTANT_REQUEST_CHANGED');
@@ -12,6 +12,7 @@ export async function pilotModelCall(model:AssistantModel,journal:AssistantJourn
   if(old.state!=='received')throw new AssistantError(old.code??'ASSISTANT_MODEL_ERROR');
   return {value:structuredClone(old.value),usage:old.usage!,replayed:true};
  }
+ if(dispatch==='replay_only')throw new AssistantError('PILOT_REPLAY_MISSING');
  let sent=false,usage:Usage|undefined;
  try{
   const result=await model.complete(input,async()=>{

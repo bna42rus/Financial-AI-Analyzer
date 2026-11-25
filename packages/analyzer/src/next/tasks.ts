@@ -15,6 +15,7 @@ import type {Catalog} from '../yandex-contract.ts';
 import {questionQuote} from '../task-literals.ts';
 import {periodExpression} from './period.ts';
 import {normalizeReadBinding} from './read-binding.ts';
+import {comparisonPeriodOrder} from './comparison-periods.ts';
 import {assistantAmountLiteral} from '../assistant-money.ts';
 import {calculateFinancial,parseCalculatorInput,calculatorRublesMinor} from '../calculators.ts';
 import type {LoanInput,CalculatorResult} from '../calculators.ts';
@@ -168,10 +169,15 @@ export function prepareTask(state:State,env:Environment,raw:unknown):Preparation
   return {status:'explanation',state:clone(state),subject:clone(intent.parameters.subject),historical:clone(historical)};
  }
  if(intent.action==='compare'){
+  if(intent.binding.mode!=='new')selected(state,intent.binding);
   const refs=intent.parameters.scenarios.map(handle=>lookup(state,handle));
   if(refs.every(r=>r.task.kind==='read')&&intent.parameters.criterion==='value'){
    if(refs.length!==2)fail('TASK_COMPARISON_REQUIRES_TWO');
-   const [a,b]=refs.map(r=>r.task as ReadTask),base=clone(a!.node.query),target=clone(b!.node.query);
+   const reads=refs.map(r=>r.task as ReadTask);
+   let order:[number,number];
+   try{order=comparisonPeriodOrder([reads[0]!.node.query.filter,reads[1]!.node.query.filter],env.question,env.date);}
+   catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
+   const a=reads[order[0]]!,b=reads[order[1]]!,base=clone(a.node.query),target=clone(b.node.query);
    const signature=(query:Query)=>{const filter={...query.filter};delete filter.from;delete filter.through;const options={...query.options};delete options.comparisonPeriod;return canonical({metric:query.metric,grouping:query.grouping,filter,options});};
    if(signature(base)!==signature(target)||!base.filter.from||!base.filter.through||!target.filter.from||!target.filter.through)fail('TASK_COMPARISON_SCOPE_MISMATCH');
    const node=readBase(state,env,b!,true,target.metric,target.grouping,'custom',[]);

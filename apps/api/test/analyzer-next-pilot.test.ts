@@ -24,6 +24,13 @@ test('unknown delivery retains its reservation and cannot retry on rerun',async(
  await assert.rejects(pilotModelCall(h.model,h.journal,input),/ASSISTANT_DELIVERY_UNKNOWN/);assert.equal(h.journal.receipt.calls[0]?.state,'unknown');assert.ok(h.events.includes('hold'));h.events.length=0;
  await assert.rejects(pilotModelCall(h.model,h.journal,input),/ASSISTANT_DELIVERY_UNKNOWN/);assert.deepEqual(h.events,[]);
 });
+test('replay-only permits a saved response but never calls the model or reserves money for a missing response',async()=>{
+ const missing=harness();let calls=0;missing.model.complete=async()=>{calls++;throw Error('must not call');};
+ await assert.rejects(pilotModelCall(missing.model,missing.journal,input,'replay_only'),/PILOT_REPLAY_MISSING/);assert.equal(calls,0);assert.deepEqual(missing.events,[]);assert.deepEqual(missing.journal.receipt.calls,[]);
+ const saved=harness();await pilotModelCall(saved.model,saved.journal,input);saved.events.length=0;saved.model.complete=missing.model.complete;
+ assert.equal((await pilotModelCall(saved.model,saved.journal,input,'replay_only')).replayed,true);assert.equal(calls,0);assert.deepEqual(saved.events,[]);
+ saved.journal.receipt.calls[0]!.state='unknown';await assert.rejects(pilotModelCall(saved.model,saved.journal,input,'replay_only'),/ASSISTANT_DELIVERY_UNKNOWN/);assert.equal(calls,0);
+});
 test('invalid JSON with known usage is billed once and marked failed instead of releasing the hold for free',async()=>{
  const h=harness();h.model.complete=async(_input,before)=>{await before();throw Object.assign(Error('private response text'),{usage,responsePhase:'JSON'});};
  await assert.rejects(pilotModelCall(h.model,h.journal,input));assert.equal(h.journal.receipt.calls[0]?.state,'failed');assert.ok(h.events.includes('settle'));assert.ok(!h.events.includes('hold'));h.events.length=0;

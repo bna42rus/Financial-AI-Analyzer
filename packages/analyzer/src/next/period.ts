@@ -22,7 +22,9 @@ function canonical(expression:string):Period|null{
 }
 function literal(quote:string,date:string,previous:Period):Period{
  const source=quote.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/[(),]/gu,' ').replace(/\s+/gu,' ').trim();
- const normalized=source.replace(/^(?:за|в)\s+/u,'').replace(/[.?]$/u,'').trim().replace(/^(\p{L}+)\s*[-–—]\s*(\d{4})$/u,'$1 $2');
+ const normalized=source.replace(/^(?:за|в)\s+/u,'').replace(/[.?]$/u,'').trim().replace(/^(\p{L}+)\s*[-–—]\s*(\d{4})$/u,'$1 $2')
+  .replace(/^(январ|феврал|апрел|июн|июл|сентябр|октябр|ноябр|декабр)(?:[её]м|ю)(?=\s|$)/u,'$1ь')
+  .replace(/^(март|август)(?:ом|у)(?=\s|$)/u,'$1').replace(/^ма(?:ем|ю)(?=\s|$)/u,'май');
  const period=canonical(normalized)??periodLiteral(normalized,normalized,date);
  if(/^\p{L}+$/u.test(normalized)&&period.from?.endsWith('-01')&&period.from!==period.through&&previous.from&&previous.through){
   if(previous.from.slice(0,4)!==previous.through.slice(0,4))fail('TASK_PERIOD_YEAR_AMBIGUOUS');

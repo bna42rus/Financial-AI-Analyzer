@@ -43,5 +43,8 @@ export function pilotPreparationMatches(id:PilotId,p:Preparation):boolean{
 export function pilotOutcomeMatches(id:PilotId,outcome:Outcome):boolean{
  if(id==='loan-cheaper')return outcome.kind==='loan_comparison'&&outcome.winnerIndexes.every(i=>outcome.results[i]?.input.payment==='differentiated');
  if(id.startsWith('loan-'))return outcome.kind==='loan'&&outcome.results.every(v=>v.principalMinor==='30000000'&&v.rows.length===36);
- return outcome.kind==='read'&&outcome.result.totals.expenses===(id==='read-month'?'12000':'16800')&&(id!=='read-compare'||outcome.result.previousTotals.expenses==='12000');
+ if(outcome.kind!=='read'||outcome.result.totals.expenses!==(id==='read-month'?'12000':'16800'))return false;
+ if(id!=='read-compare')return true;
+ const deltas=outcome.result.points.map(p=>({label:p.label,value:BigInt(p.values.expenses??'0')-BigInt(p.previous.expenses??'0')}));
+ return outcome.result.previousTotals.expenses==='12000'&&deltas.length===2&&deltas.some(p=>p.label==='Продукты'&&p.value===5000n)&&deltas.some(p=>p.label==='Такси'&&p.value===-200n);
 }

@@ -38,8 +38,12 @@ def main():
     parser.add_argument('--source', required=True)
     parser.add_argument('--sha', required=True)
     parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
-    parser.add_argument('--live', action='store_true', required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--live', action='store_true')
+    mode.add_argument('--replay-only', action='store_true', help='Never dispatch a model request; require all saved replies')
     args = parser.parse_args()
+    if args.replay_only and not args.resume:
+        parser.error('--replay-only requires --resume')
     if os.geteuid() != 0 or not re.fullmatch('[a-f0-9]{40}', args.sha):
         raise RuntimeError('PILOT_ROOT_SHA_REQUIRED')
     if args.resume is not None and not re.fullmatch('[a-f0-9]{40}', args.resume):
@@ -87,6 +91,11 @@ def main():
             modules.symlink_to(Path(api) / 'node_modules', target_is_directory=True)
         if json.loads(private(target / 'source-ready.json')) != {'sha': args.sha}:
             raise RuntimeError('PILOT_SOURCE_INCOMPLETE')
+        print('PRECHECK: offline contracts, context, complete dialogs and comparison regressions.', flush=True)
+        checks = ['next-contract', 'next-period', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression']
+        checked = subprocess.run(['/usr/bin/node', '--test', *[str(source / 'packages/analyzer/test' / (name+'.test.ts')) for name in checks]], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
+        if checked.returncode:
+            raise RuntimeError('PILOT_OFFLINE_PRECHECK_FAILED')
         spec = importlib.util.spec_from_file_location('pilot_account', source / 'scripts/diagnose-analyzer-account-staging.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
@@ -105,9 +114,9 @@ def main():
                 raise RuntimeError('PILOT_RESUME_NOT_FOUND')
             directory(journal_target)
             private(journal_target / 'run.json')
-            print('Reusing the existing pilot receipts; only missing replies may dispatch.', flush=True)
+            print('Reusing the existing pilot receipts; '+('model dispatch disabled.' if args.replay_only else 'only missing replies may dispatch.'), flush=True)
         payload = {'activeApi': api, 'directory': str(journal_target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0]}
-        result = subprocess.run(['/usr/bin/node', '--import', 'tsx', 'src/analyzer-next-pilot-main.ts', '--live'], cwd=source / 'apps/api', input=json.dumps(payload), text=True, env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'production'})
+        result = subprocess.run(['/usr/bin/node', '--import', 'tsx', 'src/analyzer-next-pilot-main.ts', '--replay-only' if args.replay_only else '--live'], cwd=source / 'apps/api', input=json.dumps(payload), text=True, env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'production'})
         return result.returncode
 
 if __name__ == '__main__':
