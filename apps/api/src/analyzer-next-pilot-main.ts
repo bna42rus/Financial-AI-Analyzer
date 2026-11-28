@@ -75,7 +75,7 @@ async function main(){
     });
    });
    const ok=semantic&&suite.outcomeMatches(c,result);tested++;if(ok)passed++;else failedChains.add(c.chain);
-   const call=receipt?.calls[0],usage=call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{if(ok&&resolved==='loan')shape='raw:recovered';}
+   const call=receipt?.calls[0],usage=call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{if(ok&&(resolved==='loan'||resolved==='loan_comparison'))shape='raw:recovered';}
    console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}`);
    if(!ok){const details=pilotIntentDiagnostic((call?.value as any)?.intent);console.log('DIAGNOSTIC '+c.id+' '+(providerCode||reviewCode||('code'in result?result.code:'PILOT_OUTCOME_MISMATCH'))+' '+sanitizeText(JSON.stringify(details)));}
    if(/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED|ASSISTANT_DELIVERY_UNKNOWN|ASSISTANT_.*CHANGED)$/.test(providerCode)||result.status==='failed'&&/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED)$/.test(result.code))break;

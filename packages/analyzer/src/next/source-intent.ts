@@ -49,6 +49,27 @@ function chartTarget(question:string,state:State){
  return loan?{loan,both}:null;
 }
 function keys(value:unknown,allowed:string[]):value is Record<string,any>{return !!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(k=>allowed.includes(k));}
+function currentVariantQuestion(question:string){
+ const text=fold(question),words=text.match(/\p{L}+/gu)??[];
+ if(!/^[\p{L}\s.,?!;:—–-]+$/u.test(text)||!/(?:из этих(?: двух)?|эти(?: два)?|оба) вариант(?:а|ов|ы)/u.test(text))return false;
+ return words.every(w=>/^(?:а|тогда|теперь|какой|какие|который|что|из|этих|эти|два|двух|оба|обоих|вариант|варианта|вариантов|варианты|дешевле|выгоднее|дороже|лучше|самый|дешевый|дорогой|сравни|сравните|по|в|итоге|будет|с|и|меньше|больше|меньшей|большей|минимальной|максимальной|наименьшей|наибольшей|переплата|переплате|переплатой|проценты|процентам|процентов|общей|сумме|выплат|платежу|платеж|платежей)$/u.test(w));
+}
+/** Resolve a deictic selection before the wire's six-scenario bound. Every
+ * supplied alias must still be owned and valid; no list is blindly truncated. */
+function currentComparisonFrame(raw:unknown,question:string,state:State):unknown{
+ if(state.pending||state.running||state.failure||!currentVariantQuestion(question)||!keys(raw,['version','action','binding','parameters','presentation'])||raw.action!=='compare')return raw;
+ const active=state.history.find(t=>t.handle===state.active),p=raw.parameters;
+ if(active?.kind!=='loan'||active.results.length<2||active.results.length>6||!keys(p,['scenarios','criterion','objective'])||!Array.isArray(p.scenarios)||p.scenarios.length<2||p.scenarios.length>100||new Set(p.scenarios).size!==p.scenarios.length)return raw;
+ if(/(?:^|\s)(?:оба|обоих|два|двух)(?:\s|[.,?!]|$)/u.test(fold(question))&&active.results.length!==2)return raw;
+ const selected=active.results.map((_v,i)=>active.handle+'_v'+(i+1)),covered=new Set<string>();
+ for(const alias of p.scenarios){
+  if(typeof alias!=='string'||alias.length>32)return raw;const m=/^(t[1-9][0-9]*)(?:_v([1-9][0-9]*))?$/.exec(alias),task=m&&state.history.find(t=>t.handle===m[1]);
+  if(task?.kind!=='loan'||m![2]&&!task.results[Number(m![2])-1])return raw;
+  for(const handle of m![2]?[alias]:task.results.map((_v,i)=>task.handle+'_v'+(i+1)))covered.add(handle);
+ }
+ if(!selected.every(handle=>covered.has(handle)))return raw;
+ try{const parsed=parseIntent({...raw,parameters:{...p,scenarios:selected}});return knownBinding(parsed,state)?{...parsed,binding:{mode:'continue',conditions:'pin'}}:raw;}catch{return raw;}
+}
 /** A source quote is non-executable evidence, not a new calculator field.
  * Validate the entire canonical frame after removing only clear.quote. */
 function clearQuoteFrame(raw:unknown,question:string):unknown{
@@ -68,6 +89,7 @@ function clearQuoteFrame(raw:unknown,question:string):unknown{
  * calculator parameters remain invalid. */
 export function recoverLoanGraphFrame(raw:unknown,question:string,state:State):unknown{
  const canonical=clearQuoteFrame(raw,question);if(canonical!==raw)return canonical;
+ const comparison=currentComparisonFrame(raw,question,state);if(comparison!==raw)return comparison;
  if(state.pending||state.running||state.failure||!chartTarget(question,state)||!keys(raw,['version','action','binding','parameters','presentation'])||raw.action!=='read')return raw;
  const p=raw.parameters;
  if(!keys(p,['metric','grouping','comparison','conditions','options'])||p.metric!=='loan_payments'||p.grouping!=='time'||p.comparison!=='none'||!Array.isArray(p.conditions)||p.conditions.length||!keys(p.options,['chart','format','detail']))return raw;
@@ -82,6 +104,7 @@ function signature(task:ReadTask){
 }
 export function normalizeSourceIntent(intent:Intent,state:State,env:Environment):Intent{
  if(state.running||state.failure||!knownBinding(intent,state))return intent;
+ const comparison=currentComparisonFrame(intent,env.question,state);if(comparison!==intent)return comparison as Intent;
  const previous=nearestLoan(state),choice=paymentChoice(env.question);
  if(choice&&(previous||state.pending?.draft.kind==='loan')&&(intent.action==='explain'||intent.action==='calculate'&&intent.parameters.calculator==='loan')){
   const binding=state.pending?.draft.kind==='loan'?{mode:'answer',clarification:state.pending.handle,option:null} as const:{mode:'reference',handle:previous!.handle,conditions:'pin'} as const;

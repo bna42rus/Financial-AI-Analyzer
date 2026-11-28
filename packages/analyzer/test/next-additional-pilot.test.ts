@@ -6,7 +6,7 @@ import type {Understanding,TurnResult,ProviderInput} from '../src/next/workflow.
 import {prepareTask} from '../src/next/tasks.ts';
 import type {Preparation} from '../src/next/tasks.ts';
 import {intentVersion,parseIntent} from '../src/next/intent.ts';
-import {recoverLoanGraphFrame,paymentChoice,isLoanChartResume,sourcePeriodEdit} from '../src/next/source-intent.ts';
+import {recoverLoanGraphFrame,normalizeSourceIntent,paymentChoice,isLoanChartResume,sourcePeriodEdit} from '../src/next/source-intent.ts';
 import {calculateWidget,parseWidget} from '../../finance-core/src/overview.ts';
 import {scope,id,account,catalog,rows} from './fixtures/next-finances.ts';
 const keep={mode:'continue',conditions:'merge_ui'},fresh={mode:'new'},ref=(handle:string)=>({mode:'reference',handle,conditions:'pin'});
@@ -104,6 +104,29 @@ test('the retained both-chart clear with an extra source quote completes all 25 
  assert.throws(()=>parseIntent(bad),/INTENT_PROTOTYPE_INVALID/);
  const h=await run({...retained,[c.id]:bad}),p=h.prepared.get(c.id);assert.equal(h.results.size,25);
  if(p?.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.annualRatePercent==='0'&&v.months===12));
+});
+const historyAliases=['t1_v1','t1_v2','t2_v1','t2_v2','t3_v1','t3_v2','t4_v1','t5_v1','t6_v1','t6_v2'];
+const retainedComparison=()=>({...envelope('compare',{scenarios:[...historyAliases],criterion:'interest',objective:'min'}),presentation:{format:'auto',detail:'short'}});
+test('the retained ten-alias comparison binds these variants to the active result and reports a zero-rate tie',async()=>{
+ const c=additionalCases.find(v=>v.id==='loan-both-charts')!,bad=retainedComparison();assert.throws(()=>parseIntent(bad),/INTENT_PROTOTYPE_INVALID/);
+ const h=await run({...retained,[c.id]:loan([{field:'payment',op:'clear',quote:c.question}],keep,'chart'),'loan-tied-comparison':bad});
+ const p=h.prepared.get('loan-tied-comparison'),r=h.results.get('loan-tied-comparison');assert.equal(h.results.size,25);
+ if(p?.status!=='ready'||p.task.kind!=='loan_comparison'||r?.status!=='completed'||r.outcome.kind!=='loan_comparison')throw Error('comparison');
+ assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.months===12&&v.annualRatePercent==='0'));assert.deepEqual(r.outcome.winnerIndexes,[0,1]);assert.deepEqual(bad.parameters,{scenarios:historyAliases,criterion:'interest',objective:'min'});
+});
+test('current variant binding preserves historical requests, rejects invalid aliases, and follows the active task rather than a fixed handle',async()=>{
+ const h=await run(),state=h.states.get('loan-tied-comparison')!,question=additionalCases.find(v=>v.id==='loan-tied-comparison')!.question;
+ for(const phrase of ['Какой из этих вариантов дешевле по переплате?','Сравни эти два варианта по процентам','Сравни оба варианта по процентам']){
+  const p=parseIntent(recoverLoanGraphFrame(retainedComparison(),phrase,state));if(p.action!=='compare')throw Error('compare');assert.deepEqual(p.parameters.scenarios,['t6_v1','t6_v2']);
+ }
+ const old=parseIntent(recoverLoanGraphFrame(retainedComparison(),question,{...state,active:'t1'}));if(old.action!=='compare')throw Error('compare');assert.deepEqual(old.parameters.scenarios,['t1_v1','t1_v2']);
+ const historical=envelope('compare',{scenarios:['t1_v1','t1_v2'],criterion:'interest',objective:'min'});assert.equal(recoverLoanGraphFrame(historical,'Сравни прошлые варианты',state),historical);
+ const shortList=envelope('compare',{scenarios:['t1_v1','t1_v2','t6_v1','t6_v2'],criterion:'interest',objective:'min'}),selected=normalizeSourceIntent(parseIntent(shortList),state,{scope,requestId:id(12345),question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog});if(selected.action!=='compare')throw Error('compare');assert.deepEqual(selected.parameters.scenarios,['t6_v1','t6_v2']);
+ for(const phrase of ['Сравни все прошлые варианты','Сравни эти варианты с предыдущими кредитами','Какой из этих вариантов дешевле при ставке 12%?','Не сравнивай эти варианты'])assert.throws(()=>parseIntent(recoverLoanGraphFrame(retainedComparison(),phrase,state)),/INTENT_PROTOTYPE_INVALID/);
+ for(const change of [(p:any)=>p.parameters.scenarios.push('t6_v1'),(p:any)=>p.parameters.scenarios[0]='t999_v1',(p:any)=>p.parameters.scenarios=p.parameters.scenarios.slice(0,8),(p:any)=>p.parameters.criterion='overpayment',(p:any)=>p.parameters.sql='select anything']){
+  const bad=retainedComparison();change(bad);assert.throws(()=>parseIntent(recoverLoanGraphFrame(bad,question,state)),/INTENT_PROTOTYPE_INVALID/);
+ }
+ assert.throws(()=>parseIntent(recoverLoanGraphFrame(retainedComparison(),question,{...state,active:'t5'})),/INTENT_PROTOTYPE_INVALID/);
 });
 test('clear quote metadata is canonicalized across fields only with exact source evidence and a fully valid frame',async()=>{
  const h=await run(),state=h.states.get('loan-both-charts')!,question='Сними ограничение';

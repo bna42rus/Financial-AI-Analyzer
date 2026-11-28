@@ -37,6 +37,7 @@ export function pilotIntentDiagnostic(raw:unknown):unknown{
  return {invalid:true,action:finite(r.action,['read','calculate','compare','explain']),bindingMode:finite(b.mode,['new','continue','reference','answer']),
   missing:common.filter(k=>!Object.hasOwn(r,k)),unknownCommonCount:Object.keys(r).filter(k=>!common.includes(k)).length,
   metric:finite(p.metric,[...queryMetrics,'loan_payments']),grouping:finite(p.grouping,[...queryGroupings,'time']),calculator:finite(p.calculator,calculatorKinds),edits,
+  ...(r.action==='compare'?{scenarioCount:Array.isArray(p.scenarios)?p.scenarios.length:null,scenarioAliases:Array.isArray(p.scenarios)?p.scenarios.slice(0,100).map(v=>typeof v==='string'&&/^t[1-9][0-9]*(?:_v[1-9][0-9]*)?$/.test(v)&&v.length<=32?v:'unsupported'):null,criterion:finite(p.criterion,['interest','total_paid','payment','net_return','value']),objective:finite(p.objective,['min','max']),unknownParameterCount:Object.keys(p).filter(k=>!['scenarios','criterion','objective'].includes(k)).length}:{}),
   presentationFormat:finite(presentation.format,['auto','number','table','chart','operations']),
   invalidPresentationOptionNames:['format','detail'].filter(k=>Object.hasOwn(options,k)),unknownOptionCount:Object.keys(options).filter(k=>!optionNames.includes(k)).length};
 }
