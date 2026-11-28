@@ -119,7 +119,7 @@ Nice=15
 IOSchedulingClass=idle
 CPUWeight=10
 MemoryMax=768M
-TimeoutStartSec=2h
+TimeoutStartSec=150min
 LimitCORE=0
 NoNewPrivileges=yes
 PrivateTmp=yes
@@ -130,7 +130,7 @@ RestrictSUIDSGID=yes
 """
     definitions = {
         'production': ('*-*-* 03:10:00 Europe/Moscow', True),
-        'journal': ('*:0/5', False),
+        'journal': ('*:2/5', False),
         'restore-production': ('*-*-01 04:10:00 Europe/Moscow', True),
         'restore-staging': ('*-*-02 04:10:00 Europe/Moscow', True),
         'watchdog': ('hourly', True),
@@ -162,6 +162,20 @@ WantedBy=timers.target
 """
         unit_write(root / timer, text)
         timers.append(timer)
+        if name in ('production', 'restore-production', 'restore-staging'):
+            # Only an exhausted lock wait (exit 75) is retried. Actual backup
+            # errors (exit 1) stay failed and alert instead of being retried blindly.
+            dropin = root / ('cashneuro-backup@' + name + '.service.d')
+            dropin.mkdir(mode=0o755, parents=True, exist_ok=True)
+            unit_write(dropin / '20-contention-retry.conf', """[Unit]
+StartLimitIntervalSec=6h
+StartLimitBurst=12
+
+[Service]
+Restart=no
+RestartSec=5min
+RestartForceExitStatus=75
+""")
     retention_service = """[Unit]
 Description=CashNeuro bounded release retention
 After=docker.service

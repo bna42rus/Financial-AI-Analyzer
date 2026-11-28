@@ -197,10 +197,10 @@ def journal(config, environment, db=None):
     return result
 
 
-def backup(config, environment, kind, *, already_locked=False):
+def backup(config, environment, kind, *, already_locked=False, wait_seconds=0):
     if kind not in ('daily', 'predeploy') or environment == 'staging' and kind != 'predeploy':
         raise OpsError('BACKUP_KIND_INVALID')
-    with nullcontext() if already_locked else locked():
+    with nullcontext() if already_locked else locked(wait_seconds=wait_seconds):
         with locked(BACKUP_LOCK):
             db = database(environment)
             current_journal = journal(config, environment, db)
@@ -256,9 +256,9 @@ def backup(config, environment, kind, *, already_locked=False):
                 shutil.rmtree(root)
 
 
-def restore_test(config, environment):
+def restore_test(config, environment, *, wait_seconds=0):
     """Restore into an ephemeral, network-isolated PostgreSQL, never into live DBs."""
-    with locked():
+    with locked(wait_seconds=wait_seconds):
         with locked(BACKUP_LOCK):
             memory = re.search(r'^MemAvailable:\s+(\d+) kB', Path('/proc/meminfo').read_text(), re.M)
             if not memory or int(memory[1]) < 768 * 1024:

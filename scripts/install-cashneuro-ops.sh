@@ -33,7 +33,7 @@ git -c safe.directory="$repo" -C "$repo" archive "$sha" \
   package.json | tar --no-same-owner -xf - -C "$build"
 
 exec 9>/run/lock/cashneuro-assistant-install.lock
-flock -n 9
+flock -w 900 9
 destination=/usr/local/lib/cashneuro-ops-releases/$sha
 install -d -m 755 /usr/local/lib/cashneuro-ops-releases
 if test ! -d "$destination"; then
@@ -63,7 +63,8 @@ flock -u 9
 exec 9>&-
 
 if test "$tools_only" = 1; then
-  echo 'Инструменты обновлены: остановка копирования по объёму S3 отключена.'
+  echo 'Инструменты обновлены; обновляем расписание и повтор при занятой блокировке.'
+  cashneuro-ops refresh-schedule
   cashneuro-ops capacity
   cashneuro-ops status
   exit 0

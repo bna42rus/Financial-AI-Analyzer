@@ -18,40 +18,44 @@ def state():
             report[key][environment] = json.loads(private_read(path)) if path.exists() else None
     failure = STATE / 'last-failure.json'
     report['lastFailure'] = json.loads(private_read(failure)) if failure.exists() else None
-    for filename,key in [('provider-key-check.json','providerKeyCheck'),('synthetic-sizing.json','syntheticSizing'),('storage-capacity.json','storageCapacity'),('storage-last-alert.json','storageGrowthAlert')]:
+    for filename,key in [('provider-key-check.json','providerKeyCheck'),('synthetic-sizing.json','syntheticSizing'),('storage-capacity.json','storageCapacity'),('storage-last-alert.json','storageGrowthAlert'),('journal-check.json','deletionJournalCheck')]:
         path = STATE / filename
         report[key] = json.loads(private_read(path)) if path.exists() else None
     return report
 
 
-def watchdog(config):
-    report = state()
-    now = datetime.now(timezone.utc)
+def check_freshness(report, now):
     production = report['backups']['production']
-    if not production or (now - datetime.fromisoformat(production['at'])).total_seconds() > 36 * 3600:
+    if not production or not production.get('ok') or not 0 <= (now - datetime.fromisoformat(production['at'])).total_seconds() <= 36 * 3600:
         raise OpsError('PRODUCTION_BACKUP_STALE')
     for result in report['restoreTests'].values():
-        if not result or (now - datetime.fromisoformat(result['at'])).total_seconds() > 40 * 86400:
+        if not result or not result.get('ok') or not 0 <= (now - datetime.fromisoformat(result['at'])).total_seconds() <= 40 * 86400:
             raise OpsError('RESTORE_TEST_STALE')
+
+
+def watchdog(config):
+    report = state()
+    check_freshness(report, datetime.now(timezone.utc))
     if report['lastFailure'] and not report['lastFailure'].get('resolved'):
         raise OpsError('BACKUP_FAILURE_UNRESOLVED')
     emit('watchdog', ok=True)
 
 
-def scheduled(name):
+def scheduled(name, *, wait_for_lock=False):
     config = backups.validate_config(settings())
     if name == 'production':
-        backups.backup(config, 'production', 'daily')
+        backups.backup(config, 'production', 'daily', wait_seconds=900)
         capacity.monitor(config)
     elif name in ('restore-production', 'restore-staging'):
-        backups.restore_test(config, name.removeprefix('restore-'))
+        backups.restore_test(config, name.removeprefix('restore-'), wait_seconds=900)
     elif name == 'journal':
-        with locked():
+        with locked(wait_seconds=900 if wait_for_lock else 0):
             with locked(backups.BACKUP_LOCK):
                 for environment in ('staging', 'production'):
                     result = backups.journal(config, environment)
                     emit('deletion-journal', environment=environment, erasedAccounts=len(result['erased']),
                          trackedGenerations=len(result['generations']))
+                private_write(STATE / 'journal-check.json', json.dumps({'ok': True, 'at': datetime.now(timezone.utc).isoformat()}))
     elif name == 'watchdog':
         capacity.monitor(config)
         watchdog(config)
@@ -62,15 +66,24 @@ def scheduled(name):
 def failure(code, operation):
     private_dir(STATE)
     record = {'code': code, 'operation': operation, 'at': datetime.now(timezone.utc).isoformat(), 'resolved': False}
-    private_write(STATE / 'last-failure.json', json.dumps(record))
-    # One incident notification per day, even if the hourly watchdog repeats it.
-    notified = STATE / 'last-alert.json'
-    previous = json.loads(private_read(notified)) if notified.exists() else None
-    if previous and (datetime.now(timezone.utc) - datetime.fromisoformat(previous['at'])).total_seconds() < 86400:
-        return
-    private_write(notified, json.dumps(record))
+    with locked(STATE / 'incident.lock', wait_seconds=30):
+        path = STATE / 'last-failure.json'
+        previous_failure = json.loads(private_read(path)) if path.exists() else None
+        if code == 'BACKUP_FAILURE_UNRESOLVED' and (not previous_failure or previous_failure.get('resolved')):
+            return
+        if operation == 'scheduled:watchdog' and previous_failure and not previous_failure.get('resolved'):
+            # The watchdog observes an incident; it must not replace its cause or
+            # rekindle an incident resolved since the watchdog read its snapshot.
+            record = previous_failure
+        else:
+            private_write(path, json.dumps(record))
+        notified = STATE / 'last-alert.json'
+        previous = json.loads(private_read(notified)) if notified.exists() else None
+        if previous and (datetime.now(timezone.utc) - datetime.fromisoformat(previous['at'])).total_seconds() < 86400:
+            return
+        private_write(notified, json.dumps({**record, 'at': datetime.now(timezone.utc).isoformat()}))
     try:
-        backups.alert(settings(), code)
+        backups.alert(settings(), record['code'])
         emit('backup-alert', accepted=True)
     except Exception:
         emit('backup-alert', accepted=False, code='ALERT_DELIVERY_NOT_CONFIRMED')
@@ -85,12 +98,58 @@ def operation_name(args):
 
 
 def success(operation):
+    private_dir(STATE)
+    with locked(STATE / 'incident.lock', wait_seconds=30):
+        _success(operation)
+
+
+def _success(operation):
     path = STATE / 'last-failure.json'
     if path.exists():
         value = json.loads(private_read(path))
         if value.get('operation') == operation and not value.get('resolved'):
             value['resolved'] = True
+            value['resolvedAt'] = datetime.now(timezone.utc).isoformat()
             private_write(path,json.dumps(value))
+
+
+def resolve_alert():
+    with locked(wait_seconds=900):
+        private_dir(STATE)
+        with locked(STATE / 'incident.lock', wait_seconds=30):
+            report = state()
+            now = datetime.now(timezone.utc)
+            check_freshness(report, now)
+            incident = report['lastFailure']
+            if incident and not incident.get('resolved'):
+                since = datetime.fromisoformat(incident['at'])
+                def newer(result):
+                    return bool(result and result.get('ok') and since < datetime.fromisoformat(result['at']) <= now)
+                journal_path = STATE / 'journal-check.json'
+                journal = json.loads(private_read(journal_path)) if journal_path.exists() else None
+                operation = incident.get('operation')
+                if operation == 'scheduled:watchdog':
+                    # Legacy watchdog records lost the original operation. Prove
+                    # fresh backup, an isolated restore of that snapshot, and both journals.
+                    production = report['backups']['production']
+                    restored = report['restoreTests']['production']
+                    proven = (newer(production) and newer(restored) and newer(journal)
+                              and production['snapshot'] == restored['snapshot']
+                              and datetime.fromisoformat(restored['at']) >= datetime.fromisoformat(production['at']))
+                elif operation == 'scheduled:journal':
+                    proven = newer(journal)
+                else:
+                    evidence = {'scheduled:production': ('backups', 'production'),
+                                'backup:production': ('backups', 'production'), 'backup:staging': ('backups', 'staging'),
+                                'scheduled:restore-production': ('restoreTests', 'production'),
+                                'scheduled:restore-staging': ('restoreTests', 'staging'),
+                                'restore-test:production': ('restoreTests', 'production'),
+                                'restore-test:staging': ('restoreTests', 'staging')}.get(operation)
+                    proven = bool(evidence and newer(report[evidence[0]][evidence[1]]))
+                if not proven:
+                    raise OpsError('FAILURE_RECOVERY_EVIDENCE_MISSING')
+                private_write(STATE / 'last-failure.json', json.dumps({**incident, 'resolved': True, 'resolvedAt': now.isoformat()}))
+    emit('alert-resolved', ok=True)
 
 
 def main():
@@ -100,6 +159,7 @@ def main():
     prune.add_argument('--apply', action='store_true')
     prune.add_argument('--deployment-lock-held', action='store_true')
     sub.add_parser('setup')
+    sub.add_parser('refresh-schedule')
     configure = sub.add_parser('configure')
     configure.add_argument('--replace', action='store_true')
     sub.add_parser('status')
@@ -123,6 +183,7 @@ def main():
     restore.add_argument('environment', choices=['staging', 'production'])
     schedule = sub.add_parser('scheduled')
     schedule.add_argument('name', choices=['production', 'journal', 'restore-production', 'restore-staging', 'watchdog'])
+    schedule.add_argument('--wait', action='store_true', help='Wait for the manual journal recovery lock.')
     sub.add_parser('resolve-alert')
     args = parser.parse_args()
     try:
@@ -132,6 +193,9 @@ def main():
             releases.prune(apply=args.apply, already_locked=args.deployment_lock_held)
         elif args.command == 'setup':
             installation.setup()
+        elif args.command == 'refresh-schedule':
+            with locked(wait_seconds=900):
+                installation.install_units()
         elif args.command == 'configure':
             installation.configure(args.replace)
         elif args.command == 'status':
@@ -156,20 +220,16 @@ def main():
             sizing.benchmark()
         elif args.command == 'backup':
             config = backups.validate_config(settings())
-            backups.backup(config, args.environment, args.kind, already_locked=args.deployment_lock_held)
+            backups.backup(config, args.environment, args.kind, already_locked=args.deployment_lock_held, wait_seconds=900)
             capacity.monitor(config)
         elif args.command == 'restore-test':
-            backups.restore_test(backups.validate_config(settings()), args.environment)
+            backups.restore_test(backups.validate_config(settings()), args.environment, wait_seconds=900)
         elif args.command == 'scheduled':
-            scheduled(args.name)
+            scheduled(args.name, wait_for_lock=args.wait)
         elif args.command == 'resolve-alert':
-            watchdog({}) if not (STATE / 'last-failure.json').exists() else None
-            path = STATE / 'last-failure.json'
-            if path.exists():
-                value = json.loads(private_read(path)); value['resolved'] = True
-                private_write(path, json.dumps(value))
-            emit('alert-resolved', ok=True)
-        success(operation_name(args))
+            resolve_alert()
+        if args.command in ('scheduled', 'backup', 'restore-test'):
+            success(operation_name(args))
     except KeyboardInterrupt:
         emit('STOP', code='CANCELLED_BY_OPERATOR', paidCalls=0)
         raise SystemExit(130)
@@ -177,6 +237,9 @@ def main():
         code = str(error) if isinstance(error, OpsError) and re.fullmatch('[A-Z0-9_]{1,100}', str(error)) else 'MAINTENANCE_FAILED'
         emit('STOP', code=code, paidCalls=0)
         if code == 'ANOTHER_OPERATION_RUNNING' and args.command == 'scheduled':
+            if args.name in ('production', 'restore-production', 'restore-staging'):
+                emit('scheduled-deferred', reason='deployment-or-backup-in-progress', retryAfterSeconds=300)
+                raise SystemExit(75)
             emit('scheduled-skip', reason='deployment-or-backup-in-progress')
             return
         if args.command in ('scheduled', 'backup', 'restore-test'):

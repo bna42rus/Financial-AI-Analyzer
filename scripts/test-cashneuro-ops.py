@@ -1,5 +1,7 @@
 """Destructive-operation guards and backup failure/retention orchestration."""
 import contextlib
+from datetime import datetime, timedelta, timezone
+import fcntl
 import io
 import json
 import os
@@ -211,7 +213,7 @@ class OperationsTests(unittest.TestCase):
                 if args[:2]==['docker','inspect']:return b'{"Running":true}'
                 if args[-2:]==['cat','/proc/1/comm']:return b'postgres\n'
                 return b''
-            with patch.object(backups,'STATE',state),patch.object(backups,'locked',contextlib.nullcontext),\
+            with patch.object(backups,'STATE',state),patch.object(backups,'locked',lambda *a,**kw:contextlib.nullcontext()),\
                  patch.object(backups,'database',return_value=live),patch.object(backups,'restic',side_effect=restic),\
                  patch.object(backups,'sql',side_effect=query),patch.object(backups,'run',side_effect=command),\
                  patch.object(common,'run',side_effect=command),patch.object(common,'sql',side_effect=query),\
@@ -266,7 +268,7 @@ class OperationsTests(unittest.TestCase):
                 if args[0]=='dump':return json.dumps({} if fault=='verify' else manifest).encode()
                 return b''
             db={'container':'synthetic-container','owner':'synthetic','database':'finance_production'}
-            with patch.object(backups,'STATE',state),patch.object(backups,'locked',contextlib.nullcontext),\
+            with patch.object(backups,'STATE',state),patch.object(backups,'locked',lambda *a,**kw:contextlib.nullcontext()),\
                  patch.object(backups,'database',return_value=db),patch.object(backups,'journal',return_value={'currentWorkspaces':[]}),\
                  patch.object(backups,'sql',side_effect=['1000000','[]']),patch.object(backups,'run',side_effect=command),\
                  patch.object(backups,'copy_configuration'),patch.object(backups,'restic',side_effect=restic),\
@@ -435,9 +437,126 @@ class OperationsTests(unittest.TestCase):
                 installation.install_units(root)
             self.assertIn('03:10:00 Europe/Moscow',(root/'cashneuro-backup-production.timer').read_text())
             self.assertIn('Persistent=false',(root/'cashneuro-backup-journal.timer').read_text())
+            self.assertIn('OnCalendar=*:2/5',(root/'cashneuro-backup-journal.timer').read_text())
             self.assertIn('ProtectSystem=strict',(root/'cashneuro-backup@.service').read_text())
             self.assertIn('MemoryMax=768M',(root/'cashneuro-backup@.service').read_text())
             self.assertIn('enable',run.call_args.args[0])
+            for name in ('production','restore-production','restore-staging'):
+                retry=(root/('cashneuro-backup@'+name+'.service.d')/'20-contention-retry.conf').read_text()
+                self.assertIn('Restart=no',retry)
+                self.assertIn('RestartForceExitStatus=75',retry)
+                self.assertIn('StartLimitBurst=12',retry)
+            self.assertFalse((root/'cashneuro-backup@journal.service.d').exists())
+
+    def test_busy_lock_waits_then_enters_only_after_the_real_owner_releases_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/'deployment.lock'
+            owner=os.open(path,os.O_RDWR|os.O_CREAT,0o600)
+            try:
+                fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                with self.assertRaisesRegex(common.OpsError,'ANOTHER_OPERATION_RUNNING'):
+                    with common.locked(path):self.fail('entered a held lock')
+                with patch.object(common.time,'sleep',side_effect=lambda _n:fcntl.flock(owner,fcntl.LOCK_UN)) as pause:
+                    with common.locked(path,wait_seconds=5):
+                        with self.assertRaises(BlockingIOError):fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+                self.assertEqual(pause.call_count,1)
+                fcntl.flock(owner,fcntl.LOCK_EX|fcntl.LOCK_NB)
+            finally:os.close(owner)
+
+    def test_lock_wait_is_bounded_and_never_breaks_the_other_owners_lock(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path=Path(temporary)/'deployment.lock'
+            with common.locked(path):
+                with patch.object(common.time,'monotonic',side_effect=[0,0,1,2]),patch.object(common.time,'sleep') as pause:
+                    with self.assertRaisesRegex(common.OpsError,'ANOTHER_OPERATION_RUNNING'):
+                        with common.locked(path,wait_seconds=2):self.fail('entered a held lock')
+                self.assertEqual(pause.call_count,2)
+            with common.locked(path):pass
+            for invalid in (-1,901,float('nan')):
+                with self.assertRaisesRegex(common.OpsError,'LOCK_WAIT_INVALID'):
+                    with common.locked(path,wait_seconds=invalid):self.fail('invalid wait')
+
+    def test_critical_schedules_wait_before_tools_and_the_manual_journal_records_both_successes(self):
+        with patch.object(cli,'settings',return_value=config()),patch.object(backups,'backup') as backup,patch.object(backups,'restore_test') as restore,patch.object(capacity,'monitor'):
+            cli.scheduled('production');cli.scheduled('restore-production');cli.scheduled('restore-staging')
+            self.assertEqual(backup.call_args.kwargs['wait_seconds'],900)
+            self.assertEqual([c.kwargs['wait_seconds'] for c in restore.call_args_list],[900,900])
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);os.chmod(root,0o700)
+            with patch.object(cli,'STATE',root),patch.object(cli,'settings',return_value=config()),patch.object(cli,'locked',return_value=contextlib.nullcontext()) as lock,patch.object(backups,'journal',return_value={'erased':[],'generations':[]}) as journal,contextlib.redirect_stdout(io.StringIO()):
+                cli.scheduled('journal',wait_for_lock=True)
+                self.assertEqual(lock.call_args_list[0].kwargs,{'wait_seconds':900})
+                self.assertEqual([c.args[1] for c in journal.call_args_list],['staging','production'])
+                self.assertTrue(json.loads((root/'journal-check.json').read_text())['ok'])
+                (root/'journal-check.json').unlink()
+                journal.side_effect=[{'erased':[],'generations':[]},common.OpsError('SYNTHETIC_JOURNAL_FAILURE')]
+                with self.assertRaisesRegex(common.OpsError,'SYNTHETIC_JOURNAL_FAILURE'):cli.scheduled('journal')
+                self.assertFalse((root/'journal-check.json').exists())
+
+    def test_contention_defers_critical_units_but_only_frequent_journal_may_skip(self):
+        for name in ('production','restore-production','restore-staging','journal'):
+            with self.subTest(name=name),patch('sys.argv',['ops','scheduled',name]),patch.object(cli,'require_root'),patch.object(cli,'scheduled',side_effect=common.OpsError('ANOTHER_OPERATION_RUNNING')),patch.object(cli,'failure') as failure,patch.object(cli,'success') as success,contextlib.redirect_stdout(io.StringIO()):
+                if name=='journal':cli.main()
+                else:
+                    with self.assertRaises(SystemExit) as stopped:cli.main()
+                    self.assertEqual(stopped.exception.code,75)
+                failure.assert_not_called();success.assert_not_called()
+
+    def test_actual_backup_failure_is_not_a_retry_or_a_successful_skip(self):
+        with patch('sys.argv',['ops','scheduled','production']),patch.object(cli,'require_root'),patch.object(cli,'scheduled',side_effect=common.OpsError('BACKUP_MANIFEST_MISMATCH')),patch.object(cli,'failure') as failure,patch.object(cli,'success') as success,contextlib.redirect_stdout(io.StringIO()):
+            with self.assertRaises(SystemExit) as stopped:cli.main()
+            self.assertEqual(stopped.exception.code,1)
+            failure.assert_called_once_with('BACKUP_MANIFEST_MISMATCH','scheduled:production');success.assert_not_called()
+
+    def test_watchdog_preserves_the_original_cause_until_the_matching_job_succeeds(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);os.chmod(root,0o700)
+            with patch.object(cli,'STATE',root),patch.object(cli,'settings',return_value=config()),patch.object(backups,'alert') as alert,contextlib.redirect_stdout(io.StringIO()):
+                cli.failure('BACKUP_MANIFEST_MISMATCH','scheduled:production')
+                original=json.loads((root/'last-failure.json').read_text())
+                cli.failure('BACKUP_FAILURE_UNRESOLVED','scheduled:watchdog')
+                cli.failure('PRODUCTION_BACKUP_STALE','scheduled:watchdog')
+                self.assertEqual(json.loads((root/'last-failure.json').read_text()),original)
+                cli.success('scheduled:journal');self.assertFalse(json.loads((root/'last-failure.json').read_text())['resolved'])
+                cli.success('scheduled:production');resolved=json.loads((root/'last-failure.json').read_text());self.assertTrue(resolved['resolved'])
+                cli.failure('BACKUP_FAILURE_UNRESOLVED','scheduled:watchdog')
+                self.assertEqual(json.loads((root/'last-failure.json').read_text()),resolved)
+                alert.assert_called_once()
+
+    def recovery_fixture(self, root):
+        now=datetime.now(timezone.utc)
+        incident={'code':'BACKUP_FAILURE_UNRESOLVED','operation':'scheduled:watchdog','at':(now-timedelta(hours=2)).isoformat(),'resolved':False}
+        production={'ok':True,'snapshot':'a'*64,'at':(now-timedelta(hours=1)).isoformat()}
+        report={'backups':{'production':production,'staging':None},'restoreTests':{'production':{**production,'at':(now-timedelta(minutes=30)).isoformat()},'staging':{'ok':True,'snapshot':'b'*64,'at':(now-timedelta(days=4)).isoformat()}},'lastFailure':incident}
+        common.private_write(root/'last-failure.json',json.dumps(incident))
+        common.private_write(root/'journal-check.json',json.dumps({'ok':True,'at':(now-timedelta(minutes=10)).isoformat()}))
+        return report
+
+    def recovery_locks(self, root):
+        return lambda path=None,**kw:common.locked(path or root/'deployment.lock',**kw)
+
+    def test_legacy_watchdog_incident_resolves_only_after_new_backup_matching_restore_and_both_journals(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary);os.chmod(root,0o700);report=self.recovery_fixture(root)
+            with patch.object(cli,'STATE',root),patch.object(cli,'state',return_value=report),patch.object(cli,'locked',self.recovery_locks(root)),contextlib.redirect_stdout(io.StringIO()):
+                cli.resolve_alert()
+            result=json.loads((root/'last-failure.json').read_text());self.assertTrue(result['resolved']);self.assertEqual(result['at'],report['lastFailure']['at']);self.assertIn('resolvedAt',result)
+
+    def test_recovery_never_marks_stale_missing_or_unrelated_evidence_resolved(self):
+        for fault in ('stale-backup','failed-backup','stale-restore','old-backup','old-journal','missing-journal','wrong-snapshot','unknown-operation'):
+            with self.subTest(fault=fault),tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary);os.chmod(root,0o700);report=self.recovery_fixture(root)
+                if fault=='stale-backup':report['backups']['production']['at']=(datetime.now(timezone.utc)-timedelta(hours=37)).isoformat()
+                if fault=='failed-backup':report['backups']['production']['ok']=False
+                if fault=='stale-restore':report['restoreTests']['staging']['at']=(datetime.now(timezone.utc)-timedelta(days=41)).isoformat()
+                if fault=='old-backup':report['backups']['production']['at']=report['lastFailure']['at']
+                if fault=='old-journal':common.private_write(root/'journal-check.json',json.dumps({'ok':True,'at':report['lastFailure']['at']}))
+                if fault=='missing-journal':(root/'journal-check.json').unlink()
+                if fault=='wrong-snapshot':report['restoreTests']['production']['snapshot']='c'*64
+                if fault=='unknown-operation':report['lastFailure']['operation']='unknown'
+                with patch.object(cli,'STATE',root),patch.object(cli,'state',return_value=report),patch.object(cli,'locked',self.recovery_locks(root)),contextlib.redirect_stdout(io.StringIO()):
+                    with self.assertRaises(common.OpsError):cli.resolve_alert()
+                self.assertFalse(json.loads((root/'last-failure.json').read_text())['resolved'])
 
     def test_provider_check_uses_cloudru_without_asking_for_another_key(self):
         with patch.object(installation,'prompt',side_effect=AssertionError('No provider prompt')),\

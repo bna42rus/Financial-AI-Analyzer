@@ -86,16 +86,24 @@ def run(args, *, data=None, input_file=None, env=None, cwd=None, output=None, ti
 
 
 @contextmanager
-def locked(path=INSTALL_LOCK):
+def locked(path=INSTALL_LOCK, *, wait_seconds=0):
+    if not isinstance(wait_seconds, (int, float)) or not 0 <= wait_seconds <= 900:
+        raise OpsError('LOCK_WAIT_INVALID')
     fd = os.open(path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     try:
         info = os.fstat(fd)
         if not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077 or info.st_nlink != 1:
             raise OpsError('LOCK_FILE_INVALID')
-        try:
-            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            raise OpsError('ANOTHER_OPERATION_RUNNING') from None
+        deadline = time.monotonic() + wait_seconds
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise OpsError('ANOTHER_OPERATION_RUNNING') from None
+                time.sleep(min(1, remaining))
         yield
     finally:
         os.close(fd)
