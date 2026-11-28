@@ -41,3 +41,10 @@ test('changed question or context is rejected before a review call or additional
   const h=await harness({});await assert.rejects(reviewNextUnderstanding(changed,reply,state,env,h.model,h.journal),/NEXT_REVIEW_CONTEXT_CHANGED/);assert.equal(h.calls,1);assert.equal(h.reserves,1);
  }
 });
+test('review quotes tolerate only source spelling; normalized duplicates and invented operators still fail',async()=>{
+ const verdict={version:nextReviewVersion,decision:'accept',conditions:[{quote:'ОКТЯБРЬ 2025',covered:true},{quote:'больше  120 рублей',covered:true}]},h=await harness(verdict);
+ assert.equal(await reviewNextUnderstanding(input,reply,state,env,h.model,h.journal),true);
+ for(const conditions of [[{quote:'октябрь 2025',covered:true},{quote:'ОКТЯБРЬ 2025',covered:true}],[{quote:'>=120',covered:true}],[{quote:'октябрь 2024',covered:true}]]){
+  const rejected=await harness({...verdict,conditions});await assert.rejects(reviewNextUnderstanding(input,reply,state,env,rejected.model,rejected.journal),/NEXT_REVIEW_EVIDENCE_INVALID/);
+ }
+});

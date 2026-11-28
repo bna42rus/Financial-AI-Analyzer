@@ -8,6 +8,7 @@ import type {ProviderInput,Understanding} from '../../../packages/analyzer/src/n
 import {workflowPrototypeVersion} from '../../../packages/analyzer/src/next/workflow.ts';
 import type {AssistantModel,AssistantJournal} from './assistant-workflow.ts';
 import {nextModelCall} from './analyzer-next-model-call.ts';
+import {foldSource,sourceOccurrences} from '../../../packages/analyzer/src/next/source-literals.ts';
 
 export const nextReviewVersion='cashneuro-next-review/1';
 export const nextReviewSchema={type:'object',additionalProperties:false,required:['version','decision','conditions'],properties:{
@@ -46,6 +47,6 @@ export async function reviewNextUnderstanding(input:ProviderInput,reply:Understa
  const checked=await nextModelCall(model,journal,{phase:'check_changes',protocol:nextReviewVersion,prompt:nextReviewPrompt,input:nextReviewInput(input,reply,state,env),schema:nextReviewSchema},1,dispatch);
  assertClosedSchema(checked.value,nextReviewSchema);
  const verdict=checked.value as {decision:'accept'|'reject';conditions:{quote:string;covered:boolean}[]};
- if(verdict.conditions.some(c=>!c.quote.trim()||!input.question.includes(c.quote))||new Set(verdict.conditions.map(c=>c.quote)).size!==verdict.conditions.length)throw new TypeError('NEXT_REVIEW_EVIDENCE_INVALID');
+ if(verdict.conditions.some(c=>!c.quote.trim()||!sourceOccurrences(c.quote,input.question).length)||new Set(verdict.conditions.map(c=>foldSource(c.quote))).size!==verdict.conditions.length)throw new TypeError('NEXT_REVIEW_EVIDENCE_INVALID');
  return verdict.decision==='accept'&&verdict.conditions.every(c=>c.covered);
 }

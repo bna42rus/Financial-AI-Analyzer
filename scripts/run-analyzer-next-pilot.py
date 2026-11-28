@@ -96,7 +96,7 @@ def main():
         if json.loads(private(target / 'source-ready.json')) != {'sha': args.sha}:
             raise RuntimeError('PILOT_SOURCE_INCOMPLETE')
         print('PRECHECK: offline contracts, context, complete dialogs and comparison regressions.', flush=True)
-        checks = ['next-contract', 'next-period', 'next-read-evidence', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression', 'next-additional-pilot']
+        checks = ['next-lexicon', 'next-contract', 'next-period', 'next-read-evidence', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression', 'next-additional-pilot']
         checked = subprocess.run(['/usr/bin/node', '--test', *[str(source / 'packages/analyzer/test' / (name+'.test.ts')) for name in checks]], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
         if checked.returncode:
             raise RuntimeError('PILOT_OFFLINE_PRECHECK_FAILED')

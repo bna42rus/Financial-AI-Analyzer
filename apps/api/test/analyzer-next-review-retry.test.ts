@@ -39,5 +39,6 @@ test('one durable retry ID preserves the original receipt and cumulative budget 
 });
 test('runtime literal guidance does not change the frozen legacy pilot prompt',()=>{
  assert.equal(pilotPrompt,legacyUnderstandingPrompt);assert.ok(understandingPrompt.startsWith(pilotPrompt));assert.notEqual(understandingPrompt,pilotPrompt);
+ assert.equal(createHash('sha256').update(understandingPrompt).digest('hex'),'de59fbac4e1ebb9bb481293c311950cd694bbe4f17289d976ecef27856ec9847');
  assert.equal(createHash('sha256').update(pilotPrompt).digest('hex'),'1083a42dbf127c6201130cc71dcdc4be21c6f198975524e978b61a4bf0cc386f');
 });

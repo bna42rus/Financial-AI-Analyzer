@@ -17,6 +17,7 @@ import {assertClosedSchema} from '../../../packages/analyzer/src/closed-schema.t
 import {understandingPrompt,understandingSchema} from '../../../packages/analyzer/src/next/understanding.ts';
 import {calculateWidget,parseWidget} from '../../../packages/finance-core/src/overview.ts';
 import {rows,catalog as fixtureCatalog} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
+import {foldSource,sourceOccurrences} from '../../../packages/analyzer/src/next/source-literals.ts';
 
 const strict={amountBasis:'absolute_operation' as const,amountFrom:'10001'};
 export const reviewPilotCases:readonly AdditionalCase[]=[
@@ -60,8 +61,8 @@ export async function runReviewPilotTurn(c:AdditionalCase,session:PrototypeSessi
 export function reviewPilotDiagnostic(raw:unknown,question:string){
  const r=raw&&typeof raw==='object'?raw as Record<string,unknown>:{},conditions=Array.isArray(r.conditions)?r.conditions:[];
  let schemaValid=true;try{assertClosedSchema(raw,nextReviewSchema);}catch{schemaValid=false;}
- const source=(c:any)=>typeof c?.quote==='string'&&!!c.quote.trim()&&question.includes(c.quote);
+ const source=(c:any)=>typeof c?.quote==='string'&&!!c.quote.trim()&&!!sourceOccurrences(c.quote,question).length;
  return {received:raw!==undefined,schemaValid,versionMatches:r.version===nextReviewVersion,decision:r.decision==='accept'||r.decision==='reject'?r.decision:'unsupported',conditionCount:conditions.length,
-  invalidEvidenceCount:conditions.filter(c=>!source(c)).length,duplicateQuoteCount:conditions.length-new Set(conditions.map(c=>c?.quote)).size,
+  invalidEvidenceCount:conditions.filter(c=>!source(c)).length,duplicateQuoteCount:conditions.length-new Set(conditions.map(c=>typeof c?.quote==='string'?foldSource(c.quote):null)).size,
   uncoveredSourceConditions:conditions.filter(c=>source(c)&&c.covered===false).slice(0,8).map(c=>c.quote),unknownFieldCount:Object.keys(r).filter(k=>!['version','decision','conditions'].includes(k)).length};
 }

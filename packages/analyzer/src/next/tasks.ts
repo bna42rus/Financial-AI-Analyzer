@@ -14,6 +14,7 @@ import type {WidgetResult} from '../../../finance-core/src/overview.ts';
 import type {Catalog} from '../yandex-contract.ts';
 import {questionQuote} from '../task-literals.ts';
 import {periodExpression} from './period.ts';
+import {sourceNameIndex} from './source-literals.ts';
 import {normalizeReadBinding} from './read-binding.ts';
 import {comparisonPeriodOrder} from './comparison-periods.ts';
 import {normalizeSourceIntent,sourcePeriodEdit} from './source-intent.ts';
@@ -122,16 +123,9 @@ function expressionEdit(field:Condition,expression:string,env:Environment,base:Q
   value=field==='period'?period:{postedFrom:period.from,postedThrough:period.through};
  }else if(field==='amount')value=assistantAmountLiteral(expression,'absolute_operation');
  else if(['accounts','categories','counterparties'].includes(field)){
-  const group=field as 'accounts'|'categories'|'counterparties',fold=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU').replaceAll('ё','е').replace(/\s+/gu,' ').trim();
-  const candidates=env.catalog[group].filter(item=>fold(item.name)===fold(expression));
-  if(candidates.length!==1)fail(candidates.length?'TASK_ENTITY_AMBIGUOUS':'TASK_ENTITY_MISSING');
-  const item=candidates[0]!;
-  // Case/NFKC/ё equivalence supplies no authority: require the whole name in
-  // the question and reject a shorter name contained in a longer catalog name.
-  const source=fold(env.question),spans:{start:number;end:number;name:string}[]=[];
-  for(const candidate of env.catalog[group]){const name=fold(candidate.name);if(!name)continue;for(let at=source.indexOf(name);at>=0;at=source.indexOf(name,at+1))if(!/[\p{L}\p{N}_]/u.test(source[at-1]??'')&&!/[\p{L}\p{N}_]/u.test(source[at+name.length]??''))spans.push({start:at,end:at+name.length,name});}
-  const maximal=spans.filter(a=>!spans.some(b=>b.start<=a.start&&b.end>=a.end&&(b.start<a.start||b.end>a.end)));
-  if(!maximal.some(s=>s.name===fold(expression)))fail('TASK_EVIDENCE_MISSING');
+  const group=field as 'accounts'|'categories'|'counterparties';let index:number;
+  try{index=sourceNameIndex(group,expression,env.question,env.catalog[group].map(item=>item.name));}catch(e){if(e instanceof TypeError&&/^TASK_[A-Z_]+$/.test(e.message))fail(e.message);throw e;}
+  const item=env.catalog[group][index]!;
   if(group==='categories'){
    const category=item as Catalog['categories'][number];
    value=category.parentId?{categoryIds:[category.parentId],subcategoryIds:[category.id]}:{categoryIds:[category.id]};

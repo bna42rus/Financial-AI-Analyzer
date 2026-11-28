@@ -8,6 +8,10 @@ import {intentVersion} from '../../../packages/analyzer/src/next/intent.ts';
 import type {AssistantModel,AssistantJournal,RunReceipt,CompletionInput} from '../src/assistant-workflow.ts';
 import {scope,catalog,id} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
 import {createCloudAssistantModel} from '../src/assistant-transport.ts';
+import {nextCallFingerprint} from '../src/analyzer-next-model-call.ts';
+import {workflowPrototypeVersion} from '../../../packages/analyzer/src/next/workflow.ts';
+import {taskProjection} from '../../../packages/analyzer/src/next/tasks.ts';
+import {understandingPrompt,understandingSchema} from '../../../packages/analyzer/src/next/understanding.ts';
 
 const binding={mode:'continue',conditions:'pin'};
 const intent=(action:string,parameters:unknown,bind:unknown={mode:'new'},format='auto')=>({relevance:'financial',intent:{version:intentVersion,action,parameters,binding:bind,presentation:{format,detail:'normal'}}});
@@ -62,4 +66,15 @@ test('review uses its own closed wire protocol and cannot select it on legacy or
 test('terminal diagnostics expose only schema facts and source-backed missing conditions, never arbitrary response data',()=>{
  const question=reviewPilotCases[0]!.question,d=reviewPilotDiagnostic({version:'private-value',decision:'private-value',conditions:[{quote:'строго больше 100 рублей',covered:false},{quote:'private-value',covered:false}],'private-key':'private-value'},question);
  assert.equal(d.schemaValid,false);assert.equal(d.versionMatches,false);assert.equal(d.invalidEvidenceCount,1);assert.deepEqual(d.uncoveredSourceConditions,['строго больше 100 рублей']);assert.ok(!JSON.stringify(d).includes('private-'));assert.equal(reviewPilotDiagnostic(undefined,question).received,false);
+});
+test('the second observed reply reuses its received understanding and pays only the missing review; a second replay pays nothing',async()=>{
+ const c=reviewPilotCases[0]!,suite=createPilotSuite('review',catalog),env={scope,requestId:id(970),question:c.question,date:'2026-11-25',global:suite.global(c),accessRevision:'synthetic/1',dataRevision:'synthetic/1',catalog};
+ const session=new PrototypeSession(scope),understand={phase:'understand' as const,prompt:understandingPrompt,input:{version:workflowPrototypeVersion,question:env.question,date:env.date,context:taskProjection(session.snapshot())},schema:understandingSchema};
+ const value=intent('read',{metric:'expenses',grouping:'category',comparison:null,conditions:[{field:'period',op:'set',expression:'за октябрь 2025'},{field:'accounts',op:'set',expression:'со счёта «Учебный счёт»'},{field:'amount',op:'set',expression:'строго больше 100 рублей'}],options:{}});
+ let posts=0,reserves=0;const usage={modelVersion:'synthetic-review-model',inputTokens:100,outputTokens:50};
+ const receipt:RunReceipt={fingerprint:'e'.repeat(64),calls:[{phase:'understand',state:'received',fingerprint:nextCallFingerprint(understand),value:structuredClone(value),usage}]};
+ const original=structuredClone(receipt.calls[0]),journal:AssistantJournal={receipt,async persist(){},async reserve(index){assert.equal(index,1);reserves++;},async settle(){}};
+ const model:AssistantModel={bound:{modelVersion:usage.modelVersion,inputTokens:10000,outputTokens:1000},async complete(input,before){assert.equal(input.phase,'check_changes');await before();posts++;return {value:{version:nextReviewVersion,decision:'accept',conditions:[{quote:c.question,covered:true}]},usage};}};
+ const checked=await runReviewPilotTurn(c,session,env,model,journal,async()=>{});assert.equal(checked.matches,true);assert.equal(checked.replayed,true);assert.equal(posts,1);assert.equal(reserves,1);assert.equal(checked.reads,1);assert.deepEqual(receipt.calls[0],original);
+ model.complete=async()=>{throw Error('No model call on replay');};const replay=await runReviewPilotTurn(c,new PrototypeSession(scope),env,model,journal,async()=>{},'replay_only');assert.equal(replay.matches,true);assert.equal(reserves,1);assert.equal(posts,1);
 });

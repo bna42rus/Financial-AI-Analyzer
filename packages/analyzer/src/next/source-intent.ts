@@ -4,26 +4,18 @@ import {parseIntent} from './intent.ts';
 import type {Intent,ConditionEdit} from './intent.ts';
 import type {State,Environment,ReadTask} from './tasks.ts';
 import type {Query} from '../registry.ts';
+import {resolveLexeme} from './lexicon.ts';
 import {periodFacts,isCompletePeriodLiteral} from './period.ts';
 import {hasExplicitComparisonBase,comparisonPeriodOrder} from './comparison-periods.ts';
 const fold=(v:string)=>v.normalize('NFKC').toLocaleLowerCase('ru-RU').replaceAll('ё','е').trim();
 const same=(a:unknown,b:unknown)=>stable(a)===stable(b);
 function stable(v:unknown):string{return JSON.stringify(v,(_key,value)=>value&&typeof value==='object'&&!Array.isArray(value)?Object.fromEntries(Object.entries(value).sort(([a],[b])=>a.localeCompare(b))):Array.isArray(value)?[...value].sort():value);}
 function fail(code:string):never{throw new TypeError(code);}
-function distance(a:string,b:string){
- const rows=Array.from({length:a.length+1},()=>Array<number>(b.length+1).fill(0));
- for(let i=0;i<=a.length;i++)rows[i]![0]=i;for(let j=0;j<=b.length;j++)rows[0]![j]=j;
- for(let i=1;i<=a.length;i++)for(let j=1;j<=b.length;j++){
-  rows[i]![j]=Math.min(rows[i-1]![j]!+1,rows[i]![j-1]!+1,rows[i-1]![j-1]!+(a[i-1]===b[j-1]?0:1));
-  if(i>1&&j>1&&a[i-1]===b[j-2]&&a[i-2]===b[j-1])rows[i]![j]=Math.min(rows[i]![j]!,rows[i-2]![j-2]!+1);
- }return rows[a.length]![b.length]!;
-}
-export function paymentChoice(question:string){
+export function paymentChoice(question:string):{payment:'annuity'|'differentiated';quote:string}|null{
  const quote=question.trim().replace(/[?!.]+$/u,'').trim().replace(/^(?:(?:а|тогда|теперь|выбери|у меня)\s+)+/iu,''),word=fold(quote);
  if(!/^\p{L}{8,24}$/u.test(word))return null;
- const choices=[['annuity','аннуитетный'],['differentiated','дифференцированный']] as const;
- const matches=choices.filter(([,label])=>distance(word,label)<=2);
- return matches.length===1?{payment:matches[0]![0],quote}:null;
+ const match=resolveLexeme('payment',word,true);
+ return match.status==='known'&&(match.key==='annuity'||match.key==='differentiated')?{payment:match.key,quote}:null;
 }
 function nearestLoan(state:State){return [...state.history].reverse().find(t=>t.kind==='loan');}
 function knownBinding(intent:Intent,state:State){
@@ -36,7 +28,8 @@ function chartWords(question:string):string[]|false{
  const text=fold(question).replace(/(?:,?\s+не\s+(?:меняя|изменяя)\s+(?:условий|параметров))[.!?]*$/u,''),words=text.match(/\p{L}+/gu)??[];
  if(!words.length||!/^[\p{L}\s.,?!;:—–-]+$/u.test(text))return false;
  const allowed=/^(?:вернись|вернитесь|верни|верните|возвратись|покажи|покажите|построй|постройте|к|и|по|для|того|этому|этого|сохраненному|сохраненного|прежнему|предыдущему|расчету|расчета|модели|модель|сценарию|сценария|кредита|кредиту|займа|займу|график|графики|графика|платежей|платежи|ежемесячных|ежемесячные|основного|основным|долга|долгом|процентов|процентами|оба|обоих|типов|типа|вместе|с)$/u;
- return words.every(w=>allowed.test(w))&&words.some(w=>/^график/u.test(w))&&(words.some(w=>/^(?:покажи|покажите|построй|постройте)$/u.test(w))||words[0]?.startsWith('график'))?words:false;
+ const normalized=words.map(w=>{const format=resolveLexeme('format',w,true);if(format.status==='known'&&format.key==='chart')return 'график';const action=resolveLexeme('action',w,true);return action.status==='known'&&action.key==='read'?'покажи':w;});
+ return normalized.every(w=>allowed.test(w))&&normalized.some(w=>/^график/u.test(w))&&(normalized.some(w=>/^(?:покажи|покажите|построй|постройте)$/u.test(w))||normalized[0]?.startsWith('график'))?normalized:false;
 }
 export function isLoanChartResume(question:string){
  const words=chartWords(question);

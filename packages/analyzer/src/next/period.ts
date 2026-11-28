@@ -4,7 +4,9 @@
 import {dateFact} from '../../../finance-core/src/model.ts';
 import {parseOperationsFilter} from '../../../finance-core/src/operations.ts';
 import type {OperationsFilter} from '../../../finance-core/src/operations.ts';
-import {periodLiteral,questionQuote} from '../task-literals.ts';
+import {periodLiteral} from '../task-literals.ts';
+import {resolveLexeme} from './lexicon.ts';
+import {sourceOccurrences} from './source-literals.ts';
 type Period=Pick<OperationsFilter,'from'|'through'>;
 const same=(a:Period,b:Period)=>a.from===b.from&&a.through===b.through;
 function fail(code:string):never{throw new TypeError(code);}
@@ -20,11 +22,17 @@ function canonical(expression:string):Period|null{
  if(range)return parseOperationsFilter({from:range[1],through:range[2]});
  return null;
 }
-function literal(quote:string,date:string,previous:Period):Period{
+function literal(quote:string,date:string,previous:Period,allowBareTypos=true):Period{
  const source=quote.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/[(),]/gu,' ').replace(/\s+/gu,' ').trim();
- const normalized=source.replace(/^(?:за|в)\s+/u,'').replace(/[.?]$/u,'').trim().replace(/^(\p{L}+)\s*[-–—]\s*(\d{4})$/u,'$1 $2')
+ let normalized=source.replace(/^(?:за|в)\s+/u,'').replace(/[.?]$/u,'').trim().replace(/^(\p{L}+)\s*[-–—]\s*(\d{4})$/u,'$1 $2')
   .replace(/^(январ|феврал|апрел|июн|июл|сентябр|октябр|ноябр|декабр)(?:[её]м|ю)(?=\s|$)/u,'$1ь')
   .replace(/^(март|август)(?:ом|у)(?=\s|$)/u,'$1').replace(/^ма(?:ем|ю)(?=\s|$)/u,'май');
+ const month=/^([\p{L}]+)\.?(?:\s+(\d{4})(?: года| г\.?)?)?$/u.exec(normalized);
+ if(month){const term=resolveLexeme('calendar_month',month[1]!,allowBareTypos||/^(?:за|в)\s/u.test(source)||!!month[2]);if(term.status==='known')normalized=term.canonical+(month[2]?' '+month[2]:'');}
+ const range=/^(с \d{1,2} по \d{1,2} )([\p{L}]+)\.?( \d{4}(?: года)?(?: включительно)?)$/u.exec(normalized);
+ if(range){const term=resolveLexeme('calendar_month',range[2]!,true);if(term.status==='known')normalized=range[1]+term.canonical+range[3];}
+ const relative=/^([\p{L}]+) ([\p{L}]+)\.?$/u.exec(normalized);
+ if(relative){const relation=resolveLexeme('time_relation',relative[1]!,true),unit=resolveLexeme('calendar_unit',relative[2]!,true);if(relation.status==='known'&&unit.status==='known'&&unit.key==='month'&&['previous','current'].includes(relation.key))normalized=(relation.key==='previous'?'предыдущий':'текущий')+' месяц';}
  const period=canonical(normalized)??periodLiteral(normalized,normalized,date);
  if(/^\p{L}+$/u.test(normalized)&&period.from?.endsWith('-01')&&period.from!==period.through&&previous.from&&previous.through){
   if(previous.from.slice(0,4)!==previous.through.slice(0,4))fail('TASK_PERIOD_YEAR_AMBIGUOUS');
@@ -41,11 +49,12 @@ export function periodFacts(question:string,date:string,previous:Period={}){
  // Use the existing grammar and retain maximal spans so an explicit year or
  // larger range cannot disappear while matching a convenient smaller token.
  const tokens=[...question.matchAll(/[\p{L}\p{N}]+(?:[-./][\p{L}\p{N}]+)*|[—–]/gu)];
+ const bareContext=/^(?:(?:а|теперь|тогда|покажи|выведи)\s+)*(?:(?:за|в)\s+)?[\p{L}]+\.?[?!]*$/iu.test(question.trim());
  const found:{start:number;end:number;period:Period}[]=[];
  for(let i=0;i<tokens.length;i++)for(let j=i;j<Math.min(tokens.length,i+8);j++){
   const start=tokens[i]!.index!,end=tokens[j]!.index!+tokens[j]![0].length;
   if(end-start>200)break;
-  try{const period=literal(question.slice(start,end),date,previous);found.push({start,end,period});}catch{continue;}
+  try{const period=literal(question.slice(start,end),date,previous,bareContext);found.push({start,end,period});}catch{continue;}
   if(found.length>64)fail('TASK_PERIOD_EVIDENCE_AMBIGUOUS');
  }
  const maximal=found.filter(a=>!found.some(b=>b!==a&&b.start<=a.start&&b.end>=a.end&&(b.start<a.start||b.end>a.end)));
@@ -55,7 +64,16 @@ export function periodExpression(expression:string,question:string,date:string,p
  if(!question||question.length>2000||!expression||expression.length>2000)fail('TASK_PERIOD_UNSUPPORTED');
  let proposed:Period|null;
  try{proposed=canonical(expression.trim());}catch{fail('TASK_PERIOD_UNSUPPORTED');}
- if(!proposed){questionQuote(expression,question);return literal(expression,date,previous);}
+ if(!proposed){
+  const value=literal(expression,date,previous),quote=expression.replace(/[.?]$/u,'');
+  const all=periodFacts(question,date,previous);
+  const quoted=all.filter(f=>sourceOccurrences(quote,f.source).length);
+  const facts=quoted.length?quoted:all;
+  if(!quoted.length&&all.some(f=>!same(f.period,all[0]!.period)))fail('TASK_PERIOD_EVIDENCE_AMBIGUOUS');
+  if(!facts.length)fail('TASK_EVIDENCE_MISSING');
+  if(facts.some(f=>!same(value,f.period)))fail('TASK_PERIOD_EVIDENCE_MISMATCH');
+  return value;
+ }
  const maximal=periodFacts(question,date,previous);
  if(!maximal.length)fail('TASK_EVIDENCE_MISSING');
  if(maximal.some(p=>!same(p.period,maximal[0]!.period)))fail('TASK_PERIOD_EVIDENCE_AMBIGUOUS');
