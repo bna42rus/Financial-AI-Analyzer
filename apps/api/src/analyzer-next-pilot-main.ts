@@ -5,7 +5,7 @@ import {mkdir} from 'node:fs/promises';
 import {join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {performance} from 'node:perf_hooks';
-import {createStagingAssistantProvider} from './analyzer-assistant-provider.ts';
+import {createStagingAssistantProvider,AssistantModelAdmissionError} from './analyzer-assistant-provider.ts';
 import {withAssistantJournal,readAssistantPrivateFile} from './assistant-journal.ts';
 import type {AssistantAccounting} from './assistant-journal.ts';
 import type {RunReceipt,AssistantRequest} from './assistant-workflow.ts';
@@ -36,6 +36,7 @@ async function main(){
  const pool=new Pool({connectionString:cfg.databaseUrl,max:2});
  try{
   const provider=await createStagingAssistantProvider(pool,cfg.settings,fetch,expected.sourceSha256);
+  console.log('MODEL_ADMISSION '+JSON.stringify((provider.binding as {modelAdmission:unknown}).modelAdmission));
   if(!provider.costPeriod||!provider.allowed(cfg.email))throw Error('PILOT_MONTHLY_ACCOUNT_DENIED');
   const manifestPath=join(cfg.directory,'run.json'),accountBinding=createHash('sha256').update(cfg.userId+':'+provider.policy.projectId).digest('hex');let manifest:any;
   try{manifest=await readAssistantPrivateFile(manifestPath);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;
@@ -84,4 +85,4 @@ async function main(){
   if(passed!==suite.cases.length)process.exitCode=1;
  }finally{await pool.end();}
 }
-main().catch(e=>{console.error(e instanceof Error&&/^[A-Z][A-Z0-9_]{1,80}$/.test(e.message)?e.message:'PILOT_STOPPED');process.exitCode=1;});
+main().catch(e=>{if(e instanceof AssistantModelAdmissionError)console.error('MODEL_DIAGNOSTIC '+JSON.stringify(e.diagnostic));console.error(e instanceof Error&&/^[A-Z][A-Z0-9_]{1,80}$/.test(e.message)?e.message:'PILOT_STOPPED');process.exitCode=1;});

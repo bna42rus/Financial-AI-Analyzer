@@ -15,6 +15,10 @@ import type { MonthlyBudgetState } from './assistant-monthly.ts';
 
 export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
 const providers = new WeakSet<object>();
+export class AssistantModelAdmissionError extends AssistantError {
+  readonly diagnostic: unknown;
+  constructor(diagnostic: unknown) { super('ASSISTANT_MODEL_CHANGED'); this.diagnostic=diagnostic; }
+}
 export const isAssistantProvider = (value: unknown): value is AssistantProvider => !!value && typeof value === 'object' && providers.has(value);
 /** Isolated HTTP/DB acceptance only. No key loader, default fetch or live switch.
  * The explicit fetcher receives a synthetic key; it must be a test transport. */
@@ -39,8 +43,21 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
   await pool.query('SELECT 1 FROM commerce.ai_cost_reservation LIMIT 0');
   const credentials = { apiKey: settings.apiKey };
   const metadata = await inspectCloudTaskModel(credentials,fetcher);
-  if (metadata.modelMetadataSha256 !== settings.modelMetadataSha256 || metadata.numericMetadata.context_length !== 131072 || metadata.numericMetadata.max_model_len !== 131072) throw new AssistantError('ASSISTANT_MODEL_CHANGED');
   const model = createCloudAssistantModel(credentials,fetcher), snapshot = structuredClone(settings);
+  const classification = createCloudAssistantModel(credentials,fetcher,'classification');
+  const hashMatches=metadata.modelMetadataSha256===settings.modelMetadataSha256;
+  const versioned=metadata.metadataFieldsPresent.some(k=>['version','revision','snapshot'].includes(k));
+  const n=metadata.numericMetadata,has=(key:string)=>metadata.metadataFieldsPresent.includes(key);
+  const limitsMatch=n.context_length===candidates['cloud-oss'].contextTokens&&n.max_model_len===candidates['cloud-oss'].contextTokens&&
+    (!has('max_input_tokens')||n.max_input_tokens!==undefined&&n.max_input_tokens>=model.bound.inputTokens)&&
+    (!has('max_output_tokens')||n.max_output_tokens!==undefined&&n.max_output_tokens>=Math.max(model.bound.outputTokens,classification.bound.outputTokens));
+  // An unversioned /models card is an operational contract, not a weights
+  // attestation. Monthly mode tolerates non-contract metadata drift; explicit
+  // version/revision/snapshot changes and incompatible limits still stop it.
+  const monthlyContract=!!settings.monthly&&!versioned;
+  const modelAdmission={model:metadata.model,hashMatches,versioned,limitsMatch,monthlyContract,
+    expectedHash:settings.modelMetadataSha256,actualHash:metadata.modelMetadataSha256,numericMetadata:n,immutableModelVersionVerified:false};
+  if(!limitsMatch||!hashMatches&&!monthlyContract)throw new AssistantModelAdmissionError(modelAdmission);
   // Owner-managed price schedule. Monthly verification is manual; no tariff
   // PDF, parser, quote refresh or freshness dependency is on the request path.
   const requestModel = (purpose: 'assistant'|'classification' = 'assistant') =>
@@ -62,7 +79,7 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
       const count = Number((await db.query('SELECT dispatch_count AS n FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2', [settings.cost.projectId,settings.cost.projectPeriodStart])).rows[0].n);
       if (count > settings.maximumCalls) throw new AssistantError('ASSISTANT_PILOT_CALL_LIMIT');
     },
-    binding:{workflow:assistantWorkflowVersion,plan:assistantVersion,sourceSha256,modelMetadataSha256:metadata.modelMetadataSha256,
+    binding:{workflow:assistantWorkflowVersion,plan:assistantVersion,sourceSha256,modelMetadataSha256:metadata.modelMetadataSha256,modelAdmission,
       bound:model.bound,cost:settings.cost,admission:settings.admission,...(settings.monthly ? { monthly: settings.monthly } : { maximumCalls:settings.maximumCalls,expiresAt:settings.expiresAt,tariffCheckedAt:settings.tariffCheckedAt })},
   });
   providers.add(provider);return provider;

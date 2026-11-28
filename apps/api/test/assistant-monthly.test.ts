@@ -5,7 +5,7 @@ import type { Pool, PoolClient } from 'pg';
 import { monthlyPeriod, monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch } from '../src/assistant-monthly.ts';
 import { checkAssistantStagingSettings, assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
 import { monthlyClassificationAdmission } from '../src/classification-admission.ts';
-import { createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
+import { createStagingAssistantProvider,AssistantModelAdmissionError } from '../src/analyzer-assistant-provider.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
 
 const at = new Date('2026-11-01T13:34:00Z');
@@ -108,4 +108,22 @@ test('monthly assistant and classification use configured prices and never fetch
  await send('assistant');clock=new Date('2026-12-15T12:00:00Z');await send('assistant');await send('classification');
  assert.equal(posts,3);assert.equal(tariffGets,0);assert.deepEqual(settings,before);
  assert.equal(tokenCost(provider.policy.price,1_000_000,0),15_860_000_000n);
+});
+test('monthly model admission uses the fixed model and operational limits instead of an unversioned card fingerprint',async()=>{
+ const original={id:'openai/gpt-oss-120b',owned_by:'old',context_length:131072,max_model_len:131072};
+ const old=legacy();old.modelMetadataSha256=createHash('sha256').update(JSON.stringify(original)).digest('hex');
+ const settings=monthlyClassificationAdmission(old,totals,'d'.repeat(64),at),before=structuredClone(settings);let gets=0,posts=0;
+ const pool={async query(sql:string){assert.ok(sql.startsWith('SELECT '));return {rows:sql.includes('current_user')?[{role:'finance_api',name:'finance_staging'}]:[]};}} as unknown as Pool;
+ const fetcher:typeof fetch=async(_url,options)=>{if(options?.method!=='GET'){posts++;throw Error('NO_PAID_CALL');}gets++;return new Response(JSON.stringify({data:[{max_model_len:131072,context_length:131072,id:original.id,owned_by:'new',created:1795840000,description:settings.apiKey}]}));};
+ const p=await createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at),diagnostic=(p.binding as any).modelAdmission;
+ assert.equal(diagnostic.hashMatches,false);assert.equal(diagnostic.limitsMatch,true);assert.equal(diagnostic.immutableModelVersionVerified,false);assert.equal(p.policy.projectLimitRub,'100');assert.equal(gets,1);assert.equal(posts,0);assert.deepEqual(settings,before);assert.ok(!JSON.stringify(diagnostic).includes(settings.apiKey));
+ await assert.rejects(createStagingAssistantProvider(pool,old,fetcher,old.sourceSha256,()=>at),/ASSISTANT_MODEL_CHANGED/);assert.equal(posts,0);
+});
+test('model admission still refuses changed identity, context, versioned pins and invalid input/output bounds without a paid call',async()=>{
+ const original={id:'openai/gpt-oss-120b',context_length:131072,max_model_len:131072},old=legacy();old.modelMetadataSha256=createHash('sha256').update(JSON.stringify(original)).digest('hex');
+ const settings=monthlyClassificationAdmission(old,totals,'d'.repeat(64),at),pool={async query(sql:string){assert.ok(sql.startsWith('SELECT '));return {rows:sql.includes('current_user')?[{role:'finance_api',name:'finance_staging'}]:[]};}} as unknown as Pool;
+ for(const change of [{id:'other-model'},{context_length:65536},{max_model_len:65536},{version:'new'},{revision:'new'},{snapshot:'new'},{max_input_tokens:4096},{max_output_tokens:1200},{max_output_tokens:'4096'}]){
+  let posts=0;const fetcher:typeof fetch=async(_url,options)=>{if(options?.method!=='GET'){posts++;throw Error('NO_PAID_CALL');}return new Response(JSON.stringify({data:[{...original,...change,description:settings.apiKey}]}));};
+  await assert.rejects(createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at),error=>{assert.ok(!String(error).includes(settings.apiKey));if(error instanceof AssistantModelAdmissionError)assert.ok(!JSON.stringify(error.diagnostic).includes(settings.apiKey));return true;});assert.equal(posts,0);
+ }
 });
