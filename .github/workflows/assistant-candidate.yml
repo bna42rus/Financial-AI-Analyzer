@@ -270,4 +270,4 @@ jobs:
       - name: Verify the assistant HTTP and PostgreSQL boundary without paid calls
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-next-store.test.ts test/monthly-budget-integration.test.ts test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/import-ingestion.test.ts test/import-validation.test.ts test/finance.test.ts test/finance-reset.test.ts test/overview.test.ts test/operations.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-next-http.test.ts test/analyzer-next-store.test.ts test/monthly-budget-integration.test.ts test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/import-ingestion.test.ts test/import-validation.test.ts test/finance.test.ts test/finance-reset.test.ts test/overview.test.ts test/operations.test.ts

@@ -33,3 +33,13 @@ it('shows comparison differences and the largest changes in a public answer',asy
  const content=text(renderToStaticMarkup(createElement(AnalyzerAnalysis,{value,onOpen:()=>{}})));
  expect(content).toContain('Изменение относительно периода сравнения: −20 ₽');expect(content).toContain('Наибольший рост — Beta : +60 ₽');expect(content).toContain('Наибольшее снижение — Gamma : −90 ₽');
 });
+
+it('renders both V2 payment schedules with their charts; number/table mode can hide charts',()=>{
+ const inputs=['annuity','differentiated'].map(payment=>({...input,months:24,payment})) as Parameters<typeof calculateFinancial>[0][];
+ const results=inputs.map(v=>calculateFinancial(v)) as Extract<ReturnType<typeof calculateFinancial>,{kind:'loan'}>[];
+ const report:ReportResult={version:'cashneuro-report/1',facts:[],narrative:[],sections:results.map((calculation,i)=>({index:i+1,label:'Вариант '+(i+1)+' · '+(calculation.input.payment==='annuity'?'аннуитетный':'дифференцированный'),calculation}))};
+ const render=(showCharts:boolean)=>renderToStaticMarkup(createElement(AnalyzerReport,{id:'synthetic-v2',value:report,state:{} as FinanceState,onOpen:()=>{},showCharts}));
+ const html=render(true);expect((html.match(/role="img"/g)??[]).length).toBe(2);expect((html.match(/Расчётный график кредита/g)??[]).length).toBe(2);
+ expect(text(html)).toContain('Основной долг');expect(text(html)).toContain('Проценты');expect(text(html)).toContain('12 из 24');expect(text(html)).toContain('Вариант 1 · аннуитетный');expect(text(html)).toContain('Вариант 2 · дифференцированный');
+ expect(render(false)).not.toContain('role="img"');
+});

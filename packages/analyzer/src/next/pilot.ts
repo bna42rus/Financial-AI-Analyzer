@@ -1,18 +1,7 @@
 /** Small synthetic understanding pilot. Expected outcomes never enter model input. */
 import {calculatorRublesMinor} from '../calculators.ts';
-import {intentSchema} from './intent.ts';
 import type {Preparation,Outcome} from './tasks.ts';
-const variants=(intentSchema as any).anyOf.filter((s:any)=>['read','calculate','compare','explain'].includes(s.properties.action.enum[0])).map((s:any)=>structuredClone(s));
-for(const schema of variants)if(schema.properties.action.enum[0]==='calculate')schema.properties.parameters.anyOf=schema.properties.parameters.anyOf.filter((v:any)=>v.properties.calculator.enum[0]==='loan');
-export const pilotSchema={anyOf:[
- {type:'object',additionalProperties:false,required:['relevance','intent'],properties:{relevance:{type:'string',enum:['financial','adjacent']},intent:{anyOf:variants}}},
- {type:'object',additionalProperties:false,required:['relevance','intent'],properties:{relevance:{type:'string',enum:['ambiguous','unrelated']},intent:{type:'null'}}},
-]};
-export const pilotPrompt=`Ты финансовый помощник CashNeuro. Верни только JSON по схеме: relevance и intent. Не считай деньги самостоятельно.
-Оболочка intent обязательна для каждого действия: version, action, binding, parameters, presentation. Новая тема: binding mode=new. Продолжение: mode=continue, conditions=merge_ui; явно прежние условия: conditions=pin. На уточнение отвечай через mode=answer и выданный handle, option=null.
-Извлекай только новые условия текущей реплики, остальные восстановит сервер. Кредит: calculator=loan; edits задают field/op/value/quote. quote — точная подстрока question. Тысячи/миллионы переводи в десятичные рубли, годы в целые месяцы, ставку — в годовые проценты. Неизвестные существенные значения не выдумывай. Не выбран тип платежа — сервер покажет оба; не задавай ненужную анкету. Смена payment сохраняет сумму/ставку/срок. Явные «оба типа» снимают выбор payment через clear.
-Вопрос о значении термина — explain concept, он сохраняет расчёт. Короткий выбор типа с опечаткой — calculate продолжение. «Что выгоднее» — compare с доступными handles конкретных вариантов, criterion=interest, objective=min, а не определение термина.
-Read: metric/grouping/comparison=null сохраняют прежнее значение. Для периода используй точную expression из question, без скопированных условий. Один месяц без года в продолжении сохраняет год исходного периода. «По категориям» означает grouping=category. Сравнение месяцев: compare criterion=value; scenarios=[база, новый период]. Если порядок не задан, база — более ранний месяц. Не объединяй несовместимые области. UUID и SQL не выдумывай. Ответ unrelated/ambiguous: intent=null. Неизвестный параметр или отрицание нельзя молча отбрасывать.`;
+export {understandingSchema as pilotSchema,understandingPrompt as pilotPrompt} from './understanding.ts';
 export const pilotCases=[
  {id:'loan-new',chain:'loan',question:'Посчитай кредит: беру 300 тысяч, ставка 19% в год, вернуть за три года.'},
  {id:'loan-concept',chain:'loan',question:'А что значит аннуитетный и дифференцированный, где это у себя посмотреть?'},

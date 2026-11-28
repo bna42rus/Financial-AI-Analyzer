@@ -1,3 +1,4 @@
+import {validateNextConfiguration,nextRequestRoute} from './analyzer-next-config.ts';
 import {maintenanceStatus,changeMaintenance} from './maintenance.ts';
 import {maintenanceBlocks} from '../../../packages/access/src/maintenance.ts';
 import {analyzerAccess} from './analyzer-access.ts';
@@ -36,6 +37,7 @@ import {cancelAccessCheckout,checkoutAccountState,disableAutoRenewal,firstChecko
 
 export async function createServer(config: Config) {
   if (config.assistantProvider && (config.profile !== 'finance' || !['test','staging'].includes(config.environment) || !isAssistantProvider(config.assistantProvider) || config.environment !== config.assistantProvider.environment || config.assistantProvider.pool !== config.pool || config.taskProvider || config.yandexAnalyzer || config.analyzerAdapter)) throw new Error('Assistant provider requires explicit matching acceptance configuration');
+  const nextEmails=validateNextConfiguration(config.analyzerNextEmails,config.profile,config.environment,config.assistantProvider);
   if (config.taskProvider && (config.profile !== 'finance' || config.environment !== 'test' || !isCloudTaskProvider(config.taskProvider) || config.taskProvider.pool !== config.pool)) throw new Error('Task provider requires isolated test acceptance');
   if (config.accessPayments && (config.profile!=='finance'||config.accessPayments.test!==true||!['test','staging'].includes(config.environment)))throw Error('Access checkout requires an isolated test shop');
   if (!['development', 'test', 'staging'].includes(config.environment)) throw new Error('Production requires separate security and release acceptance');
@@ -68,6 +70,7 @@ export async function createServer(config: Config) {
   const financialProfile = config.profile === 'finance' ? await import('./finance-profile.ts') : null;
   const analyzer = config.profile === 'finance' ? await import('./analyzer.ts') : null;
   const assistant = config.assistantProvider ? await import('./analyzer-assistant-store.ts') : null;
+  const nextEngine=nextEmails?await import('./analyzer-next-engine.ts'):null;
   const classification = config.profile === 'finance' ? await import('./classification-store.ts') : null;
   if(config.classificationEnabled&&!config.assistantProvider)throw new Error('CLASSIFICATION_PROVIDER_REQUIRED');
   const tasks = config.profile === 'finance' && (config.taskProvider || config.assistantProvider) ? await import('./analyzer-task-store.ts') : null;
@@ -342,14 +345,18 @@ export async function createServer(config: Config) {
         if(config.assistantProvider&&path.startsWith('/finance/analyzer')&&!(await analyzerAccess(db,s.user.id,s.user.email,config.assistantProvider)))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
         if(config.assistantProvider&&path==='/finance/assistant-profile'&&!(await analyzerAccess(db,s.user.id,s.user.email,config.assistantProvider)))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
         if(tasks&&path==='/finance/analyzer-task'){
+          const nextSelected=!!assistant&&await nextRequestRoute(db,s.user.id,request.body,!!nextEngine&&!!nextEmails?.includes(s.user.email.toLowerCase()));
           // Release the outer global/auth/workspace transaction before ANY network.
           await db.query('COMMIT');db.release();db=undefined;
           const authorize=async (connection:PoolClient)=>{
             const session=await current(makeAuth(config,connection,seal),request);
             if(!session||!session.user.emailVerified||session.user.id!==s.user.id)throw new HttpError(401,'AUTH_REQUIRED');
             if(config.assistantProvider&&!(await analyzerAccess(connection,session.user.id,session.user.email,config.assistantProvider)))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
+            if(nextSelected&&!nextEmails?.includes(session.user.email.toLowerCase()))throw new HttpError(403,'ASSISTANT_PILOT_ACCESS_DENIED');
           };
-          const result=assistant
+          const result=nextSelected
+            ?await nextEngine!.executeNextRequest(config.pool,s.user.id,request.body,config.assistantProvider!,config.wrappingKey,authorize)
+            :assistant
             ?await assistant.executeAssistant(config.pool,s.user.id,request.body,config.assistantProvider!,authorize)
             :await tasks.executeAnalyzerTask(config.pool,s.user.id,request.body,config.taskProvider!,authorize);
           return reply.send(result);

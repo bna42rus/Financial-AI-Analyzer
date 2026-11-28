@@ -13,7 +13,7 @@ import type { CostPolicy } from './analyzer-cost.ts';
 import { monthlyPolicy, prepareMonthlyDispatch, authorizeMonthlyDispatch, monthlyBudgetState } from './assistant-monthly.ts';
 import type { MonthlyBudgetState } from './assistant-monthly.ts';
 
-export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
+export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; forNextRequest():AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
 const providers = new WeakSet<object>();
 export class AssistantModelAdmissionError extends AssistantError {
   readonly diagnostic: unknown;
@@ -28,6 +28,7 @@ export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, p
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
   const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (email: string) => !allowedEmails||allowedEmails.includes(email.toLowerCase()), async authorizeDispatch(_db: PoolClient) {},
     forRequest: (purpose: 'assistant'|'classification' = 'assistant') => createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher,purpose),
+    forNextRequest:()=>createCloudAssistantModel({apiKey:'synthetic-assistant-key-for-tests-only'},fetcher,'assistant','cashneuro-intent-prototype/1'),
     binding: { workflow: assistantWorkflowVersion, plan: assistantVersion, bound: model.bound, cost } });
   providers.add(provider); return provider;
 }
@@ -68,6 +69,7 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
     allowed: (email: string) => settings.allowedEmails.includes(email.toLowerCase()),
     async budgetState(db: PoolClient) { return settings.monthly ? monthlyBudgetState(db, provider.policy) : undefined; },
     forRequest: requestModel,
+    forNextRequest:()=>createCloudAssistantModel(credentials,fetcher,'assistant','cashneuro-intent-prototype/1'),
     async prepareDispatch(db: PoolClient, policy: CostPolicy) { if (settings.monthly) await prepareMonthlyDispatch(db, policy); },
     async authorizeDispatch(db: PoolClient, policy = provider.policy) {
       checkAssistantStagingSettings(settings,now());

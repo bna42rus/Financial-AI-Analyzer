@@ -27,7 +27,7 @@ import {HttpError} from './types.ts';
 export const nextStoreVersion='cashneuro-next-store/1';
 export type NextReply={id:string;answer:Answer;result:TurnResult;quota:Quota};
 export type NextExecution={answer:Answer;result:TurnResult;dependencyIds?:string[]};
-export type NextStoreContext={session:PrototypeSession;environment:Environment;journal:AssistantJournal;
+export type NextStoreContext={session:PrototypeSession;environment:Environment;calendar:{now:Date;timezone:string};journal:AssistantJournal;
  within<T>(action:(db:PoolClient)=>Promise<T>):Promise<T>};
 type Expected={checkpointMac:string|null;globalRevision:number;dataRevision:string;accessRevision:string;timezone:string};
 const fail=(code:string):never=>{throw new HttpError(409,code);};
@@ -121,7 +121,7 @@ export async function runNextRequest(pool:Pool,userId:string,value:unknown,provi
   await persist();
   const session=initial.checkpoint?restoreNextSessionForStore(scope,initial.checkpoint,key,body.generation):new PrototypeSession(scope);
   const environment:Environment={scope,requestId:body.id,question:body.text,date:claim.row.input.date,global:claim.row.input.global,dataRevision:expected.dataRevision,accessRevision:expected.accessRevision,catalog:initial.catalog};
-  const execution=structuredClone(await execute({session,environment:structuredClone(environment),journal,within:action=>within(async()=>{await guard();return action(db);})}));
+  const execution=structuredClone(await execute({session,environment:structuredClone(environment),calendar:{now:new Date(claim.row.input.now),timezone:expected.timezone},journal,within:action=>within(async()=>{await guard();return action(db);})}));
   const checkpoint=sealNextSession(session,key),result=execution.result;
   if(result.asOfRevision!==expected.dataRevision||result.status==='discarded'||result.status==='completed'&&session.snapshot().history.at(-1)?.requestId!==body.id)fail('AI_STATE_CHANGED');
   if(execution.answer.registryVersion!==registryVersion||typeof execution.answer.text!=='string'||execution.answer.text.length>100000||execution.answer.proposal)fail('NEXT_RESULT_INVALID');
