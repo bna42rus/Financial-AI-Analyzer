@@ -5,18 +5,21 @@ import {nextCheckpointVersion} from './analyzer-next-checkpoint.ts';
 import {nextStoreVersion} from './analyzer-next-store.ts';
 import {HttpError} from './types.ts';
 
-/** Server opt-in for one existing test account, never client authority. */
+/** Server selection for Staging; normal access and per-user quota checks remain. */
 export function nextTestEmails(raw:unknown):readonly string[]|undefined{
  if(raw===undefined)return undefined;
  if(!Array.isArray(raw)||raw.length!==1||typeof raw[0]!=='string'||raw[0]!==raw[0].toLowerCase()||!/^[^\s@]{1,100}@[^\s@]{1,150}\.[^\s@]{1,50}$/.test(raw[0]))throw Error('ANALYZER_NEXT_CONFIGURATION_DENIED');
  return Object.freeze([...raw]);
 }
 export function nextEmailSetting(raw:string|undefined){return raw===undefined?undefined:nextTestEmails(raw.split(','));}
-export function validateNextConfiguration(emails:unknown,profile:string,environment:string,provider:AssistantProvider|undefined){
+export function nextAllSetting(raw:string|undefined){if(raw===undefined||raw==='0')return false;if(raw==='1')return true;throw Error('ANALYZER_NEXT_CONFIGURATION_DENIED');}
+export function validateNextConfiguration(emails:unknown,profile:string,environment:string,provider:AssistantProvider|undefined,all:unknown=false){
  const allowed=nextTestEmails(emails);
+ if(typeof all!=='boolean'||all&&(profile!=='finance'||!['test','staging'].includes(environment)||!provider))throw Error('ANALYZER_NEXT_CONFIGURATION_DENIED');
  if(allowed&&(profile!=='finance'||!['test','staging'].includes(environment)||!provider||allowed.some(email=>!provider.allowed(email))))throw Error('ANALYZER_NEXT_CONFIGURATION_DENIED');
- return allowed;
+ return allowed??(all?Object.freeze([]):undefined);
 }
+export function nextAccountEnabled(email:string,emails:readonly string[]|undefined,all:boolean){return all||!!emails?.includes(email.toLowerCase());}
 /** Preserve the protocol of existing work/history even after enabling the new
  * slice. A disabled signed chat cannot be sent through the legacy parser. */
 export async function nextRequestRoute(db:PoolClient,userId:string,value:unknown,enabled:boolean){

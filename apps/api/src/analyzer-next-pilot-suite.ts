@@ -12,14 +12,15 @@ import {parseIntent} from '../../../packages/analyzer/src/next/intent.ts';
 import {queryMetrics,queryGroupings} from '../../../packages/analyzer/src/registry.ts';
 import {analysisOptionsSchema} from '../../../packages/analyzer/src/analysis.ts';
 import {calculatorSchema} from '../../../packages/analyzer/src/calculators.ts';
+import {nextReviewVersion} from './analyzer-next-review.ts';
 import {reviewPilotCases,reviewPilotVersion,reviewPilotSignature,reviewPilotPreparationMatches,reviewPilotOutcomeMatches} from './analyzer-next-review-pilot.ts';
 export type SuiteCase={id:string;chain:string;question:string;ui?:AdditionalCase['ui']};
 export function createPilotSuite(name:unknown,catalog:Catalog){
- if(name!==undefined&&name!=='basic'&&name!=='additional'&&name!=='review')throw Error('PILOT_SUITE_INVALID');
- const review=name==='review',additional=name==='additional'||review,cases:readonly SuiteCase[]=review?reviewPilotCases:additional?additionalCases:pilotCases;
- const version=review?reviewPilotVersion:additional?'analyzer-next-additional/1':'analyzer-next-pilot/1',limitRub=additional?'5':'10';
- const caseSignature=review?reviewPilotSignature:additional?createHash('sha256').update(JSON.stringify(cases.map(c=>({id:c.id,chain:c.chain,question:c.question,ui:c.ui??null})))).digest('hex'):undefined;
- return {name:review?'review':additional?'additional':'basic',version,cases,limitRub,caseSignature,
+ if(name!==undefined&&name!=='basic'&&name!=='additional'&&name!=='review'&&name!=='acceptance')throw Error('PILOT_SUITE_INVALID');
+ const acceptance=name==='acceptance',review=name==='review'||acceptance,additional=name==='additional'||review,cases:readonly SuiteCase[]=acceptance?[...additionalCases,...reviewPilotCases]:review?reviewPilotCases:additional?additionalCases:pilotCases;
+ const version=acceptance?'analyzer-next-acceptance/1':review?reviewPilotVersion:additional?'analyzer-next-additional/1':'analyzer-next-pilot/1',limitRub=acceptance?'10':additional?'5':'10';
+ const caseSignature=acceptance?createHash('sha256').update(JSON.stringify({version,cases,review:nextReviewVersion})).digest('hex'):review?reviewPilotSignature:additional?createHash('sha256').update(JSON.stringify(cases.map(c=>({id:c.id,chain:c.chain,question:c.question,ui:c.ui??null})))).digest('hex'):undefined;
+ return {name:acceptance?'acceptance':review?'review':additional?'additional':'basic',version,cases,limitRub,caseSignature,
   global(c:SuiteCase):GlobalSnapshot{return {revision:c.ui?.revision??0,filter:additionalFilter(c.ui?.filter??{},catalog),touched:c.ui?.revision?{period:c.ui.revision,categories:c.ui.revision}:{}};},
   preparationMatches(c:SuiteCase,p:Preparation|null,reply:Understanding){return review?reviewPilotPreparationMatches(c as AdditionalCase,p,reply,catalog):additional?additionalPreparationMatches(c as AdditionalCase,p,reply,catalog):!!p&&reply.intent!==null&&(c.id!=='read-compare'||reply.intent.action==='compare'&&reply.intent.parameters.objective==='max')&&pilotPreparationMatches(c.id as PilotId,p);},
   outcomeMatches(c:SuiteCase,r:TurnResult){return review?reviewPilotOutcomeMatches(c as AdditionalCase,r):additional?additionalOutcomeMatches(c as AdditionalCase,r):c.id==='loan-concept'?r.status==='explanation':r.status==='completed'&&pilotOutcomeMatches(c.id as PilotId,r.outcome);},

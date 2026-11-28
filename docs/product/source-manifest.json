@@ -44,7 +44,7 @@
     {
       "path": "docs/product/analyzer-improvement-program-20261117.md",
       "role": "approved_amendment",
-      "sha256": "da2498d2310e31513b05b466a9c73e0bdc028cc8eaa44e7ac790d02b55e8679d"
+      "sha256": "cad38689d67ddddfd7eefd3c3aeb095f4e333852cb2b2ee10bb488cd7be72188"
     },
     {
       "path": "docs/product/analyzer-capabilities-20261117.md",
@@ -53,6 +53,7 @@
     }
   ],
   "precedence": [
+    "Owner-approved 2026-11-28 update at the end of Analyzer program broadens V2-S5 to all Staging accounts with normal access/quota/RLS checks and a 30-case live review regression capped at 10 RUB within the unchanged monthly 100 RUB; proposed additional 50 RUB was cancelled before any application; Production remains separate",
     "Owner-approved Analyzer revision 2026-11-25 in program section 16 refines the full 240-task/12-dialog scope, shared task/tool/result contracts, context and assumptions, UI actions, diagnostics, 0/1/2-call targets and offline-first pilot before integration; these are requirements, not acceptance evidence; accounting, privacy, access, confirmation and Production gates remain active",
     "Approved Analyzer program and 240-task catalog 2026-11-17 define target scope, global-filter/context behavior, performance goals, cost/quality gates and response/visual contracts; delivery remains phased and unverified until acceptance; existing accounting, access, privacy, billing and deployment controls remain active",
     "Approved category-review amendment 2026-11-17 resolves the previously pending category policy, manual-only redistribution triggers, existing Review UI, inline structural resolution, rules/counterparty interaction and field-specific errors in its stated scope",

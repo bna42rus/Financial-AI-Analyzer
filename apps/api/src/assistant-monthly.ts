@@ -35,7 +35,7 @@ export function monthlyTariffGuard(checkedAt: string, verify: () => Promise<{ ch
  * This serializes the same project's dispatches even across a month boundary. */
 export async function prepareMonthlyDispatch(db: PoolClient, policy: CostPolicy) {
   await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['assistant-monthly:' + policy.projectId]);
-  const blocked = (await db.query(`SELECT 1 FROM commerce.ai_project_budget WHERE project_id=$1 AND blocked LIMIT 1`, [policy.projectId])).rowCount;
+  const blocked = (await db.query(`SELECT 1 FROM commerce.ai_project_budget WHERE project_id=$1 AND (blocked OR reserved_atoms>0) LIMIT 1`, [policy.projectId])).rowCount;
   const unresolved = (await db.query(`SELECT 1 FROM commerce.ai_cost_reservation WHERE project_id=$1 AND state IN ('reserved','unknown') LIMIT 1`, [policy.projectId])).rowCount;
   if (blocked || unresolved) throw new AssistantError('ASSISTANT_RECONCILIATION_REQUIRED');
 }

@@ -330,7 +330,45 @@ def activate_ai(dropin):
     return value.replace(b'ASSISTANT_ENABLED=0', b'ASSISTANT_ENABLED=1').rstrip() + b'\nEnvironment=ASSISTANT_ENABLED=1\nEnvironment=CLASSIFICATION_ENABLED=1\nEnvironment=AI_ENABLED=0\n'
 
 
-def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False, full_staging=False, restore_default_tariffs=False):
+def inspect_next_release(sha):
+    """Read-only, complete check before skipping an already installed release."""
+    if not re.fullmatch('[a-f0-9]{40}', sha):
+        raise m.InstallationError('RELEASE_INVALID')
+    config = settings()  # Validate the Staging realm before any action.
+    release = m.BASE / 'backend-releases' / sha
+    current = m.run(['systemctl', 'show', m.UNIT, '--property=WorkingDirectory', '--value']).decode().strip()
+    if current != str(release / 'apps/api'):
+        return False
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=5) as response:
+            health = json.load(response)
+        if health.get('status') != 'ok' or health.get('profile') != 'finance' or health.get('assistant') != 'cashneuro-assistant-workflow/7' or health.get('analyzerNext') != 'all-staging':
+            return False
+        caddy = json.loads(m.run(['caddy', 'adapt', '--config', m.CADDY, '--pretty']))
+        if m.frontend_root(caddy) != str(release / 'apps/web/dist'):
+            return False
+        validate_manifest(json.loads((release / 'apps/web/dist/release.json').read_text()), sha, validate_origin(config['API_BASE_URL']))
+        return True
+    except (OSError, ValueError, m.InstallationError):
+        return False
+
+
+def analyzer_all_dropin(value):
+    """Only a server-side Staging selector; no key, allowlist or budget changes."""
+    if re.search(rb'(?m)^ExecStart=.*CASHNEURO_ANALYZER_NEXT_ALL=', value):
+        raise m.InstallationError('ANALYZER_NEXT_ENVIRONMENT_CHANGED')
+    current = re.findall(rb'(?m)^Environment=CASHNEURO_ANALYZER_NEXT_ALL=([^\n]+)$', value)
+    if any(v not in (b'0', b'1') for v in current):
+        raise m.InstallationError('ANALYZER_NEXT_ENVIRONMENT_CHANGED')
+    if current == [b'1']:
+        return value
+    value = re.sub(rb'(?m)^Environment=CASHNEURO_ANALYZER_NEXT_ALL=[01]\n?', b'', value)
+    return value.rstrip() + b'\n[Service]\nEnvironment=CASHNEURO_ANALYZER_NEXT_ALL=1\n'
+
+
+def install(source, sha, enable_classification=False, evidence=None, tested_sha=None, keep_ai_paused=False, resume_ai=False, monthly_budget=None, preserve_active_ai=False, full_staging=False, restore_default_tariffs=False, analyzer_next_all=False):
+    if analyzer_next_all and not preserve_active_ai:
+        raise m.InstallationError("ANALYZER_NEXT_REQUIRES_ACTIVE_AI")
     if restore_default_tariffs and not full_staging:
         raise m.InstallationError('TARIFF_RESTORE_REQUIRES_FULL_STAGING')
     if preserve_active_ai and (keep_ai_paused or resume_ai or enable_classification or evidence or tested_sha or monthly_budget is not None):
@@ -530,6 +568,8 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
             else:
                 print('Проверка категоризации: два платных запроса на синтетике в пределах прежнего лимита.', flush=True)
                 m.run(['/usr/bin/node', '--experimental-transform-types', release / 'apps/api/src/classification-smoke-main.ts', '--live'], output=sys.stdout.buffer, timeout=180)
+        if analyzer_next_all:
+            new_dropin = analyzer_all_dropin(new_dropin)
         m.atomic_replace(m.DROPIN, new_dropin)
         if metadata['workerManaged']:
             # Copy only the scoped DB connection, never auth/KMS/AI credentials.
@@ -544,6 +584,10 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         m.run(['systemctl', 'daemon-reload'])
         m.run(['systemctl', 'restart', m.UNIT])
         wait_release_health(release, keep_ai_paused)
+        if analyzer_next_all:
+            with urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=5) as response:
+                if json.load(response).get('analyzerNext') != 'all-staging':
+                    raise m.InstallationError('ANALYZER_NEXT_HEALTH_CHANGED')
         if metadata['workerManaged']:
             m.run(['systemctl', 'enable', WORKER])
             m.run(['systemctl', 'restart', WORKER])
@@ -558,6 +602,10 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         gate.install(release, m.private_write, m.run, m.atomic_replace)
         m.run(['systemctl', 'reload', 'caddy'])
         wait_release_health(release, keep_ai_paused)
+        if analyzer_next_all:
+            with urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=5) as response:
+                if json.load(response).get('analyzerNext') != 'all-staging':
+                    raise m.InstallationError('ANALYZER_NEXT_HEALTH_CHANGED')
         m.run(['/usr/bin/python3', str(release / 'scripts/sync-merchant-dictionary.py'), '--install', str(release)])
         if payment_webhook:
             check_payment_webhook()
@@ -571,7 +619,7 @@ def install(source, sha, enable_classification=False, evidence=None, tested_sha=
         raise
     print('3/3: установлен подключённый интерфейс, API помощника и обработчик импорта.', flush=True)
     operator_maintenance('prune')
-    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_active_preserved' if preserve_active_ai else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), **({'paymentWebhook': WEBHOOK_URL} if payment_webhook else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, 'rollback': rollback}, ensure_ascii=False), flush=True)
+    print(json.dumps({'status': 'UPDATED', 'sha': sha, 'frontendMode': 'connected', 'apiOrigin': origin, 'assistantAdmission': 'blocked_reconciliation' if resume_blocker else 'paused_preserving_usage' if keep_ai_paused else 'monthly_active_preserved' if preserve_active_ai else 'monthly_100_rub' if rebound.get('monthly') else 'continued_with_prior_usage' if evidence else 'unchanged', **({'aiResumeBlocker':resume_blocker} if resume_blocker else {}), **({'paymentWebhook': WEBHOOK_URL} if payment_webhook else {}), 'paidCalls': 2 if enable_classification and not evidence else 0, **({'analyzerNextAudience':'all-staging'} if analyzer_next_all else {}), 'rollback': rollback}, ensure_ascii=False), flush=True)
 
 
 def wait_release_health(release, keep_ai_paused):
@@ -588,8 +636,10 @@ def main():
     if os.geteuid() != 0:
         raise m.InstallationError('ROOT_REQUIRED')
     parser = argparse.ArgumentParser()
+    parser.add_argument('--inspect-next-release')
     parser.add_argument('--inspect-api-origin', action='store_true')
     parser.add_argument('--inspect-control-origin', action='store_true')
+    parser.add_argument('--analyzer-next-all', action='store_true')
     parser.add_argument('--full-staging', action='store_true')
     parser.add_argument('--restore-default-tariffs', action='store_true')
     parser.add_argument('--source')
@@ -603,6 +653,10 @@ def main():
     parser.add_argument('--classification-evidence')
     parser.add_argument('--tested-runtime-sha')
     args = parser.parse_args()
+    if args.inspect_next_release:
+        ready = inspect_next_release(args.inspect_next_release)
+        print(json.dumps({'status':'ALREADY_INSTALLED' if ready else 'UPDATE_REQUIRED','analyzerNext':'all-staging' if ready else 'unverified','paidCalls':0}))
+        raise SystemExit(0 if ready else 3)
     if args.inspect_api_origin:
         print(validate_origin(settings()['API_BASE_URL']))
         return
@@ -614,7 +668,7 @@ def main():
     if args.rollback:
         restore(Path(args.rollback).resolve())
     elif args.source and args.sha:
-        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai, args.full_staging, args.restore_default_tariffs)
+        install(Path(args.source).resolve(), args.sha, args.enable_classification, args.classification_evidence, args.tested_runtime_sha, args.keep_ai_paused, args.resume_ai, args.monthly_ai_budget, args.preserve_active_ai, args.full_staging, args.restore_default_tariffs, args.analyzer_next_all)
     else:
         raise m.InstallationError('ARGUMENTS_REQUIRED')
 

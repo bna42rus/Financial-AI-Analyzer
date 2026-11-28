@@ -33,7 +33,7 @@ async function main(){
  const mode=process.argv.slice(2).join(' '),replayOnly=mode==='--replay-only';
  if(process.getuid?.()!==0||!['--live','--replay-only'].includes(mode))throw Error('PILOT_ROOT_LIVE_REQUIRED');
  let input='';for await(const chunk of process.stdin){input+=chunk.toString();if(input.length>262144)throw Error('PILOT_INPUT_TOO_LARGE');}
- const cfg=JSON.parse(input),suite=createPilotSuite(cfg.suite,catalog),reviewPilot=suite.name==='review';
+ const cfg=JSON.parse(input),suite=createPilotSuite(cfg.suite,catalog),reviewPilot=suite.name==='review'||suite.name==='acceptance';
  if(!/^\/srv\/cashneuro\/staging\/backend-releases\/[a-f0-9]{40}\/apps\/api$/.test(cfg.activeApi)||!/^\/var\/lib\/cashneuro\/analyzer-next-pilot\/[a-f0-9]{40}$/.test(cfg.directory))throw Error('PILOT_PATH_INVALID');
  stagingDatabase('staging',cfg.databaseUrl);
  const dbUrl=new URL(cfg.databaseUrl);if(dbUrl.username!=='finance_api'||dbUrl.pathname!=='/finance_staging'||typeof cfg.userId!=='string'||!cfg.userId)throw Error('PILOT_DATABASE_DENIED');
@@ -49,11 +49,11 @@ async function main(){
   if(manifest.version!==suite.version||manifest.accountBinding!==accountBinding||manifest.caseSignature!==suite.caseSignature||!Array.isArray(manifest.ids)||manifest.ids.length!==suite.cases.length||new Set(manifest.ids).size!==suite.cases.length||manifest.ids.some((v:unknown)=>typeof v!=='string'||!/^[-a-f0-9]{36}$/.test(v)))throw Error('PILOT_MANIFEST_INVALID');
   let budgetIds=[...manifest.ids];
   if(cfg.retryFirstRejected){
-   if(!reviewPilot)throw Error('PILOT_RETRY_DENIED');const c=suite.cases[0]!,requestId=manifest.ids[0],global=suite.global(c),env={scope,requestId,question:c.question,date:'2026-11-25',global,dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+   if(suite.name!=='review')throw Error('PILOT_RETRY_DENIED');const c=suite.cases[0]!,requestId=manifest.ids[0],global=suite.global(c),env={scope,requestId,question:c.question,date:'2026-11-25',global,dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
    const request:AssistantRequest={requestId,scope,question:c.question,global,conversation:emptyConversation(scope),dataRevision:env.dataRevision,timezone:'Europe/Moscow',now:new Date('2026-11-25T12:00:00Z')};
    const retry=await firstReviewRetry(cfg.directory,manifest,request,env);budgetIds=retry.budgetIds;manifest={...manifest,ids:retry.ids};console.log('RETRY: previous rejected receipt retained; all previous spend remains within the same 5 RUB ceiling.');
   }else if(reviewPilot)try{await readAssistantPrivateFile(join(cfg.directory,'review-first-retry.json'));throw Error('PILOT_RETRY_FLAG_REQUIRED');}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
-  if(cfg.refreshRejectedReview&&!reviewPilot)throw Error('PILOT_REVIEW_REFRESH_DENIED');
+  if(cfg.refreshRejectedReview&&suite.name!=='review'&&suite.name!=='acceptance')throw Error('PILOT_REVIEW_REFRESH_DENIED');
   if(reviewPilot)budgetIds.push(...await reviewRefreshBudgetIds(cfg.directory,manifest,!!cfg.refreshRejectedReview));
   const journalDirectory=join(cfg.directory,'journal');await mkdir(journalDirectory,{recursive:true,mode:0o700});
   const transaction=async<T>(action:(db:import('pg').PoolClient)=>Promise<T>)=>{const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[cfg.userId]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}};
@@ -65,6 +65,7 @@ async function main(){
    if(failedChains.has(c.chain)){skipped++;continue;}
    const session=sessions.get(c.chain)!,requestId=manifest.ids[index],environment={scope,requestId,question:c.question,date:'2026-11-25',global:suite.global(c),dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
    const request:AssistantRequest={requestId,scope,question:c.question,global:environment.global,conversation:emptyConversation(scope),dataRevision:environment.dataRevision,timezone:'Europe/Moscow',now:new Date('2026-11-25T12:00:00Z')};
+   let reviewDispatched=false;
    const accounting:AssistantAccounting={async reserve(id,call,bound){if(replayOnly)throw Error('PILOT_REPLAY_MISSING');if(reviewPilot?![0,1].includes(call):call!==0)throw Error('PILOT_ONE_CALL_ONLY');await transaction(async db=>{
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['cloud-task-dispatch:'+cfg.userId]);
     if(reviewPilot){
@@ -77,7 +78,7 @@ async function main(){
     const fingerprint=createHash('sha256').update('analyzer-next-pilot/1:'+id).digest('hex');
     await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES($1,$2,'assistant_0',$3,'sent','cashneuro-next-pilot/1',$4,$5,$5,'not_sent')`,[cfg.userId,id,fingerprint,bound.modelVersion,policy.projectPeriodStart]);
     await reserveCost(db,{userId:cfg.userId,requestId:id,step:'assistant_0',anchorAt:policy.projectPeriodStart,periodStart:policy.projectPeriodStart},policy,bound);await provider.authorizeDispatch(db,policy);
-   });newReservations++;},async settle(id,call,usage){if(reviewPilot?![0,1].includes(call):call!==0)throw Error('PILOT_ONE_CALL_ONLY');const violation=await transaction(async db=>{
+   });newReservations++;if(call===1)reviewDispatched=true;},async settle(id,call,usage){if(reviewPilot?![0,1].includes(call):call!==0)throw Error('PILOT_ONE_CALL_ONLY');const violation=await transaction(async db=>{
     if(reviewPilot)return settleAssistantCall(db,cfg.userId,id,call,usage);
     const changed=await settleCost(db,cfg.userId,id,'assistant_0',usage);
     await db.query(`UPDATE commerce.analyzer_request SET state=$3,usage_state=$4,input_tokens=$5,output_tokens=$6,model_version=$7,updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='assistant_0'`,[cfg.userId,id,usage?'completed':'unknown',usage?'reported':'unknown',usage?.inputTokens??null,usage?.outputTokens??null,usage?.modelVersion??null]);return changed;
@@ -101,13 +102,13 @@ async function main(){
    });
    const ok=semantic&&suite.outcomeMatches(c,result);tested++;if(ok)passed++;else failedChains.add(c.chain);
    const call=receipt?.calls[0],usage=reviewPilot?{inputTokens:receipt!.calls.reduce((n,c)=>n+(c.usage?.inputTokens??0),0),outputTokens:receipt!.calls.reduce((n,c)=>n+(c.usage?.outputTokens??0),0)}:call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{if(ok&&(resolved==='loan'||resolved==='loan_comparison'))shape='raw:recovered';}
-   console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${ok&&c.id==='review-rejects-lost-filter'?'expected rejection':result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}${reviewPilot?'; reviewer='+(reviewAccepted===undefined?'not completed':reviewAccepted?'accepted':'rejected')+'; recorded calls='+receipt!.calls.length:''}`);
+   console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${ok&&c.id==='review-rejects-lost-filter'?'expected rejection':result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${reviewPilot?'understand='+(!call?'not_completed':replayed?'reused':'new'):replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}${reviewPilot?'; reviewer='+(reviewAccepted===undefined?'not completed':reviewAccepted?'accepted':'rejected')+'; review='+(reviewDispatched?'new':reviewAccepted===undefined?'not_completed':'reused')+'; recorded calls='+receipt!.calls.length:''}`);
    if(!ok){const details=pilotIntentDiagnostic(((reviewPilot?reviewPilotCandidate(c.id,call?.value):call?.value) as any)?.intent);console.log('DIAGNOSTIC '+c.id+' '+(providerCode||reviewCode||('code'in result?result.code:'PILOT_OUTCOME_MISMATCH'))+' '+sanitizeText(JSON.stringify(details)));}
-   if(reviewPilot&&!ok){console.log('REVIEW_DIAGNOSTIC '+c.id+' '+JSON.stringify(reviewPilotDiagnostic(receipt?.calls[1]?.value,c.question)));console.log('STOP: review pilot failed; no automatic retry or further dispatch.');break;}
+   if(reviewPilot&&!ok){console.log('REVIEW_DIAGNOSTIC '+c.id+' '+JSON.stringify(reviewPilotDiagnostic(receipt?.calls[1]?.value,c.question)));if(suite.name==='review'||/^(?:ASSISTANT_(?:DELIVERY_UNKNOWN|PROVIDER_CHANGED|RECONCILIATION)|AI_COST_RECONCILIATION)/.test(providerCode||('code'in result?result.code:''))){console.log('STOP: review pilot failed; no automatic retry or further dispatch.');break;}console.log('CHAIN_STOP: dependent turns skipped; independent chains continue without retry.');}
    if(/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED|ASSISTANT_DELIVERY_UNKNOWN|ASSISTANT_.*CHANGED)$/.test(providerCode)||result.status==='failed'&&/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED)$/.test(result.code))break;
    const current=await budget();if(BigInt(current.month!.heldAtoms)>0n){console.log('STOP: unresolved cost hold; no retry');break;}
   }
-  const after=await budget();console.log(`RESULT ${passed}/${tested}; total ${suite.cases.length}; skipped ${skipped}; not run ${suite.cases.length-tested}; new reservations ${newReservations}; NEW_COST ${rub(after.run-before.run)} RUB; RUN_TOTAL ${rub(after.run)} RUB; MONTH_AVAILABLE ${rub(after.month!.remainingAtoms)} RUB; MONTH_HELD ${rub(after.month!.heldAtoms)} RUB; no financial data changed`);
+  const after=await budget();console.log(`RESULT ${passed}/${tested}; total ${suite.cases.length}; skipped ${skipped}; not run ${suite.cases.length-tested-(suite.name==='acceptance'?skipped:0)}; new reservations ${newReservations}; NEW_COST ${rub(after.run-before.run)} RUB; RUN_TOTAL ${rub(after.run)} RUB; MONTH_AVAILABLE ${rub(after.month!.remainingAtoms)} RUB; MONTH_HELD ${rub(after.month!.heldAtoms)} RUB; no financial data changed`);
   if(passed!==suite.cases.length)process.exitCode=1;
  }finally{await pool.end();}
 }

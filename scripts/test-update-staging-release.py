@@ -22,6 +22,31 @@ gate = m.load_staging_gate()
 
 
 class UpdateTests(unittest.TestCase):
+    def test_repeat_requires_matching_api_frontend_and_enabled_health(self):
+        with tempfile.TemporaryDirectory() as directory:
+            base=Path(directory);sha='b'*40;release=base/'backend-releases'/sha
+            (release/'apps/web/dist').mkdir(parents=True)
+            (release/'apps/web/dist/release.json').write_text(json.dumps({'schema':'cashneuro-web-build/1','revision':sha,'profile':'finance','mode':'connected','apiOrigin':'https://test.cashneuro.ru'}))
+            def run(args,**kw):
+                return str(release/'apps/api').encode() if args[0]=='systemctl' else b'{}'
+            health={'status':'ok','profile':'finance','assistant':'cashneuro-assistant-workflow/7','analyzerNext':'all-staging'}
+            with patch.object(m.m,'BASE',base),patch.object(m,'settings',return_value={'API_BASE_URL':'https://test.cashneuro.ru'}),patch.object(m.m,'run',side_effect=run),patch.object(m.m,'frontend_root',return_value=str(release/'apps/web/dist')),patch.object(m.urllib.request,'urlopen',side_effect=lambda *a,**kw:io.BytesIO(json.dumps(health).encode())):
+                self.assertTrue(m.inspect_next_release(sha))
+                health['analyzerNext']='off';self.assertFalse(m.inspect_next_release(sha))
+                health['analyzerNext']='all-staging'
+                (release/'apps/web/dist/release.json').write_text('{}');self.assertFalse(m.inspect_next_release(sha))
+
+    def test_all_staging_selector_is_explicit_idempotent_and_leaves_admission_untouched(self):
+        value = b'[Service]\nExecStart=/usr/bin/node --import tsx src/main.ts\nEnvironment=ASSISTANT_ENABLED=1\n'
+        configured = m.analyzer_all_dropin(value)
+        self.assertIn(value.rstrip(), configured)
+        self.assertEqual(configured.count(b'Environment=CASHNEURO_ANALYZER_NEXT_ALL=1'), 1)
+        self.assertEqual(m.analyzer_all_dropin(configured), configured)
+        with self.assertRaisesRegex(m.m.InstallationError, 'ANALYZER_NEXT_REQUIRES_ACTIVE_AI'):
+            m.install(Path('/not-touched'), 'a'*40, analyzer_next_all=True)
+        with self.assertRaises(m.m.InstallationError):
+            m.analyzer_all_dropin(b'[Service]\nExecStart=/usr/bin/env CASHNEURO_ANALYZER_NEXT_ALL=0 node main.ts\n')
+
     def test_monthly_mode_requires_explicit_100_rub_authorization_and_cannot_reset_history(self):
         before = {'realm':'staging/finance','apiKey':'synthetic','allowedEmails':['owner@example.test'],
                   'sourceSha256':'a'*64,'modelMetadataSha256':'b'*64,'tariffSource':'fixed',
@@ -178,7 +203,7 @@ class UpdateTests(unittest.TestCase):
         # and the receipt helper are substituted; snapshots, config/dropin
         # replacements, Caddy selection and release copies use real files.
         from contextlib import ExitStack, redirect_stdout
-        for mode in ['paused','blocked','renewed','preserved']:
+        for mode in ['paused','blocked','renewed','preserved','all']:
             with self.subTest(mode=mode), tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
                 root=Path(directory);base=root/'staging';current=base/'backend-releases'/('a'*40);source=root/'build';release=base/'backend-releases'/('b'*40)
                 current.mkdir(parents=True);(source/'apps/web/dist').mkdir(parents=True);(source/'apps/api').mkdir(parents=True);(root/'backups').mkdir()
@@ -188,10 +213,21 @@ class UpdateTests(unittest.TestCase):
                 origin='https://test.cashneuro.ru';(source/'apps/web/dist/release.json').write_text(json.dumps({'schema':'cashneuro-web-build/1','revision':'b'*40,'profile':'finance','mode':'connected','apiOrigin':origin}))
                 cfg=root/'settings';dropin=root/'dropin';caddy=root/'Caddyfile';worker=root/'worker';worker_env=root/'worker-env'
                 old={'realm':'staging/finance','apiKey':'synthetic-only','allowedEmails':['owner@example.test'],'modelMetadataSha256':'c'*64,'tariffSource':'fixed','sourceSha256':'a'*64,'expiresAt':'2000-01-01T00:00:00Z','maximumCalls':14,'admission':{'stageCapAtoms':'10000000000','stageMaximumCalls':70,'spentAtoms':'100','calls':56},'cost':{'projectId':'staging/synthetic','price':{'input':'15.86'}}}
-                if mode=='preserved':old['monthly']={'version':'cashneuro-staging-monthly/1','limitRub':'100','activatedAt':'2026-11-02T13:00:00Z'}
+                if mode in ('preserved','all'):old['monthly']={'version':'cashneuro-staging-monthly/1','limitRub':'100','activatedAt':'2026-11-02T13:00:00Z'}
                 cfg.write_text(json.dumps(old));cfg.chmod(0o600)
+                # The deployment is root-only; emulate ownership of this one
+                # synthetic file when the test runner is unprivileged.
+                real_lstat = Path.lstat
+                def config_lstat(path, *args, **kwargs):
+                    info = real_lstat(path, *args, **kwargs)
+                    if path == cfg:
+                        values = list(info); values[4] = 0
+                        return os.stat_result(values)
+                    return info
+                stack.enter_context(patch.object(Path, 'lstat', config_lstat))
+                stack.enter_context(patch.object(m.os, 'chown'))
                 old_dropin=('[Service]\nWorkingDirectory='+str(current/'apps/api')+'\nExecStart=\nExecStart=/usr/bin/env CREDENTIALS_DIRECTORY=/run/private ASSISTANT_ENABLED=0 AI_ENABLED=0 /usr/bin/node --import tsx src/main.ts\nEnvironment=CLASSIFICATION_ENABLED=0\n').encode();dropin.write_bytes(old_dropin)
-                if mode=='preserved':old_dropin=m.activate_ai(old_dropin);dropin.write_bytes(old_dropin)
+                if mode in ('preserved','all'):old_dropin=m.activate_ai(old_dropin);dropin.write_bytes(old_dropin)
                 old_root=str(current/'web');old_caddy=old_root+'\ntest.cashneuro.ru {\n basic_auth {\n owner synthetic_hash\n }\n}\nadmin.test.cashneuro.ru {\n basic_auth {\n admin synthetic_admin_hash\n }\n}\n';caddy.write_text(old_caddy);worker.write_text('old worker');worker_env.write_text('old scoped env')
                 calls=[];sql_calls=[]
                 def run(args,**kw):
@@ -228,16 +264,20 @@ class UpdateTests(unittest.TestCase):
                 original_create=m.create_backup_directory
                 for target,key,value in [(m.m,'BASE',base),(m.m,'CONFIG',cfg),(m.m,'DROPIN',dropin),(m.m,'CADDY',caddy),(m,'WORKER_UNIT',worker),(m,'WORKER_ENV',worker_env)]:stack.enter_context(patch.object(target,key,value))
                 config={'API_BASE_URL':origin,'DATABASE_URL':'synthetic scoped database'}
-                if mode=='preserved':config['YOOKASSA_ACCESS_TEST_ENABLED']='1'
+                if mode in ('preserved','all'):config['YOOKASSA_ACCESS_TEST_ENABLED']='1'
                 stack.enter_context(patch.object(m,'load_staging_gate',return_value=gate));stack.enter_context(patch.object(gate,'install'));stack.enter_context(patch.object(m,'settings',return_value=config));stack.enter_context(patch.object(m.m,'run',side_effect=run));stack.enter_context(patch.object(m.m,'docker_database',return_value=('synthetic','owner',sql)));stack.enter_context(patch.object(m.m,'frontend_root',side_effect=lambda v:v['root']));stack.enter_context(patch.object(m,'create_backup_directory',side_effect=lambda parent,sha:original_create(root/'backups',sha)));stack.enter_context(patch.object(m,'prepare_admission',side_effect=admit));stack.enter_context(patch.object(m.time,'sleep'))
                 def health_response(*a,**kw):
                     value={'status':'ok','profile':'finance'}
                     if b'ASSISTANT_ENABLED=1' in dropin.read_bytes():value['assistant']='cashneuro-assistant-workflow/7'
+                    if b'CASHNEURO_ANALYZER_NEXT_ALL=1' in dropin.read_bytes():value['analyzerNext']='all-staging'
                     return io.BytesIO(json.dumps(value).encode())
                 stack.enter_context(patch.object(m.m.urllib.request,'urlopen',side_effect=health_response))
                 output=io.StringIO()
-                with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode in ('blocked','renewed') else None,tested_sha='b'*64 if mode in ('blocked','renewed') else None,keep_ai_paused=mode=='paused',resume_ai=mode in ('blocked','renewed'),preserve_active_ai=mode=='preserved')
+                with redirect_stdout(output):m.install(source,'b'*40,evidence='synthetic-archive' if mode in ('blocked','renewed') else None,tested_sha='b'*64 if mode in ('blocked','renewed') else None,keep_ai_paused=mode=='paused',resume_ai=mode in ('blocked','renewed'),preserve_active_ai=mode in ('preserved','all'),analyzer_next_all=mode=='all')
                 result=json.loads(output.getvalue().splitlines()[-1]);self.assertEqual(result['status'],'UPDATED');self.assertEqual(result['paidCalls'],0)
+                if mode=='all':
+                    self.assertEqual(result['analyzerNextAudience'],'all-staging')
+                    self.assertEqual(dropin.read_bytes().count(b'Environment=CASHNEURO_ANALYZER_NEXT_ALL=1'),1)
                 self.assertEqual(sql_calls.count('BEGIN;\n' + allowance + '\nCOMMIT;'),1)
                 expected_caddy,webhook=m.configure_payment_webhook(old_caddy.replace(old_root,str(release/'apps/web/dist')).encode(),config)
                 self.assertEqual(caddy.read_bytes(),gate.configure(expected_caddy))
@@ -247,7 +287,7 @@ class UpdateTests(unittest.TestCase):
                 if mode=='renewed':
                     self.assertEqual(settings['admission']['calls'],57)
                     self.assertNotIn('ASSISTANT_ENABLED=0',dropin.read_text())
-                elif mode=='preserved':
+                elif mode in ('preserved','all'):
                     self.assertEqual(settings, {**old,'sourceSha256':'b'*64})
                     self.assertNotIn('ASSISTANT_ENABLED=0',dropin.read_text())
                     self.assertEqual(result['assistantAdmission'],'monthly_active_preserved')
@@ -257,7 +297,7 @@ class UpdateTests(unittest.TestCase):
                 backup=next((root/'backups').iterdir())
                 if mode in ('blocked','renewed'):
                     self.assertEqual(json.loads((backup/'assistantConfig.original').read_text()),old)
-                if mode=='preserved':
+                if mode in ('preserved','all'):
                     self.assertEqual(json.loads((backup/'assistantConfig').read_text()),old)
                     self.assertEqual((backup/'dropin').read_bytes(),old_dropin)
                 self.assertFalse(any('classification-smoke-main.ts' in ' '.join(c) for c in calls))

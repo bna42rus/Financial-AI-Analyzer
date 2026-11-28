@@ -16,7 +16,7 @@ import {intentVersion} from '../../../packages/analyzer/src/next/intent.ts';
 import {nextReviewVersion} from '../src/analyzer-next-review.ts';
 import {restoreNextSession} from '../src/analyzer-next-checkpoint.ts';
 import {nextStoreVersion} from '../src/analyzer-next-store.ts';
-import {nextEmailSetting} from '../src/analyzer-next-config.ts';
+import {nextEmailSetting,nextAllSetting} from '../src/analyzer-next-config.ts';
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, config: Config;
@@ -159,4 +159,28 @@ test('only the server allowlist selects the slice; forged flags and unauthentica
 test('test account configuration is explicit, bounded, provider-authorized and disabled by default',async()=>{
  assert.equal(nextEmailSetting(undefined),undefined);for(const value of ['', '*', 'first@example.test,second@example.test','FIRST@example.test'])assert.throws(()=>nextEmailSetting(value),/CONFIGURATION_DENIED/);
  for(const patch of [{assistantProvider:undefined},{environment:'development'},{profile:'control'},{analyzerNextEmails:[]},{analyzerNextEmails:['first@example.test','second@example.test']},{assistantProvider:createTestAssistantProvider(pg.finance,fetcher,{projectId:'test/deny',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:'45'},['second@example.test'])}])await assert.rejects(createServer({...config,...patch} as Config));
+});
+
+
+test('all-Staging mode serves two isolated accounts and preserves ordinary access, ownership and quota gates',async()=>{
+ const all=await createServer({...config,analyzerNextEmails:undefined,analyzerNextAll:true});
+ try{
+  const health=await all.fastify.inject({method:'GET',url:'/health'});assert.equal(health.json().analyzerNext,'all-staging');
+  const first=await loanBody();outputs=[initialLoan()];assert.equal((await run(first,all)).statusCode,200);assert.equal(calls,2);
+  await pg.owner.query("INSERT INTO identity.auth_account(id,user_id,account_id,provider_id,password,created_at,updated_at) VALUES('second-account','second','second','credential',$1,now(),now())",[await hashPassword(password)]);
+  await pg.owner.query("INSERT INTO commerce.access_cycle(user_id,anchor_at,timezone,calendar_months,extra_days,indefinite,quota_policy) VALUES('second',date_trunc('milliseconds',clock_timestamp()-interval '1 day'),'Europe/Moscow',0,0,true,'{\"source\":\"override\",\"limit\":10000}')");
+  await pg.owner.query("INSERT INTO commerce.access_paid_window(user_id,starts_at,ends_at,kind,quota,allowance_anchor) SELECT user_id,anchor_at,anchor_at+interval '1 month','calendar_months',10000,anchor_at FROM commerce.access_cycle WHERE user_id='second'");
+  const login=await all.fastify.inject({method:'POST',url:'/auth/sign-in/email',payload:{email:'second@example.test',password},headers:{origin:config.origin,'content-type':'application/json'}});assert.equal(login.statusCode,200,login.body);cookie=login.cookies.map(c=>c.name+'='+c.value).join('; ');
+  assert.equal((await request('/finance/assistant-profile',{timezone:'Europe/Moscow'},all)).statusCode,200);
+  generation=await within(async db=>(await financeView(db,'second')).generation,'second');
+  const second=await loanBody();outputs=[initialLoan()];const next=await run(second,all);assert.equal(next.statusCode,200,next.body);assert.equal(calls,4);assert.equal(next.json().result.status,'completed');
+  const count=calls,foreign=await run({...second,id:randomUUID(),chatId:first.chatId,chatEpoch:first.chatEpoch},all);assert.ok([400,403,404,409].includes(foreign.statusCode),foreign.body);assert.equal(calls,count);
+  const limited=createTestAssistantProvider(pg.finance,fetcher,{projectId:'test/staging-access',projectPeriodStart:'2020-01-01T00:00:00Z',projectPeriodEnd:'2100-01-01T00:00:00Z',projectLimitRub:'45'},['first@example.test']);
+  const gated=await createServer({...config,assistantProvider:limited,analyzerNextEmails:undefined,analyzerNextAll:true});try{const denied=await run({...second,id:randomUUID()},gated);assert.equal(denied.statusCode,403,denied.body);assert.equal(calls,count);}finally{await gated.close();}
+  const users=await pg.owner.query('SELECT DISTINCT user_id FROM finance.assistant_conversation ORDER BY user_id');assert.deepEqual(users.rows.map(r=>r.user_id),['first','second']);
+ }finally{await all.close();}
+});
+test('all-Staging selection is a strict server-only setting and cannot enable another profile or environment',async()=>{
+ assert.equal(nextAllSetting(undefined),false);assert.equal(nextAllSetting('0'),false);assert.equal(nextAllSetting('1'),true);for(const value of ['true','yes','*',''])assert.throws(()=>nextAllSetting(value));
+ for(const patch of [{environment:'development'},{profile:'control'},{assistantProvider:undefined},{analyzerNextAll:'1'}])await assert.rejects(createServer({...config,analyzerNextEmails:undefined,analyzerNextAll:true,...patch} as Config));
 });

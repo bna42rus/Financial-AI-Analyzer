@@ -127,3 +127,10 @@ test('model admission still refuses changed identity, context, versioned pins an
   await assert.rejects(createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at),error=>{assert.ok(!String(error).includes(settings.apiKey));if(error instanceof AssistantModelAdmissionError)assert.ok(!JSON.stringify(error.diagnostic).includes(settings.apiKey));return true;});assert.equal(posts,0);
  }
 });
+
+
+test('Staging-wide admission sees another account reserve through shared project totals without reading private receipts',async()=>{
+ const policy=monthlyPolicy(legacy().cost,{version:'cashneuro-staging-monthly/1',limitRub:'100',activatedAt:at.toISOString()},at),queries:string[]=[];
+ const db={async query(sql:string){queries.push(sql);return {rows:[],rowCount:sql.includes('ai_project_budget')&&sql.includes('reserved_atoms>0')?1:0};}} as unknown as PoolClient;
+ await assert.rejects(prepareMonthlyDispatch(db,policy),/RECONCILIATION_REQUIRED/);assert.ok(queries.some(sql=>sql.includes('reserved_atoms>0')));assert.ok(!queries.some(sql=>sql.includes('UPDATE')||sql.includes('DELETE')));
+});

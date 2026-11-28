@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--source', required=True)
     parser.add_argument('--sha', required=True)
     parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
-    parser.add_argument('--suite', choices=['basic', 'additional', 'review'], default='basic')
+    parser.add_argument('--suite', choices=['basic', 'additional', 'review', 'acceptance'], default='basic')
     parser.add_argument('--retry-first-rejected', action='store_true', help='One explicit review retry; preserve prior receipt and cumulative cost')
     parser.add_argument('--refresh-rejected-review', action='store_true', help='Re-review changed server interpretation once, reusing received understanding and cumulative budget')
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -47,8 +47,8 @@ def main():
     args = parser.parse_args()
     if args.retry_first_rejected and (args.suite != 'review' or not args.resume):
         parser.error('--retry-first-rejected requires --suite review and --resume')
-    if args.refresh_rejected_review and (args.suite != 'review' or not args.resume):
-        parser.error('--refresh-rejected-review requires --suite review and --resume')
+    if args.refresh_rejected_review and (args.suite not in ('review', 'acceptance') or not args.resume):
+        parser.error('--refresh-rejected-review requires --suite review/acceptance and --resume')
     if args.replay_only and not args.resume:
         parser.error('--replay-only requires --resume')
     if os.geteuid() != 0 or not re.fullmatch('[a-f0-9]{40}', args.sha):
@@ -62,6 +62,13 @@ def main():
     api = active.get('WorkingDirectory', '')
     if active.get('ActiveState') != 'active' or active.get('SubState') != 'running' or not re.fullmatch('/srv/cashneuro/staging/backend-releases/[a-f0-9]{40}/apps/api', api):
         raise RuntimeError('PILOT_ACTIVE_RELEASE_REQUIRED')
+    if args.suite == 'acceptance':
+        if Path(api).parents[1].name != args.sha:
+            raise RuntimeError('ACCEPTANCE_INSTALLED_RELEASE_REQUIRED')
+        import urllib.request
+        with urllib.request.urlopen('http://127.0.0.1:3000/health', timeout=5) as response:
+            if json.load(response).get('analyzerNext') != 'all-staging':
+                raise RuntimeError('ACCEPTANCE_ALL_STAGING_REQUIRED')
     values = {}
     for line in private(Path('/etc/cashneuro/staging/finance-api.env')).splitlines():
         match = re.fullmatch(r'\s*([A-Z_]+)\s*=\s*(.*?)\s*', line)
@@ -98,13 +105,14 @@ def main():
             modules.symlink_to(Path(api) / 'node_modules', target_is_directory=True)
         if json.loads(private(target / 'source-ready.json')) != {'sha': args.sha}:
             raise RuntimeError('PILOT_SOURCE_INCOMPLETE')
-        print('PRECHECK: offline contracts, context, complete dialogs and comparison regressions.', flush=True)
+        print('PRECHECK: offline contracts and dialogs; scripted model replies, paid calls: 0.', flush=True)
+        print('MODEL_RUN: only missing calls may dispatch.' if args.live else 'REPLAY_ONLY: model dispatch disabled.', flush=True)
         checks = ['next-lexicon', 'next-contract', 'next-period', 'next-read-evidence', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression', 'next-additional-pilot']
         checked = subprocess.run(['/usr/bin/node', '--test', *[str(source / 'packages/analyzer/test' / (name+'.test.ts')) for name in checks]], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
         if checked.returncode:
             raise RuntimeError('PILOT_OFFLINE_PRECHECK_FAILED')
-        if args.suite == 'review':
-            checked = subprocess.run(['/usr/bin/node', '--import', 'tsx', '--test', 'test/analyzer-next-review.test.ts', 'test/analyzer-next-review-pilot.test.ts', 'test/analyzer-next-review-retry.test.ts', 'test/analyzer-next-review-refresh.test.ts'], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
+        if args.suite in ('review', 'acceptance'):
+            checked = subprocess.run(['/usr/bin/node', '--import', 'tsx', '--test', 'test/analyzer-next-review.test.ts', 'test/analyzer-next-review-pilot.test.ts', 'test/analyzer-next-review-retry.test.ts', 'test/analyzer-next-review-refresh.test.ts', 'test/analyzer-next-acceptance.test.ts'], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
             if checked.returncode:
                 raise RuntimeError('PILOT_REVIEW_PRECHECK_FAILED')
         spec = importlib.util.spec_from_file_location('pilot_account', source / 'scripts/diagnose-analyzer-account-staging.py')
