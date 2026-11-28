@@ -65,3 +65,12 @@
 .calculatorChart {margin:16px 0;max-width:100%;color:var(--color-text)}.calculatorChart svg {display:block;width:100%;max-height:260px}.calculatorChart text {fill:currentColor;font-size:14px}.chartLine {stroke:var(--color-primary);stroke-width:3;fill:none}.chartAxis {stroke:var(--color-border);stroke-width:1}
 @media(max-width:700px){.layout [role="log"] article p,.analysis{font-size:calc(16px * var(--text-scale,1))}.tableWrap table{font-size:calc(14px * var(--text-scale,1))}}
 .reportSection {padding-top:.5rem;margin-top:1.2rem;border-top:1px solid var(--color-border);min-width:0}.derivedValue {font-size:calc(28px * var(--text-scale,1))!important;font-weight:650;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+
+.calculatorMore {display:block;margin-top:1rem}
+.chartPrincipal {fill:var(--color-primary);fill-opacity:.28;stroke:var(--color-primary);stroke-width:1}
+.chartInterest {fill:#e9a23b;fill-opacity:.55;stroke:#b77816;stroke-dasharray:4 3;stroke-width:1}
+.chartExtra {fill:#42a68a;fill-opacity:.45;stroke:#23836a;stroke-width:1}
+.chartLegend {display:flex;flex-wrap:wrap;gap:.5rem 1rem;font-size:.85em}
+.chartLegend span {display:inline-flex;align-items:center;gap:.4rem}
+.chartLegend i {display:inline-block;width:.9rem;height:.9rem;border:1px solid currentColor}
+.legendPrincipal {background:var(--color-primary);opacity:.65}.legendInterest {background:#e9a23b;border-style:dashed!important}.legendExtra {background:#42a68a}

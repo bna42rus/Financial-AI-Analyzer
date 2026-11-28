@@ -1,0 +1,104 @@
+# Analyzer follow-up and latency corrections
+
+Owner requested only “Как рассчитано” and “Открыть в Операциях” in read-answer footers, instant reuse of already loaded chats, faster simple answers, and an automated real-provider test within the existing 100 RUB monthly project cap.
+
+A closed local grammar now handles plain income/expense month queries, grouping-only and period-only continuations, and comparison of the last two compatible resolved periods. Unrecognized words/conditions fall through to the normal AI planner. Bare month continuations preserve the earlier explicit year. A payment-type choice, including bounded spelling variation, reuses validated loan inputs only when the source is unambiguous. All local plans still use the ordinary closed compiler, current-data calculation, authorization, revision and persistence gates. No model call or independent model-cost reservation is needed for these plans.
+
+The authenticated workspace retains the Analyzer instance after first visit. Hidden instances stop background screen refreshes and close overlays; logout/revocation removes the workspace. Generation changes remount the instance. Initial duplicate search requests are removed. A bounded five-chat in-memory cache immediately shows previously loaded conversations while revalidating, and drops removed chats or changed epochs. No persistent browser storage is added. The Analyzer requests the compact workspace summary; Review loads its own scoped queue.
+
+Removed the three read-answer footer actions and the generic answer editor. Explicit natural-language change proposals retain the existing confirmation flow. The previous REQUEST_FAILED editor path is no longer exposed by a read answer.
+
+`scripts/check-analyzer-live.sh` verifies the existing Staging 100 RUB project-cap configuration, takes one normal login with hidden password input, and runs eleven questions through the actual authenticated HTTP runtime. It uses the existing ledger and admission rules, does not reset any budget or reservation, does not retry unknown delivery, changes no financial data, and retains two diagnostic chats. Output contains PASS/FAIL, elapsed time and safe failure details. On failure it also invokes the existing sanitized per-account diagnosis. Real-provider acceptance is not claimed until this command passes on the server.
+
+Live acceptance on a67f191: 9/11; monthly reads and comparison passed in 1.2–1.5 s, payment switches in 0.1 s. The initial loan incorrectly assumed annuity and a cost-comparison report referred to steps from an earlier report. Acceptance is still pending for the correction. Complete basic loan inputs now show both payment types if none was specified. Known loan choices, an explicit rate change, numerical comparison and payment-composition charts use the checked scenario inputs with fresh deterministic calculations and local step references; no narration call is needed. Unknown words or additional conditions, ambiguous bases, unrelated pending tasks, and mixed reports fall through to the normal planner. Prepayments and future rate changes are retained.
+
+The live wrapper invokes Node from apps/api, just like the installed API service: it no longer starts pnpm or an implicit install. It accepts optional credential environment variables, removes them before diagnostics, and never prints or saves the password. Run it from the concrete installed backend-releases/<sha>/scripts path; the installer does not maintain a backend-current symlink.
+
+2026-11-24 follow-up: owner explicitly replaced automatic PDF tariff verification with a manually managed configured rate. The runtime provider for both Analyzer and classification uses the existing settings.cost.price; no tariff PDF, extraction or freshness gate remains on the request path. The release wrapper also skips its old public-PDF request. Per-dispatch reservation, actual token usage settlement, historical quotes, unknown-delivery holds and the shared 100 RUB monthly authorization remain unchanged. Amounts shown by the diagnostic are accounting costs at the configured rate, not a provider invoice.
+
+Common, complete qualitative concept questions use reviewed local definitions. Unknown words, numerical requests and compound conditions go through the planner. A general explanation can now be returned inside the closed plan and completed with one model call, with the existing privacy/numeric checks and source requirements. The old two-phase shape remains readable for durable receipts and fallback. The persisted workflow/health protocol stays /7.
+
+The default live suite contains the original eleven checks plus twenty-three varied cases: different loan wording, changed terms, zero rate, misspellings, retained prepayments, old years, implicit comparisons, multiple read conditions and clearing only one condition, deposits, percentages, non-template explanations, missing parameters and privacy/relevance boundaries. The runner reads a bounded, read-only cost diagnostic before the suite and after each question. It prints configured-price per-request cost, tokens, model-call count and time, the prior diagnostic cost separately from monthly spending, and local/model latency distributions. It stops before sending the next question after reaching 5 RUB of run spending/holds; an already active question settles under the existing server cap. No finance data is changed, reservations are never released by this runner, credentials are never saved, and diagnostic chats remain available. Expanded real-provider acceptance is pending the server run.
+
+Expanded live run a138ec59: 28/34. Basic scenarios were fast and model-free; the credit explanation took 111 ms. Three loan failures followed an unresolved payment variant; the other failures concerned implicit period comparison, operation-list continuation and foreign-data refusal. More critically, the diagnostic selected the configured account by case-sensitive auth email, returned empty per-request costs, and failed to enforce its stop threshold while the monthly project balance increased. Corrections use the actual runner account through the case-insensitive account directory, require account/task existence and agreement between durable model-call count and cost receipts, and use monthly spending growth as a conservative additional stop condition. The latest diagnostic run is identified from its first chat so all eight chats are included. The next server action is a read-only reconciliation of existing receipts, with no model POSTs.
+
+Explicit payment selectors now resolve an unambiguous saved scenario without requiring the model to invent a numeric variant. Bounded term/rate/type, date, comparison and presentation edits preserve the same checked inputs and query conditions. Unknown conditions still use the full planner. Dependent live checks are skipped after a failed prerequisite; unrelated boundary cases remain independent. Expanded live acceptance after these corrections is pending.
+# Repeated model input: 24 November follow-up
+
+The owner requested lower latency and cost after the real extended run spent
+5.158192940 RUB with model p50 7,233 ms and p95 18,778 ms. The existing monthly
+100 RUB cap, settled costs, unknown-delivery reservations and configured tariff
+remain unchanged. No external tariff refresh is reintroduced.
+
+Both planner and independent completeness reviewer now share concise English
+semantic instructions; output remains Russian. Every registry action is still
+available: no keyword-selected subset of financial capabilities is sent. The
+original closed JSON Schema remains the server-side authority. Since the model
+endpoint already received that schema as plain system text in JSON-object mode,
+its model-facing description now uses compact type declarations, optional keys,
+aliases and explicit JSON Schema constraints. An independent round-trip reader
+in the tests reconstructs the full schema, including every bound and required
+key. Unknown schema vocabulary falls back to the complete JSON Schema;
+classification retains its previous representation.
+
+The planner's static system content decreased from 79,320 to 34,422 UTF-8 bytes
+(57%). This measures serialized input, not billed tokens, actual cost or latency.
+The independent review call, authorization, validation, financial arithmetic,
+dispatch reservations and actual usage settlement remain active. Short, purely
+loan-calculation reports use their existing checked summaries/comparison table
+instead of an additional narration call. Detailed and mixed reports still get
+narration. Recovery consumes a previously dispatched narration receipt rather
+than stranding it. Conversational monthly questions with an explicit historical
+year use the bounded local grammar; unrecognized extra conditions fall through.
+
+`CASHNEURO_SMOKE_SUITE=efficiency` selects 16 existing questions covering the
+formerly expensive model paths, exact condition assertions, context retention,
+the historical-month failure and finance/access boundaries. It does not force a
+model call or retry failures. Run after deployment with a small positive
+`CASHNEURO_SMOKE_STOP_RUB`; the threshold is checked between questions, so a sent
+question can finish above it under the unchanged server cap. A real run is still
+required to accept model understanding, billed token reduction and latency;
+offline results alone do not establish these.
+
+# Archived regression correction: 25 November
+
+The 3a75a476 real run regressed: four failures among fourteen sent questions,
+with two dependent cases skipped; cost 2.496373760 RUB. The compact type guide
+is retired in favor of ordinary lossless JSON Schema. Concise planning
+instructions and safe definition deduplication remain. Input byte reduction is
+therefore smaller than the previous 57%; that percentage is no longer a claim
+about the active transport. No new model cost or latency is claimed here.
+
+Archived metadata showed redundant root context `{mode:new}` on independent
+calculator plans, including a correct candidate broken by the completeness
+reviewer, and misplaced root narration that caused a paid repair. A bounded
+canonicalizer removes only an empty new context/empty changes on independent
+calculators or pure calculator/derive reports and relocates nonconflicting
+report narration. Historical bindings, nonempty edits, restart flags, write
+scopes and unknown fields still fail the original closed/semantic validation.
+Both initial and reviewed plans pass through this normalization.
+
+The amount parser now recognizes complete strict/inclusive comparator synonyms
+(e.g. более/крупнее/выше and ниже/мельче); all thresholds remain integer cents.
+It does not remove unknown qualifiers. The fourth real failure's literal was
+not present in the metadata-only diagnostic, so its correction requires an
+archived-plan check rather than assuming all financial conditions were correct.
+
+`check-analyzer-archive.py` accepts up to five named synthetic smoke request IDs
+on stdin, reads only those Staging receipts and sends them to a local offline
+checker. The checker first verifies each archived question against the fixed
+smoke catalog, then parses the original candidates/reviews and checks their
+calculator results or compiled filters against existing acceptance assertions.
+It neither imports a model provider nor queries financial operations, writes
+data, settles reservations or resets a budget. Raw archived values are never
+printed. Its output validates archived plans, not fresh model understanding.
+A future live regression must be separate and bounded, after archive checks pass.
+
+The remaining archived read failed because its period was the complete ISO
+interval `2026-10-01/2026-10-31`, not because of its supported `>1500` amount.
+The assistant compiler now maps a whole ISO day/day slash interval to its
+existing inclusive date range grammar for both operation and posted periods.
+The original calendar validation rejects impossible dates and reversed ranges;
+trailing conditions or additional separators are never discarded. Legacy task
+literal/evidence contracts remain unchanged. The offline regression fixture
+uses both exact observed literals so this failure is reproduced without AI.

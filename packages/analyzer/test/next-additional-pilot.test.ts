@@ -1,0 +1,219 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {additionalCases,additionalFilter,additionalPreparationMatches,additionalOutcomeMatches} from '../src/next/additional-pilot.ts';
+import {PrototypeSession} from '../src/next/workflow.ts';
+import type {Understanding,TurnResult,ProviderInput} from '../src/next/workflow.ts';
+import {prepareTask} from '../src/next/tasks.ts';
+import type {Preparation} from '../src/next/tasks.ts';
+import {intentVersion,parseIntent} from '../src/next/intent.ts';
+import {recoverLoanGraphFrame,normalizeSourceIntent,paymentChoice,isLoanChartResume,sourcePeriodEdit} from '../src/next/source-intent.ts';
+import {calculateWidget,parseWidget} from '../../finance-core/src/overview.ts';
+import {scope,id,account,catalog,rows} from './fixtures/next-finances.ts';
+const keep={mode:'continue',conditions:'merge_ui'},fresh={mode:'new'},ref=(handle:string)=>({mode:'reference',handle,conditions:'pin'});
+const envelope=(action:string,parameters:unknown,binding:unknown=fresh,format='auto')=>({version:intentVersion,action,parameters,binding,presentation:{format,detail:'normal'}});
+const set=(field:string,value:unknown,quote:string)=>({field,op:'set',value,quote});
+const condition=(field:string,expression:string)=>({field,op:'set',expression});
+const read=(conditions:unknown[],binding:unknown=fresh,grouping:string|null=null,metric:string|null='expenses')=>envelope('read',{metric,grouping,comparison:null,conditions,options:{}},binding);
+const month=(expression:string,binding:unknown=fresh,grouping:string|null=null)=>read([condition('period',expression)],binding,grouping);
+const loan=(edits:unknown[],binding:unknown=fresh,format='auto')=>envelope('calculate',{calculator:'loan',edits},binding,format);
+const compare=(scenarios:string[],criterion='value')=>envelope('compare',{scenarios,criterion,objective:criterion==='value'?'max':'min'},keep);
+// Scripted replies test the harness and tool path. No provider is called here;
+// real understanding quality is measured separately by --suite additional.
+import {scriptedAdditionalReplies as scripts} from './fixtures/next-additional-replies.ts';
+
+async function run(overrides:Record<string,unknown>={},restart=false){
+ const sessions=new Map(additionalCases.map(c=>[c.chain,new PrototypeSession(scope)])),prepared=new Map<string,Preparation>(),results=new Map<string,TurnResult>(),states=new Map<string,ReturnType<PrototypeSession['snapshot']>>(),inputs:ProviderInput[]=[];let reads=0;
+ for(const [n,c]of additionalCases.entries()){
+  const session=sessions.get(c.chain)!,before=session.snapshot(),environment={scope,requestId:id(1100+n),question:c.question,date:'2026-11-25',global:{revision:c.ui?.revision??0,filter:additionalFilter(c.ui?.filter??{},catalog),touched:c.ui?.revision?{period:c.ui.revision,categories:c.ui.revision}:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+  states.set(c.id,before);
+  const terminal=c.expected.kind==='unrelated'||c.expected.kind==='ambiguous',reply=terminal?{relevance:c.expected.kind as 'unrelated'|'ambiguous',intent:null}:{relevance:'financial',intent:overrides[c.id]??scripts[c.id]};
+  const result=await session.run(environment,{async understand(input){inputs.push(input);return reply;}},{current:()=>environment,async authorize(){},async review(_input,r){const p=r.intent?prepareTask(session.snapshot(),environment,r.intent):null;if(p)prepared.set(c.id,p);return additionalPreparationMatches(c,p,r,catalog);},tools:{async guard(){},async read(q){reads++;return calculateWidget(parseWidget({id:scope.chatId,name:'Синтетическая выборка',metrics:[q.metric],grouping:q.grouping,filter:q.filter,comparison:q.comparison==='custom'?{kind:'custom',...q.options?.comparisonPeriod}:{kind:q.comparison},chart:'table',topN:50}),rows,catalog,{},new Date('2026-11-25T12:00:00Z'),'Europe/Moscow',true);}}});
+  assert.equal(additionalOutcomeMatches(c,result),true,c.id+' '+JSON.stringify(result));results.set(c.id,result);
+  if(terminal||c.expected.kind==='explanation')assert.deepEqual(session.snapshot(),before,c.id);
+  if(restart)sessions.set(c.chain,PrototypeSession.fromTrustedCheckpoint(scope,JSON.parse(JSON.stringify(session.snapshot()))));
+ }
+ return {sessions,prepared,results,states,inputs,reads};
+}
+test('all 25 additional turns pass through understanding, mandatory review, preparation and the real financial tools',async()=>{
+ const h=await run();assert.equal(h.results.size,25);assert.equal(h.inputs.length,25);assert.equal(h.reads,12);assert.equal(h.sessions.get('mixed')!.snapshot().history.length,5);
+ const text=JSON.stringify(h.inputs);for(const hidden of ['expected','16800',scope.ownerId,scope.chatId,account,rows[0]!.id])assert.ok(!text.includes(hidden),hidden);
+ assert.ok(h.inputs.every(v=>Object.keys(v).sort().join(',')==='context,date,question,version'));
+});
+test('all 25 turns preserve meaning after a fresh session is restored between every question',async()=>{
+ const original=await run(),restarted=await run({},true);
+ assert.deepEqual([...restarted.results],[...original.results]);assert.equal(restarted.reads,original.reads);
+ for(const [chain,session]of original.sessions)assert.deepEqual(restarted.sessions.get(chain)!.snapshot(),session.snapshot());
+});
+test('read oracle rejects wrong accounts, categories, strictness, grouping, copied dates and statistics',async()=>{
+ const h=await run(),c=additionalCases.find(v=>v.id==='filters-strict-money')!,original=h.prepared.get(c.id)!;if(original.status!=='ready'||original.task.kind!=='read')throw Error('read');
+ for(const change of [(q:any)=>q.filter.accountIds=[id(999)],(q:any)=>q.filter.categoryIds=[],(q:any)=>q.filter.amountFrom='12000',(q:any)=>q.filter.from='2026-09-01',(q:any)=>q.grouping='category',(q:any)=>q.options={statistic:'mean'}]){
+  const p=structuredClone(original);if(p.status!=='ready'||p.task.kind!=='read')throw Error('read');change(p.task.node.query);assert.equal(additionalPreparationMatches(c,p,{relevance:'financial',intent:parseIntent(scripts[c.id])},catalog),false);
+ }
+ const growth=additionalCases.find(v=>v.id==='months-growth')!,reply=parseIntent(scripts[growth.id]);if(reply.action!=='compare')throw Error('compare');reply.parameters.objective='min';assert.equal(additionalPreparationMatches(growth,h.prepared.get(growth.id)!,{relevance:'financial',intent:reply},catalog),false);
+});
+test('loan oracle rejects missing variants, changed terms, invented extras, a missing requested chart and false zero-rate charges',async()=>{
+ const h=await run(),c=additionalCases.find(v=>v.id==='loan-both-charts')!,original=h.prepared.get(c.id)!;if(original.status!=='ready'||original.task.kind!=='loan')throw Error('loan');
+ for(const change of [(p:any)=>p.task.inputs.pop(),(p:any)=>p.task.inputs[0].months=13,(p:any)=>p.task.inputs[0].prepayments=[{month:1,amountRubles:'1',strategy:'reduce_term'}],(p:any)=>p.task.presentation.format='auto']){
+  const p=structuredClone(original);change(p);assert.equal(additionalPreparationMatches(c,p,{relevance:'financial',intent:parseIntent(scripts[c.id])},catalog),false);
+ }
+ const bad=structuredClone(h.results.get(c.id)!);if(bad.status!=='completed'||bad.outcome.kind!=='loan')throw Error('loan');bad.outcome.results[0]!.rows[0]!.interestMinor='1';assert.equal(additionalOutcomeMatches(c,bad),false);
+});
+test('financial boundary and explanation have their own assertions and never pass as an arbitrary successful result',async()=>{
+ const h=await run(),unrelated=additionalCases.find(c=>c.id==='boundary-unrelated')!,concept=additionalCases.find(c=>c.id==='mixed-concept')!;
+ assert.equal(additionalOutcomeMatches(unrelated,h.results.get('months-start')!),false);
+ assert.equal(additionalPreparationMatches(unrelated,null,{relevance:'ambiguous',intent:null},catalog),false);
+ const p=structuredClone(h.prepared.get(concept.id)!);if(p.status!=='explanation'||p.subject.kind!=='concept')throw Error('explain');p.subject.question='Что такое вклад?';assert.equal(additionalPreparationMatches(concept,p,{relevance:'financial',intent:parseIntent(scripts[concept.id])},catalog),false);
+ const tied=additionalCases.find(c=>c.id==='loan-tied-comparison')!,bad=structuredClone(h.results.get(tied.id)!);if(bad.status!=='completed'||bad.outcome.kind!=='loan_comparison')throw Error('compare');for(const winners of [[0],[0,0],[],[0,2]]){bad.outcome.winnerIndexes=winners;assert.equal(additionalOutcomeMatches(tied,bad),false);}
+});
+const retained:Record<string,unknown>={
+ 'months-explicit-base':envelope('read',{metric:'expenses',grouping:'category',comparison:'previous_month',conditions:[condition('period','2025-10-01/2025-10-31')],options:{}}),
+ 'filters-new-scope':read([],fresh,'category'),
+ 'loan-switch-typo':envelope('explain',{subject:{kind:'concept',question:'А дифиренцированный?'}}),
+ 'mixed-back-to-loan':envelope('read',{metric:'loan_payments',grouping:'time',comparison:'none',conditions:[],options:{chart:'line',format:'chart',detail:'normal'}},keep,'chart'),
+};
+test('all four retained model failures now traverse the full 25-turn chain without changing the oracle or schema',async()=>{
+ const h=await run(retained);assert.equal(h.results.size,25);assert.equal(h.reads,12);
+ const q=h.prepared.get('months-explicit-base');if(q?.status!=='ready'||q.task.kind!=='read')throw Error('read');assert.equal(q.task.node.query.filter.from,'2025-09-01');assert.equal(q.task.node.query.options?.comparisonPeriod?.from,'2025-10-01');
+ const loan=h.prepared.get('mixed-back-to-loan');if(loan?.status!=='ready'||loan.task.kind!=='loan')throw Error('loan');assert.equal(loan.task.parent,'t2');assert.equal(loan.task.presentation.format,'chart');
+});
+test('the same plot-family recovery covers both variants of the active loan, including an explanatory misclassification',async()=>{
+ for(const value of [retained['mixed-back-to-loan'],envelope('explain',{subject:{kind:'concept',question:'Покажи оба графика платежей, не меняя условий.'}})]){
+  const h=await run({...retained,'loan-both-charts':value});assert.equal(h.results.size,25);
+  const p=h.prepared.get('loan-both-charts');if(p?.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,2);assert.equal(p.task.presentation.format,'chart');
+ }
+});
+test('the retained both-chart clear with an extra source quote completes all 25 turns',async()=>{
+ const c=additionalCases.find(v=>v.id==='loan-both-charts')!,bad=loan([{field:'payment',op:'clear',quote:c.question}],keep,'chart');
+ assert.throws(()=>parseIntent(bad),/INTENT_PROTOTYPE_INVALID/);
+ const h=await run({...retained,[c.id]:bad}),p=h.prepared.get(c.id);assert.equal(h.results.size,25);
+ if(p?.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.annualRatePercent==='0'&&v.months===12));
+});
+const historyAliases=['t1_v1','t1_v2','t2_v1','t2_v2','t3_v1','t3_v2','t4_v1','t5_v1','t6_v1','t6_v2'];
+const retainedComparison=()=>({...envelope('compare',{scenarios:[...historyAliases],criterion:'interest',objective:'min'}),presentation:{format:'auto',detail:'short'}});
+test('the retained ten-alias comparison binds these variants to the active result and reports a zero-rate tie',async()=>{
+ const c=additionalCases.find(v=>v.id==='loan-both-charts')!,bad=retainedComparison();assert.throws(()=>parseIntent(bad),/INTENT_PROTOTYPE_INVALID/);
+ const h=await run({...retained,[c.id]:loan([{field:'payment',op:'clear',quote:c.question}],keep,'chart'),'loan-tied-comparison':bad});
+ const p=h.prepared.get('loan-tied-comparison'),r=h.results.get('loan-tied-comparison');assert.equal(h.results.size,25);
+ if(p?.status!=='ready'||p.task.kind!=='loan_comparison'||r?.status!=='completed'||r.outcome.kind!=='loan_comparison')throw Error('comparison');
+ assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.months===12&&v.annualRatePercent==='0'));assert.deepEqual(r.outcome.winnerIndexes,[0,1]);assert.deepEqual(bad.parameters,{scenarios:historyAliases,criterion:'interest',objective:'min'});
+});
+test('current variant binding preserves historical requests, rejects invalid aliases, and follows the active task rather than a fixed handle',async()=>{
+ const h=await run(),state=h.states.get('loan-tied-comparison')!,question=additionalCases.find(v=>v.id==='loan-tied-comparison')!.question;
+ for(const phrase of ['Какой из этих вариантов дешевле по переплате?','Сравни эти два варианта по процентам','Сравни оба варианта по процентам']){
+  const p=parseIntent(recoverLoanGraphFrame(retainedComparison(),phrase,state));if(p.action!=='compare')throw Error('compare');assert.deepEqual(p.parameters.scenarios,['t6_v1','t6_v2']);
+ }
+ const old=parseIntent(recoverLoanGraphFrame(retainedComparison(),question,{...state,active:'t1'}));if(old.action!=='compare')throw Error('compare');assert.deepEqual(old.parameters.scenarios,['t1_v1','t1_v2']);
+ const historical=envelope('compare',{scenarios:['t1_v1','t1_v2'],criterion:'interest',objective:'min'});assert.equal(recoverLoanGraphFrame(historical,'Сравни прошлые варианты',state),historical);
+ const shortList=envelope('compare',{scenarios:['t1_v1','t1_v2','t6_v1','t6_v2'],criterion:'interest',objective:'min'}),selected=normalizeSourceIntent(parseIntent(shortList),state,{scope,requestId:id(12345),question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog});if(selected.action!=='compare')throw Error('compare');assert.deepEqual(selected.parameters.scenarios,['t6_v1','t6_v2']);
+ for(const phrase of ['Сравни все прошлые варианты','Сравни эти варианты с предыдущими кредитами','Какой из этих вариантов дешевле при ставке 12%?','Не сравнивай эти варианты'])assert.throws(()=>parseIntent(recoverLoanGraphFrame(retainedComparison(),phrase,state)),/INTENT_PROTOTYPE_INVALID/);
+ for(const change of [(p:any)=>p.parameters.scenarios.push('t6_v1'),(p:any)=>p.parameters.scenarios[0]='t999_v1',(p:any)=>p.parameters.scenarios[0]='t6_v3',(p:any)=>p.parameters.criterion='overpayment',(p:any)=>p.parameters.sql='select anything']){
+  const bad=retainedComparison();change(bad);assert.throws(()=>parseIntent(recoverLoanGraphFrame(bad,question,state)),/INTENT_PROTOTYPE_INVALID/);
+ }
+ assert.throws(()=>parseIntent(recoverLoanGraphFrame(retainedComparison(),question,{...state,active:'t5'})),/INTENT_PROTOTYPE_INVALID/);
+});
+test('retained six historical aliases and read-continue across a loan keep current variants and the explicitly named report',async()=>{
+ const comparison=envelope('compare',{scenarios:historyAliases.slice(0,6),criterion:'interest',objective:'min'});
+ const back=read([condition('period','сентябрь')],keep,null,null),copy=structuredClone(back);
+ const h=await run({...retained,'loan-tied-comparison':comparison,'mixed-back-to-read':back});
+ assert.equal(h.results.size,25);assert.deepEqual(back,copy);
+ const p=h.prepared.get('loan-tied-comparison'),r=h.results.get('loan-tied-comparison');
+ if(p?.status!=='ready'||p.task.kind!=='loan_comparison'||r?.status!=='completed'||r.outcome.kind!=='loan_comparison')throw Error('comparison');
+ assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.months===12&&v.annualRatePercent==='0'));assert.deepEqual(r.outcome.winnerIndexes,[0,1]);
+ const report=h.prepared.get('mixed-back-to-read');if(report?.status!=='ready'||report.task.kind!=='read')throw Error('read');
+ assert.equal(report.task.parent,'t1');assert.equal(report.task.node.query.grouping,'category');assert.equal(report.task.node.query.filter.from,'2025-09-01');
+ const state=h.states.get('mixed-back-to-read')!,env={scope,requestId:id(2451),question:'А сентябрь?',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ assert.throws(()=>prepareTask(state,env,back),/TASK_CONTEXT_INCOMPATIBLE/);
+ for(const question of ['Не возвращайся к отчёту о расходах; месяц замени на сентябрь.','Что означает отчёт о расходах за сентябрь?'])assert.equal(normalizeSourceIntent(parseIntent(back),state,{...env,question}).binding.mode,'continue');
+ assert.throws(()=>prepareTask(state,{...env,question:'Вернись к отчёту о доходах; месяц замени на сентябрь.'},back),/TASK_CONTEXT_MISSING/);
+ assert.throws(()=>prepareTask(state,{...env,question:'Вернись к отчёту о расходах и вернись к отчёту о доходах.'},back),/TASK_CONTEXT_REFERENCE_AMBIGUOUS/);
+ const conflict=read([],keep,null,'income');assert.throws(()=>prepareTask(state,{...env,question:additionalCases.find(c=>c.id==='mixed-back-to-read')!.question},conflict),/TASK_CONTEXT_DECISION_CONFLICT/);
+});
+test('clear quote metadata is canonicalized across fields only with exact source evidence and a fully valid frame',async()=>{
+ const h=await run(),state=h.states.get('loan-both-charts')!,question='Сними ограничение';
+ for(const field of ['amount','period','categories']){
+  const raw=read([{field,op:'clear',quote:question}],keep);assert.throws(()=>parseIntent(raw),/INTENT_PROTOTYPE_INVALID/);
+  const canonical=parseIntent(recoverLoanGraphFrame(raw,question,state));if(canonical.action!=='read')throw Error('read');assert.deepEqual(canonical.parameters.conditions,[{field,op:'clear'}]);
+ }
+ for(const edit of [{field:'payment',op:'clear',quote:'не из вопроса'},{field:'payment',op:'clear',quote:''},{field:'payment',op:'clear',quote:question,value:null},{field:'payment',op:'clear',quote:question,admin:true},{field:'payment',op:'set',value:'both',quote:question}])assert.throws(()=>parseIntent(recoverLoanGraphFrame(loan([edit],keep,'chart'),question,state)),/INTENT_PROTOTYPE_INVALID/);
+});
+test('two principal/interest plots do not switch a selected payment type to both variants',async()=>{
+ const h=await run(),state=h.states.get('loan-both-charts')!,environment={scope,requestId:id(1888),question:'Покажи оба графика основного долга и процентов',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ const p=prepareTask(state,environment,loan([],keep,'chart'));if(p.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,1);assert.equal(p.task.inputs[0]!.payment,'differentiated');
+});
+test('comparison roles survive alternative date spelling and model defaults, while conflicting years and scopes remain rejected',async()=>{
+ const h=await run(),state=h.states.get('months-explicit-base')!,environment={scope,requestId:id(1900),question:'',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ for(const question of ['Сопоставь 2025-09 относительно 2025-10','Сравни сентябрь 2025 по сравнению с октябрём 2025'])for(const comparison of ['none','previous_month','previous_year']){
+  const intent=envelope('read',{metric:'expenses',grouping:'category',comparison,conditions:[],options:{}}),p=prepareTask(state,{...environment,question},intent);
+  if(p.status!=='ready'||p.task.kind!=='read')throw Error('read');assert.equal(p.task.node.query.filter.from,'2025-09-01');assert.equal(p.task.node.query.options?.comparisonPeriod?.from,'2025-10-01');
+ }
+ assert.throws(()=>prepareTask(state,{...environment,question:'Сравни сентябрь 2024 относительно октября 2024'},retained['months-explicit-base']),/TASK_COMPARISON_CONTEXT_AMBIGUOUS/);
+ const ambiguous=structuredClone(state);
+ for(const [n,task]of state.history.filter(t=>t.kind==='read'&&t.node.query.comparison==='none').entries()){
+  const copy=structuredClone(task);if(copy.kind!=='read')throw Error('read');copy.handle='t'+(10+n);copy.node.query.filter.categoryIds=[catalog.categories[0]!.id];ambiguous.history.push(copy);
+ }
+ assert.throws(()=>prepareTask(ambiguous,{...environment,question:additionalCases.find(c=>c.id==='months-explicit-base')!.question},retained['months-explicit-base']),/TASK_COMPARISON_CONTEXT_AMBIGUOUS/);
+});
+test('retained custom baseline keeps the explicit comparison year for both months',async()=>{
+ const h=await run(),state=h.states.get('months-explicit-base')!,c=additionalCases.find(c=>c.id==='months-explicit-base')!;
+ const env={scope,requestId:id(2500),question:c.question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ const raw=envelope('read',{metric:'expenses',grouping:'category',comparison:'custom',conditions:[condition('period','сентябрь')],options:{comparisonPeriod:{from:'2025-10-01',through:'2025-10-31'}}});
+ const p=prepareTask(state,env,raw);if(p.status!=='ready'||p.task.kind!=='read')throw Error('read');
+ assert.deepEqual({from:p.task.node.query.filter.from,through:p.task.node.query.filter.through},{from:'2025-09-01',through:'2025-09-30'});
+ assert.deepEqual(p.task.node.query.options?.comparisonPeriod,{from:'2025-10-01',through:'2025-10-31'});
+ const replay=await run({'months-explicit-base':raw});assert.equal(replay.results.size,25);
+ for(const question of ['Сопоставь 2025-09 относительно 2025-10','Сравни сентябрь 2025 по сравнению с октябрём 2025']){
+  const same=prepareTask(state,{...env,question},raw);if(same.status!=='ready'||same.task.kind!=='read')throw Error('read');
+  assert.equal(same.task.node.query.filter.from,'2025-09-01');assert.equal(same.task.node.query.options?.comparisonPeriod?.from,'2025-10-01');
+ }
+ for(const period of [{from:'2026-10-01',through:'2026-10-31'},{from:'2025-09-01',through:'2025-09-30'},{from:'2025-10-01',through:'2025-10-01'}]){
+  const wrong=structuredClone(raw);wrong.parameters.options={comparisonPeriod:period};assert.throws(()=>prepareTask(state,env,wrong),/TASK_COMPARISON_PERIOD_MISMATCH/);
+ }
+ for(const expression of ['2026-09','2025-10','сентябрь 2024']){
+  const wrong=structuredClone(raw);wrong.parameters.conditions=[condition('period',expression)];assert.throws(()=>prepareTask(state,env,wrong),/TASK_PERIOD_EVIDENCE_MISMATCH/);
+ }
+ const statistics=structuredClone(raw);statistics.parameters.options={...statistics.parameters.options,statistic:'mean'};
+ assert.equal(normalizeSourceIntent(parseIntent(statistics),state,env).action,'read');
+});
+test('payment typo matching is bounded to a whole choice, not explanations, negations, arbitrary labels or numbers',()=>{
+ for(const q of ['А дифиренцированный?','дифференцированный','тогда диференцированный'])assert.equal(paymentChoice(q)?.payment,'differentiated',q);
+ for(const q of ['ануитентный','аннуитетный','Выбери ануитетный.'])assert.equal(paymentChoice(q)?.payment,'annuity',q);
+ for(const q of ['Что значит дифиренцированный?','не аннуитетный','аннуитетный под 25%','вклад','дифференцированный или аннуитетный','анн','удали операции'])assert.equal(paymentChoice(q),null,q);
+});
+test('graph recovery requires a saved calculation, preserves the closed frame, and refuses real-data or changing requests',async()=>{
+ const h=await run(),state=h.states.get('mixed-back-to-loan')!,c=additionalCases.find(v=>v.id==='mixed-back-to-loan')!,raw=retained[c.id];
+ assert.equal(parseIntent(recoverLoanGraphFrame(raw,c.question,state)).action,'calculate');
+ for(const question of ['Покажи реальные платежи по кредиту','Покажи график операций счёта','Вернись к расчёту кредита и покажи график платежей под 25%','Вернись к расчёту кредита и покажи график платежей под ２５％','Не показывай график расчёта кредита']){
+  assert.equal(isLoanChartResume(question),false,question);assert.throws(()=>parseIntent(recoverLoanGraphFrame(raw,question,state)),/INTENT_PROTOTYPE_INVALID/);
+ }
+ for(const mutate of [(r:any)=>r.sql='select anything',(r:any)=>r.parameters.options.admin=true,(r:any)=>r.parameters.conditions=[condition('amount','>100')],(r:any)=>r.parameters.options.format='operations',(r:any)=>r.binding.handle='t999']){
+  const bad=structuredClone(raw) as any;mutate(bad);assert.throws(()=>parseIntent(recoverLoanGraphFrame(bad,c.question,state)),/INTENT_PROTOTYPE_INVALID/);
+ }
+ assert.throws(()=>parseIntent(recoverLoanGraphFrame(raw,c.question,{...state,history:[]})),/INTENT_PROTOTYPE_INVALID/);
+});
+test('source date completion does not treat category or merchant month names as a time condition',()=>{
+ const base={name:'query_finances',metric:'expenses',grouping:'none',comparison:'none',filter:{accountIds:[account]}} as const;
+ assert.equal(sourcePeriodEdit('Расходы в категории Май','2026-11-25',base),null);
+ assert.equal(sourcePeriodEdit('Расходы в магазине Март','2026-11-25',base),null);
+ assert.equal(sourcePeriodEdit('Новая задача: расходы за октябрь 2025','2026-11-25',base)?.op,'set');
+ assert.throws(()=>sourcePeriodEdit('Расходы за сентябрь 2025 и за октябрь 2025','2026-11-25',base),/TASK_PERIOD_EVIDENCE_AMBIGUOUS/);
+});
+test('schedule vocabulary and complete keep clauses decode both saved loan methods without editing numerical inputs',async()=>{
+ const h=await run(),state=h.states.get('loan-both-charts')!,previous=state.history.find(t=>t.handle===state.active);if(previous?.kind!=='loan')throw Error('loan');
+ const raw=envelope('read',{metric:'loan_payments',grouping:'time',comparison:null,conditions:[],options:{chart:'line'}});
+ for(const [n,question] of [
+  'Выведи графики помесячных платежей для обоих способов. Сумму, ставку и срок не меняй.',
+  'Покажи графики ежемесячных платежей для обоих типов. Ставку и срок не изменяй.',
+  'Отобрази диаграммы помесячных платежей для обоих способов. Сумму не меняйте.',
+ ].entries()){
+  const env={scope,requestId:id(1990+n),question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+  const p=prepareTask(state,env,raw);if(p.status!=='ready'||p.task.kind!=='loan')throw Error('loan');
+  assert.equal(p.task.presentation.format,'chart');assert.deepEqual(p.task.inputs.map(i=>({...i,payment:undefined})),[0,1].map(()=>({...previous.results[0]!.input,payment:undefined})));assert.deepEqual(p.task.inputs.map(i=>i.payment),['annuity','differentiated']);
+ }
+ for(const question of [
+  'Выведи графики помесячных платежей для обоих способов по реальным операциям.',
+  'Выведи графики помесячных платежей для обоих способов. Сумму увеличь.',
+  'Выведи графики помесячных платежей для обоих способов под 15%.',
+  'Не выводи графики помесячных платежей для обоих способов.',
+  'Выведи графики помесячных платежей для обоих способов. Сумму не уменьшай.',
+ ])assert.equal(normalizeSourceIntent(parseIntent(raw),state,{scope,requestId:id(1998),question,date:'2026-11-25',global:{revision:0,filter:{},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog}).action,'read',question);
+});

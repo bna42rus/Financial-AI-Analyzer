@@ -1,4 +1,6 @@
 import {reserveCost} from '../src/analyzer-cost.ts';
+import {execFileSync} from 'node:child_process';
+import {fileURLToPath} from 'node:url';
 import { test, before, after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID, createHash, generateKeyPairSync } from 'node:crypto';
@@ -19,6 +21,7 @@ import { createTestAssistantProvider, createStagingAssistantProvider } from '../
 import { assistantVersion } from '../../../packages/analyzer/src/assistant-plan.ts';
 import { parseConversation } from '../../../packages/analyzer/src/assistant-conversation.ts';
 import { monthlyPeriod } from '../src/assistant-monthly.ts';
+import {syntheticTariffPdf} from './fixtures/synthetic-tariff-pdf.ts';
 
 let pg: Awaited<ReturnType<typeof postgresFixture>>, server: Awaited<ReturnType<typeof createServer>>, config: Config;
 let cookie: string, generation: string, account: string, operationIds: string[], calls = 0, outputs: unknown[], outgoing: any[], behavior = 'normal';
@@ -94,12 +97,12 @@ test('HTTP route uses the current DB, persists context/usage and replays after s
   const b = await body(); outputs = [plan([set('metric', 'expenses'), set('amount', { basis: 'absolute_operation', expression: 'от 100 до 200 рублей' })])];
   const first = await run(b); assert.equal(first.statusCode, 200, first.body); assert.equal(first.json().answer.result.totals.expenses, '24690'); assert.equal(calls, 2);
   const next = { ...b, id: randomUUID(), text: 'А по категориям?' }; outputs = [plan([set('grouping', 'category_totals')], 'continue')];
-  const follow = await run(next); assert.equal(follow.statusCode, 200, follow.body); assert.equal(follow.json().answer.query.filter.amountFrom, '10000'); assert.equal(follow.json().answer.query.grouping, 'category'); assert.equal(calls, 4);
+  const follow = await run(next); assert.equal(follow.statusCode, 200, follow.body); assert.equal(follow.json().answer.query.filter.amountFrom, '10000'); assert.equal(follow.json().answer.query.grouping, 'category'); assert.equal(calls, 2, 'Grouping-only continuation reuses the checked conditions without a model call');
   const stored = (await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation;
   parseConversation(stored, stored.book.scope); assert.equal(stored.book.nodes[1].parent, b.id);
-  assert.equal(Number((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n), 2);
+  assert.equal(Number((await pg.owner.query('SELECT sum(units) AS n FROM commerce.analyzer_usage')).rows[0].n), 1, 'The grouping-only continuation makes no model call and consumes no paid unit');
   const restarted = await createServer({ ...config, assistantProvider: provider() });
-  try { const replay = await run(next, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), follow.json()); assert.equal(calls, 4); } finally { await restarted.close(); }
+  try { const replay = await run(next, restarted); assert.equal(replay.statusCode, 200, replay.body); assert.deepEqual(replay.json(), follow.json()); assert.equal(calls, 2); } finally { await restarted.close(); }
   for (const input of outgoing) { const text = JSON.stringify(input); assert.equal(text.includes(account), false); assert.equal(text.includes('first@example.test'), false); }
   const cost = (await pg.owner.query('SELECT spent_atoms,reserved_atoms FROM commerce.ai_user_budget')).rows[0]; assert.ok(BigInt(cost.spent_atoms) > 0n); assert.equal(cost.reserved_atoms, '0');
 });
@@ -112,11 +115,22 @@ test('profile timezone has no Moscow fallback and an invalid or missing profile 
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM finance.analyzer_task_request')).rows[0].n, '0');
 });
 
+test('read-only cost diagnostic separates one run from monthly totals and reports actual token receipts',async()=>{
+ const b=await body();outputs=[plan([set('metric','expenses')])];const answer=await run(b);assert.equal(answer.statusCode,200,answer.body);
+ const settings={realm:'staging/finance',monthly:{limitRub:'100'},allowedEmails:['configured@example.test'],cost:{projectId:'test/assistant-integration'}};
+ const code="import importlib.util,json,sys; s=importlib.util.spec_from_file_location('cost',sys.argv[1]); m=importlib.util.module_from_spec(s); s.loader.exec_module(m); print(m.query(json.loads(sys.stdin.read()),json.loads(sys.argv[2]),account_email='FIRST@EXAMPLE.TEST'))";
+ const sql=execFileSync('python3',['-B','-c',code,fileURLToPath(new URL('../../../scripts/diagnose-analyzer-cost-staging.py',import.meta.url)),JSON.stringify([b.id])],{input:JSON.stringify(settings),encoding:'utf8'});
+ const results:any=await pg.owner.query(sql),report=(Array.isArray(results)?results:[results]).flatMap((r:any)=>r.rows).find((r:any)=>r.json_build_object)?.json_build_object;
+ assert.equal(report.version,'analyzer-cost-diagnostic/1');assert.equal(report.paidCalls,0);assert.equal(report.requests.length,1);assert.equal(report.requests[0].calls,2);assert.equal(report.requests[0].inputTokens,1000);assert.equal(report.requests[0].outputTokens,100);
+ assert.equal(report.accountFound,true);assert.equal(report.requests[0].requestFound,true);assert.equal(report.requests[0].modelCalls,2);
+ assert.equal(report.requests[0].spentAtoms,'21960000');assert.equal(report.spentAtoms,'21960000');assert.equal(report.heldAtoms,'0');assert.ok(report.requests[0].timings);assert.equal(calls,2,'Diagnosis must not dispatch');
+});
+
 test('off-topic is free, ordinary AI explanation consumes one unit and neither reads the financial catalog', async () => {
   const b = await body(); outputs = [{ version: assistantVersion, topic: 'unrelated', action: 'redirect' }];
   const off = await run({ ...b, text: 'Почему белка рыжая?' }); assert.equal(off.statusCode, 200, off.body); assert.equal(off.json().answer.mode, 'redirect');assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n,'0');
   outputs = [{ version: assistantVersion, topic: 'general_finance', action: 'explain' }, { text: 'Инфляция уменьшает покупательную способность денег.' }];
-  const explained = await run({ ...b, id: randomUUID(), text: 'Объясни инфляцию.' }); assert.equal(explained.statusCode, 200, explained.body); assert.equal(explained.json().answer.mode, 'ai'); assert.equal(calls, 3);
+  const explained = await run({ ...b, id: randomUUID(), text: 'Объясни связь ликвидности и сроков обязательств.' }); assert.equal(explained.statusCode, 200, explained.body); assert.equal(explained.json().answer.mode, 'ai'); assert.equal(calls, 3);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
   assert.equal((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation.turns.length, 2);
   for (const input of outgoing) assert.equal('catalog' in input, false);
@@ -169,7 +183,7 @@ test('a profile or UI change during HTTP invalidates the calculation without dis
   const before = (await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation;
   outputs = [plan([set('grouping', 'category_totals')], 'continue')];
   onDispatch = async () => { onDispatch = undefined; assert.equal((await request('/finance/assistant-profile', { timezone: 'America/Los_Angeles' })).statusCode, 200); };
-  const failed = await run({ ...b, id: randomUUID(), text: 'А по категориям?' }); assert.equal(failed.statusCode, 409, failed.body);
+  const failed = await run({ ...b, id: randomUUID(), text: 'Пожалуйста, покажи расходы по категориям' }); assert.equal(failed.statusCode, 409, failed.body);
   assert.deepEqual((await pg.owner.query('SELECT conversation FROM finance.assistant_conversation')).rows[0].conversation, before);
   assert.equal((await pg.owner.query('SELECT count(*) AS n FROM commerce.analyzer_usage')).rows[0].n, '1');
 });
@@ -268,7 +282,11 @@ async function stagingConfig(t: any, maximumCalls = 2, allowedEmails = ['first@e
     cost:{projectId:monthly ? 'staging/assistant-monthly' : 'test/assistant-staging',projectPeriodStart:new Date(at.getTime()-1000).toISOString(),projectPeriodEnd:new Date(at.getTime()+3600000).toISOString(),projectLimitRub:'10',
       price:{version:'test-staging',currency:'RUB',inputRubPerMillion:'15.86',outputRubPerMillion:'61'}},
   };
-  const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => String(url).endsWith('/models') ? new Response(JSON.stringify({data:[metadata]})) : fetcher(url,options),raw.sourceSha256,clock);
+  const provider = await createStagingAssistantProvider(pg.finance,raw,async (url,options) => {
+    if(String(url).endsWith('/models'))return new Response(JSON.stringify({data:[metadata]}));
+    if(String(url)===assistantTariffSource&&options?.method==='GET')return new Response(syntheticTariffPdf(),{headers:{'content-type':'application/pdf'}});
+    return fetcher(url,options);
+  },raw.sourceSha256,clock);
   assert.equal(JSON.stringify(provider.binding).includes(raw.apiKey),false); assert.equal(JSON.stringify(provider.binding).includes(allowedEmails[0]!),false);
   const dir=await mkdtemp(join(tmpdir(),'assistant-staging-kms-'));t.after(()=>rm(dir,{recursive:true,force:true}));
   const realm='staging/finance',rsa=generateKeyPairSync('rsa',{modulusLength:2048}),auth=join(dir,'auth.json'),wrapped=join(dir,'wrapped.json');

@@ -8,6 +8,7 @@ full_staging=false
 shift 2
 while (($#)); do
   case "$1" in
+    --analyzer-next-all) extra+=("$1"); shift ;;
     --restore-default-tariffs) extra+=("$1"); shift ;;
     --full-staging) full_staging=true; extra+=("$1"); shift ;;
     --resume-ai) resume_ai=true; extra+=("$1"); shift ;;
@@ -24,9 +25,12 @@ test "$(pnpm --version)" = 11.25.0
 build=$(mktemp -d /tmp/cashneuro-connected-build-XXXXXXXX)
 trap 'rm -rf -- "$build"' EXIT
 git -C "$repo" archive "$sha" | tar --no-same-owner -x -C "$build"
+# Reject an incompatible health/persistence protocol before any Staging changes.
+python3 -B "$build/scripts/test-install-assistant-staging.py" > /dev/null
+python3 -B "$build/scripts/test-update-staging-release.py" > /dev/null
 sudo /usr/bin/python3 -B "$build/scripts/install-tariff-extractor.py"
 api_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-api-origin)
-(cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && pnpm --filter @finance/api exec node --import tsx ../../scripts/verify-cloud-tariff.mjs && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")
+(cd "$build" && pnpm install --frozen-lockfile --ignore-scripts && VITE_API_ORIGIN="$api_origin" node scripts/build-connected-web.mjs finance "$sha")
 if "$full_staging"; then
   control_origin=$(sudo /usr/bin/python3 -B "$build/scripts/update-staging-release.py" --inspect-control-origin)
   (cd "$build" && VITE_API_ORIGIN="$control_origin" VITE_FINANCE_ORIGIN="$api_origin" node scripts/build-connected-web.mjs control "$sha")

@@ -1,0 +1,6081 @@
+{
+  "version": "cashneuro-analyzer-coverage/1",
+  "source": "docs/product/analyzer-capabilities-20261117.md",
+  "decision": "docs/product/analyzer-improvement-program-20261117.md#16",
+  "runtimeIntegrated": false,
+  "measurement": "not_executed",
+  "paidCalls": 0,
+  "statusMeaning": "Candidate = symbol/file found; no claim about complete route, model quality, current server or owner acceptance. Missing = explicit contract/tool gap, not a source-wide proof of absence.",
+  "gaps": {
+    "new_contract_adapter": "Адаптер нового контракта и подготовка задачи ещё не реализованы/проверены.",
+    "end_to_end_acceptance": "Нужны эталонные данные, весь диалог, закрытые переформулировки и приёмка; наличие старого теста этого не доказывает.",
+    "missing_tool_or_contract": "Нужен отдельный инструмент или договорная модель; текущий калькулятор не подменяет отсутствующие условия."
+  },
+  "checks": {
+    "intent_scope": "Смысл, условия, исключения и разрешённая область совпадают с запросом.",
+    "context": "Продолжение/уточнение/новая тема и изменения UI проверены по контракту.",
+    "result_oracle": "Результат и отсутствие побочных эффектов сверены с независимым эталоном.",
+    "phrasing_holdout": "Отдельные не использованные при разработке формулировки и комбинации.",
+    "resource_measurement": "Измерены время, вызовы, токены и стоимость; целевой бюджет не выдан за факт.",
+    "preview_commit_undo": "Явный preview, повторная авторизация, подтверждение и допустимый Undo.",
+    "conflict_retry": "Конкурентное изменение, неизвестный исход и идемпотентный повтор.",
+    "ownership": "Чужие, удалённые и недоступные объекты не дают authority.",
+    "source_freshness": "Официальный источник, дата и проверка применимости либо честная недоступность.",
+    "integer_money": "Точный денежный эталон, округление, суммы графика и границы.",
+    "assumptions": "Допущения показаны; неизвестные существенные условия не выдуманы."
+  },
+  "tools": {
+    "read": {
+      "path": "packages/analyzer/src/registry.ts",
+      "symbol": "parseTool",
+      "inspection": "candidate"
+    },
+    "analysis": {
+      "path": "packages/analyzer/src/analysis.ts",
+      "symbol": "analyzeFinancialRows",
+      "inspection": "candidate"
+    },
+    "context": {
+      "path": "packages/analyzer/src/task-context.ts",
+      "symbol": "resolveTaskDecision",
+      "inspection": "candidate"
+    },
+    "conversation": {
+      "path": "packages/analyzer/src/assistant-conversation.ts",
+      "symbol": "conversationCalculation",
+      "inspection": "candidate"
+    },
+    "calculate": {
+      "path": "packages/analyzer/src/calculators.ts",
+      "symbol": "calculateFinancial",
+      "inspection": "candidate"
+    },
+    "scenario": {
+      "path": "packages/analyzer/src/scenario-calculators.ts",
+      "symbol": "calculateScenario",
+      "inspection": "candidate"
+    },
+    "planning": {
+      "path": "packages/analyzer/src/planning-calculators.ts",
+      "symbol": "calculatePlanning",
+      "inspection": "candidate"
+    },
+    "report": {
+      "path": "packages/analyzer/src/report.ts",
+      "symbol": "deriveReportFact",
+      "inspection": "candidate"
+    },
+    "change": {
+      "path": "packages/analyzer/src/assistant-changes.ts",
+      "symbol": "compileAssistantChange",
+      "inspection": "candidate"
+    },
+    "action": {
+      "path": "packages/analyzer/src/actions.ts",
+      "symbol": "parseActionTool",
+      "inspection": "candidate"
+    },
+    "budget": {
+      "path": "packages/analyzer/src/budget-read.ts",
+      "symbol": "BudgetReadResult",
+      "inspection": "candidate"
+    },
+    "source": {
+      "path": "packages/analyzer/src/financial-sources.ts",
+      "symbol": "parseFinancialSourceRequest",
+      "inspection": "candidate"
+    },
+    "interface": {
+      "path": "packages/analyzer/src/interface-actions.ts",
+      "symbol": "interfaceAction",
+      "inspection": "candidate"
+    },
+    "history": {
+      "path": "apps/api/src/finance-history.ts",
+      "symbol": null,
+      "inspection": "candidate"
+    },
+    "evidence": {
+      "path": "packages/finance-core/src/financial-evidence.ts",
+      "symbol": null,
+      "inspection": "candidate"
+    },
+    "scheduler": {
+      "path": null,
+      "symbol": null,
+      "inspection": "missing"
+    },
+    "daily_contract": {
+      "path": null,
+      "symbol": null,
+      "inspection": "missing"
+    }
+  },
+  "groups": [
+    {
+      "id": "A01",
+      "title": "Итоги и финансовый поток",
+      "priority": "P0",
+      "inputs": "операции, финансовый смысл, части, связи, исключения.",
+      "outcome": "точные суммы, число операций и условия; баланс по операциям не выдавать за остаток на счёте."
+    },
+    {
+      "id": "A02",
+      "title": "Периоды, календарь и даты",
+      "priority": "P0",
+      "inputs": "дата операции, дата проводки, выбранный период, текущая дата.",
+      "outcome": "однозначные границы; уточнение только при значимой неоднозначности."
+    },
+    {
+      "id": "A03",
+      "title": "Категории, подкатегории и магазины",
+      "priority": "P0",
+      "inputs": "личные категории по ID, единые имена брендов, распознанные услуги.",
+      "outcome": "корректные суммы при переименованиях и собственном дереве категорий."
+    },
+    {
+      "id": "A04",
+      "title": "Счета, банки и контрагенты",
+      "priority": "P0",
+      "inputs": "принадлежащие пользователю счета и контрагенты, безопасные банковские соответствия.",
+      "outcome": "правильное разрешение имён и сочетаний фильтров без раскрытия реквизитов."
+    },
+    {
+      "id": "A05",
+      "title": "Сравнения, статистика и динамика",
+      "priority": "P0",
+      "inputs": "сопоставимые выборки и одинаковые правила учёта.",
+      "outcome": "абсолютная и относительная разница; корректная обработка нулевой базы."
+    },
+    {
+      "id": "A06",
+      "title": "Поиск, доказательства и качество данных",
+      "priority": "P0",
+      "inputs": "операции, происхождение, причины проверки, покрытие периода.",
+      "outcome": "ссылка на состав результата; отсутствие данных отличать от нулевого значения."
+    },
+    {
+      "id": "A07",
+      "title": "Снижение расходов и персональные рекомендации",
+      "priority": "P0",
+      "inputs": "несколько месяцев расходов, устойчивость дохода, обязательства, предпочтения.",
+      "outcome": "советы из фактических сумм; проверяемая экономия и ограничения."
+    },
+    {
+      "id": "A08",
+      "title": "Бюджеты и распределение дохода",
+      "priority": "P0",
+      "inputs": "действующие бюджеты, периоды, правила переноса, точная расходная база.",
+      "outcome": "расчёт остатка и подготовка изменений через существующий preview."
+    },
+    {
+      "id": "A09",
+      "title": "Цели и финансовая подушка",
+      "priority": "P1",
+      "inputs": "целевая сумма, срок, накопления, обязательные расходы, доступный взнос.",
+      "outcome": "план взносов и дефицит; расчётный сценарий отделён от гарантии."
+    },
+    {
+      "id": "A10",
+      "title": "Расчёт обычного кредита",
+      "priority": "P0",
+      "inputs": "сумма, срок, ставка, тип платежа; для точного договора также даты и правила начисления.",
+      "outcome": "график, платёж, проценты и общая выплата с явными допущениями."
+    },
+    {
+      "id": "A11",
+      "title": "Ипотека, автокредит и рефинансирование",
+      "priority": "P1",
+      "inputs": "стоимость покупки, первоначальный взнос, графики, комиссии, страховки, срок владения.",
+      "outcome": "сопоставимые полные сценарии; актуальные условия требуют источника."
+    },
+    {
+      "id": "A12",
+      "title": "Досрочное погашение и управление долгами",
+      "priority": "P0",
+      "inputs": "остаток долга, оставшийся срок, ставки, досрочные взносы, прочие долги.",
+      "outcome": "два варианта досрочного погашения и влияние на ликвидность."
+    },
+    {
+      "id": "A13",
+      "title": "Кредитные карты, долги и обязательства",
+      "priority": "P1",
+      "inputs": "условия карты, льготный период, выписки, минимальный платёж, даты.",
+      "outcome": "не угадывать договорные условия по названию банка или операции."
+    },
+    {
+      "id": "A14",
+      "title": "Вклады, накопительные счета и доходность",
+      "priority": "P0",
+      "inputs": "ставка, срок, пополнения, капитализация; для банка — даты и правила остатка.",
+      "outcome": "проценты, взносы и итог; неизвестные налоги и условия явно отделены."
+    },
+    {
+      "id": "A15",
+      "title": "Доступность покупок и сценарии денежных потоков",
+      "priority": "P1",
+      "inputs": "доходы, расходы, стартовые остатки, даты, обязательства и сценарные изменения.",
+      "outcome": "прогноз с допущениями; неизвестный стартовый остаток не выдумывать."
+    },
+    {
+      "id": "A16",
+      "title": "Подписки и регулярные платежи",
+      "priority": "P1",
+      "inputs": "повторяющиеся операции, интервалы, суммы, подтверждённые обязательства.",
+      "outcome": "предложения о регулярности с уверенностью; списание не равно активной подписке."
+    },
+    {
+      "id": "A17",
+      "title": "Изменение операций, частей и связей",
+      "priority": "P0",
+      "inputs": "фиксированные ID выборки, актуальная ревизия, допустимые действия.",
+      "outcome": "preview, подтверждение, атомарность, история и Undo."
+    },
+    {
+      "id": "A18",
+      "title": "Категории, подкатегории и привязки",
+      "priority": "P0",
+      "inputs": "личное дерево категорий, устойчивые ID и семантические связи.",
+      "outcome": "согласованная политика переименования и замены без самовольного перераспределения."
+    },
+    {
+      "id": "A19",
+      "title": "Создание и управление личными правилами",
+      "priority": "P0",
+      "inputs": "допустимые условия, назначения, зависимости, приоритет и безопасные идентификаторы.",
+      "outcome": "новое правило, раздельный выбор будущего и истории, preview фактических совпадений."
+    },
+    {
+      "id": "A20",
+      "title": "Контрагенты и собственные счета",
+      "priority": "P0",
+      "inputs": "реальные контрагенты, собственные счета, серверные банковские соответствия.",
+      "outcome": "создание и изменения с проверкой совпадений; имя не доказывает владение счётом."
+    },
+    {
+      "id": "A21",
+      "title": "Объяснения, обучение и общие финансовые вопросы",
+      "priority": "P0",
+      "inputs": "термины приложения, достоверные общефинансовые знания, при необходимости источники.",
+      "outcome": "уровень объяснения по просьбе пользователя и связь с его ситуацией."
+    },
+    {
+      "id": "A22",
+      "title": "Уточнения, диалог и разговорные формулировки",
+      "priority": "P0",
+      "inputs": "состояние задачи, явные условия, доступные данные и выбранная область.",
+      "outcome": "минимальный адресный вопрос; отдельная новая задача не наследует лишние фильтры."
+    },
+    {
+      "id": "A23",
+      "title": "Инвестиционные сценарии и финансовые риски",
+      "priority": "P2",
+      "inputs": "цели, срок, ликвидность, терпимость к убытку, данные об инструментах.",
+      "outcome": "сравнение сценариев с рисками; доходность и возможность убытка не выдаются за гарантию."
+    },
+    {
+      "id": "A24",
+      "title": "Налоги, страховки и актуальные финансовые условия",
+      "priority": "P2",
+      "inputs": "страна и период, документы, актуальные официальные источники.",
+      "outcome": "проверяемый источник и дата; расчётный пример отделён от применимости нормы."
+    }
+  ],
+  "tasks": [
+    {
+      "id": "A01-01",
+      "group": "A01",
+      "question": "Сколько я потратил за октябрь?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Расходы октября; год и область показаны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-02",
+      "group": "A01",
+      "question": "Какой у меня доход за последние три месяца?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Доходы трёх месяцев; свои переводы исключены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-03",
+      "group": "A01",
+      "question": "Сколько осталось от доходов после расходов?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Разность доходов и расходов; не остаток счёта",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-04",
+      "group": "A01",
+      "question": "Покажи валовые расходы и возвраты отдельно.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Валовые расходы и возвраты отдельно; нет двойного вычитания",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-05",
+      "group": "A01",
+      "question": "Сколько покупок я сделал и какова средняя сумма?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Число покупок и среднее; единый знаменатель",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-06",
+      "group": "A01",
+      "question": "Какова медианная сумма покупки?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Медиана чётной и нечётной выборки",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-07",
+      "group": "A01",
+      "question": "Какая самая крупная и самая маленькая покупка?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Минимум и максимум с операциями-основаниями",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-08",
+      "group": "A01",
+      "question": "Сколько денег прошло через счета, включая свои переводы?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Оборот включает свои переводы только явно; не доход",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-09",
+      "group": "A01",
+      "question": "Сколько расходов исключено из аналитики?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Исключённые расходы отдельной выборкой",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A01-10",
+      "group": "A01",
+      "question": "Какая сумма пока не определена как доход или расход?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Неопределённые суммы отдельно от доходов и расходов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-01",
+      "group": "A02",
+      "question": "Сколько ушло денег сегодня и вчера?",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Два дня по часовому поясу пользователя",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-02",
+      "group": "A02",
+      "question": "Покажи расходы за эту неделю.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Текущая календарная неделя; границы видны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-03",
+      "group": "A02",
+      "question": "Сколько потратил за прошлый календарный месяц?",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Полный предыдущий календарный месяц",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-04",
+      "group": "A02",
+      "question": "Возьми последние три полных месяца.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Три полных месяца без текущего неполного",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-05",
+      "group": "A02",
+      "question": "Посчитай за последние 90 дней.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Ровно 90 дней; календарные месяцы не подставлены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-06",
+      "group": "A02",
+      "question": "Покажи с 15 августа по 3 октября включительно.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Обе границы включены; год не потерян",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-07",
+      "group": "A02",
+      "question": "Сравни первые десять дней октября и ноября.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Одинаковые первые десять дней двух месяцев",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-08",
+      "group": "A02",
+      "question": "Разбей расходы по выходным и будням.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Будни и выходные по датам операций",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-09",
+      "group": "A02",
+      "question": "Найди платежи после 22 часов.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Только известное локальное время после 22:00",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A02-10",
+      "group": "A02",
+      "question": "Почему операция вошла в август, если проводка была в сентябре?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Дата операции и проводки различены; источник показан",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-01",
+      "group": "A03",
+      "question": "Сколько потратил на продукты?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Личная категория разрешена по устойчивому ID",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-02",
+      "group": "A03",
+      "question": "Покажи продукты без доставки.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Продукты без доставки; исключение не потеряно",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-03",
+      "group": "A03",
+      "question": "Разбей еду вне дома на кафе, кофе и доставку по моим подкатегориям.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Подкатегории личного дерева; родитель не посчитан повторно",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-04",
+      "group": "A03",
+      "question": "Сколько потратил во ВкусВилле с учётом разных написаний?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Варианты магазина объединены по подтверждённому соответствию",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-05",
+      "group": "A03",
+      "question": "Покажи десять магазинов с самыми большими расходами.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Топ-10 магазинов; порядок и прочие суммы воспроизводимы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-06",
+      "group": "A03",
+      "question": "Какую долю всех расходов занимает транспорт?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Доля транспорта; знаменатель всей допустимой выборки",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-07",
+      "group": "A03",
+      "question": "Сравни расходы на такси и каршеринг.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Такси и каршеринг отдельно; одинаковая база",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-08",
+      "group": "A03",
+      "question": "Покажи все подкатегории внутри моей категории Кафешки.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Показаны дети выбранной личной категории",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-09",
+      "group": "A03",
+      "question": "Найди расходы, у которых есть категория, но нет подкатегории.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Категория есть; подкатегория отсутствует",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A03-10",
+      "group": "A03",
+      "question": "Почему платёж МегаФону относится к мобильной связи?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Причина категории из происхождения; без выдуманной причины",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-01",
+      "group": "A04",
+      "question": "Покажи расходы только по Т-Банку.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Ограничение банком сохранено",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-02",
+      "group": "A04",
+      "question": "Посчитай по всем банкам, кроме Сбербанка.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Все доступные банки кроме названного",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-03",
+      "group": "A04",
+      "question": "Сравни расходы по двум выбранным картам.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Две карты отдельно без сумм чужих счетов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-04",
+      "group": "A04",
+      "question": "Сколько перевёл контрагенту Арендодатель?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Получатель разрешён в личном справочнике",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-05",
+      "group": "A04",
+      "question": "Покажи входящие переводы от работодателя.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Входящие от работодателя; не все пополнения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-06",
+      "group": "A04",
+      "question": "Сколько переводил себе между своими счетами?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Собственные переводы; нейтральная роль сохранена",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-07",
+      "group": "A04",
+      "question": "Найди переводы другим людям без контрагента.",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Переводы другим людям без контрагента",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-08",
+      "group": "A04",
+      "question": "Посчитай продукты по Т-Банку дороже тысячи рублей за октябрь.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Банк, категория, порог и октябрь одновременно",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-09",
+      "group": "A04",
+      "question": "Сколько переводил этому человеку до и после изменения его имени?",
+      "tools": [
+        "read",
+        "history"
+      ],
+      "criterion": "Переименование не рвёт ID; граница сравнения задана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A04-10",
+      "group": "A04",
+      "question": "Какие расходы попали на отключённый от аналитики счёт?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Отключённый счёт явно выбран; исключение показано",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-01",
+      "group": "A05",
+      "question": "Сравни расходы сентября и октября.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Сентябрь и октябрь; абсолютная и процентная разница",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-02",
+      "group": "A05",
+      "question": "Что сильнее всего повлияло на рост расходов?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Вклад категорий в рост; сумма вкладов сверена",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-03",
+      "group": "A05",
+      "question": "Покажи пять категорий с наибольшим снижением.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Пять наибольших снижений; знак сохранён",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-04",
+      "group": "A05",
+      "question": "Насколько выросла средняя покупка?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Средние двух выборок; число покупок показано",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-05",
+      "group": "A05",
+      "question": "Нарисуй динамику расходов по неделям в доступном формате.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Недельные суммы и подписи; неполные недели отмечены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-06",
+      "group": "A05",
+      "question": "Сравни этот неполный месяц с таким же числом дней прошлого.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Сопоставимые дни; неполнота не скрыта",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-07",
+      "group": "A05",
+      "question": "Сколько трачу в среднем за день с учётом дней без покупок?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Средний день включает дни без покупок",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-08",
+      "group": "A05",
+      "question": "Какие месяцы были самыми дорогими за год?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Месяцы года отсортированы по расходам",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-09",
+      "group": "A05",
+      "question": "Сравни две произвольные выборки: кафе летом и кафе осенью.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Две независимые выборки; общие условия не перепутаны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A05-10",
+      "group": "A05",
+      "question": "Почему процент роста не считается, если в прошлом периоде было ноль?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "При нулевой базе процент не определён; разница в рублях есть",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-01",
+      "group": "A06",
+      "question": "Найди покупку примерно на три тысячи в конце августа.",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Примерная сумма требует явного диапазона; не произвольный допуск",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-02",
+      "group": "A06",
+      "question": "Покажи последние пять оплат связи.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Последние пять по дате; назначение связи сохранено",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-03",
+      "group": "A06",
+      "question": "Из каких операций получились эти расходы?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Точная выборка ответа; счётчик совпадает",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-04",
+      "group": "A06",
+      "question": "Почему здесь две похожие операции?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Похожие операции не объявлены дублями без доказательства",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-05",
+      "group": "A06",
+      "question": "Какие возвраты ещё не связаны с покупками?",
+      "tools": [
+        "read"
+      ],
+      "criterion": "Несвязанные возвраты; не любой входящий платёж",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-06",
+      "group": "A06",
+      "question": "Какие суммы требуют моего решения?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Суммы с нерешённым смыслом и причинами проверки",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-07",
+      "group": "A06",
+      "question": "Есть ли дни или счета, по которым могла отсутствовать выписка?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Пробелы покрытия отмечены как возможные; отсутствие покупок не доказательство",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-08",
+      "group": "A06",
+      "question": "Почему мои расходы отличаются от общей суммы списаний банка?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Списания отделены от расходов, переводов и возвратов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-09",
+      "group": "A06",
+      "question": "Что изменилось в расчёте после исправления категории?",
+      "tools": [
+        "read",
+        "history"
+      ],
+      "criterion": "Старый снимок и новый расчёт с актуальной ревизией",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A06-10",
+      "group": "A06",
+      "question": "Могу ли я доверять итогу, если часть операций ещё не разобрана?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Подтверждённый итог и неопределённые суммы разделены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-01",
+      "group": "A07",
+      "question": "Как мне снизить расходы?",
+      "tools": [
+        "read",
+        "analysis",
+        "report"
+      ],
+      "criterion": "Совет опирается на личную базу; экономия посчитана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-02",
+      "group": "A07",
+      "question": "Посмотри последние три полных месяца и найди варианты экономии.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Три полных месяца; неполное покрытие отмечено",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-03",
+      "group": "A07",
+      "question": "Что можно сократить без изменения основных привычек?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Необязательные расходы как варианты; привычки не выдуманы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-04",
+      "group": "A07",
+      "question": "Как освободить десять тысяч в месяц?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Проверка достижимости 10000; дефицит не скрыт",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-05",
+      "group": "A07",
+      "question": "Составь мягкий и строгий варианты сокращения расходов.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Мягкий и строгий варианты с разными вычисленными суммами",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-06",
+      "group": "A07",
+      "question": "Кафе не трогай: где ещё можно сэкономить?",
+      "tools": [
+        "read",
+        "context"
+      ],
+      "criterion": "Запрет трогать кафе сохранён во всех вариантах",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-07",
+      "group": "A07",
+      "question": "Почему ты предлагаешь сократить именно эту категорию?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Совет связан с фактической категорией и величиной",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-08",
+      "group": "A07",
+      "question": "В аптеках выросли расходы: что можно выяснить по выписке, а что нельзя?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "По аптекам нет медицинских причин и диагнозов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-09",
+      "group": "A07",
+      "question": "Проверь через месяц, помог ли мой план экономии.",
+      "tools": [
+        "read",
+        "history",
+        "scheduler"
+      ],
+      "criterion": "Повторная проверка отдельно от обещания автоматического напоминания",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A07-10",
+      "group": "A07",
+      "question": "Что выгоднее для моего бюджета: реже пользоваться такси или отказаться от части доставок?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Обе альтернативы оценены на общей личной базе",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-01",
+      "group": "A08",
+      "question": "Какой бюджет на продукты мне подойдёт по моей истории?",
+      "tools": [
+        "read",
+        "budget",
+        "report"
+      ],
+      "criterion": "Лимит продуктов обоснован историей и условиями",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-02",
+      "group": "A08",
+      "question": "Сколько осталось по каждому бюджету?",
+      "tools": [
+        "budget"
+      ],
+      "criterion": "Остаток каждого бюджета по периоду и net/gross базе",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-03",
+      "group": "A08",
+      "question": "Какие бюджеты превышены и почему?",
+      "tools": [
+        "budget",
+        "read"
+      ],
+      "criterion": "Превышения и операции-основания; актуальные лимиты",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-04",
+      "group": "A08",
+      "question": "Распредели мой месячный доход по обязательным расходам, целям и отдыху.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Распределение дохода сохраняет сумму; обязательные расходы учтены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-05",
+      "group": "A08",
+      "question": "Создай бюджет на кафе со следующего месяца.",
+      "tools": [
+        "change",
+        "budget"
+      ],
+      "criterion": "Новый бюджет будущего периода; только preview",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-06",
+      "group": "A08",
+      "question": "Уменьши лимит этого бюджета после показа последствий.",
+      "tools": [
+        "change",
+        "budget"
+      ],
+      "criterion": "Текущий бюджет и период применения; последствия до commit",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-07",
+      "group": "A08",
+      "question": "Что будет, если сохранить текущий темп расходов до конца месяца?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Прогноз темпа; неполный месяц и допущения показаны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-08",
+      "group": "A08",
+      "question": "Как составить бюджет при нерегулярном доходе?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Нерегулярный доход: диапазоны и резерв, не выдуманная стабильность",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-09",
+      "group": "A08",
+      "question": "Покажи недельный лимит, чтобы уложиться в месячный бюджет.",
+      "tools": [
+        "budget",
+        "report"
+      ],
+      "criterion": "Недельная сумма согласуется с оставшимися днями месяца",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A08-10",
+      "group": "A08",
+      "question": "Сравни план бюджета с фактом и объясни отклонения.",
+      "tools": [
+        "budget",
+        "read",
+        "report"
+      ],
+      "criterion": "План и факт на одинаковых периодах и категориях",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-01",
+      "group": "A09",
+      "question": "Как накопить на отпуск к июлю?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Цель, исходная сумма и дата; недостающее уточнено",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-02",
+      "group": "A09",
+      "question": "Сколько откладывать ежемесячно на первоначальный взнос?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Нужный ежемесячный взнос; срок и ставка явно заданы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-03",
+      "group": "A09",
+      "question": "Когда соберу нужную сумму, если откладывать по пятнадцать тысяч?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Срок при взносе 15000; недостижимая цель обработана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-04",
+      "group": "A09",
+      "question": "Какой размер подушки соответствует моим обязательным расходам?",
+      "tools": [
+        "read",
+        "scenario"
+      ],
+      "criterion": "Подушка по обязательным расходам; месяцы резерва уточнены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-05",
+      "group": "A09",
+      "question": "Как разделить накопления между подушкой и отпуском?",
+      "tools": [
+        "scenario",
+        "report"
+      ],
+      "criterion": "Разделение накоплений; общий доступный взнос не превышен",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-06",
+      "group": "A09",
+      "question": "Что важнее сейчас: пополнить резерв или погасить дорогой долг?",
+      "tools": [
+        "read",
+        "calculate",
+        "report"
+      ],
+      "criterion": "Резерв и долг сравнены по стоимости и ликвидности",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-07",
+      "group": "A09",
+      "question": "Как изменится срок цели при пропуске двух взносов?",
+      "tools": [
+        "planning"
+      ],
+      "criterion": "Два пропущенных взноса отражены в расписании",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-08",
+      "group": "A09",
+      "question": "Составь план накоплений с нерегулярными пополнениями.",
+      "tools": [
+        "planning"
+      ],
+      "criterion": "Нерегулярные взносы по месяцам; точный итог",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-09",
+      "group": "A09",
+      "question": "Сколько не хватает до цели при текущем плане?",
+      "tools": [
+        "scenario",
+        "report"
+      ],
+      "criterion": "Недостающая сумма относительно цели и текущего плана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A09-10",
+      "group": "A09",
+      "question": "Пересчитай цель после изменения её стоимости.",
+      "tools": [
+        "scenario",
+        "context"
+      ],
+      "criterion": "Изменяется стоимость цели; остальные условия сохранены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-01",
+      "group": "A10",
+      "question": "Рассчитай кредит на миллион под 20 процентов на пять лет.",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "1000000, 20 процентов годовых, 60 месяцев; оба типа без выбора",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-02",
+      "group": "A10",
+      "question": "Сравни аннуитетные и дифференцированные платежи.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Оба типа на одинаковых условиях; платёж и переплата",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-03",
+      "group": "A10",
+      "question": "Сколько всего переплачу?",
+      "tools": [
+        "calculate",
+        "context"
+      ],
+      "criterion": "Переплата текущего кредита; не повторный запрос параметров",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-04",
+      "group": "A10",
+      "question": "Покажи график по месяцам с долгом и процентами.",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Полный график; платёж равен основному долгу плюс процентам",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-05",
+      "group": "A10",
+      "question": "Какая сумма кредита доступна при платеже до двадцати тысяч?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Максимальная сумма при заданном платеже; модель обозначена",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-06",
+      "group": "A10",
+      "question": "На какой срок нужен кредит, чтобы платёж не превышал мой предел?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Минимальный срок с заданным пределом; недостижимость распознана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-07",
+      "group": "A10",
+      "question": "Сравни два кредита с разными ставками и сроками.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Два кредита с отдельными ставками и сроками",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-08",
+      "group": "A10",
+      "question": "Посчитай беспроцентную рассрочку.",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Нулевая ставка; последний платёж закрывает долг",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-09",
+      "group": "A10",
+      "question": "Почему расчёт отличается от графика банка?",
+      "tools": [
+        "calculate",
+        "evidence"
+      ],
+      "criterion": "Равные месяцы модели отделены от банковского договора",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A10-10",
+      "group": "A10",
+      "question": "Пересчитай, если ставка изменится с тринадцатого месяца.",
+      "tools": [
+        "calculate",
+        "context"
+      ],
+      "criterion": "Новая ставка с месяца 13; первые 12 месяцев прежние",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-01",
+      "group": "A11",
+      "question": "Рассчитай ипотеку с первоначальным взносом.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Цена минус взнос; взнос не больше цены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-02",
+      "group": "A11",
+      "question": "Сколько должен быть взнос, чтобы уложиться в мой платёж?",
+      "tools": [
+        "scenario",
+        "report"
+      ],
+      "criterion": "Минимальный взнос при ограничении платежа",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-03",
+      "group": "A11",
+      "question": "Сравни ипотеку на двадцать и тридцать лет.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "240 и 360 месяцев на одинаковой сумме и ставке",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-04",
+      "group": "A11",
+      "question": "Выгодно ли рефинансирование с учётом расходов на оформление?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Рефинансирование с расходами; экономия не равна снижению платежа",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-05",
+      "group": "A11",
+      "question": "За сколько месяцев окупятся затраты на рефинансирование?",
+      "tools": [
+        "scenario",
+        "report"
+      ],
+      "criterion": "Месяц окупаемости либо отсутствие окупаемости",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-06",
+      "group": "A11",
+      "question": "Сравни автокредит со страховкой и вариант без неё по моим условиям.",
+      "tools": [
+        "calculate",
+        "planning",
+        "report"
+      ],
+      "criterion": "Страховка и ставки учтены раздельно; договорные условия явны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-07",
+      "group": "A11",
+      "question": "Как изменится переплата, если увеличить первоначальный взнос?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Изменён только взнос; разница переплаты вычислена",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-08",
+      "group": "A11",
+      "question": "Сравни покупку в кредит и накопление нужной суммы.",
+      "tools": [
+        "calculate",
+        "scenario",
+        "report"
+      ],
+      "criterion": "Кредит и накопление; срок владения и стоимость сопоставимы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-09",
+      "group": "A11",
+      "question": "Что будет со стоимостью покупки при кредитных каникулах по заданным условиям?",
+      "tools": [
+        "daily_contract",
+        "calculate"
+      ],
+      "criterion": "Каникулы по договорной схеме; проценты не выдуманы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A11-10",
+      "group": "A11",
+      "question": "Каких данных не хватает для точного сравнения двух предложений банка?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Адресный список недостающих условий двух предложений",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-01",
+      "group": "A12",
+      "question": "Что выгоднее: уменьшить срок или платёж?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Обе стратегии досрочки против общего исходного кредита",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-02",
+      "group": "A12",
+      "question": "Сколько сэкономлю при досрочном взносе через полгода?",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Разовый взнос через шесть месяцев; момент внесения указан",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-03",
+      "group": "A12",
+      "question": "Посчитай регулярное досрочное погашение по пять тысяч.",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Повторные 5000 по явному расписанию; стратегия известна",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-04",
+      "group": "A12",
+      "question": "Когда закрою кредит с таким планом?",
+      "tools": [
+        "calculate",
+        "context"
+      ],
+      "criterion": "Дата закрытия текущего досрочного плана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-05",
+      "group": "A12",
+      "question": "Какую сумму нужно внести, чтобы закрыть долг до конца года?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Нужный досрочный взнос для заданной даты; стратегия известна",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-06",
+      "group": "A12",
+      "question": "Как распределить свободные деньги между несколькими кредитами?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Распределение между долгами; общий свободный бюджет сохранён",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-07",
+      "group": "A12",
+      "question": "Сравни погашение самых дорогих долгов и самых маленьких.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Лавина и снежный ком; одинаковые доступные взносы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-08",
+      "group": "A12",
+      "question": "Что изменится, если оставить часть денег в резерве?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Часть денег в резерве; влияние на стоимость и срок",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-09",
+      "group": "A12",
+      "question": "Что произойдёт, если досрочный взнос больше остатка долга?",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Сверхостаток не создаёт отрицательный долг; неиспользованная сумма видна",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A12-10",
+      "group": "A12",
+      "question": "Сравни погашение сейчас и через три месяца.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Сейчас и через три месяца; общий исходный долг",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-01",
+      "group": "A13",
+      "question": "Сколько нужно внести на кредитку, чтобы выполнить условия льготного периода?",
+      "tools": [
+        "daily_contract"
+      ],
+      "criterion": "Платёж для льготы только по условиям конкретной карты",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-02",
+      "group": "A13",
+      "question": "Когда заканчивается беспроцентный период по моим условиям?",
+      "tools": [
+        "daily_contract"
+      ],
+      "criterion": "Дата льготы из договора и цикла; не универсальные 50 дней",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-03",
+      "group": "A13",
+      "question": "Что будет, если платить только минимальный платёж?",
+      "tools": [
+        "daily_contract"
+      ],
+      "criterion": "Минимальный платёж по договорной формуле; срок и проценты",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-04",
+      "group": "A13",
+      "question": "Сравни погашение кредитки и потребительского кредита.",
+      "tools": [
+        "daily_contract",
+        "calculate",
+        "report"
+      ],
+      "criterion": "Карта и кредит сравнимы только при известных условиях",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-05",
+      "group": "A13",
+      "question": "Почему погашение карты не считается повторной покупкой?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Покупка и погашение не посчитаны дважды",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-06",
+      "group": "A13",
+      "question": "Сколько я должен людям и сколько должны мне по подтверждённым данным?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Личные долги только по подтверждённым связям",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-07",
+      "group": "A13",
+      "question": "Подготовь график возврата личного долга.",
+      "tools": [
+        "planning"
+      ],
+      "criterion": "Явные суммы и даты личного долга; без записи обязательства",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-08",
+      "group": "A13",
+      "question": "Покажи ближайшие обязательные платежи по известным графикам.",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Ближайшие подтверждённые платежи; прогнозы отдельно",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-09",
+      "group": "A13",
+      "question": "Как повлияет на бюджет пропуск платежа по заданным условиям?",
+      "tools": [
+        "daily_contract",
+        "scenario"
+      ],
+      "criterion": "Пропуск с заданными санкциями; не выдуманный штраф",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A13-10",
+      "group": "A13",
+      "question": "Какие условия кредитки нужно предоставить для точного расчёта процентов?",
+      "tools": [
+        "daily_contract"
+      ],
+      "criterion": "Список необходимых дат, тарифов, льготы и операций",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-01",
+      "group": "A14",
+      "question": "Посчитай вклад с ежемесячной капитализацией.",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Вклад с ежемесячной капитализацией; взнос и срок заданы",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-02",
+      "group": "A14",
+      "question": "Сравни два вклада с разными сроками.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Доход и итог двух вкладов; сроки показаны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-03",
+      "group": "A14",
+      "question": "Сколько накопится при ежемесячном пополнении?",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Пополнение в заданный момент месяца",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-04",
+      "group": "A14",
+      "question": "Как отличается доход с капитализацией и без неё?",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Одинаковые ставка и срок; капитализация меняется",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-05",
+      "group": "A14",
+      "question": "Какая доходность останется после заданных комиссий и налогов?",
+      "tools": [
+        "calculate",
+        "planning",
+        "report"
+      ],
+      "criterion": "Заданные комиссии и налог вычтены ровно один раз",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-06",
+      "group": "A14",
+      "question": "Посчитай реальную доходность при заданной инфляции.",
+      "tools": [
+        "calculate"
+      ],
+      "criterion": "Формула реальной доходности; отрицательная инфляция проверена",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-07",
+      "group": "A14",
+      "question": "Сравни вклад и досрочное погашение кредита.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Вклад и досрочка; общий бюджет, сроки и ликвидность",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-08",
+      "group": "A14",
+      "question": "Как влияет изменение ставки накопительного счёта?",
+      "tools": [
+        "planning",
+        "daily_contract"
+      ],
+      "criterion": "Переменная ставка накопительного счёта по условиям договора",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-09",
+      "group": "A14",
+      "question": "Что будет при досрочном закрытии вклада по условиям договора?",
+      "tools": [
+        "planning",
+        "daily_contract"
+      ],
+      "criterion": "Досрочное закрытие по заданному перерасчёту процентов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A14-10",
+      "group": "A14",
+      "question": "Почему рекламная ставка отличается от моего фактического дохода?",
+      "tools": [
+        "calculate",
+        "evidence"
+      ],
+      "criterion": "Реклама и фактические условия; период, ограничения и ставка",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-01",
+      "group": "A15",
+      "question": "Могу ли я позволить себе покупку за сто тысяч?",
+      "tools": [
+        "read",
+        "scenario"
+      ],
+      "criterion": "Доступность покупки с известным остатком и резервом",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-02",
+      "group": "A15",
+      "question": "Сколько останется, если доход снизится на двадцать процентов?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Доход снижен на 20 процентов; расходы и горизонт прежние",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-03",
+      "group": "A15",
+      "question": "На сколько месяцев хватит накоплений без дохода?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Срок жизни накоплений; обязательные расходы и резерв известны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-04",
+      "group": "A15",
+      "question": "Что будет с бюджетом при увеличении аренды?",
+      "tools": [
+        "scenario"
+      ],
+      "criterion": "Изменена аренда; прочие потоки сохранены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-05",
+      "group": "A15",
+      "question": "Сравни покупку машины и мои нынешние расходы на транспорт.",
+      "tools": [
+        "read",
+        "scenario",
+        "report"
+      ],
+      "criterion": "Все известные затраты машины и текущего транспорта",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-06",
+      "group": "A15",
+      "question": "Составь кассовый план до следующей зарплаты.",
+      "tools": [
+        "planning",
+        "daily_contract"
+      ],
+      "criterion": "Кассовый план по датам; фактический начальный остаток известен",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-07",
+      "group": "A15",
+      "question": "В какие дни может не хватить денег на известные платежи?",
+      "tools": [
+        "planning",
+        "daily_contract"
+      ],
+      "criterion": "Дни дефицита по расписанию, не месячному среднему",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-08",
+      "group": "A15",
+      "question": "Сколько нужно держать на счёте с учётом ближайших обязательств?",
+      "tools": [
+        "planning",
+        "daily_contract"
+      ],
+      "criterion": "Нужный остаток покрывает обязательства и резерв",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance",
+        "missing_tool_or_contract"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-09",
+      "group": "A15",
+      "question": "Пересчитай сценарий, если отменить поездку.",
+      "tools": [
+        "scenario",
+        "context"
+      ],
+      "criterion": "Отменена поездка; остальные расходы сохранены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A15-10",
+      "group": "A15",
+      "question": "Какая часть моих выводов зависит от неизвестного остатка на счёте?",
+      "tools": [
+        "scenario",
+        "evidence"
+      ],
+      "criterion": "Неизвестный остаток ограничивает вывод; поток не заменяет остаток",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-01",
+      "group": "A16",
+      "question": "Какие подписки можно найти в моей истории?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Кандидаты подписок; регулярность не факт договора",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-02",
+      "group": "A16",
+      "question": "Сколько стоят регулярные платежи в месяц и в год?",
+      "tools": [
+        "read",
+        "analysis",
+        "report"
+      ],
+      "criterion": "Месячный и годовой эквивалент с фактической частотой",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-03",
+      "group": "A16",
+      "question": "Какие регулярные платежи подорожали?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Сопоставимые повторные платежи; суммы и даты роста",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-04",
+      "group": "A16",
+      "question": "Есть ли похожие повторные списания за один сервис?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Похожие списания — кандидаты; дубли не подтверждены автоматически",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-05",
+      "group": "A16",
+      "question": "Какие подписки стоит проверить на необходимость?",
+      "tools": [
+        "read",
+        "analysis",
+        "report"
+      ],
+      "criterion": "Список для самостоятельной оценки; нужность не выдумана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-06",
+      "group": "A16",
+      "question": "Когда ожидается следующий регулярный платёж?",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Следующая дата — прогноз с основанием",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-07",
+      "group": "A16",
+      "question": "Что можно понять о подписке, если списание было только один раз?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Одно списание не доказывает регулярность",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-08",
+      "group": "A16",
+      "question": "Отдели коммунальные платежи от подписок.",
+      "tools": [
+        "read",
+        "analysis"
+      ],
+      "criterion": "Коммуналка отделена по данным, неоднозначное отмечено",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-09",
+      "group": "A16",
+      "question": "Составь список сервисов, отмену которых я хочу проверить самостоятельно.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Выбранные сервисы; отмена подписок не объявлена выполненной",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A16-10",
+      "group": "A16",
+      "question": "Сколько освободится, если я отменю выбранные подписки?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Экономия только выбранных подписок; прогнозная частота указана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-01",
+      "group": "A17",
+      "question": "Этим покупкам поставь категорию Кафе.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Категория только фиксированной выборке; preview и commit",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-02",
+      "group": "A17",
+      "question": "Добавь выбранным операциям комментарий.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Комментарий выбранным операциям; банковский текст сохранён",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-03",
+      "group": "A17",
+      "question": "Исключи из аналитики только операции этого ответа.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Исключение только ID ответа; нет расширения выборки",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-04",
+      "group": "A17",
+      "question": "Верни их в аналитику.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Возврат той же выборки в аналитику",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-05",
+      "group": "A17",
+      "question": "Пометь найденные операции для проверки.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Флаг проверки не меняет банковский факт",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-06",
+      "group": "A17",
+      "question": "Этот перевод был себе: подготовь исправление.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Свой перевод по явному решению; нейтральный смысл",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-07",
+      "group": "A17",
+      "question": "Свяжи этот возврат с выбранной покупкой.",
+      "tools": [
+        "action"
+      ],
+      "criterion": "Связь возврата и покупки; лимиты аллокации проверены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-08",
+      "group": "A17",
+      "question": "Раздели покупку на продукты и бытовые товары по моим суммам.",
+      "tools": [
+        "action"
+      ],
+      "criterion": "Сумма частей равна родителю; двойного учёта нет",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-09",
+      "group": "A17",
+      "question": "Покажи, какие операции изменятся, прежде чем сохранять.",
+      "tools": [
+        "action"
+      ],
+      "criterion": "Preview перечисляет реально изменяемые объекты",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A17-10",
+      "group": "A17",
+      "question": "Отмени последнее подтверждённое изменение.",
+      "tools": [
+        "action",
+        "history"
+      ],
+      "criterion": "Undo допустимого действия; ревизия и конфликт проверены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-01",
+      "group": "A18",
+      "question": "Создай категорию Кафешки.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Создание личной категории после подтверждения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-02",
+      "group": "A18",
+      "question": "Добавь подкатегорию Кофе в эту категорию.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Подкатегория под выбранным родителем",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-03",
+      "group": "A18",
+      "question": "Переименуй категорию, сохранив связи операций.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Переименование сохраняет ID и связи",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-04",
+      "group": "A18",
+      "question": "Какие мои категории пересекаются по смыслу?",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "Смысловые пересечения как предложения; без автоматического merge",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-05",
+      "group": "A18",
+      "question": "Как распределить покупки, если я удалил все стандартные категории?",
+      "tools": [
+        "read",
+        "change"
+      ],
+      "criterion": "Личное дерево без стандартных; добавление только с подтверждением",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-06",
+      "group": "A18",
+      "question": "Привяжи распознаваемые рестораны к моей категории Отдых после подтверждения.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Смысловая привязка; нет самовольного перераспределения истории",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-07",
+      "group": "A18",
+      "question": "Что произойдёт, если скрыть эту подкатегорию?",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Последствия скрытия; связь операций сохраняется",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-08",
+      "group": "A18",
+      "question": "Какие операции потеряют категорию при удалении?",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Удаление с явной заменой либо снятием; список последствий",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-09",
+      "group": "A18",
+      "question": "Подготовь перенос подкатегории и покажи последствия.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Перенос с сохранением роли и проверкой циклов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A18-10",
+      "group": "A18",
+      "question": "Объясни простыми словами разницу между категорией и типом операции.",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Категория и тип операции объяснены раздельно",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-01",
+      "group": "A19",
+      "question": "Все будущие покупки в этом магазине относить к продуктам.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Новое правило магазина; будущее отдельно от истории",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-02",
+      "group": "A19",
+      "question": "Создай правило для оплаты аренды этому контрагенту.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Условия контрагента и назначения; новое личное правило",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-03",
+      "group": "A19",
+      "question": "Запомни переводы по этим собственным реквизитам в обоих направлениях.",
+      "tools": [
+        "change",
+        "evidence"
+      ],
+      "criterion": "Собственные реквизиты только на сервере; оба направления",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-04",
+      "group": "A19",
+      "question": "Применить новое правило только к будущим операциям.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Создание правила не меняет прошлые операции",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-05",
+      "group": "A19",
+      "question": "Покажи старые операции, к которым можно применить правило.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Применение к фиксированной истории; актуальные совпадения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-06",
+      "group": "A19",
+      "question": "Почему это правило не сработало?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Причина несрабатывания из условий и приоритетов",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-07",
+      "group": "A19",
+      "question": "Почему одновременно подходят два правила?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Два подходящих правила; порядок и итог назначения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-08",
+      "group": "A19",
+      "question": "Измени условие правила и покажи новые совпадения.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Редактирование условия и preview фактических новых совпадений",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-09",
+      "group": "A19",
+      "question": "Отключи выбранное правило после подтверждения.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Отключение конкретного правила после подтверждения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A19-10",
+      "group": "A19",
+      "question": "Создай правило по описанию, но сначала объясни его простым языком.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Описание условия и назначения до сохранения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-01",
+      "group": "A20",
+      "question": "Создай контрагента Арендодатель.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Контрагент создаётся после проверки совпадений",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-02",
+      "group": "A20",
+      "question": "Привяжи выбранные переводы к этому контрагенту.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Назначение фиксированным переводам, не всем похожим",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-03",
+      "group": "A20",
+      "question": "Запоминай этого получателя для будущих переводов.",
+      "tools": [
+        "change",
+        "evidence"
+      ],
+      "criterion": "Запоминание получателя; банковский отпечаток остаётся на сервере",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-04",
+      "group": "A20",
+      "question": "Переименуй контрагента без потери связи с операциями.",
+      "tools": [
+        "change"
+      ],
+      "criterion": "Переименование не рвёт связи",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-05",
+      "group": "A20",
+      "question": "Почему двум людям присвоен один контрагент?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Причина общего контрагента из подтверждённого происхождения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-06",
+      "group": "A20",
+      "question": "Подготовь объединение двух контрагентов и покажи затронутые операции.",
+      "tools": [
+        "change",
+        "action"
+      ],
+      "criterion": "Объединение с явной целью и затронутыми связями",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-07",
+      "group": "A20",
+      "question": "Раздели ошибочно объединённого контрагента.",
+      "tools": [
+        "action"
+      ],
+      "criterion": "Разделение с явной выборкой; нельзя восстановить неизвестное происхождение",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-08",
+      "group": "A20",
+      "question": "Это мой счёт: как это повлияет на переводы?",
+      "tools": [
+        "change",
+        "evidence"
+      ],
+      "criterion": "Владение подтверждено; последствия для переводов показаны",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-09",
+      "group": "A20",
+      "question": "Какие переводы можно пересмотреть после добавления моего нового счёта?",
+      "tools": [
+        "read",
+        "evidence"
+      ],
+      "criterion": "Кандидаты пересмотра; без автоматического изменения истории",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A20-10",
+      "group": "A20",
+      "question": "Почему нельзя признать перевод своим только по одинаковому имени?",
+      "tools": [
+        "conversation",
+        "evidence"
+      ],
+      "criterion": "Совпадение имени не доказывает собственный счёт",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-01",
+      "group": "A21",
+      "question": "Объясни аннуитет простыми словами.",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Аннуитет: одинаковый платёж; долг и проценты меняют долю",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-02",
+      "group": "A21",
+      "question": "Почему досрочное погашение уменьшает проценты?",
+      "tools": [
+        "conversation",
+        "calculate"
+      ],
+      "criterion": "Меньший остаток — меньше проценты; связь с расчётом",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-03",
+      "group": "A21",
+      "question": "Чем денежный поток отличается от финансового результата?",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Поток и экономический результат объяснены без подмены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-04",
+      "group": "A21",
+      "question": "Объясни этот расчёт без формул.",
+      "tools": [
+        "conversation",
+        "context"
+      ],
+      "criterion": "Объяснение текущего расчёта без формул и потери контекста",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-05",
+      "group": "A21",
+      "question": "Теперь покажи формулу и исходные данные.",
+      "tools": [
+        "conversation",
+        "calculate"
+      ],
+      "criterion": "Формула и проверенные исходные параметры",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-06",
+      "group": "A21",
+      "question": "Что означает капитализация процентов?",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Капитализация; процент прибавляется к базе",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-07",
+      "group": "A21",
+      "question": "Как учитывать возврат покупки?",
+      "tools": [
+        "conversation",
+        "evidence"
+      ],
+      "criterion": "Возврат связан с покупкой; не обычный доход",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-08",
+      "group": "A21",
+      "question": "Почему перевод между моими счетами не является доходом?",
+      "tools": [
+        "conversation",
+        "evidence"
+      ],
+      "criterion": "Свой перевод нейтрален; входящий поток не доход",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-09",
+      "group": "A21",
+      "question": "Объясни, как работает личное правило в CashNeuro.",
+      "tools": [
+        "conversation",
+        "evidence"
+      ],
+      "criterion": "Условие, назначение и приоритет правила простыми словами",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A21-10",
+      "group": "A21",
+      "question": "Составь понятный план действий из моего финансового разбора.",
+      "tools": [
+        "read",
+        "report"
+      ],
+      "criterion": "План действий связан с фактами; сам ничего не сохраняет",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-01",
+      "group": "A22",
+      "question": "А теперь по магазинам?",
+      "tools": [
+        "context"
+      ],
+      "criterion": "Меняется только группировка на магазины",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-02",
+      "group": "A22",
+      "question": "То же самое, но без такси.",
+      "tools": [
+        "context"
+      ],
+      "criterion": "Исключение такси добавлено; остальные условия сохранены",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-03",
+      "group": "A22",
+      "question": "Нет, я имел в виду прошлый год.",
+      "tools": [
+        "context"
+      ],
+      "criterion": "Исправлен год; месяц, категория и смысл прежние",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-04",
+      "group": "A22",
+      "question": "Возьми другую категорию Кафе, их у меня две.",
+      "tools": [
+        "context"
+      ],
+      "criterion": "Другая одноимённая категория — адресный выбор",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-05",
+      "group": "A22",
+      "question": "Миллион на пять лет — посчитай кредит, ставку пока не знаю.",
+      "tools": [
+        "calculate",
+        "conversation"
+      ],
+      "criterion": "Сумма и срок сохранены; вопрос только о ставке",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-06",
+      "group": "A22",
+      "question": "Сравни эти два варианта и объясни, чего не хватает.",
+      "tools": [
+        "report",
+        "context"
+      ],
+      "criterion": "Два связанных варианта; недостающее названо по полям",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-07",
+      "group": "A22",
+      "question": "Сначала коротко, затем подробнее по моему запросу.",
+      "tools": [
+        "conversation",
+        "context"
+      ],
+      "criterion": "Меняется подробность, не цифры и параметры",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-08",
+      "group": "A22",
+      "question": "Не трогай мои данные, просто покажи возможный план.",
+      "tools": [
+        "report",
+        "change"
+      ],
+      "criterion": "Только сценарий или preview; записи отсутствуют",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-09",
+      "group": "A22",
+      "question": "Какие именно данные нужны и почему ты без них не можешь ответить точно?",
+      "tools": [
+        "conversation",
+        "context"
+      ],
+      "criterion": "Конкретные недостающие поля и причина; без общей анкеты",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A22-10",
+      "group": "A22",
+      "question": "Начнём новый вопрос: мои доходы за сентябрь.",
+      "tools": [
+        "context",
+        "read"
+      ],
+      "criterion": "Новая тема доходов; старые кредитные параметры не наследуются",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-01",
+      "group": "A23",
+      "question": "Какие вопросы мне нужно решить перед выбором способа накопления?",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Цель, срок, ликвидность и допустимый убыток уточняются адресно",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-02",
+      "group": "A23",
+      "question": "Сравни вклад и облигации по заданным условиям.",
+      "tools": [
+        "calculate",
+        "planning",
+        "report"
+      ],
+      "criterion": "Вклад и облигации по заданным потокам, рискам и комиссиям",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-03",
+      "group": "A23",
+      "question": "Как срок цели влияет на выбор доступных вариантов?",
+      "tools": [
+        "conversation",
+        "report"
+      ],
+      "criterion": "Срок и доступность денег; нет обещания гарантированного рынка",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-04",
+      "group": "A23",
+      "question": "Как повлияют комиссии на мой результат?",
+      "tools": [
+        "planning"
+      ],
+      "criterion": "Комиссии учтены в заданном сценарии",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-05",
+      "group": "A23",
+      "question": "Посчитай сценарии роста и падения стоимости.",
+      "tools": [
+        "planning"
+      ],
+      "criterion": "Рост и падение; отрицательное изменение допустимо",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-06",
+      "group": "A23",
+      "question": "Что такое диверсификация простыми словами?",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Диверсификация не равна отсутствию риска",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-07",
+      "group": "A23",
+      "question": "Какие риски есть у предложения с высокой обещанной доходностью?",
+      "tools": [
+        "conversation",
+        "source"
+      ],
+      "criterion": "Обещанная доходность отделена от доказанных условий",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "source_freshness"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-08",
+      "group": "A23",
+      "question": "Как влияет невозможность быстро вывести деньги?",
+      "tools": [
+        "conversation",
+        "report"
+      ],
+      "criterion": "Ограничение вывода учтено в сценарии ликвидности",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-09",
+      "group": "A23",
+      "question": "Сравни номинальную и реальную доходность двух сценариев.",
+      "tools": [
+        "calculate",
+        "report"
+      ],
+      "criterion": "Номинальная и реальная доходность на общей базе",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A23-10",
+      "group": "A23",
+      "question": "Почему нельзя обещать мне конкретный доход от рынка?",
+      "tools": [
+        "conversation"
+      ],
+      "criterion": "Рыночный доход не гарантирован; убыток возможен",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-01",
+      "group": "A24",
+      "question": "Какие данные нужны, чтобы оценить налог по моему вкладу?",
+      "tools": [
+        "conversation",
+        "source"
+      ],
+      "criterion": "Налог по вкладу: применимость, период и нужные данные",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "source_freshness"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-02",
+      "group": "A24",
+      "question": "Рассчитай налог по предоставленным мной правилам и исходным суммам.",
+      "tools": [
+        "planning"
+      ],
+      "criterion": "Налог по явно предоставленным правилам; это не проверка закона",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-03",
+      "group": "A24",
+      "question": "Какие вычеты стоит проверить в моей ситуации?",
+      "tools": [
+        "conversation",
+        "source"
+      ],
+      "criterion": "Вычеты как варианты проверки; применимость не выдумана",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "source_freshness"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-04",
+      "group": "A24",
+      "question": "Сравни страховые варианты по моим условиям и ограничениям.",
+      "tools": [
+        "planning",
+        "report"
+      ],
+      "criterion": "Страховые варианты, франшиза, лимиты и исключения",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-05",
+      "group": "A24",
+      "question": "Как меняется стоимость кредита с учётом страховки?",
+      "tools": [
+        "calculate",
+        "planning",
+        "report"
+      ],
+      "criterion": "Страховка включена в стоимость кредита по условиям",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-06",
+      "group": "A24",
+      "question": "Какая сейчас ключевая ставка и откуда эти сведения?",
+      "tools": [
+        "source"
+      ],
+      "criterion": "Официальная ключевая ставка; дата источника и действия",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "source_freshness"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-07",
+      "group": "A24",
+      "question": "Почему текущая рыночная ставка отличается от ставки моего договора?",
+      "tools": [
+        "conversation",
+        "source"
+      ],
+      "criterion": "Рыночная и договорная ставки; актуальность отделена",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "source_freshness"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-08",
+      "group": "A24",
+      "question": "Какие комиссии нужно учесть при сравнении банковских предложений?",
+      "tools": [
+        "conversation",
+        "report"
+      ],
+      "criterion": "Комиссии перечислены и включены только по известным условиям",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-09",
+      "group": "A24",
+      "question": "Проверь дату актуальности информации, на которую опираешься.",
+      "tools": [
+        "source"
+      ],
+      "criterion": "Дата публикации, получения и применимости различаются",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "source_freshness"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "A24-10",
+      "group": "A24",
+      "question": "Что изменится в расчёте, если применимое правило оказалось другим?",
+      "tools": [
+        "planning",
+        "context"
+      ],
+      "criterion": "Новые правила создают новый сценарий; старый ответ исторический",
+      "gaps": [
+        "new_contract_adapter",
+        "end_to_end_acceptance"
+      ],
+      "requiredChecks": [
+        "intent_scope",
+        "context",
+        "result_oracle",
+        "phrasing_holdout",
+        "resource_measurement",
+        "integer_money",
+        "assumptions"
+      ],
+      "status": "mapped_not_accepted"
+    }
+  ],
+  "dialogs": [
+    {
+      "id": "D01",
+      "title": "Экономия с ограничениями",
+      "steps": [
+        "Как снизить расходы за последние три месяца?",
+        "Кафе не трогай, это важно для меня.",
+        "Сколько даст второй вариант в месяц и за год?",
+        "Подготовь бюджет под этот вариант, пока не сохраняй."
+      ],
+      "criteria": [
+        "Ограничение кафе сохранено после совета",
+        "Второй вариант связан с его проверенными фактами",
+        "Бюджет только подготовлен; commit отсутствует"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D02",
+      "title": "Кредит и досрочный взнос",
+      "steps": [
+        "Рассчитай кредит на миллион под 20 процентов на пять лет, аннуитет.",
+        "А если через полгода внести сто тысяч?",
+        "Сравни уменьшение срока и платежа.",
+        "Объясни коротко, сколько экономлю относительно исходного варианта."
+      ],
+      "criteria": [
+        "Исходный аннуитет сохранён",
+        "Взнос через полгода применяется к исходной сумме и ставке",
+        "Обе стратегии сравниваются с одним baseline"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D03",
+      "title": "Недостающие условия кредита",
+      "steps": [
+        "Посчитай кредит на машину.",
+        "Цена два миллиона, своих денег пятьсот тысяч.",
+        "Ставку не знаю: скажи, что нужно узнать у банка.",
+        "Давай пока сравним два явно заданных сценария ставок."
+      ],
+      "criteria": [
+        "Недостающие сумма/ставка/срок названы отдельно",
+        "Цена минус взнос даёт сумму кредита",
+        "Объяснение ставки не сбрасывает уточнение",
+        "Два явно заданных сценария; ставка не выдумана"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D04",
+      "title": "Личное правило",
+      "steps": [
+        "Найди оплаты ВкусВилла.",
+        "Все будущие такие покупки относить к моей категории Продукты.",
+        "Покажи условие и конфликты правила.",
+        "Применить к выбранной истории тоже, покажи список до сохранения."
+      ],
+      "criteria": [
+        "Магазин выбран по подтверждённой истории",
+        "Новое правило будущего отделено от применения к истории",
+        "Preview учитывает приоритеты и фиксированную выборку"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D05",
+      "title": "Контрагент",
+      "steps": [
+        "Покажи переводы, которые могут относиться к аренде.",
+        "Выбранные действительно аренда, создай контрагента Арендодатель.",
+        "Назначь его этим операциям и запоминай получателя.",
+        "Отмена: до подтверждения ничего не должно сохраниться."
+      ],
+      "criteria": [
+        "Кандидаты аренды не факт назначения",
+        "Новый контрагент и привязка представлены как зависимости",
+        "Отмена до commit не меняет ни операции, ни справочник"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D06",
+      "title": "Переименование категории",
+      "steps": [
+        "Сколько ушло на Рестораны и кафе?",
+        "Я переименовал эту категорию в Кафешки.",
+        "Покажи то же за прошлый месяц.",
+        "Не создавай вторую категорию со старым именем."
+      ],
+      "criteria": [
+        "Категория сохраняет ID после переименования",
+        "Меняется только период",
+        "Старое имя не создаёт дубликат категории"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D07",
+      "title": "Неоднозначный выбор",
+      "steps": [
+        "Сколько потратил на Кофе?",
+        "У меня две подкатегории Кофе: в Отдыхе и в Работе.",
+        "Возьми только рабочую.",
+        "А теперь сравни обе отдельно."
+      ],
+      "criteria": [
+        "Одноимённые подкатегории требуют выбора родителя",
+        "Выбор рабочей снимает только эту неоднозначность",
+        "Сравнение двух отдельно без объединения"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D08",
+      "title": "Правка и конкурентное изменение",
+      "steps": [
+        "Этим операциям добавь комментарий.",
+        "Покажи предварительный просмотр.",
+        "До подтверждения я изменил одну операцию в другой вкладке.",
+        "Объясни конфликт и сохрани мой черновик без молчаливой перезаписи."
+      ],
+      "criteria": [
+        "Preview фиксирует ревизии",
+        "Конкурентная правка блокирует устаревший commit",
+        "Черновик сохраняется; нужен новый preview"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D09",
+      "title": "Нет данных",
+      "steps": [
+        "Сравни расходы за август и сентябрь.",
+        "Август загружен только со второй половины месяца.",
+        "Тогда сравни одинаковые доступные даты.",
+        "Объясни, какие выводы делать нельзя из такой выборки."
+      ],
+      "criteria": [
+        "Неполнота августа отмечена",
+        "Сравнение переносится на совпадающие доступные даты",
+        "Отсутствие операций не объявлено доказательством полноты"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D10",
+      "title": "Два сценария накопления",
+      "steps": [
+        "Хочу накопить к отпуску.",
+        "Нужно триста тысяч к июлю, сейчас есть сто тысяч.",
+        "Сравни равные взносы и увеличенные взносы в месяцы премии.",
+        "Теперь доход уменьшится: пересчитай, сохранив срок и цель."
+      ],
+      "criteria": [
+        "Цель и срок сохранены после уточнения",
+        "Месяцы премий и суммы явно заданы",
+        "Снижение дохода не меняет срок и цель молча"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D11",
+      "title": "Изменение и потеря связи",
+      "steps": [
+        "Исключи из аналитики операции этого ответа.",
+        "Подтверждаю показанную выборку.",
+        "Соединение пропало после сохранения: повтори получение результата.",
+        "Покажи единственное действие в истории и возможность отмены."
+      ],
+      "criteria": [
+        "Явное подтверждение связано с preview",
+        "Потеря связи после commit не создаёт второе действие",
+        "Поиск по тому же idempotency key; один history action и Undo"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout",
+        "preview_commit_undo",
+        "conflict_retry",
+        "ownership"
+      ],
+      "status": "mapped_not_accepted"
+    },
+    {
+      "id": "D12",
+      "title": "Объяснение и новая задача",
+      "steps": [
+        "Объясни мой график кредита без формул.",
+        "Теперь подробнее про проценты в первом месяце.",
+        "Сохрани остальные параметры и сравни другой срок.",
+        "Новая тема: мои доходы за сентябрь, без фильтров кредита."
+      ],
+      "criteria": [
+        "Подробность не меняет параметры кредита",
+        "Другой срок создаёт совместимый сценарий сравнения",
+        "Новая тема доходов не наследует кредитные условия"
+      ],
+      "requiredChecks": [
+        "context",
+        "intent_scope",
+        "result_oracle",
+        "phrasing_holdout"
+      ],
+      "status": "mapped_not_accepted"
+    }
+  ],
+  "relatedCatalog": "docs/architecture/analyzer-acceptance/questions-v1.json"
+}

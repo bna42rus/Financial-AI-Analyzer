@@ -44,15 +44,17 @@
     {
       "path": "docs/product/analyzer-improvement-program-20261117.md",
       "role": "approved_amendment",
-      "sha256": "fbbc8fb8e74431b49309939d573ed04f86d5845046f34be5bee56f8d2b465d1e"
+      "sha256": "cad38689d67ddddfd7eefd3c3aeb095f4e333852cb2b2ee10bb488cd7be72188"
     },
     {
       "path": "docs/product/analyzer-capabilities-20261117.md",
       "role": "approved_amendment",
-      "sha256": "62963636c9be46778007c1fdab0334dd2722365d87eb8f90111a9578ac0968e3"
+      "sha256": "6f2d9ff4022ad51bc1c551bb16ee90fe5df6f3cb73ae467be5bee677a82e14ad"
     }
   ],
   "precedence": [
+    "Owner-approved 2026-11-28 update at the end of Analyzer program broadens V2-S5 to all Staging accounts with normal access/quota/RLS checks and a 30-case live review regression capped at 10 RUB within the unchanged monthly 100 RUB; proposed additional 50 RUB was cancelled before any application; Production remains separate",
+    "Owner-approved Analyzer revision 2026-11-25 in program section 16 refines the full 240-task/12-dialog scope, shared task/tool/result contracts, context and assumptions, UI actions, diagnostics, 0/1/2-call targets and offline-first pilot before integration; these are requirements, not acceptance evidence; accounting, privacy, access, confirmation and Production gates remain active",
     "Approved Analyzer program and 240-task catalog 2026-11-17 define target scope, global-filter/context behavior, performance goals, cost/quality gates and response/visual contracts; delivery remains phased and unverified until acceptance; existing accounting, access, privacy, billing and deployment controls remain active",
     "Approved category-review amendment 2026-11-17 resolves the previously pending category policy, manual-only redistribution triggers, existing Review UI, inline structural resolution, rules/counterparty interaction and field-specific errors in its stated scope",
     "Approved classifier amendment 2026-11-16 overrides canonical display names, finite dictionary additions, transfer self-evidence, printed local clocks and overview credit notice in its stated scope; category replacement policy remains pending owner approval",

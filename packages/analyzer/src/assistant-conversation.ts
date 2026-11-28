@@ -8,9 +8,10 @@ import { parseTaskBook, emptyTaskBook, globalSnapshot } from './task-context.ts'
 import type { TaskNode, TaskBook, TaskScope, GlobalSnapshot } from './task-context.ts';
 import { parseCalendar, cleanAssistantQuestion, AssistantError, assistantGrouping } from './assistant-plan.ts';
 import type { Calendar, SourceContext } from './assistant-plan.ts';
+import {assistantDisplayText} from './assistant-text.ts';
 
 export const conversationVersion = 'cashneuro-assistant-conversation/2';
-export type ConversationTurn = { report?:{request:ReportRequest;facts:Fact[]}; calculation?:CalculatorInput; messageId: string; question: string; calendar: Calendar; global: GlobalSnapshot;
+export type ConversationTurn = { response?:string; report?:{request:ReportRequest;facts:Fact[]}; calculation?:CalculatorInput; messageId: string; question: string; calendar: Calendar; global: GlobalSnapshot;
   status: 'query' | 'answer' | 'redirect' | 'clarification' | 'unsupported' | 'error'; code: string; pending: boolean };
 export type CategoryChoice = { node: TaskNode; options: string[] };
 export type Conversation = { version: typeof conversationVersion; book: TaskBook; turns: ConversationTurn[]; pendingMessageId: string | null; categoryChoice: CategoryChoice | null };
@@ -22,7 +23,8 @@ export function parseConversation(value: unknown, scope: TaskScope): Conversatio
   if (r.version !== conversationVersion || !Array.isArray(r.turns) || r.turns.length > 100) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
   const book = parseTaskBook(r.book, scope), seen = new Set<string>();
   const turns = r.turns.map(raw => {
-    const v = object(raw, ['messageId', 'question', 'calendar', 'global', 'status', 'code', 'pending','calculation','report']);
+    const v = object(raw, ['messageId', 'question', 'calendar', 'global', 'status', 'code', 'pending','calculation','report','response']);
+    if(v.response!==undefined&&assistantDisplayText(v.response,1200)!==v.response)throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
     const messageId = uuid(v.messageId);
     if (seen.has(messageId) || cleanAssistantQuestion(v.question) !== v.question || typeof v.pending !== 'boolean' ||
         typeof v.code !== 'string' || !/^[A-Z][A-Z0-9_]{0,80}$/.test(v.code) || !['query', 'answer', 'redirect', 'clarification', 'unsupported', 'error'].includes(String(v.status))) throw new AssistantError('ASSISTANT_CONTEXT_INVALID');
@@ -44,25 +46,32 @@ export function parseConversation(value: unknown, scope: TaskScope): Conversatio
   return { version: conversationVersion, book, turns, pendingMessageId, categoryChoice };
 }
 
-/** Only cleaned user requests and coarse outcomes leave the server. No model
- * payloads, UUIDs, filters, totals or private transaction/catalog dumps. */
+/** Send cleaned questions, short public explanations and checked semantic
+ * summaries. UUIDs and complete transaction/catalog dumps stay on the server. */
 export function conversationInput(raw: Conversation, scope: TaskScope, question: string, calendar: Calendar) {
   const state = parseConversation(raw, scope), head = state.book.nodes.at(-1)?.messageId;
-  const lastQuery = state.turns.findLastIndex(t => t.status === 'query');
+  const lastQuery = state.turns.findLastIndex(completedTask);
   const unresolved = (turn: ConversationTurn, index: number) => state.pendingMessageId !== null && turn.pending && index > lastQuery;
-  const selected = state.turns.map((turn, index) => ({ turn, index })).filter(({ turn, index }) => index >= state.turns.length - 12 || unresolved(turn, index) || turn.messageId === head);
+  const calculationTurn=state.turns.findLast(t=>t.calculation||t.report?.request.steps.some(s=>s.kind==='calculate'));
+  const reportTurn=state.turns.findLast(t=>t.report);
+  const recentTasks=new Set(state.book.nodes.slice(-8).map(n=>n.messageId));
+  const selected = state.turns.map((turn, index) => ({ turn, index })).filter(({ turn, index }) => index >= state.turns.length - 12 || unresolved(turn, index) || turn.messageId === head || recentTasks.has(turn.messageId) || turn===calculationTurn || turn===reportTurn);
   const history = selected.map(({ turn, index }) => {
     const node = state.book.nodes.find(n => n.messageId === turn.messageId);
-    return { ...(turn.report?{report:{steps:turn.report.request.steps.map(s=>({kind:s.kind,label:s.label,...(s.kind==='calculate'?{calculation:s.calculation}:{})}))}}:{}),...(turn.calculation?{calculation:turn.calculation}:{}),ref: 'h' + (index + 1), question: turn.question, calendar: turn.calendar, status: turn.status, pending: unresolved(turn, index),
-      ...(node ? { task: { metric: node.query.metric, grouping: assistantGrouping[node.query.grouping], comparison: node.query.comparison } } : {}) };
+    return { ...(turn.response?{response:turn.response}:{}),...(turn.report?{report:{steps:turn.report.request.steps.map(s=>({kind:s.kind,label:s.label,...(s.kind==='calculate'?{calculation:s.calculation}:{})}))}}:{}),...(turn.calculation?{calculation:turn.calculation}:{}),ref: 'h' + (index + 1), question: turn.question, calendar: turn.calendar, status: turn.status, pending: unresolved(turn, index),
+      ...(node ? { task: taskSummary(node) } : {}) };
   });
-  const sources: Record<string, SourceContext> = Object.fromEntries(selected.map(({ turn, index }) => ['h' + (index + 1), { calendar: turn.calendar, global: turn.global, pending: unresolved(turn, index) }]));
+  const sources: Record<string, SourceContext> = Object.fromEntries(selected.map(({ turn, index }) => {
+    const taskIndex=state.book.nodes.findIndex(n=>n.messageId===turn.messageId),node=state.book.nodes[taskIndex];
+    return ['h' + (index + 1), { calendar: turn.calendar, global: turn.global, pending: unresolved(turn, index),...(node?{taskHandle:'t'+(taskIndex+1),query:node.query}:{}) }];
+  }));
   const pending = state.turns.findIndex(t => t.messageId === state.pendingMessageId);
   const active = state.book.nodes.at(-1)?.query;
   return { input: { question: cleanAssistantQuestion(question), calendar: parseCalendar(calendar),
-    activeReport:state.turns.findLast(t=>t.status==='query'||t.status==='answer')?.report??null,
-    activeCalculation:(()=>{const t=state.turns.findLast(t=>t.status==='query'||t.status==='answer'),s=t?.report?.request.steps.findLast(s=>s.kind==='calculate');return t?.calculation??(s?.kind==='calculate'?s.calculation:null);})(),
-    activeTask: active ? { metric: active.metric, grouping: assistantGrouping[active.grouping], comparison: active.comparison, omittedChanges: 'preserve' } : null,
+    activeReport:reportTurn?.report??null,
+    activeCalculation:calculationTurn?.calculation??calculationTurn?.report?.request.steps.findLast(s=>s.kind==='calculate')?.calculation??null,
+    activeCalculations:calculationTurn?.calculation?[{calculation:calculationTurn.calculation}]:calculationTurn?.report?.request.steps.filter(s=>s.kind==='calculate').map(s=>({label:s.label,calculation:s.calculation}))??[],
+    activeTask: active ? { ...taskSummary(state.book.nodes.at(-1)!), omittedChanges: 'preserve' } : null,
     categoryChoice: state.categoryChoice ? { options: state.categoryChoice.options, omittedChanges: 'preserve' } : null,
     pendingRequest: pending < 0 ? null : history.find(t => t.ref === 'h' + (pending + 1)) ?? null,
     history, omittedHistoryCount: state.turns.length - history.length },
@@ -71,7 +80,19 @@ export function conversationInput(raw: Conversation, scope: TaskScope, question:
 
 export function appendConversation(state: Conversation, scope: TaskScope, turn: ConversationTurn, book = state.book, categoryChoice: CategoryChoice | null = null): Conversation {
   const next = { version: conversationVersion, book, turns: [...state.turns, turn],
-    pendingMessageId: turn.status === 'query' ? null : turn.pending ? turn.messageId : state.pendingMessageId,
-    categoryChoice: turn.status === 'query' ? null : categoryChoice ?? (turn.pending ? null : state.categoryChoice) };
+    pendingMessageId: completedTask(turn) ? null : turn.pending ? turn.messageId : state.pendingMessageId,
+    categoryChoice: completedTask(turn) ? null : categoryChoice ?? (turn.pending ? null : state.categoryChoice) };
   return parseConversation(next, scope);
+}
+
+function completedTask(t:ConversationTurn){return t.status==='query'||t.status==='answer'&&['FINANCIAL_CALCULATION','FINANCIAL_REPORT','CHANGE_PROPOSED'].includes(t.code);}
+function taskSummary(node:TaskNode){const q=node.query;return {metric:q.metric,grouping:assistantGrouping[q.grouping],comparison:q.comparison,period:{...(q.filter.from?{from:q.filter.from}:{}),...(q.filter.through?{through:q.filter.through}:{})},...(q.options?{options:q.options}:{})};}
+
+export function conversationCalculation(state:Conversation,source:string,variant?:number,selector?:Partial<CalculatorInput>):CalculatorInput|undefined{
+  const turn=source==='active'?state.turns.findLast(t=>t.calculation||t.report?.request.steps.some(s=>s.kind==='calculate')):/^h(?:100|[1-9][0-9]?)$/u.test(source)?state.turns[Number(source.slice(1))-1]:undefined;
+  const values=turn?.calculation?[turn.calculation]:turn?.report?.request.steps.filter(s=>s.kind==='calculate').map(s=>s.calculation)??[];
+  if(variant)return values[variant-1];
+  if(values.length===1)return values[0];
+  if(selector?.kind==='loan'&&selector.payment){const matches=values.filter(v=>v.kind==='loan'&&v.payment===selector.payment);if(matches.length===1)return matches[0];}
+  return undefined;
 }

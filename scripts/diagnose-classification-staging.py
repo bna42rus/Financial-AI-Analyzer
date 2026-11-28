@@ -143,7 +143,7 @@ def inspect():
     emit('2/4', status='OK', admissionExpired=False if monthly else stamp('expiresAt') <= now,
          tariffOlderThan24Hours=None if monthly else (now - stamp('tariffCheckedAt')).total_seconds() > 86400,
          operatingMode='monthly' if monthly else 'trial', monthlyLimitRub='100' if monthly else None,
-         tariffRefresh='automatic before dispatch' if monthly else 'manual admission')
+         tariffRefresh='manual; configured prices' if monthly else 'manual admission')
 
     emit('3/4', status='START')
     identifiers = command(['docker', 'ps', '--format', '{{.ID}}']).splitlines()

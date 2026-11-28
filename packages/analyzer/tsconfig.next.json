@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "types": []
+  },
+  "files": [
+    "src/next/intent.ts",
+    "src/next/tasks.ts",
+    "src/next/workflow.ts",
+    "src/next/pilot.ts",
+    "src/next/period.ts",
+    "src/next/read-binding.ts",
+    "src/next/comparison-periods.ts",
+    "src/next/additional-pilot.ts",
+    "src/next/source-intent.ts"
+  ]
+}

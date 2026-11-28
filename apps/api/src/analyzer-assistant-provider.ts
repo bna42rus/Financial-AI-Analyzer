@@ -10,12 +10,15 @@ import { createCloudAssistantModel } from './assistant-transport.ts';
 import { candidates } from './benchmark-transport.ts';
 import { costPolicy } from './analyzer-cost.ts';
 import type { CostPolicy } from './analyzer-cost.ts';
-import { monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch, authorizeMonthlyDispatch, monthlyBudgetState } from './assistant-monthly.ts';
+import { monthlyPolicy, prepareMonthlyDispatch, authorizeMonthlyDispatch, monthlyBudgetState } from './assistant-monthly.ts';
 import type { MonthlyBudgetState } from './assistant-monthly.ts';
-import { classificationTariffVerifier } from './classification-tariff.ts';
 
-export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
+export type AssistantProvider = { readonly pool: Pool; readonly environment: 'test' | 'staging'; readonly costPeriod?: 'project'; allowed(email: string): boolean; budgetState?(db: PoolClient): Promise<MonthlyBudgetState | undefined>; prepareDispatch?(db: PoolClient, policy: CostPolicy): Promise<void>; authorizeDispatch(db: PoolClient, policy?: CostPolicy): Promise<void>; readonly model: AssistantModel; forRequest(purpose?: 'assistant'|'classification'): AssistantModel; forNextRequest():AssistantModel; readonly policy: CostPolicy; readonly binding: unknown };
 const providers = new WeakSet<object>();
+export class AssistantModelAdmissionError extends AssistantError {
+  readonly diagnostic: unknown;
+  constructor(diagnostic: unknown) { super('ASSISTANT_MODEL_CHANGED'); this.diagnostic=diagnostic; }
+}
 export const isAssistantProvider = (value: unknown): value is AssistantProvider => !!value && typeof value === 'object' && providers.has(value);
 /** Isolated HTTP/DB acceptance only. No key loader, default fetch or live switch.
  * The explicit fetcher receives a synthetic key; it must be a test transport. */
@@ -25,6 +28,7 @@ export function createTestAssistantProvider(pool: Pool, fetcher: typeof fetch, p
   const cost = costPolicy({ ...policy, price: candidates['cloud-oss'].price });
   const provider = Object.freeze({ pool, environment: 'test' as const, model, policy: cost, allowed: (email: string) => !allowedEmails||allowedEmails.includes(email.toLowerCase()), async authorizeDispatch(_db: PoolClient) {},
     forRequest: (purpose: 'assistant'|'classification' = 'assistant') => createCloudAssistantModel({ apiKey: 'synthetic-assistant-key-for-tests-only' }, fetcher,purpose),
+    forNextRequest:()=>createCloudAssistantModel({apiKey:'synthetic-assistant-key-for-tests-only'},fetcher,'assistant','cashneuro-intent-prototype/1'),
     binding: { workflow: assistantWorkflowVersion, plan: assistantVersion, bound: model.bound, cost } });
   providers.add(provider); return provider;
 }
@@ -40,27 +44,32 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
   await pool.query('SELECT 1 FROM commerce.ai_cost_reservation LIMIT 0');
   const credentials = { apiKey: settings.apiKey };
   const metadata = await inspectCloudTaskModel(credentials,fetcher);
-  if (metadata.modelMetadataSha256 !== settings.modelMetadataSha256 || metadata.numericMetadata.context_length !== 131072 || metadata.numericMetadata.max_model_len !== 131072) throw new AssistantError('ASSISTANT_MODEL_CHANGED');
   const model = createCloudAssistantModel(credentials,fetcher), snapshot = structuredClone(settings);
-  let currentPrice = settings.cost.price;
-  const verifyTariff = classificationTariffVerifier(fetcher, now);
-  const refreshTariff = monthlyTariffGuard('', async () => {
-    const verified = await verifyTariff();
-    if (!verified.price) throw new AssistantError('CLASSIFICATION_TARIFF_DOCUMENT_INVALID');
-    currentPrice = verified.price;
-    return verified;
-  }, now, 0);
-  const requestModel = (purpose: 'assistant'|'classification' = 'assistant') => {
-    const result = createCloudAssistantModel(credentials,fetcher,purpose);
-    if (!settings.monthly) return result;
-    return { ...result, async complete(...args: Parameters<AssistantModel['complete']>) { await refreshTariff(); return result.complete(...args); } } as AssistantModel;
-  };
+  const classification = createCloudAssistantModel(credentials,fetcher,'classification');
+  const hashMatches=metadata.modelMetadataSha256===settings.modelMetadataSha256;
+  const versioned=metadata.metadataFieldsPresent.some(k=>['version','revision','snapshot'].includes(k));
+  const n=metadata.numericMetadata,has=(key:string)=>metadata.metadataFieldsPresent.includes(key);
+  const limitsMatch=n.context_length===candidates['cloud-oss'].contextTokens&&n.max_model_len===candidates['cloud-oss'].contextTokens&&
+    (!has('max_input_tokens')||n.max_input_tokens!==undefined&&n.max_input_tokens>=model.bound.inputTokens)&&
+    (!has('max_output_tokens')||n.max_output_tokens!==undefined&&n.max_output_tokens>=Math.max(model.bound.outputTokens,classification.bound.outputTokens));
+  // An unversioned /models card is an operational contract, not a weights
+  // attestation. Monthly mode tolerates non-contract metadata drift; explicit
+  // version/revision/snapshot changes and incompatible limits still stop it.
+  const monthlyContract=!!settings.monthly&&!versioned;
+  const modelAdmission={model:metadata.model,hashMatches,versioned,limitsMatch,monthlyContract,
+    expectedHash:settings.modelMetadataSha256,actualHash:metadata.modelMetadataSha256,numericMetadata:n,immutableModelVersionVerified:false};
+  if(!limitsMatch||!hashMatches&&!monthlyContract)throw new AssistantModelAdmissionError(modelAdmission);
+  // Owner-managed price schedule. Monthly verification is manual; no tariff
+  // PDF, parser, quote refresh or freshness dependency is on the request path.
+  const requestModel = (purpose: 'assistant'|'classification' = 'assistant') =>
+    createCloudAssistantModel(credentials,fetcher,purpose);
   const provider: AssistantProvider = Object.freeze({ pool,environment:'staging' as const, model,
     costPeriod: settings.monthly ? 'project' as const : undefined,
-    get policy() { return settings.monthly ? monthlyPolicy({ ...settings.cost, price: currentPrice }, settings.monthly, now()) : settings.cost; },
+    get policy() { return settings.monthly ? monthlyPolicy(settings.cost, settings.monthly, now()) : settings.cost; },
     allowed: (email: string) => settings.allowedEmails.includes(email.toLowerCase()),
     async budgetState(db: PoolClient) { return settings.monthly ? monthlyBudgetState(db, provider.policy) : undefined; },
     forRequest: requestModel,
+    forNextRequest:()=>createCloudAssistantModel(credentials,fetcher,'assistant','cashneuro-intent-prototype/1'),
     async prepareDispatch(db: PoolClient, policy: CostPolicy) { if (settings.monthly) await prepareMonthlyDispatch(db, policy); },
     async authorizeDispatch(db: PoolClient, policy = provider.policy) {
       checkAssistantStagingSettings(settings,now());
@@ -72,7 +81,7 @@ export async function createStagingAssistantProvider(pool: Pool, raw: unknown, f
       const count = Number((await db.query('SELECT dispatch_count AS n FROM commerce.ai_project_budget WHERE project_id=$1 AND period_start=$2', [settings.cost.projectId,settings.cost.projectPeriodStart])).rows[0].n);
       if (count > settings.maximumCalls) throw new AssistantError('ASSISTANT_PILOT_CALL_LIMIT');
     },
-    binding:{workflow:assistantWorkflowVersion,plan:assistantVersion,sourceSha256,modelMetadataSha256:metadata.modelMetadataSha256,
+    binding:{workflow:assistantWorkflowVersion,plan:assistantVersion,sourceSha256,modelMetadataSha256:metadata.modelMetadataSha256,modelAdmission,
       bound:model.bound,cost:settings.cost,admission:settings.admission,...(settings.monthly ? { monthly: settings.monthly } : { maximumCalls:settings.maximumCalls,expiresAt:settings.expiresAt,tariffCheckedAt:settings.tariffCheckedAt })},
   });
   providers.add(provider);return provider;

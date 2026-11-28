@@ -1,3 +1,4 @@
+import {nextEmailSetting,nextAllSetting} from './analyzer-next-config.ts';
 import { setTimeout } from 'node:timers/promises';
 import { Pool } from 'pg';
 import { createServer } from './server.ts';
@@ -30,7 +31,7 @@ const paymentProvider=accessEnabled||topupsEnabled?createAccessPaymentProvider({
 const accessPayments=accessEnabled?paymentProvider:undefined;
 const testPayments=topupsEnabled?{...testYooKassa(shopId,secret,process.env.WEB_ORIGIN!),readRefund:paymentProvider?.readRefund}:undefined;
 const server = await createServer({ profile, pool, baseURL: process.env.API_BASE_URL!, origin: process.env.WEB_ORIGIN!, authSecret: process.env.AUTH_SECRET!,
-  wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider, classificationEnabled,testPayments,accessPayments,launchLegal:process.env.CASHNEURO_LEGAL_REQUIRED==='1' });
+  wrappingKey: key.bytes, kmsKey: key.kmsKey, environment, yandexAnalyzer, assistantProvider, analyzerNextEmails:nextEmailSetting(process.env.CASHNEURO_ANALYZER_NEXT_EMAILS),analyzerNextAll:nextAllSetting(process.env.CASHNEURO_ANALYZER_NEXT_ALL),classificationEnabled,testPayments,accessPayments,launchLegal:process.env.CASHNEURO_LEGAL_REQUIRED==='1' });
 await server.app.listen(Number(process.env.PORT ?? (profile === 'control' ? 3001 : 3000)), '127.0.0.1');
 const classification=classificationEnabled?await import('./classification-store.ts'):undefined;
 let stopping=false;

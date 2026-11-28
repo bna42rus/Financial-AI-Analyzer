@@ -6,7 +6,12 @@ import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
  * bounds still go through the existing integer-cent grammar. The frozen
  * historical parser is left unchanged. */
 export function assistantAmountLiteral(expression: string, basis: string) {
-  const text = expression.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/\s+/gu, ' ').trim().replace(/[.?]$/u, '');
+  const text = expression.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/\s+/gu, ' ').trim().replace(/[.?]$/u, '')
+    .replace(/^строго (?=(?:больше|меньше)(?:\s|[+-]?\d))/u,'')
+    .replace(/^(?:крупнее|более|выше)(?=\s|[+-]?\d)/u,'больше')
+    .replace(/^(?:мельче|ниже)(?=\s|[+-]?\d)/u,'меньше')
+    .replace(/^не (?:ниже|мельче)(?=\s|[+-]?\d)/u,'не меньше')
+    .replace(/^не крупнее(?=\s|[+-]?\d)/u,'не больше');
   if (!['absolute_operation', 'signed_operation'].includes(basis)) throw new TypeError('TASK_AMOUNT_BASIS_UNSUPPORTED');
   const interval = text.replace(/ включительно$/u, '');
   const range = /^(?:(?:от|с) )?(.+) (?:до|по) (.+)$/u.exec(interval) ?? /^(.+?)\s*\.\.\s*(.+)$/u.exec(interval);

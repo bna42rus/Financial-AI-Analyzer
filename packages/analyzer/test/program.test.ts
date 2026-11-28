@@ -10,6 +10,7 @@ import {analyzeFinancialRows,decorateAnalysis,parseAnalysisOptions} from '../src
 import {calculateFinancial} from '../src/calculators.ts';
 import {compileAssistantChange,parseAssistantChange} from '../src/assistant-changes.ts';
 import {calculatorRublesMinor} from '../src/calculators.ts';
+import {sectionFacts} from '../src/report.ts';
 const account=randomUUID(),cat=randomUUID();
 const catalog={accounts:[{id:account,bankId:'tbank',name:'Счёт',type:'bank_account' as const,analyticsEnabled:true,defaultVisible:true,loanMode:null}],categories:[{id:cat,name:'Кафе',role:'expense' as const,parentId:null,hidden:false}],counterparties:[]};
 const row=(amount:string,role:'expense'|'income'|'neutral'|'unresolved'='expense',date='2026-11-01'):OperationRow=>({id:randomUUID(),date:{precision:'day',date},accountId:account,amountMinor:amount,analyticsRole:role,decompositionActive:false,reviewReasons:[],unresolvedMinor:'0',neutralMinor:'0',excludedMinor:'0',parts:[{id:randomUUID(),componentId:null,allocationId:null,amountMinor:amount,role,categoryId:cat,subcategoryId:null,basis:[],included:true}],classification:{kind:facet('purchase'),role:facet(role),category:facet(cat),subcategory:facet(null),merchant:facet('Кафе'),counterparty:facet(null)},comment:''});
@@ -92,4 +93,15 @@ test('bank clock filters preserve overnight windows, weekdays and unknown clocks
  const monday=query({filter:{weekdays:[1],timeFrom:'22:00'}});assert.equal(result(monday,[a,b,c,unknown]).totals.expenses,'10000');
  const posted=query({filter:{calendarBasis:'posted',weekdays:[2]}});a.postedDate={precision:'day',date:'2026-11-17'};assert.equal(result(posted,[a,b]).totals.expenses,'10000');
  assert.throws(()=>parseTool({...q,filter:{timeFrom:'25:00'}}));assert.throws(()=>parseTool({...q,filter:{weekdays:[7]}}));
+});
+
+test('period comparisons find largest changes across all groups, including hidden and comparison-only groups',()=>{
+ const rows=[row('-9000','expense','2026-10-01'),row('-10000'),row('-6000'),row('-9000','expense','2026-10-02')];
+ rows[0]!.classification.merchant.value='Alpha';rows[1]!.classification.merchant.value='Alpha';rows[2]!.classification.merchant.value='Beta';rows[3]!.classification.merchant.value='Gamma';
+ const q=query({grouping:'merchant',comparison:'previous_month',filter:{from:'2026-11-01',through:'2026-11-30'}}),r=calculateWidget(parseWidget({id:randomUUID(),name:'Comparison',metrics:['expenses'],grouping:'merchant',filter:q.filter,comparison:{kind:'previous_month'},chart:'bar',topN:1}),rows,catalog,{},new Date('2026-11-24'),'Europe/Moscow',true);
+ assert.equal(r.points.length,1);assert.equal(r.points[0]!.label,'Alpha');
+ const a=decorateAnalysis(q,rows,catalog,r);assert.equal(a.comparison!.difference,'-2000');assert.equal(a.comparison!.largestIncrease!.label,'Beta');assert.equal(a.comparison!.largestIncrease!.difference,'6000');assert.equal(a.comparison!.largestDecrease!.label,'Gamma');assert.equal(a.comparison!.largestDecrease!.difference,'-9000');
+ const facts=sectionFacts({index:1,label:'Сравнение',answer:{mode:'deterministic',registryVersion:'analyzer/5',text:'Расчёт',query:q,result:r,analysis:a}});assert.equal(facts.find(f=>f.ref==='s1.change')!.value,'-2000');assert.equal(facts.find(f=>f.ref==='s1.largest_increase')!.label,'Beta');assert.equal(facts.find(f=>f.ref==='s1.largest_decrease')!.value,'-9000');
+ const privateFacts=sectionFacts({index:1,label:'Сравнение',answer:{mode:'deterministic',registryVersion:'analyzer/5',text:'Расчёт',query:{...q,grouping:'counterparty'},result:r,analysis:a}});assert.equal(privateFacts.find(f=>f.ref==='s1.largest_increase')!.label,'Контрагент с наибольшим ростом');assert.equal(JSON.stringify(privateFacts).includes('Beta'),false);assert.equal(JSON.stringify(privateFacts).includes('Gamma'),false);
+ const limited={...r,tablePoints:undefined};assert.equal(decorateAnalysis(q,rows,catalog,limited).comparison!.largestIncrease,undefined,'A truncated preview cannot establish the largest change');
 });

@@ -35,6 +35,19 @@ test('report reads expenses and income, derives exact difference and narrates on
  const reply=await h.run();assert.equal(reply.code,'FINANCIAL_REPORT');assert.equal(reply.status,'query');assert.equal(reply.report!.facts.find(f=>f.ref==='s3.total')!.value,'70000');assert.equal(reply.report!.narrative[0]!.text,'Доходы 1 000,00 ₽, расходы 300,00 ₽, разница 700,00 ₽.');assert.equal(h.calls,3);assert.equal(reply.reportDependencyIds!.length,3);assert.equal(h.state.book.nodes.length,1);assert.equal(h.state.book.nodes[0]!.query.metric,'income');for(const input of h.sent)assert.equal(JSON.stringify(input).includes(account),false);
  const before=h.calls;assert.deepEqual(await h.run(),reply);assert.equal(h.calls,before);
 });
+
+test('a short loan report uses checked calculator summaries instead of a third model call',async()=>{
+ const p={version:assistantVersion,topic:'general_finance',action:'report',report:{steps:[
+  {kind:'calculate',label:'Аннуитетный',calculation:{kind:'loan',principalRubles:'360000',annualRatePercent:'17.5',months:30,payment:'annuity'}},
+  {kind:'calculate',label:'Дифференцированный',calculation:{kind:'loan',principalRubles:'360000',annualRatePercent:'17.5',months:30,payment:'differentiated'}},
+  {kind:'derive',label:'Разница процентов',operation:'difference',left:'s1.interest',right:{ref:'s2.interest'}}
+ ],narration:'short'}},h=harness(p),r=await h.run();
+ assert.equal(r.code,'FINANCIAL_REPORT');assert.equal(h.calls,2);assert.equal(r.report!.sections.length,3);assert.equal(r.report!.narrative.length,0);
+ const a=r.report!.sections[0]!.calculation!,b=r.report!.sections[1]!.calculation!;
+ assert.ok(a.kind==='loan'&&b.kind==='loan');assert.equal(r.report!.sections[2]!.derived!.value,(BigInt(a.interestMinor)-BigInt(b.interestMinor)).toString());
+ const detailed=harness({...p,report:{...p.report,narration:'detailed'}},{blocks:[{kind:'explanation',template:'Проценты начисляются на остаток долга.'}]});
+ assert.equal((await detailed.run()).report!.narrative[0]!.text,'Проценты начисляются на остаток долга.');assert.equal(detailed.calls,3);
+});
 test('report binds a checked payment into a proposed budget, calculator inputs survive the next turn',async()=>{
  const p={version:assistantVersion,topic:'personal_finance',action:'report',report:{steps:[{kind:'calculate',label:'Кредит',calculation:{kind:'loan',principalRubles:'1200',annualRatePercent:'0',months:12,payment:'annuity'}},{kind:'change',label:'Бюджет',change:{kind:'create_budget',name:'Платёж',period:'month',basis:'net',amountRubles:'0'},bindings:[{field:'amountRubles',ref:'s1.payment'}]}]}},h=harness(p);const reply=await h.run();assert.equal(reply.code,'FINANCIAL_REPORT');assert.equal(h.prepares,1);assert.equal((reply.proposal!.intent.items as any[])[0].amountRubles,'100.00');assert.equal(reply.status,'answer');assert.equal(h.state.book.nodes.length,0);const next=conversationInput(h.state,scope,'А если на год дольше?',{timezone:'Europe/Moscow',currentDate:'2026-11-17'});assert.equal(next.input.activeCalculation?.kind,'loan');assert.equal((next.input.activeCalculation as any).principalRubles,'1200');
 });
@@ -67,7 +80,7 @@ test('operations cashflow cannot be laundered into a confirmed starting balance 
 test('real HTTP serialization fits both the extended plan and its independent completeness schema',async()=>{
  const plan={version:assistantVersion,topic:'personal_finance',action:'read',context:{mode:'new'},changes:[change('metric','expenses'),change('grouping','merchant')]},h=harness(plan);let calls=0;
  const model=createCloudAssistantModel({apiKey:'synthetic-key-1234567890123'},async(_url,init)=>{
-  calls++;const body=JSON.parse(String(init?.body));assert.ok(Buffer.byteLength(String(init?.body))<=98304);const input=JSON.parse(body.messages[1].content),value=input.candidate?{plan,conditions:[]}:plan;
+  calls++;const body=JSON.parse(String(init?.body));assert.ok(Buffer.byteLength(String(init?.body))<62000);assert.match(body.messages[0].content,/JSON Schema:/);const input=JSON.parse(body.messages[1].content),value=input.candidate?{plan,conditions:[]}:plan;
   return new Response(JSON.stringify({model:'openai/gpt-oss-120b',usage:{prompt_tokens:500,completion_tokens:100,total_tokens:600},choices:[{finish_reason:'stop',message:{role:'assistant',tool_calls:[],content:JSON.stringify(value)}}]}));
  });
  const reply=await runAssistant(h.request,model,h.journal,h.services);assert.equal(reply.code,'FINANCIAL_QUERY');assert.equal(calls,2);

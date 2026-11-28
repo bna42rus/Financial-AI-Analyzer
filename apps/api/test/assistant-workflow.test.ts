@@ -38,7 +38,7 @@ function harness() {
     } };
     const journal = journals.get(request.requestId) ?? { receipt: { fingerprint: assistantRequestFingerprint(request), calls: [] }, async persist() {}, async reserve() { if(options.reserveError) throw options.reserveError; }, async settle() {} } as AssistantJournal;
     journals.set(request.requestId, journal);
-    const services: AssistantServices = { prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
+    const services: AssistantServices = { localReads:false,prepareChange:options.prepareChange, async guard() {}, async catalog() { catalogs++; return options.catalog ?? trialCatalog; }, async authorizeQuery() {},
       async calculate(query, actualCalendar) { calculations++; assert.equal(actualCalendar.timezone, request.timezone); return trialResult(query); },
       render(_query, result) { return 'Проверенный расчёт: ' + JSON.stringify((result as any).totals); }, async commit(input) { conversation = input.conversation; } };
     return runAssistant(request, model, journal, services);
@@ -97,7 +97,7 @@ test('semantic review removes an unrequested reset and repairs a wrongly new amo
   ]);
   assert.equal(changed.query!.metric, 'income'); assert.equal(changed.query!.grouping, 'category'); assert.equal(changed.query!.comparison, 'previous_same');
   assert.equal(changed.query!.filter.from, '2026-08-01'); assert.equal(changed.modelCalls, 2);
-  assert.equal(h.calls.at(-1)!.phase, 'check_changes'); assert.equal((h.calls.at(-1)!.input as any).history, undefined);
+  assert.equal(h.calls.at(-1)!.phase, 'check_changes'); assert.equal((h.calls.at(-1)!.input as any).history[0].task.period.from, '2026-08-01');
   const amount = set('amount', { basis: 'absolute_operation', expression: 'больше 750 рублей' });
   const narrowed = await h.execute(993, 'Отбери операции больше 750 рублей', [plan([amount]), plan([amount], 'continue')]);
   assert.equal(narrowed.status, 'query'); assert.equal(narrowed.query!.filter.amountFrom, '75001'); assert.equal(narrowed.query!.filter.from, '2026-08-01');

@@ -5,8 +5,7 @@ import type { Pool, PoolClient } from 'pg';
 import { monthlyPeriod, monthlyPolicy, monthlyTariffGuard, prepareMonthlyDispatch } from '../src/assistant-monthly.ts';
 import { checkAssistantStagingSettings, assistantTariffSource } from '../src/analyzer-assistant-settings.ts';
 import { monthlyClassificationAdmission } from '../src/classification-admission.ts';
-import { createStagingAssistantProvider } from '../src/analyzer-assistant-provider.ts';
-import {syntheticTariffPdf} from './fixtures/synthetic-tariff-pdf.ts';
+import { createStagingAssistantProvider,AssistantModelAdmissionError } from '../src/analyzer-assistant-provider.ts';
 import {tokenCost} from '../../../packages/analyzer/src/cost.ts';
 
 const at = new Date('2026-11-01T13:34:00Z');
@@ -70,7 +69,7 @@ test('tariff freshness refreshes automatically once for concurrent calls, retain
   fail = false; await guard(); assert.equal(checks, 3);
 });
 
-test('monthly provider drops trial call/expiry guards, rolls periods without restart and rejects an unverifiable tariff before a model POST', async () => {
+test('monthly provider rolls periods without expiry or tariff network dependencies', async () => {
   const metadata = { id: 'openai/gpt-oss-120b', context_length: 131072, max_model_len: 131072 };
   const old = legacy(); old.modelMetadataSha256 = createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
   const settings = monthlyClassificationAdmission(old, totals, 'd'.repeat(64), at);
@@ -89,34 +88,49 @@ test('monthly provider drops trial call/expiry guards, rolls periods without res
   now = new Date('2026-12-01T00:00:00Z');
   assert.equal(provider.policy.projectPeriodStart, '2026-11-30T21:00:00.000Z');
   let reserved = false;
-  await assert.rejects(provider.forRequest().complete({ phase: 'understand', prompt: 'Synthetic', input: {}, schema: {} }, async () => { reserved = true; }), /TARIFF_DOCUMENT_CHANGED/);
-  assert.equal(posts, 0); assert.equal(gets, 2); assert.equal(reserved, false);
+  await assert.rejects(provider.forRequest().complete({ phase: 'understand', prompt: 'Synthetic', input: {}, schema: {} }, async () => { reserved = true; }), /BENCH_DELIVERY_UNKNOWN/);
+  assert.equal(posts, 1); assert.equal(gets, 1); assert.equal(reserved, true);
 });
 
-test('monthly dispatch verifies the current PDF before reserving at new rates and retains historical quotes and the 100 RUB cap',async()=>{
+test('monthly assistant and classification use configured prices and never fetch the tariff',async()=>{
  const metadata={id:'openai/gpt-oss-120b',context_length:131072,max_model_len:131072};
  const old=legacy();old.modelMetadataSha256=createHash('sha256').update(JSON.stringify(metadata)).digest('hex');
  const settings=monthlyClassificationAdmission(old,totals,'d'.repeat(64),at),before=structuredClone(settings);
  const pool={async query(sql:string){return {rows:sql.includes('current_user')?[{role:'finance_api',name:'finance_staging'}]:[]};}} as unknown as Pool;
- let priceChanged=false,invalid=false,posts=0;
- const fetcher:typeof fetch=async(url,options)=>{
+ let posts=0,tariffGets=0;
+ const fetcher:typeof fetch=async(url)=>{
   if(String(url).endsWith('/models'))return new Response(JSON.stringify({data:[metadata]}));
-  if(String(url)===assistantTariffSource){
-   assert.equal(new Headers(options?.headers).get('authorization'),null);
-   return new Response(invalid?'invalid tariff':syntheticTariffPdf(priceChanged?'24,40':'15,86',priceChanged?'122,00':'61,00'));
-  }
+  if(String(url)===assistantTariffSource){tariffGets++;throw Error('PDF_MUST_NOT_BE_FETCHED');}
   posts++;return new Response(JSON.stringify({model:metadata.id,choices:[{finish_reason:'stop',message:{role:'assistant',content:'{}',tool_calls:[]}}],usage:{prompt_tokens:10,completion_tokens:2,total_tokens:12}}));
  };
- const provider=await createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at);
- const quotes:typeof old.cost.price[]=[];
- const send=()=>provider.forRequest().complete({phase:'understand',prompt:'Synthetic',input:{},schema:{}},async()=>{
-  quotes.push(structuredClone(provider.policy.price));assert.equal(provider.policy.projectLimitRub,'100');
- });
- await send();priceChanged=true;await send();
- assert.equal(posts,2);assert.equal(quotes[0]!.inputRubPerMillion,'15.86');assert.equal(quotes[1]!.inputRubPerMillion,'24.4');
- assert.equal(quotes[0]!.outputRubPerMillion,'61');assert.equal(quotes[1]!.outputRubPerMillion,'122');
- assert.equal(tokenCost(quotes[0]!,1_000_000,0),15_860_000_000n);
- assert.deepEqual(settings,before);
- invalid=true;await assert.rejects(send(),/TARIFF_DOCUMENT_CHANGED/);
- assert.equal(posts,2);assert.equal(quotes.length,2);
+ let clock=at;const provider=await createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>clock);
+ const send=(purpose:'assistant'|'classification')=>provider.forRequest(purpose).complete({phase:'understand',prompt:'Synthetic',input:{},schema:{},...(purpose==='classification'?{protocol:'cashneuro-category-classification/4' as const}:{})},async()=>{assert.deepEqual(provider.policy.price,old.cost.price);assert.equal(provider.policy.projectLimitRub,'100');});
+ await send('assistant');clock=new Date('2026-12-15T12:00:00Z');await send('assistant');await send('classification');
+ assert.equal(posts,3);assert.equal(tariffGets,0);assert.deepEqual(settings,before);
+ assert.equal(tokenCost(provider.policy.price,1_000_000,0),15_860_000_000n);
+});
+test('monthly model admission uses the fixed model and operational limits instead of an unversioned card fingerprint',async()=>{
+ const original={id:'openai/gpt-oss-120b',owned_by:'old',context_length:131072,max_model_len:131072};
+ const old=legacy();old.modelMetadataSha256=createHash('sha256').update(JSON.stringify(original)).digest('hex');
+ const settings=monthlyClassificationAdmission(old,totals,'d'.repeat(64),at),before=structuredClone(settings);let gets=0,posts=0;
+ const pool={async query(sql:string){assert.ok(sql.startsWith('SELECT '));return {rows:sql.includes('current_user')?[{role:'finance_api',name:'finance_staging'}]:[]};}} as unknown as Pool;
+ const fetcher:typeof fetch=async(_url,options)=>{if(options?.method!=='GET'){posts++;throw Error('NO_PAID_CALL');}gets++;return new Response(JSON.stringify({data:[{max_model_len:131072,context_length:131072,id:original.id,owned_by:'new',created:1795840000,description:settings.apiKey}]}));};
+ const p=await createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at),diagnostic=(p.binding as any).modelAdmission;
+ assert.equal(diagnostic.hashMatches,false);assert.equal(diagnostic.limitsMatch,true);assert.equal(diagnostic.immutableModelVersionVerified,false);assert.equal(p.policy.projectLimitRub,'100');assert.equal(gets,1);assert.equal(posts,0);assert.deepEqual(settings,before);assert.ok(!JSON.stringify(diagnostic).includes(settings.apiKey));
+ await assert.rejects(createStagingAssistantProvider(pool,old,fetcher,old.sourceSha256,()=>at),/ASSISTANT_MODEL_CHANGED/);assert.equal(posts,0);
+});
+test('model admission still refuses changed identity, context, versioned pins and invalid input/output bounds without a paid call',async()=>{
+ const original={id:'openai/gpt-oss-120b',context_length:131072,max_model_len:131072},old=legacy();old.modelMetadataSha256=createHash('sha256').update(JSON.stringify(original)).digest('hex');
+ const settings=monthlyClassificationAdmission(old,totals,'d'.repeat(64),at),pool={async query(sql:string){assert.ok(sql.startsWith('SELECT '));return {rows:sql.includes('current_user')?[{role:'finance_api',name:'finance_staging'}]:[]};}} as unknown as Pool;
+ for(const change of [{id:'other-model'},{context_length:65536},{max_model_len:65536},{version:'new'},{revision:'new'},{snapshot:'new'},{max_input_tokens:4096},{max_output_tokens:1200},{max_output_tokens:'4096'}]){
+  let posts=0;const fetcher:typeof fetch=async(_url,options)=>{if(options?.method!=='GET'){posts++;throw Error('NO_PAID_CALL');}return new Response(JSON.stringify({data:[{...original,...change,description:settings.apiKey}]}));};
+  await assert.rejects(createStagingAssistantProvider(pool,settings,fetcher,'d'.repeat(64),()=>at),error=>{assert.ok(!String(error).includes(settings.apiKey));if(error instanceof AssistantModelAdmissionError)assert.ok(!JSON.stringify(error.diagnostic).includes(settings.apiKey));return true;});assert.equal(posts,0);
+ }
+});
+
+
+test('Staging-wide admission sees another account reserve through shared project totals without reading private receipts',async()=>{
+ const policy=monthlyPolicy(legacy().cost,{version:'cashneuro-staging-monthly/1',limitRub:'100',activatedAt:at.toISOString()},at),queries:string[]=[];
+ const db={async query(sql:string){queries.push(sql);return {rows:[],rowCount:sql.includes('ai_project_budget')&&sql.includes('reserved_atoms>0')?1:0};}} as unknown as PoolClient;
+ await assert.rejects(prepareMonthlyDispatch(db,policy),/RECONCILIATION_REQUIRED/);assert.ok(queries.some(sql=>sql.includes('reserved_atoms>0')));assert.ok(!queries.some(sql=>sql.includes('UPDATE')||sql.includes('DELETE')));
 });

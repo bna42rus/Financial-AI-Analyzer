@@ -95,3 +95,14 @@ test('legacy monthly allowance is corrected without erasing spend, pending reser
  await assert.rejects(pg.finance.query("SELECT commerce.restore_legacy_analyzer_allowance(repeat('0',64))"),{code:'42501'});
  assert.equal((await pg.owner.query('SELECT * FROM commerce.ai_cost_reservation WHERE request_id=$1',[requestId])).rowCount,3);
 });
+
+test('explicitly replacing an uncommitted Analyzer preview expires the old confirmation and preserves immutable retries',async()=>{
+ const id=await chat(),q=await query(id),answerId=q.json().id,first=randomUUID(),second=randomUUID();
+ const inclusion={actionId:first,tool:{name:'set_inclusion',answerId,value:'exclude'}};
+ assert.equal((await request('/finance/analyzer-propose',inclusion)).statusCode,200);
+ const edit={actionId:second,replacesActionId:first,tool:{name:'edit_operations',answerId,patch:{comment:'Synthetic replacement'}}};
+ const prepared=await request('/finance/analyzer-propose',edit);assert.equal(prepared.statusCode,200,prepared.body);assert.equal((await request('/finance/analyzer-propose',edit)).statusCode,200);
+ const expired=await request('/finance/commit',{actionId:first});assert.equal(expired.statusCode,409,expired.body);assert.equal(expired.json().code,'FINANCE_CHANGED');assert.equal((await request('/finance/analyzer-propose',inclusion)).statusCode,409);
+ const c=await request('/finance/commit',{actionId:second});assert.equal(c.statusCode,200,c.body);assert.equal((await within(db=>financeView(db,'first'))).summary.netExpensesMinor,'24690');
+ const forbidden=await request('/finance/analyzer-propose',{...inclusion,actionId:randomUUID(),replacesActionId:second});assert.equal(forbidden.statusCode,409,forbidden.body);
+});

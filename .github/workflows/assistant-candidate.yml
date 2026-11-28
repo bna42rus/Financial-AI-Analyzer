@@ -14,6 +14,8 @@ on:
       - 'apps/api/test/assistant-*.test.ts'
       - 'apps/api/src/analyzer-assistant-*.ts'
       - 'apps/api/test/analyzer-assistant-*.test.ts'
+      - 'apps/api/src/analyzer-next-*.ts'
+      - 'apps/api/test/analyzer-next-*.test.ts'
       - 'packages/database/migrations/0027_assistant_runtime.sql'
       - 'packages/analyzer/**'
       - 'packages/finance-core/**'
@@ -54,12 +56,16 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the bounded tariff PDF reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Start isolated PostgreSQL 18
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Verify category continuity and review fields offline
         run: pnpm --filter @finance/api exec node --import tsx --test test/classification-plan.test.ts test/classification-pass.test.ts test/category-continuity.test.ts test/review-fields.test.ts test/review-remember.test.ts ../../packages/finance-core/test/merchant-followups.test.ts
       - name: Verify Analyzer arithmetic and workflow offline
-        run: pnpm --filter @finance/api exec node --import tsx --test ../../packages/analyzer/test/program.test.ts test/assistant-workflow.test.ts test/assistant-durability.test.ts test/assistant-report.test.ts test/financial-sources.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test ../../packages/analyzer/test/program.test.ts test/assistant-workflow.test.ts test/assistant-context-followups.test.ts test/assistant-durability.test.ts test/assistant-report.test.ts test/financial-sources.test.ts test/analyzer-next-foundation.test.ts test/analyzer-next-pilot.test.ts test/analyzer-next-review.test.ts test/analyzer-next-review-pilot.test.ts test/analyzer-next-review-retry.test.ts
       - name: Verify Analyzer HTTP changes and source scopes
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
@@ -70,6 +76,12 @@ jobs:
         run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 --test-name-pattern='monthly Staging ledger|deterministic calculator|one remaining paid unit|/5 activity pass|test top-up|category binding preview|/5 import applies|/5 future Latin|/5 NAME is' test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/finance-reset.test.ts test/finance.test.ts test/import-ingestion.test.ts
       - name: Install Chromium for focused assistant HTTP browser verification
         run: pnpm --filter @finance/api exec playwright install --with-deps chromium
+      - name: Verify Analyzer preview replacement and immutable scopes over HTTP
+        env:
+          SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-name-pattern='explicitly replacing an uncommitted|forged operation scope|preview is fixed' test/analyzer.test.ts
+      - name: Verify Analyzer answer buttons and loan presentation on desktop and mobile
+        run: pnpm --filter @finance/web exec playwright test e2e/analyzer-connected.spec.ts --workers=2
       - name: Verify connected assistant, operations and catalog interfaces on desktop and mobile
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
@@ -104,6 +116,10 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the bounded tariff PDF reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Install only the pinned compiler and Node types
         run: npm install --prefix "$RUNNER_TEMP/assistant-typecheck" --no-save --ignore-scripts typescript@7.0.2 @types/node@24.19.1
       - name: Strict types for the candidate and its import closure
@@ -153,6 +169,7 @@ jobs:
           apps/api/test/classification-admission.test.ts
           apps/api/test/assistant-monthly.test.ts
           apps/api/test/assistant-workflow.test.ts
+          apps/api/test/assistant-context-followups.test.ts
           apps/api/test/assistant-durability.test.ts
           apps/api/test/assistant-trial.test.ts
           apps/api/test/financial-sources.test.ts
@@ -181,8 +198,12 @@ jobs:
           python3 scripts/test-staging-gate-config.py
           node --test scripts/test-staging-gate.mjs
           python3 scripts/test-diagnose-classification-staging.py
+          python3 scripts/test-diagnose-analyzer-cost-staging.py
+          python3 scripts/test-check-analyzer-archive.py
+          pnpm --filter @finance/api exec tsc --ignoreConfig --noEmit --target ES2023 --module ESNext --moduleResolution Bundler --strict --noUncheckedIndexedAccess --allowImportingTsExtensions --skipLibCheck --types node ../../scripts/check-analyzer-live.ts ../../scripts/analyzer-live-cases.ts ../../scripts/check-analyzer-archive.ts
           sudo /usr/bin/python3 -B scripts/test-authorize-assistant-staging-calls.py
           bash -n scripts/prepare-staging-release.sh
+          bash -n scripts/check-analyzer-live.sh
           bash -n scripts/run-classification-check.sh
       - name: Prepare the experiment without network or credentials
         run: node --experimental-transform-types apps/api/src/assistant-trial-main.ts --prepare
@@ -234,6 +255,10 @@ jobs:
         run: |
           npm install --global pnpm@11.25.0 --ignore-scripts
           pnpm install --frozen-lockfile --ignore-scripts
+      - name: Install the bounded tariff PDF reader
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends poppler-utils
       - name: Start isolated PostgreSQL 18 without a shared Docker registry
         run: bash .github/scripts/start-isolated-postgres.sh
       - name: Check Staging configuration without credentials or paid calls
@@ -245,4 +270,4 @@ jobs:
       - name: Verify the assistant HTTP and PostgreSQL boundary without paid calls
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres
-        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/monthly-budget-integration.test.ts test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/import-ingestion.test.ts test/import-validation.test.ts test/finance.test.ts test/finance-reset.test.ts test/overview.test.ts test/operations.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test --test-concurrency=1 test/analyzer-next-http.test.ts test/analyzer-next-store.test.ts test/monthly-budget-integration.test.ts test/analyzer-assistant-integration.test.ts test/classification-integration.test.ts test/import-ingestion.test.ts test/import-validation.test.ts test/finance.test.ts test/finance-reset.test.ts test/overview.test.ts test/operations.test.ts
