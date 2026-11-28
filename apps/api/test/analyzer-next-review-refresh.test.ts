@@ -7,8 +7,8 @@ import {refreshedReviewEvidence,prepareReviewRefresh,reviewRefreshBudgetIds,seed
 import {withAssistantJournal} from '../src/assistant-journal.ts';
 import {assistantRequestFingerprint,assistantWorkflowVersion} from '../src/assistant-workflow.ts';
 import {nextCallFingerprint} from '../src/analyzer-next-model-call.ts';
-import {nextReviewInput,nextReviewVersion,nextReviewPrompt,nextReviewSchema} from '../src/analyzer-next-review.ts';
-import {runReviewPilotTurn,reviewPilotCases} from '../src/analyzer-next-review-pilot.ts';
+import {nextReviewInput,nextReviewCall,nextReviewVersion,nextReviewPrompt,nextReviewSchema} from '../src/analyzer-next-review.ts';
+import {runReviewPilotTurn,reviewPilotCases,reviewPilotCandidate} from '../src/analyzer-next-review-pilot.ts';
 import {createPilotSuite} from '../src/analyzer-next-pilot-suite.ts';
 import type {ProviderInput} from '../../../packages/analyzer/src/next/workflow.ts';
 import {PrototypeSession,workflowPrototypeVersion,parseUnderstanding} from '../../../packages/analyzer/src/next/workflow.ts';
@@ -31,16 +31,29 @@ async function fixture(){
  const manifest={accountBinding:'b'.repeat(64),caseSignature:suite.caseSignature!,ids:[id(2110),id(2111),id(2112),request.requestId,id(2114)]};
  return {session,c,environment,state,request,value,input,raw,manifest};
 }
-test('canonical chart interpretation reaches review; unchanged inputs, acceptance, unknown delivery and changed context cannot authorize a refresh',async()=>{
+test('canonical interpretation reaches review; only a changed input with known delivery can authorize an explicit refresh',async()=>{
  const h=await fixture(),reply=parseUnderstanding(h.value,h.state,h.c.question),input=nextReviewInput(h.input,reply,h.state,h.environment) as any;
  assert.equal(input.candidate.intent.action,'calculate');assert.equal(input.effect.kind,'loan');assert.equal(input.effect.presentation.format,'chart');assert.equal(input.effect.inputs.length,2);
  assert.ok(refreshedReviewEvidence(h.raw,h.request,h.state,h.environment));
  const unchanged=structuredClone(h.raw);unchanged.receipt.calls[1]!.fingerprint=nextCallFingerprint({phase:'check_changes',protocol:nextReviewVersion,prompt:nextReviewPrompt,input,schema:nextReviewSchema});assert.equal(refreshedReviewEvidence(unchanged,h.request,h.state,h.environment),null);
- for(const mutate of [(r:any)=>r.receipt.calls[1].value.decision='accept',(r:any)=>r.receipt.calls[1].state='unknown',(r:any)=>r.receipt.calls[0].state='unknown']){const r=structuredClone(h.raw);mutate(r);assert.equal(refreshedReviewEvidence(r,h.request,h.state,h.environment),null);}
+ const accepted=structuredClone(h.raw);accepted.receipt.calls[1]!.value={version:nextReviewVersion,decision:'accept',conditions:[{quote:h.c.question,covered:true}]};assert.ok(refreshedReviewEvidence(accepted,h.request,h.state,h.environment));
+ accepted.receipt.calls[1]!.fingerprint=unchanged.receipt.calls[1]!.fingerprint;assert.equal(refreshedReviewEvidence(accepted,h.request,h.state,h.environment),null);
+ for(const mutate of [(r:any)=>r.receipt.calls[1].state='unknown',(r:any)=>r.receipt.calls[0].state='unknown']){const r=structuredClone(h.raw);mutate(r);assert.equal(refreshedReviewEvidence(r,h.request,h.state,h.environment),null);}
+ const missingUsage=structuredClone(h.raw);delete (missingUsage.receipt.calls[1] as any).usage;assert.throws(()=>refreshedReviewEvidence(missingUsage,h.request,h.state,h.environment),/ASSISTANT_JOURNAL_INVALID/);
  assert.throws(()=>refreshedReviewEvidence(h.raw,h.request,h.state,{...h.environment,question:'Другой вопрос'}));
 });
-test('one durable refresh keeps the original rejection, charges only review, includes both IDs and fully replays after restart',async()=>{
- const h=await fixture(),dir=await mkdtemp(join(tmpdir(),'next-review-refresh-'));await mkdir(join(dir,'journal'),{mode:0o700});
+test('the negative control uses the same candidate transform for refresh detection and never recharges an unchanged rejection',async()=>{
+ const h=await fixture(),c=reviewPilotCases[4]!,environment={...h.environment,question:c.question},request={...h.request,question:c.question};
+ const input:ProviderInput={...h.input,question:c.question},raw=structuredClone(h.raw);
+ raw.receipt.fingerprint=assistantRequestFingerprint(request);raw.receipt.calls[0]!.fingerprint=nextCallFingerprint({phase:'understand',prompt:understandingPrompt,input,schema:understandingSchema});
+ const candidate=(value:unknown)=>reviewPilotCandidate(c.id,value),reply=parseUnderstanding(candidate(raw.receipt.calls[0]!.value),h.state,c.question);
+ raw.receipt.calls[1]!.fingerprint=nextCallFingerprint(nextReviewCall(input,reply,h.state,environment));
+ raw.receipt.calls[1]!.value={version:nextReviewVersion,decision:'reject',conditions:[{quote:c.question,covered:false}]};
+ assert.equal(refreshedReviewEvidence(raw,request,h.state,environment,candidate),null);
+});
+for(const originalDecision of ['reject','accept']as const)test('one durable refresh keeps original '+originalDecision+', charges only review, includes both IDs and fully replays after restart',async()=>{
+ const h=await fixture();h.raw.receipt.calls[1]!.value={version:nextReviewVersion,decision:originalDecision,conditions:[{quote:h.c.question,covered:originalDecision==='accept'}]};
+ const dir=await mkdtemp(join(tmpdir(),'next-review-refresh-'));await mkdir(join(dir,'journal'),{mode:0o700});
  await writeFile(join(dir,'journal','assistant-version.json'),JSON.stringify({version:assistantWorkflowVersion}),{mode:0o600});
  const file=join(dir,'journal',h.request.requestId+'.json'),original=JSON.stringify(h.raw);await writeFile(file,original,{mode:0o600});
  try{
@@ -52,6 +65,6 @@ test('one durable refresh keeps the original rejection, charges only review, inc
   assert.equal(reserves,1);assert.equal(posts,1);assert.equal(await readFile(file,'utf8'),original);
   await withAssistantJournal(join(dir,'journal'),refresh.request,accounting,async journal=>{await seedRefreshedUnderstanding(journal,refresh.seed);const session=PrototypeSession.fromTrustedCheckpoint(scope,h.state);assert.equal((await runReviewPilotTurn(h.c,session,h.environment,model,journal,async()=>{},'replay_only')).matches,true);});
   assert.equal(reserves,1);assert.equal(posts,1);
-  const changed:any=structuredClone(h.raw);changed.receipt.calls[1]!.value.conditions[0]!.covered=true;await writeFile(file,JSON.stringify(changed));await assert.rejects(prepareReviewRefresh(dir,h.manifest,h.request,h.state,h.environment),/REFRESH_DENIED/);
+  const changed:any=structuredClone(h.raw);changed.receipt.calls[1]!.value.conditions[0]!.quote=h.c.question.slice(0,12);await writeFile(file,JSON.stringify(changed));await assert.rejects(prepareReviewRefresh(dir,h.manifest,h.request,h.state,h.environment),/REFRESH_DENIED/);
  }finally{await rm(dir,{recursive:true,force:true});}
 });

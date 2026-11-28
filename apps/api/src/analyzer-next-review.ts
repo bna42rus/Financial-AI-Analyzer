@@ -6,8 +6,8 @@ import {prepareTask,taskProjection} from '../../../packages/analyzer/src/next/ta
 import type {State,Environment,Preparation} from '../../../packages/analyzer/src/next/tasks.ts';
 import type {ProviderInput,Understanding} from '../../../packages/analyzer/src/next/workflow.ts';
 import {workflowPrototypeVersion} from '../../../packages/analyzer/src/next/workflow.ts';
-import type {AssistantModel,AssistantJournal} from './assistant-workflow.ts';
-import {nextModelCall} from './analyzer-next-model-call.ts';
+import type {AssistantModel,AssistantJournal,CallReceipt,CompletionInput} from './assistant-workflow.ts';
+import {nextModelCall,nextCallFingerprint} from './analyzer-next-model-call.ts';
 import {normalizeSourceIntent} from '../../../packages/analyzer/src/next/source-intent.ts';
 import {foldSource,sourceOccurrences} from '../../../packages/analyzer/src/next/source-literals.ts';
 
@@ -45,10 +45,26 @@ export function nextReviewInput(input:ProviderInput,reply:Understanding,state:St
  const prepared=financial?effect(prepareTask(state,env,candidate.intent)):{status:reply.relevance};
  return publicFields({version:nextReviewVersion,question:input.question,date:input.date,context:input.context,pendingInputs:state.pending?.draft??null,candidate,effect:prepared});
 }
+const sourceEvidenceInstruction=`\nРазделяй текущую реплику и унаследованный context. Условия из context проверяй по effect, но не выдавай их за цитаты пользователя сейчас. В conditions включай только точные фрагменты текущего question: копируй слова с исходными окончаниями, без пересказа, дополнения, названий JSON-полей и подстановки дат. Для короткого вопроса допустима одна цитата всего question с оценкой всех его требований. Не разбивай слово, не вставляй отсутствующие слова, не повторяй одну цитату. Сравнение прошлых задач не требует цитировать их прежние условия вместо нынешней просьбы. Проверяй полноту независимо от выбора цитат.`;
+function checkedVerdict(value:unknown,question:string){
+ assertClosedSchema(value,nextReviewSchema);
+ const verdict=value as {decision:'accept'|'reject';conditions:{quote:string;covered:boolean}[]};
+ if(verdict.conditions.some(c=>!c.quote.trim()||!sourceOccurrences(c.quote,question).length)||new Set(verdict.conditions.map(c=>foldSource(c.quote))).size!==verdict.conditions.length)throw new TypeError('NEXT_REVIEW_EVIDENCE_INVALID');
+ return verdict;
+}
+export function nextReviewCall(input:ProviderInput,reply:Understanding,state:State,env:Environment,stored?:CallReceipt):CompletionInput{
+ const terminal=reply.relevance==='unrelated'||reply.relevance==='ambiguous';
+ const legacy:CompletionInput={phase:'check_changes',protocol:nextReviewVersion,prompt:nextReviewPrompt,input:nextReviewInput(input,reply,state,env),schema:nextReviewSchema};
+ // Preserve a verified old verdict only for this exact canonical input. An
+ // invalid quote, changed effect or terminal-classification policy cannot use it.
+ if(!terminal&&stored?.phase==='check_changes'&&stored.state==='received'&&stored.usage&&stored.fingerprint===nextCallFingerprint(legacy)){
+  try{checkedVerdict(stored.value,input.question);return legacy;}catch{/* Explicit refresh is required; never reinterpret an invalid verdict. */}
+ }
+ const prompt=nextReviewPrompt+sourceEvidenceInstruction+(terminal?`\nДля candidate.relevance=unrelated или ambiguous проверяй корректность отказа/уточнения, а не исполнение отклонённой просьбы. Unrelated допустим только для полностью нефинансового запроса: финансовая БД и инструменты не вызываются, ответ — короткое перенаправление. Ambiguous допустим только если вопрос и context не определяют существенный смысл: ответ — уточнение без финансового действия. В этих случаях quote покрыта (covered=true), если именно такое решение корректно учитывает эту часть question. Если потеряна определённая финансовая часть либо context уже однозначно задаёт смысл, отклони такую классификацию. Само отсутствие действий не является основанием для accept. Список доказательств остаётся обязательным.`:'');
+ return {...legacy,prompt};
+}
 export async function reviewNextUnderstanding(input:ProviderInput,reply:Understanding,state:State,env:Environment,model:AssistantModel,journal:AssistantJournal,dispatch:'allow'|'replay_only'='allow'):Promise<boolean>{
- const checked=await nextModelCall(model,journal,{phase:'check_changes',protocol:nextReviewVersion,prompt:nextReviewPrompt,input:nextReviewInput(input,reply,state,env),schema:nextReviewSchema},1,dispatch);
- assertClosedSchema(checked.value,nextReviewSchema);
- const verdict=checked.value as {decision:'accept'|'reject';conditions:{quote:string;covered:boolean}[]};
- if(verdict.conditions.some(c=>!c.quote.trim()||!sourceOccurrences(c.quote,input.question).length)||new Set(verdict.conditions.map(c=>foldSource(c.quote))).size!==verdict.conditions.length)throw new TypeError('NEXT_REVIEW_EVIDENCE_INVALID');
+ const checked=await nextModelCall(model,journal,nextReviewCall(input,reply,state,env,journal.receipt.calls[1]),1,dispatch);
+ const verdict=checkedVerdict(checked.value,input.question);
  return verdict.decision==='accept'&&verdict.conditions.every(c=>c.covered);
 }

@@ -40,7 +40,7 @@ def main():
     parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
     parser.add_argument('--suite', choices=['basic', 'additional', 'review', 'acceptance'], default='basic')
     parser.add_argument('--retry-first-rejected', action='store_true', help='One explicit review retry; preserve prior receipt and cumulative cost')
-    parser.add_argument('--refresh-rejected-review', action='store_true', help='Re-review changed server interpretation once, reusing received understanding and cumulative budget')
+    parser.add_argument('--refresh-changed-review', '--refresh-rejected-review', dest='refresh_rejected_review', action='store_true', help='Re-review changed server interpretation once, retaining the original verdict, received understanding and cumulative budget')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--live', action='store_true')
     mode.add_argument('--replay-only', action='store_true', help='Never dispatch a model request; require all saved replies')

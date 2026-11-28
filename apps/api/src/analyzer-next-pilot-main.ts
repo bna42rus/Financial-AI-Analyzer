@@ -84,10 +84,10 @@ async function main(){
     await db.query(`UPDATE commerce.analyzer_request SET state=$3,usage_state=$4,input_tokens=$5,output_tokens=$6,model_version=$7,updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='assistant_0'`,[cfg.userId,id,usage?'completed':'unknown',usage?'reported':'unknown',usage?.inputTokens??null,usage?.outputTokens??null,usage?.modelVersion??null]);return changed;
    });if(violation)throw Error('ASSISTANT_PROVIDER_CHANGED');}};
    let receipt:RunReceipt|undefined,replayed=false,semantic=false,reviewCode='',providerCode='',resolved='',reviewAccepted:boolean|undefined;const started=performance.now();
-   const refresh=reviewPilot&&cfg.refreshRejectedReview?await prepareReviewRefresh(cfg.directory,manifest,request,session.snapshot(),environment):null;
+   const refresh=reviewPilot&&cfg.refreshRejectedReview?await prepareReviewRefresh(cfg.directory,manifest,request,session.snapshot(),environment,raw=>reviewPilotCandidate(c.id,raw)):null;
    if(refresh&&!budgetIds.includes(refresh.request.requestId))budgetIds.push(refresh.request.requestId);
    const result=await withAssistantJournal(journalDirectory,refresh?.request??request,accounting,async journal=>{
-    if(refresh){await seedRefreshedUnderstanding(journal,refresh.seed);console.log('REVIEW_REFRESH: original rejection retained; understanding reused; only changed review may dispatch within the same run ceiling.');}
+    if(refresh){await seedRefreshedUnderstanding(journal,refresh.seed);console.log('REVIEW_REFRESH: original verdict retained; understanding reused; only changed review may dispatch within the same run ceiling.');}
     receipt=journal.receipt;
     if(reviewPilot){
      const checked=await runReviewPilotTurn(c as AdditionalCase,session,environment,provider.forNextRequest(),journal,async()=>{if(!provider.allowed(cfg.email))throw Error('PILOT_ACCOUNT_DENIED');},replayOnly?'replay_only':'allow');

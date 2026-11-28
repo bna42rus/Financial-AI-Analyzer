@@ -57,13 +57,13 @@ function currentComparisonFrame(raw:unknown,question:string,state:State):unknown
  const active=state.history.find(t=>t.handle===state.active),p=raw.parameters;
  if(active?.kind!=='loan'||active.results.length<2||active.results.length>6||!keys(p,['scenarios','criterion','objective'])||!Array.isArray(p.scenarios)||p.scenarios.length<2||p.scenarios.length>100||new Set(p.scenarios).size!==p.scenarios.length)return raw;
  if(/(?:^|\s)(?:оба|обоих|два|двух)(?:\s|[.,?!]|$)/u.test(fold(question))&&active.results.length!==2)return raw;
- const selected=active.results.map((_v,i)=>active.handle+'_v'+(i+1)),covered=new Set<string>();
+ const selected=active.results.map((_v,i)=>active.handle+'_v'+(i+1));
  for(const alias of p.scenarios){
   if(typeof alias!=='string'||alias.length>32)return raw;const m=/^(t[1-9][0-9]*)(?:_v([1-9][0-9]*))?$/.exec(alias),task=m&&state.history.find(t=>t.handle===m[1]);
   if(task?.kind!=='loan'||m![2]&&!task.results[Number(m![2])-1])return raw;
-  for(const handle of m![2]?[alias]:task.results.map((_v,i)=>task.handle+'_v'+(i+1)))covered.add(handle);
  }
- if(!selected.every(handle=>covered.has(handle)))return raw;
+ // The explicit deictic source selects the active result even when the model
+ // enumerated only older, valid aliases. Ownership validation above remains.
  try{const parsed=parseIntent({...raw,parameters:{...p,scenarios:selected}});return knownBinding(parsed,state)?{...parsed,binding:{mode:'continue',conditions:'pin'}}:raw;}catch{return raw;}
 }
 /** A source quote is non-executable evidence, not a new calculator field.
@@ -98,8 +98,22 @@ function signature(task:ReadTask){
  if(options.statistic==='sum')delete options.statistic;if(options.purpose==='summary')delete options.purpose;if(options.dateBasis==='operation')delete options.dateBasis;
  return stable({metric:q.metric,grouping:q.grouping,filter,options});
 }
+/** A named return selects the latest report of that metric in this chat.
+ * A bare follow-up never searches history across task families. */
+function readReturn(intent:Intent,state:State,question:string):Intent{
+ if(intent.action!=='read'||state.pending||!['new','continue'].includes(intent.binding.mode))return intent;
+ const text=fold(question),target=/^(?:вернись|вернитесь|возвратись|возвратитесь)\s+к\s+(?:отчету|анализу)\s+(?:о|по)\s+(расходах|расходам|тратах|тратам|доходах|доходам)(?=$|[\s;:,.!?])/u.exec(text);
+ if(!target)return intent;
+ if(/(?:вернись|вернитесь|возвратись|возвратитесь)\s+к/u.test(text.slice(target[0].length)))fail('TASK_CONTEXT_REFERENCE_AMBIGUOUS');
+ const metric=target[1]!.startsWith('доход')?'income':'expenses';
+ if(intent.parameters.metric&&intent.parameters.metric!==metric)fail('TASK_CONTEXT_DECISION_CONFLICT');
+ const previous=[...state.history].reverse().find((t):t is ReadTask=>t.kind==='read'&&t.node.query.metric===metric);
+ if(!previous)fail('TASK_CONTEXT_MISSING');
+ return {...intent,binding:{mode:'reference',handle:previous.handle,conditions:'pin'}};
+}
 export function normalizeSourceIntent(intent:Intent,state:State,env:Environment):Intent{
  if(state.running||state.failure||!knownBinding(intent,state))return intent;
+ intent=readReturn(intent,state,env.question);
  const comparison=currentComparisonFrame(intent,env.question,state);if(comparison!==intent)return comparison as Intent;
  const previous=nearestLoan(state),choice=paymentChoice(env.question);
  if(choice&&(previous||state.pending?.draft.kind==='loan')&&(intent.action==='explain'||intent.action==='calculate'&&intent.parameters.calculator==='loan')){

@@ -106,10 +106,27 @@ test('current variant binding preserves historical requests, rejects invalid ali
  const historical=envelope('compare',{scenarios:['t1_v1','t1_v2'],criterion:'interest',objective:'min'});assert.equal(recoverLoanGraphFrame(historical,'Сравни прошлые варианты',state),historical);
  const shortList=envelope('compare',{scenarios:['t1_v1','t1_v2','t6_v1','t6_v2'],criterion:'interest',objective:'min'}),selected=normalizeSourceIntent(parseIntent(shortList),state,{scope,requestId:id(12345),question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog});if(selected.action!=='compare')throw Error('compare');assert.deepEqual(selected.parameters.scenarios,['t6_v1','t6_v2']);
  for(const phrase of ['Сравни все прошлые варианты','Сравни эти варианты с предыдущими кредитами','Какой из этих вариантов дешевле при ставке 12%?','Не сравнивай эти варианты'])assert.throws(()=>parseIntent(recoverLoanGraphFrame(retainedComparison(),phrase,state)),/INTENT_PROTOTYPE_INVALID/);
- for(const change of [(p:any)=>p.parameters.scenarios.push('t6_v1'),(p:any)=>p.parameters.scenarios[0]='t999_v1',(p:any)=>p.parameters.scenarios=p.parameters.scenarios.slice(0,8),(p:any)=>p.parameters.criterion='overpayment',(p:any)=>p.parameters.sql='select anything']){
+ for(const change of [(p:any)=>p.parameters.scenarios.push('t6_v1'),(p:any)=>p.parameters.scenarios[0]='t999_v1',(p:any)=>p.parameters.scenarios[0]='t6_v3',(p:any)=>p.parameters.criterion='overpayment',(p:any)=>p.parameters.sql='select anything']){
   const bad=retainedComparison();change(bad);assert.throws(()=>parseIntent(recoverLoanGraphFrame(bad,question,state)),/INTENT_PROTOTYPE_INVALID/);
  }
  assert.throws(()=>parseIntent(recoverLoanGraphFrame(retainedComparison(),question,{...state,active:'t5'})),/INTENT_PROTOTYPE_INVALID/);
+});
+test('retained six historical aliases and read-continue across a loan keep current variants and the explicitly named report',async()=>{
+ const comparison=envelope('compare',{scenarios:historyAliases.slice(0,6),criterion:'interest',objective:'min'});
+ const back=read([condition('period','сентябрь')],keep,null,null),copy=structuredClone(back);
+ const h=await run({...retained,'loan-tied-comparison':comparison,'mixed-back-to-read':back});
+ assert.equal(h.results.size,25);assert.deepEqual(back,copy);
+ const p=h.prepared.get('loan-tied-comparison'),r=h.results.get('loan-tied-comparison');
+ if(p?.status!=='ready'||p.task.kind!=='loan_comparison'||r?.status!=='completed'||r.outcome.kind!=='loan_comparison')throw Error('comparison');
+ assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.months===12&&v.annualRatePercent==='0'));assert.deepEqual(r.outcome.winnerIndexes,[0,1]);
+ const report=h.prepared.get('mixed-back-to-read');if(report?.status!=='ready'||report.task.kind!=='read')throw Error('read');
+ assert.equal(report.task.parent,'t1');assert.equal(report.task.node.query.grouping,'category');assert.equal(report.task.node.query.filter.from,'2025-09-01');
+ const state=h.states.get('mixed-back-to-read')!,env={scope,requestId:id(2451),question:'А сентябрь?',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ assert.throws(()=>prepareTask(state,env,back),/TASK_CONTEXT_INCOMPATIBLE/);
+ for(const question of ['Не возвращайся к отчёту о расходах; месяц замени на сентябрь.','Что означает отчёт о расходах за сентябрь?'])assert.equal(normalizeSourceIntent(parseIntent(back),state,{...env,question}).binding.mode,'continue');
+ assert.throws(()=>prepareTask(state,{...env,question:'Вернись к отчёту о доходах; месяц замени на сентябрь.'},back),/TASK_CONTEXT_MISSING/);
+ assert.throws(()=>prepareTask(state,{...env,question:'Вернись к отчёту о расходах и вернись к отчёту о доходах.'},back),/TASK_CONTEXT_REFERENCE_AMBIGUOUS/);
+ const conflict=read([],keep,null,'income');assert.throws(()=>prepareTask(state,{...env,question:additionalCases.find(c=>c.id==='mixed-back-to-read')!.question},conflict),/TASK_CONTEXT_DECISION_CONFLICT/);
 });
 test('clear quote metadata is canonicalized across fields only with exact source evidence and a fully valid frame',async()=>{
  const h=await run(),state=h.states.get('loan-both-charts')!,question='Сними ограничение';
