@@ -8,6 +8,9 @@ import type {Preparation} from '../../../packages/analyzer/src/next/tasks.ts';
 import type {Understanding,TurnResult} from '../../../packages/analyzer/src/next/workflow.ts';
 import type {Catalog} from '../../../packages/analyzer/src/yandex-contract.ts';
 import type {GlobalSnapshot} from '../../../packages/analyzer/src/task-context.ts';
+import {parseIntent} from '../../../packages/analyzer/src/next/intent.ts';
+import {queryMetrics,queryGroupings} from '../../../packages/analyzer/src/registry.ts';
+import {analysisOptionsSchema} from '../../../packages/analyzer/src/analysis.ts';
 export type SuiteCase={id:string;chain:string;question:string;ui?:AdditionalCase['ui']};
 export function createPilotSuite(name:unknown,catalog:Catalog){
  if(name!==undefined&&name!=='basic'&&name!=='additional')throw Error('PILOT_SUITE_INVALID');
@@ -19,4 +22,18 @@ export function createPilotSuite(name:unknown,catalog:Catalog){
   preparationMatches(c:SuiteCase,p:Preparation|null,reply:Understanding){return additional?additionalPreparationMatches(c as AdditionalCase,p,reply,catalog):!!p&&reply.intent!==null&&(c.id!=='read-compare'||reply.intent.action==='compare'&&reply.intent.parameters.objective==='max')&&pilotPreparationMatches(c.id as PilotId,p);},
   outcomeMatches(c:SuiteCase,r:TurnResult){return additional?additionalOutcomeMatches(c as AdditionalCase,r):c.id==='loan-concept'?r.status==='explanation':r.status==='completed'&&pilotOutcomeMatches(c.id as PilotId,r.outcome);},
  };
+}
+/** Invalid replies expose finite shape facts, never arbitrary values/key names. */
+export function pilotIntentDiagnostic(raw:unknown):unknown{
+ try{const p=parseIntent(raw);return {action:p.action,binding:p.binding,parameters:p.parameters};}catch{}
+ const record=(v:unknown):Record<string,unknown>=>v&&typeof v==='object'&&!Array.isArray(v)?v as Record<string,unknown>:{};
+ const r=record(raw),p=record(r.parameters),options=record(p.options),b=record(r.binding),presentation=record(r.presentation);
+ const finite=(value:unknown,allowed:readonly string[])=>typeof value==='string'&&allowed.includes(value)?value:'unsupported';
+ const common=['version','action','binding','parameters','presentation'];
+ const optionNames=Object.keys(analysisOptionsSchema.properties);
+ return {invalid:true,action:finite(r.action,['read','calculate','compare','explain']),bindingMode:finite(b.mode,['new','continue','reference','answer']),
+  missing:common.filter(k=>!Object.hasOwn(r,k)),unknownCommonCount:Object.keys(r).filter(k=>!common.includes(k)).length,
+  metric:finite(p.metric,[...queryMetrics,'loan_payments']),grouping:finite(p.grouping,[...queryGroupings,'time']),
+  presentationFormat:finite(presentation.format,['auto','number','table','chart','operations']),
+  invalidPresentationOptionNames:['format','detail'].filter(k=>Object.hasOwn(options,k)),unknownOptionCount:Object.keys(options).filter(k=>!optionNames.includes(k)).length};
 }

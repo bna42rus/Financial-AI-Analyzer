@@ -35,11 +35,8 @@ function literal(quote:string,date:string,previous:Period):Period{
 export function isCompletePeriodLiteral(value:string,date:string):boolean{
  if(!value||value.length>2000)return false;try{literal(value,date,{});return true;}catch{return false;}
 }
-export function periodExpression(expression:string,question:string,date:string,previous:Period={}):Period{
- if(!question||question.length>2000||!expression||expression.length>2000)fail('TASK_PERIOD_UNSUPPORTED');
- let proposed:Period|null;
- try{proposed=canonical(expression.trim());}catch{fail('TASK_PERIOD_UNSUPPORTED');}
- if(!proposed){questionQuote(expression,question);return literal(expression,date,previous);}
+export function periodFacts(question:string,date:string,previous:Period={}){
+ if(!question||question.length>2000)fail('TASK_PERIOD_UNSUPPORTED');
  // Whole-token spans prevent YYYY-MM being treated as evidence inside a day.
  // Use the existing grammar and retain maximal spans so an explicit year or
  // larger range cannot disappear while matching a convenient smaller token.
@@ -52,6 +49,14 @@ export function periodExpression(expression:string,question:string,date:string,p
   if(found.length>64)fail('TASK_PERIOD_EVIDENCE_AMBIGUOUS');
  }
  const maximal=found.filter(a=>!found.some(b=>b!==a&&b.start<=a.start&&b.end>=a.end&&(b.start<a.start||b.end>a.end)));
+ return maximal.map(f=>({...f,source:question.slice(f.start,f.end)}));
+}
+export function periodExpression(expression:string,question:string,date:string,previous:Period={}):Period{
+ if(!question||question.length>2000||!expression||expression.length>2000)fail('TASK_PERIOD_UNSUPPORTED');
+ let proposed:Period|null;
+ try{proposed=canonical(expression.trim());}catch{fail('TASK_PERIOD_UNSUPPORTED');}
+ if(!proposed){questionQuote(expression,question);return literal(expression,date,previous);}
+ const maximal=periodFacts(question,date,previous);
  if(!maximal.length)fail('TASK_EVIDENCE_MISSING');
  if(maximal.some(p=>!same(p.period,maximal[0]!.period)))fail('TASK_PERIOD_EVIDENCE_AMBIGUOUS');
  if(!same(proposed,maximal[0]!.period))fail('TASK_PERIOD_EVIDENCE_MISMATCH');

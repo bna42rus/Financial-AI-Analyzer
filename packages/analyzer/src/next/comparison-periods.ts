@@ -5,6 +5,7 @@ import {isCompletePeriodLiteral,periodExpression} from './period.ts';
 type Period=Pick<OperationsFilter,'from'|'through'>;
 function fail(code:string):never{throw new TypeError(code);}
 const same=(a:Period,b:Period)=>a.from===b.from&&a.through===b.through;
+export function hasExplicitComparisonBase(question:string){return /(?<!\p{L})(?:относительно|по сравнению с|в сравнении с|по отношению к|база\s*[:—-]|базовый период\s*[:—-]|за базу\s+(?:возьми(?:те)?|прими(?:те)?))(?!\p{L})/iu.test(question);}
 export function comparisonPeriodOrder(periods:readonly [Period,Period],question:string,date:string):[number,number]{
  const [a,b]=periods;
  if(!a.from||!a.through||!b.from||!b.through)fail('TASK_COMPARISON_PERIOD_REQUIRED');

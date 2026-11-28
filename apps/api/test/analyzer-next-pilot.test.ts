@@ -8,7 +8,7 @@ import {assistantVersion} from '../../../packages/analyzer/src/assistant-plan.ts
 import {intentSchema,intentVersion} from '../../../packages/analyzer/src/next/intent.ts';
 import {prepareTask,emptyState} from '../../../packages/analyzer/src/next/tasks.ts';
 import {scope,catalog,account,id} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
-import {createPilotSuite} from '../src/analyzer-next-pilot-suite.ts';
+import {createPilotSuite,pilotIntentDiagnostic} from '../src/analyzer-next-pilot-suite.ts';
 const usage={modelVersion:'synthetic-pilot-model',inputTokens:100,outputTokens:50};
 const input:CompletionInput={phase:'understand',prompt:'Synthetic prompt',input:{question:'Синтетический кредит'},schema:{type:'object'}};
 function harness(){
@@ -74,4 +74,9 @@ test('suite selection preserves the legacy replay manifest and isolates the addi
  assert.equal(new Set(extra.cases.map(v=>v.id)).size,25);assert.throws(()=>createPilotSuite('anything',catalog),/PILOT_SUITE_INVALID/);
  const ui=extra.global(extra.cases.find(c=>c.id==='months-current-ui')!);assert.equal(ui.revision,1);assert.equal(ui.filter.from,'2025-09-01');assert.deepEqual(ui.touched,{period:1,categories:1});assert.equal(ui.filter.categoryIds?.length,1);
  assert.equal(extra.global(extra.cases.find(c=>c.id==='loan-two-variants')!).filter.amountFrom,'99999999');
+});
+test('invalid reply diagnostics identify family/presentation confusion without echoing arbitrary keys or values',()=>{
+ const raw={version:intentVersion,action:'read',binding:{mode:'continue',conditions:'merge_ui'},parameters:{metric:'loan_payments',grouping:'time',comparison:'none',conditions:[],options:{chart:'line',format:'chart',detail:'normal'}},presentation:{format:'chart',detail:'normal'}};
+ const d:any=pilotIntentDiagnostic(raw);assert.equal(d.invalid,true);assert.equal(d.metric,'loan_payments');assert.equal(d.grouping,'time');assert.deepEqual(d.invalidPresentationOptionNames,['format','detail']);assert.equal(d.unknownOptionCount,2);
+ const malicious:any=structuredClone(raw);malicious['private-key-name']='private-value';malicious.parameters.metric='private-value';malicious.parameters.options['private-option']='private-value';const text=JSON.stringify(pilotIntentDiagnostic(malicious));assert.ok(!text.includes('private-'));assert.ok(text.includes('unknownCommonCount'));
 });

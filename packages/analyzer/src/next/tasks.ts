@@ -16,6 +16,7 @@ import {questionQuote} from '../task-literals.ts';
 import {periodExpression} from './period.ts';
 import {normalizeReadBinding} from './read-binding.ts';
 import {comparisonPeriodOrder} from './comparison-periods.ts';
+import {normalizeSourceIntent,sourcePeriodEdit} from './source-intent.ts';
 import {assistantAmountLiteral} from '../assistant-money.ts';
 import {calculateFinancial,parseCalculatorInput,calculatorRublesMinor} from '../calculators.ts';
 import type {LoanInput,CalculatorResult} from '../calculators.ts';
@@ -160,6 +161,7 @@ function prepareLoan(state:State,env:Environment,intent:Extract<Intent,{action:'
 }
 export function prepareTask(state:State,env:Environment,raw:unknown):Preparation{
  check(state,env);let intent=parseIntent(raw);
+ try{intent=normalizeSourceIntent(intent,state,env);}catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
  const active=state.history.find(t=>t.handle===state.active);
  try{intent=normalizeReadBinding(intent,active?.kind==='read'?active.node.query:null,env.question,env.date,!!(state.pending||state.running),{accounts:env.catalog.accounts.map(v=>v.name),categories:env.catalog.categories.map(v=>v.name),counterparties:env.catalog.counterparties.map(v=>v.name),merchant:active?.kind==='read'?(active.node.query.grouping==='merchant'?active.result.points.map(p=>p.label):active.node.query.filter.merchant?[active.node.query.filter.merchant]:[]):[]});}
  catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
@@ -203,7 +205,11 @@ export function prepareTask(state:State,env:Environment,raw:unknown):Preparation
  const initial=pending?.kind==='read'?mergeDraft(pending.filter,pending.global,env.global):undefined;
  const grouping=p.grouping??(pending?.kind==='read'?pending.grouping:null),comparison=p.comparison??(pending?.kind==='read'?pending.comparison:null);
  let node=readBase(state,env,prior,pin,metric??'expenses',grouping,'none',[],initial);
- const edits:ConditionEdit[]=p.conditions.map(edit=>{
+ const conditions=[...p.conditions];
+ if(!conditions.some(e=>e.field==='period'||e.field==='postedPeriod')&&(p.options.dateBasis??prior?.node.query.options?.dateBasis)!=='posted'){
+  try{const edit=sourcePeriodEdit(env.question,env.date,node.query);if(edit)conditions.push(edit);}catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
+ }
+ const edits:ConditionEdit[]=conditions.map(edit=>{
   if(edit.op==='set')return expressionEdit(edit.field,edit.expression,env,node.query);
   if(edit.op==='clear')return {field:edit.field,op:'clear'};
   const value=pick(env.global.filter,edit.field);return Object.keys(value).length?{field:edit.field,op:'set',value}:{field:edit.field,op:'clear'};

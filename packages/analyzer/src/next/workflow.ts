@@ -4,6 +4,7 @@
 import {emptyState,prepareTask,executeTask,finishTask,taskProjection,PreparationError} from './tasks.ts';
 import type {State,Environment,Prepared,Outcome,Preparation} from './tasks.ts';
 import {parseIntent} from './intent.ts';
+import {recoverLoanGraphFrame} from './source-intent.ts';
 import type {Intent} from './intent.ts';
 import {safeText} from '../../../privacy/src/text.ts';
 import {object,choice,uuid} from '../../../finance-core/src/model.ts';
@@ -32,14 +33,14 @@ class WorkflowError extends TypeError {readonly code:string;constructor(code:str
 function fail(code:string):never{throw new WorkflowError(code);}
 const clone=<T>(value:T):T=>structuredClone(value);
 function sameScope(a:TaskScope,b:TaskScope){return ['ownerId','chatId','chatEpoch','generation'].every(k=>a[k as keyof TaskScope]===b[k as keyof TaskScope]);}
-function parseUnderstanding(raw:unknown):Understanding{
+function parseUnderstanding(raw:unknown,state:State,question:string):Understanding{
  const r=object(raw,['relevance','intent']);
  if(Object.keys(r).length!==2||!Object.hasOwn(r,'intent'))fail('PROVIDER_REPLY_INVALID');
  const relevance=choice(r.relevance,['financial','adjacent','ambiguous','unrelated']);
  if(relevance==='ambiguous'||relevance==='unrelated'){
   if(r.intent!==null)fail('PROVIDER_REPLY_INVALID');return {relevance,intent:null};
  }
- const intent=parseIntent(r.intent);if(intent.action==='unrelated')fail('PROVIDER_REPLY_INVALID');return {relevance,intent};
+ const intent=parseIntent(recoverLoanGraphFrame(r.intent,question,state));if(intent.action==='unrelated')fail('PROVIDER_REPLY_INVALID');return {relevance,intent};
 }
 function safeCode(error:unknown,fallback:string):string{
  if(error instanceof WorkflowError||error instanceof PreparationError)return /^[A-Z][A-Z_]{0,79}$/.test(error.code)?error.code:fallback;
@@ -101,7 +102,7 @@ export class PrototypeSession {
    phase='PROVIDER_FAILED';calls++;
    const raw=await provider.understand(clone(input));
    if(ticket!==this.sequence)return result({status:'discarded',code:'NEWER_QUESTION'});
-   phase='PROVIDER_REPLY_INVALID';const reply=parseUnderstanding(raw);
+   phase='PROVIDER_REPLY_INVALID';const reply=parseUnderstanding(raw,this.state,env.question);
    phase='SEMANTIC_REVIEW_FAILED';
    if(!await services.review(clone(input),clone(reply)))return result({status:'failed',code:'SEMANTIC_REVIEW_REJECTED'});
    if(ticket!==this.sequence)return result({status:'discarded',code:'NEWER_QUESTION'});

@@ -18,7 +18,7 @@ import {PrototypeSession} from '../../../packages/analyzer/src/next/workflow.ts'
 import {prepareTask} from '../../../packages/analyzer/src/next/tasks.ts';
 import {parseIntent} from '../../../packages/analyzer/src/next/intent.ts';
 import {pilotSchema,pilotPrompt} from '../../../packages/analyzer/src/next/pilot.ts';
-import {createPilotSuite} from './analyzer-next-pilot-suite.ts';
+import {createPilotSuite,pilotIntentDiagnostic} from './analyzer-next-pilot-suite.ts';
 import {scope,catalog,rows} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
 import {calculateWidget,parseWidget} from '../../../packages/finance-core/src/overview.ts';
 import {sanitizeText} from '../../../packages/privacy/src/text.ts';
@@ -74,9 +74,9 @@ async function main(){
     });
    });
    const ok=semantic&&suite.outcomeMatches(c,result);tested++;if(ok)passed++;else failedChains.add(c.chain);
-   const call=receipt?.calls[0],usage=call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{}
+   const call=receipt?.calls[0],usage=call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{if(ok&&resolved==='loan')shape='raw:recovered';}
    console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}`);
-   if(!ok){let details:unknown={invalid:true};try{const p=parseIntent((call?.value as any)?.intent);details={action:p.action,binding:p.binding,parameters:p.parameters};}catch{}console.log('DIAGNOSTIC '+c.id+' '+(providerCode||reviewCode)+' '+sanitizeText(JSON.stringify(details)));}
+   if(!ok){const details=pilotIntentDiagnostic((call?.value as any)?.intent);console.log('DIAGNOSTIC '+c.id+' '+(providerCode||reviewCode||('code'in result?result.code:'PILOT_OUTCOME_MISMATCH'))+' '+sanitizeText(JSON.stringify(details)));}
    if(/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED|ASSISTANT_DELIVERY_UNKNOWN|ASSISTANT_.*CHANGED)$/.test(providerCode)||result.status==='failed'&&/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED)$/.test(result.code))break;
    const current=await budget();if(BigInt(current.month!.heldAtoms)>0n){console.log('STOP: unresolved cost hold; no retry');break;}
   }

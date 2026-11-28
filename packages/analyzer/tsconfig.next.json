@@ -19,6 +19,7 @@
     "src/next/period.ts",
     "src/next/read-binding.ts",
     "src/next/comparison-periods.ts",
-    "src/next/additional-pilot.ts"
+    "src/next/additional-pilot.ts",
+    "src/next/source-intent.ts"
   ]
 }
