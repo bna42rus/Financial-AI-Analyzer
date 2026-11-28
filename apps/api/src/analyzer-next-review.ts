@@ -42,8 +42,8 @@ export function nextReviewInput(input:ProviderInput,reply:Understanding,state:St
  const prepared=financial?effect(prepareTask(state,env,reply.intent)):{status:reply.relevance};
  return publicFields({version:nextReviewVersion,question:input.question,date:input.date,context:input.context,pendingInputs:state.pending?.draft??null,candidate:reply,effect:prepared});
 }
-export async function reviewNextUnderstanding(input:ProviderInput,reply:Understanding,state:State,env:Environment,model:AssistantModel,journal:AssistantJournal):Promise<boolean>{
- const checked=await nextModelCall(model,journal,{phase:'check_changes',prompt:nextReviewPrompt,input:nextReviewInput(input,reply,state,env),schema:nextReviewSchema},1);
+export async function reviewNextUnderstanding(input:ProviderInput,reply:Understanding,state:State,env:Environment,model:AssistantModel,journal:AssistantJournal,dispatch:'allow'|'replay_only'='allow'):Promise<boolean>{
+ const checked=await nextModelCall(model,journal,{phase:'check_changes',protocol:nextReviewVersion,prompt:nextReviewPrompt,input:nextReviewInput(input,reply,state,env),schema:nextReviewSchema},1,dispatch);
  assertClosedSchema(checked.value,nextReviewSchema);
  const verdict=checked.value as {decision:'accept'|'reject';conditions:{quote:string;covered:boolean}[]};
  if(verdict.conditions.some(c=>!c.quote.trim()||!input.question.includes(c.quote))||new Set(verdict.conditions.map(c=>c.quote)).size!==verdict.conditions.length)throw new TypeError('NEXT_REVIEW_EVIDENCE_INVALID');

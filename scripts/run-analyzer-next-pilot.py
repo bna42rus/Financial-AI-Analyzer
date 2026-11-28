@@ -38,7 +38,7 @@ def main():
     parser.add_argument('--source', required=True)
     parser.add_argument('--sha', required=True)
     parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
-    parser.add_argument('--suite', choices=['basic', 'additional'], default='basic')
+    parser.add_argument('--suite', choices=['basic', 'additional', 'review'], default='basic')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--live', action='store_true')
     mode.add_argument('--replay-only', action='store_true', help='Never dispatch a model request; require all saved replies')
@@ -97,6 +97,10 @@ def main():
         checked = subprocess.run(['/usr/bin/node', '--test', *[str(source / 'packages/analyzer/test' / (name+'.test.ts')) for name in checks]], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
         if checked.returncode:
             raise RuntimeError('PILOT_OFFLINE_PRECHECK_FAILED')
+        if args.suite == 'review':
+            checked = subprocess.run(['/usr/bin/node', '--import', 'tsx', '--test', 'test/analyzer-next-review.test.ts', 'test/analyzer-next-review-pilot.test.ts'], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
+            if checked.returncode:
+                raise RuntimeError('PILOT_REVIEW_PRECHECK_FAILED')
         spec = importlib.util.spec_from_file_location('pilot_account', source / 'scripts/diagnose-analyzer-account-staging.py')
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

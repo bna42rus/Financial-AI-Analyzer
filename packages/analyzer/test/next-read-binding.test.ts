@@ -1,3 +1,4 @@
+import {assistantAmountLiteral} from '../src/assistant-money.ts';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {normalizeReadBinding} from '../src/next/read-binding.ts';
@@ -60,4 +61,11 @@ test('only the requested filter changes; current UI fields are merged before the
  const h=await setup();h.env.global={revision:1,filter:{from:'2024-10-01',through:'2024-10-31',accountIds:[account],categoryIds:[taxi]},touched:{period:1,categories:1}};
  const p=ready(prepareTask(h.state,h.env,intent()));if(p.task.kind!=='read')return;
  assert.equal(p.task.node.query.filter.from,'2024-09-01');assert.deepEqual(p.task.node.query.filter.categoryIds,[taxi]);assert.equal(p.task.node.query.grouping,'category');
+});
+
+test('explicit strict wording preserves one-cent boundaries and never removes a negation',()=>{
+ assert.equal(assistantAmountLiteral('строго больше 100 рублей','absolute_operation').amountFrom,'10001');
+ assert.equal(assistantAmountLiteral('строго меньше 100 рублей','absolute_operation').amountThrough,'9999');
+ assert.equal(assistantAmountLiteral('строго больше 0,01 рубля','absolute_operation').amountFrom,'2');
+ for(const text of ['строго не меньше 100 рублей','не строго больше 100 рублей','строго больше 100 рублей включительно'])assert.throws(()=>assistantAmountLiteral(text,'absolute_operation'));
 });

@@ -7,6 +7,7 @@ import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
  * historical parser is left unchanged. */
 export function assistantAmountLiteral(expression: string, basis: string) {
   const text = expression.normalize('NFKC').toLocaleLowerCase('ru-RU').replace(/\s+/gu, ' ').trim().replace(/[.?]$/u, '')
+    .replace(/^строго (?=(?:больше|меньше)(?:\s|[+-]?\d))/u,'')
     .replace(/^(?:крупнее|более|выше)(?=\s|[+-]?\d)/u,'больше')
     .replace(/^(?:мельче|ниже)(?=\s|[+-]?\d)/u,'меньше')
     .replace(/^не (?:ниже|мельче)(?=\s|[+-]?\d)/u,'не меньше')

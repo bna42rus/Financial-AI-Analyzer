@@ -11,6 +11,9 @@ import type {AssistantAccounting} from './assistant-journal.ts';
 import type {RunReceipt,AssistantRequest} from './assistant-workflow.ts';
 import {createCloudAssistantModel} from './assistant-transport.ts';
 import {pilotModelCall} from './analyzer-next-pilot-call.ts';
+import {runReviewPilotTurn,reviewPilotCandidate,reviewPilotDiagnostic} from './analyzer-next-review-pilot.ts';
+import type {AdditionalCase} from '../../../packages/analyzer/src/next/additional-pilot.ts';
+import {reserveAssistantCall,settleAssistantCall} from './assistant-db-accounting.ts';
 import {reserveCost,settleCost} from './analyzer-cost.ts';
 import {emptyConversation} from '../../../packages/analyzer/src/assistant-conversation.ts';
 import {rubAmount,tokenCost} from '../../../packages/analyzer/src/cost.ts';
@@ -28,7 +31,7 @@ async function main(){
  const mode=process.argv.slice(2).join(' '),replayOnly=mode==='--replay-only';
  if(process.getuid?.()!==0||!['--live','--replay-only'].includes(mode))throw Error('PILOT_ROOT_LIVE_REQUIRED');
  let input='';for await(const chunk of process.stdin){input+=chunk.toString();if(input.length>262144)throw Error('PILOT_INPUT_TOO_LARGE');}
- const cfg=JSON.parse(input),suite=createPilotSuite(cfg.suite,catalog);
+ const cfg=JSON.parse(input),suite=createPilotSuite(cfg.suite,catalog),reviewPilot=suite.name==='review';
  if(!/^\/srv\/cashneuro\/staging\/backend-releases\/[a-f0-9]{40}\/apps\/api$/.test(cfg.activeApi)||!/^\/var\/lib\/cashneuro\/analyzer-next-pilot\/[a-f0-9]{40}$/.test(cfg.directory))throw Error('PILOT_PATH_INVALID');
  stagingDatabase('staging',cfg.databaseUrl);
  const dbUrl=new URL(cfg.databaseUrl);if(dbUrl.username!=='finance_api'||dbUrl.pathname!=='/finance_staging'||typeof cfg.userId!=='string'||!cfg.userId)throw Error('PILOT_DATABASE_DENIED');
@@ -52,21 +55,30 @@ async function main(){
    if(failedChains.has(c.chain)){skipped++;continue;}
    const session=sessions.get(c.chain)!,requestId=manifest.ids[index],environment={scope,requestId,question:c.question,date:'2026-11-25',global:suite.global(c),dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
    const request:AssistantRequest={requestId,scope,question:c.question,global:environment.global,conversation:emptyConversation(scope),dataRevision:environment.dataRevision,timezone:'Europe/Moscow',now:new Date('2026-11-25T12:00:00Z')};
-   const accounting:AssistantAccounting={async reserve(id,call,bound){if(replayOnly)throw Error('PILOT_REPLAY_MISSING');if(call!==0)throw Error('PILOT_ONE_CALL_ONLY');await transaction(async db=>{
+   const accounting:AssistantAccounting={async reserve(id,call,bound){if(replayOnly)throw Error('PILOT_REPLAY_MISSING');if(reviewPilot?![0,1].includes(call):call!==0)throw Error('PILOT_ONE_CALL_ONLY');await transaction(async db=>{
     await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',['cloud-task-dispatch:'+cfg.userId]);
+    if(reviewPilot){
+     const policy=provider.policy;if(await runCost(db)+tokenCost(policy.price,bound.inputTokens,bound.outputTokens)>rubAmount(suite.limitRub))throw Error('PILOT_RUN_COST_LIMIT');
+     await reserveAssistantCall(db,cfg.userId,id,call,createHash('sha256').update(suite.version+':'+id).digest('hex'),bound,{anchorExact:policy.projectPeriodStart,periodExact:policy.projectPeriodStart},provider,'cashneuro-analyzer-next/1');return;
+    }
     if((await db.query('SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3',[cfg.userId,id,'assistant_0'])).rowCount)throw Error('ASSISTANT_DELIVERY_UNKNOWN');
     const policy=provider.policy;await provider.prepareDispatch!(db,policy);
     if(await runCost(db)+tokenCost(policy.price,bound.inputTokens,bound.outputTokens)>rubAmount(suite.limitRub))throw Error('PILOT_RUN_COST_LIMIT');
     const fingerprint=createHash('sha256').update('analyzer-next-pilot/1:'+id).digest('hex');
     await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state) VALUES($1,$2,'assistant_0',$3,'sent','cashneuro-next-pilot/1',$4,$5,$5,'not_sent')`,[cfg.userId,id,fingerprint,bound.modelVersion,policy.projectPeriodStart]);
     await reserveCost(db,{userId:cfg.userId,requestId:id,step:'assistant_0',anchorAt:policy.projectPeriodStart,periodStart:policy.projectPeriodStart},policy,bound);await provider.authorizeDispatch(db,policy);
-   });newReservations++;},async settle(id,call,usage){if(call!==0)throw Error('PILOT_ONE_CALL_ONLY');const violation=await transaction(async db=>{
+   });newReservations++;},async settle(id,call,usage){if(reviewPilot?![0,1].includes(call):call!==0)throw Error('PILOT_ONE_CALL_ONLY');const violation=await transaction(async db=>{
+    if(reviewPilot)return settleAssistantCall(db,cfg.userId,id,call,usage);
     const changed=await settleCost(db,cfg.userId,id,'assistant_0',usage);
     await db.query(`UPDATE commerce.analyzer_request SET state=$3,usage_state=$4,input_tokens=$5,output_tokens=$6,model_version=$7,updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='assistant_0'`,[cfg.userId,id,usage?'completed':'unknown',usage?'reported':'unknown',usage?.inputTokens??null,usage?.outputTokens??null,usage?.modelVersion??null]);return changed;
    });if(violation)throw Error('ASSISTANT_PROVIDER_CHANGED');}};
-   let receipt:RunReceipt|undefined,replayed=false,semantic=false,reviewCode='',providerCode='',resolved='';const started=performance.now();
+   let receipt:RunReceipt|undefined,replayed=false,semantic=false,reviewCode='',providerCode='',resolved='',reviewAccepted:boolean|undefined;const started=performance.now();
    const result=await withAssistantJournal(journalDirectory,request,accounting,async journal=>{
     receipt=journal.receipt;
+    if(reviewPilot){
+     const checked=await runReviewPilotTurn(c as AdditionalCase,session,environment,provider.forNextRequest(),journal,async()=>{if(!provider.allowed(cfg.email))throw Error('PILOT_ACCOUNT_DENIED');},replayOnly?'replay_only':'allow');
+     semantic=checked.matches;replayed=checked.replayed;resolved=checked.resolved;reviewAccepted=checked.accepted;providerCode=checked.diagnostic;return checked.result;
+    }
     return session.run(environment,{async understand(modelInput){try{const r=await pilotModelCall(createCloudAssistantModel({apiKey:cfg.settings.apiKey},fetch,'assistant','cashneuro-intent-prototype/1'),journal,{phase:'understand',prompt:pilotPrompt,input:modelInput,schema:pilotSchema},replayOnly?'replay_only':'allow');replayed=r.replayed;return r.value;}catch(error){const code=(error as {code?:string})?.code;providerCode=typeof code==='string'&&/^[A-Z][A-Z0-9_]{1,80}$/.test(code)?code:'PILOT_PROVIDER_FAILED';throw error;}}},{
      current:()=>({scope,dataRevision:environment.dataRevision,accessRevision:environment.accessRevision}),
      async authorize(){if(!provider.allowed(cfg.email))throw Error('PILOT_ACCOUNT_DENIED');},
@@ -75,9 +87,10 @@ async function main(){
     });
    });
    const ok=semantic&&suite.outcomeMatches(c,result);tested++;if(ok)passed++;else failedChains.add(c.chain);
-   const call=receipt?.calls[0],usage=call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{if(ok&&(resolved==='loan'||resolved==='loan_comparison'))shape='raw:recovered';}
-   console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}`);
-   if(!ok){const details=pilotIntentDiagnostic((call?.value as any)?.intent);console.log('DIAGNOSTIC '+c.id+' '+(providerCode||reviewCode||('code'in result?result.code:'PILOT_OUTCOME_MISMATCH'))+' '+sanitizeText(JSON.stringify(details)));}
+   const call=receipt?.calls[0],usage=reviewPilot?{inputTokens:receipt!.calls.reduce((n,c)=>n+(c.usage?.inputTokens??0),0),outputTokens:receipt!.calls.reduce((n,c)=>n+(c.usage?.outputTokens??0),0)}:call?.usage;let shape='invalid';try{const p=parseIntent((call?.value as any)?.intent);shape=p.action+':'+p.binding.mode+(p.action==='calculate'?':'+p.parameters.edits.map(e=>e.field).join(','):'');}catch{if(ok&&(resolved==='loan'||resolved==='loan_comparison'))shape='raw:recovered';}
+   console.log(`${ok?'PASS':'FAIL'} ${c.id}: ${ok&&c.id==='review-rejects-lost-filter'?'expected rejection':result.status}${'code'in result?':'+result.code:''}; ${Math.round(performance.now()-started)} ms; ${replayed?'replayed':'new'}; ${usage?.inputTokens??0}/${usage?.outputTokens??0} tokens; ${shape}; resolved=${resolved}${reviewPilot?'; reviewer='+(reviewAccepted===undefined?'not completed':reviewAccepted?'accepted':'rejected')+'; recorded calls='+receipt!.calls.length:''}`);
+   if(!ok){const details=pilotIntentDiagnostic(((reviewPilot?reviewPilotCandidate(c.id,call?.value):call?.value) as any)?.intent);console.log('DIAGNOSTIC '+c.id+' '+(providerCode||reviewCode||('code'in result?result.code:'PILOT_OUTCOME_MISMATCH'))+' '+sanitizeText(JSON.stringify(details)));}
+   if(reviewPilot&&!ok){console.log('REVIEW_DIAGNOSTIC '+c.id+' '+JSON.stringify(reviewPilotDiagnostic(receipt?.calls[1]?.value,c.question)));console.log('STOP: review pilot failed; no automatic retry or further dispatch.');break;}
    if(/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED|ASSISTANT_DELIVERY_UNKNOWN|ASSISTANT_.*CHANGED)$/.test(providerCode)||result.status==='failed'&&/^(?:PILOT_RUN_COST_LIMIT|AI_.*EXHAUSTED|ASSISTANT_RECONCILIATION_REQUIRED)$/.test(result.code))break;
    const current=await budget();if(BigInt(current.month!.heldAtoms)>0n){console.log('STOP: unresolved cost hold; no retry');break;}
   }
