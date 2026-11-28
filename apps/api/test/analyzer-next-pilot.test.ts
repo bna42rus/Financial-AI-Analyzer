@@ -1,5 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createCloudAssistantModel} from '../src/assistant-transport.ts';
 import {pilotModelCall} from '../src/analyzer-next-pilot-call.ts';
 import type {AssistantJournal,AssistantModel,CompletionInput} from '../src/assistant-workflow.ts';
@@ -17,6 +18,7 @@ function harness(){
 }
 test('paid adapter reserves and persists before dispatch, settles reported usage, then replays without another call',async()=>{
  const h=harness();const first=await pilotModelCall(h.model,h.journal,input);assert.equal(first.replayed,false);assert.deepEqual(h.events,['reserve','persist','http','settle','persist']);
+ assert.equal(h.journal.receipt.calls[0]!.fingerprint,createHash('sha256').update(JSON.stringify(input)).digest('hex'));
  h.events.length=0;const second=await pilotModelCall(h.model,h.journal,input);assert.equal(second.replayed,true);assert.deepEqual(h.events,[]);assert.deepEqual(second.value,first.value);
  await assert.rejects(pilotModelCall(h.model,h.journal,{...input,prompt:'changed'}),/ASSISTANT_REQUEST_CHANGED/);
 });

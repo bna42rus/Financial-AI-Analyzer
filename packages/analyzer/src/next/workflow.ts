@@ -8,7 +8,7 @@ import {recoverLoanGraphFrame} from './source-intent.ts';
 import type {Intent} from './intent.ts';
 import {safeText} from '../../../privacy/src/text.ts';
 import {object,choice,uuid} from '../../../finance-core/src/model.ts';
-import {emptyTaskBook,globalSnapshot} from '../task-context.ts';
+import {emptyTaskBook,globalSnapshot,parseTaskBook} from '../task-context.ts';
 import type {TaskScope} from '../task-context.ts';
 
 export const workflowPrototypeVersion='cashneuro-workflow-prototype/1';
@@ -57,6 +57,16 @@ export class PrototypeSession {
  private sequence=0;
  private requests=new Map<string,{fingerprint:string;promise:Promise<TurnResult>}>();
  constructor(scope:TaskScope){this.state=emptyState(scope);}
+ /** Server-only hydration after the storage adapter authenticates the entire
+  * checkpoint. Request receipts stay in the durable journal, not this cache. */
+ static fromTrustedCheckpoint(scope:TaskScope,state:State):PrototypeSession{
+  const session=new PrototypeSession(scope);
+  if(state.version!==session.state.version||!sameScope(state.scope,session.state.scope))fail('TASK_SCOPE_MISMATCH');
+  if(state.running!==null)fail('TASK_CHECKPOINT_BUSY');
+  if(!Number.isSafeInteger(state.revision)||state.revision<0||!Array.isArray(state.history)||state.history.length>100)fail('TASK_CHECKPOINT_INVALID');
+  parseTaskBook(state.book,scope);
+  session.state=clone(state);return session;
+ }
  snapshot():State{return clone(this.state);}
  private current(env:Environment,services:Services):Environment{
   const current=clone(services.current());

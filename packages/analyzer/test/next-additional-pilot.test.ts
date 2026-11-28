@@ -44,7 +44,7 @@ const scripts:Record<string,unknown>={
  'mixed-concept':envelope('explain',{subject:{kind:'concept',question:'Что означает аннуитетный?'}}),
  'mixed-rate-after-concept':loan([set('annualRatePercent','0','0%')],keep),
 };
-async function run(overrides:Record<string,unknown>={}){
+async function run(overrides:Record<string,unknown>={},restart=false){
  const sessions=new Map(additionalCases.map(c=>[c.chain,new PrototypeSession(scope)])),prepared=new Map<string,Preparation>(),results=new Map<string,TurnResult>(),states=new Map<string,ReturnType<PrototypeSession['snapshot']>>(),inputs:ProviderInput[]=[];let reads=0;
  for(const [n,c]of additionalCases.entries()){
   const session=sessions.get(c.chain)!,before=session.snapshot(),environment={scope,requestId:id(1100+n),question:c.question,date:'2026-11-25',global:{revision:c.ui?.revision??0,filter:additionalFilter(c.ui?.filter??{},catalog),touched:c.ui?.revision?{period:c.ui.revision,categories:c.ui.revision}:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
@@ -53,6 +53,7 @@ async function run(overrides:Record<string,unknown>={}){
   const result=await session.run(environment,{async understand(input){inputs.push(input);return reply;}},{current:()=>environment,async authorize(){},async review(_input,r){const p=r.intent?prepareTask(session.snapshot(),environment,r.intent):null;if(p)prepared.set(c.id,p);return additionalPreparationMatches(c,p,r,catalog);},tools:{async guard(){},async read(q){reads++;return calculateWidget(parseWidget({id:scope.chatId,name:'Синтетическая выборка',metrics:[q.metric],grouping:q.grouping,filter:q.filter,comparison:q.comparison==='custom'?{kind:'custom',...q.options?.comparisonPeriod}:{kind:q.comparison},chart:'table',topN:50}),rows,catalog,{},new Date('2026-11-25T12:00:00Z'),'Europe/Moscow',true);}}});
   assert.equal(additionalOutcomeMatches(c,result),true,c.id+' '+JSON.stringify(result));results.set(c.id,result);
   if(terminal||c.expected.kind==='explanation')assert.deepEqual(session.snapshot(),before,c.id);
+  if(restart)sessions.set(c.chain,PrototypeSession.fromTrustedCheckpoint(scope,JSON.parse(JSON.stringify(session.snapshot()))));
  }
  return {sessions,prepared,results,states,inputs,reads};
 }
@@ -60,6 +61,11 @@ test('all 25 additional turns pass through understanding, mandatory review, prep
  const h=await run();assert.equal(h.results.size,25);assert.equal(h.inputs.length,25);assert.equal(h.reads,12);assert.equal(h.sessions.get('mixed')!.snapshot().history.length,5);
  const text=JSON.stringify(h.inputs);for(const hidden of ['expected','16800',scope.ownerId,scope.chatId,account,rows[0]!.id])assert.ok(!text.includes(hidden),hidden);
  assert.ok(h.inputs.every(v=>Object.keys(v).sort().join(',')==='context,date,question,version'));
+});
+test('all 25 turns preserve meaning after a fresh session is restored between every question',async()=>{
+ const original=await run(),restarted=await run({},true);
+ assert.deepEqual([...restarted.results],[...original.results]);assert.equal(restarted.reads,original.reads);
+ for(const [chain,session]of original.sessions)assert.deepEqual(restarted.sessions.get(chain)!.snapshot(),session.snapshot());
 });
 test('read oracle rejects wrong accounts, categories, strictness, grouping, copied dates and statistics',async()=>{
  const h=await run(),c=additionalCases.find(v=>v.id==='filters-strict-money')!,original=h.prepared.get(c.id)!;if(original.status!=='ready'||original.task.kind!=='read')throw Error('read');
