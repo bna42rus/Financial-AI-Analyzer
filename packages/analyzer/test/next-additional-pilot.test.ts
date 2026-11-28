@@ -99,6 +99,24 @@ test('the same plot-family recovery covers both variants of the active loan, inc
   const p=h.prepared.get('loan-both-charts');if(p?.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,2);assert.equal(p.task.presentation.format,'chart');
  }
 });
+test('the retained both-chart clear with an extra source quote completes all 25 turns',async()=>{
+ const c=additionalCases.find(v=>v.id==='loan-both-charts')!,bad=loan([{field:'payment',op:'clear',quote:c.question}],keep,'chart');
+ assert.throws(()=>parseIntent(bad),/INTENT_PROTOTYPE_INVALID/);
+ const h=await run({...retained,[c.id]:bad}),p=h.prepared.get(c.id);assert.equal(h.results.size,25);
+ if(p?.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,2);assert.ok(p.task.inputs.every(v=>v.annualRatePercent==='0'&&v.months===12));
+});
+test('clear quote metadata is canonicalized across fields only with exact source evidence and a fully valid frame',async()=>{
+ const h=await run(),state=h.states.get('loan-both-charts')!,question='Сними ограничение';
+ for(const field of ['amount','period','categories']){
+  const raw=read([{field,op:'clear',quote:question}],keep);assert.throws(()=>parseIntent(raw),/INTENT_PROTOTYPE_INVALID/);
+  const canonical=parseIntent(recoverLoanGraphFrame(raw,question,state));if(canonical.action!=='read')throw Error('read');assert.deepEqual(canonical.parameters.conditions,[{field,op:'clear'}]);
+ }
+ for(const edit of [{field:'payment',op:'clear',quote:'не из вопроса'},{field:'payment',op:'clear',quote:''},{field:'payment',op:'clear',quote:question,value:null},{field:'payment',op:'clear',quote:question,admin:true},{field:'payment',op:'set',value:'both',quote:question}])assert.throws(()=>parseIntent(recoverLoanGraphFrame(loan([edit],keep,'chart'),question,state)),/INTENT_PROTOTYPE_INVALID/);
+});
+test('two principal/interest plots do not switch a selected payment type to both variants',async()=>{
+ const h=await run(),state=h.states.get('loan-both-charts')!,environment={scope,requestId:id(1888),question:'Покажи оба графика основного долга и процентов',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ const p=prepareTask(state,environment,loan([],keep,'chart'));if(p.status!=='ready'||p.task.kind!=='loan')throw Error('loan');assert.equal(p.task.inputs.length,1);assert.equal(p.task.inputs[0]!.payment,'differentiated');
+});
 test('comparison roles survive alternative date spelling and model defaults, while conflicting years and scopes remain rejected',async()=>{
  const h=await run(),state=h.states.get('months-explicit-base')!,environment={scope,requestId:id(1900),question:'',date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
  for(const question of ['Сопоставь 2025-09 относительно 2025-10','Сравни сентябрь 2025 по сравнению с октябрём 2025'])for(const comparison of ['none','previous_month','previous_year']){

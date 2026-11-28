@@ -45,12 +45,29 @@ export function isLoanChartResume(question:string){
 function chartTarget(question:string,state:State){
  const words=chartWords(question);if(!words)return null;
  const active=state.history.find(t=>t.handle===state.active),loan=isLoanChartResume(question)?nearestLoan(state):active?.kind==='loan'?active:null;
- return loan?{loan,both:words.includes('оба')||words.includes('обоих')}:null;
+ const both=(words.includes('оба')||words.includes('обоих'))&&(words.some(w=>w==='типа'||w==='типов')||words.some(w=>w==='платежей'||w==='платежи')&&!words.some(w=>/^(?:долга|долгом|процентов|процентами)$/u.test(w)));
+ return loan?{loan,both}:null;
 }
 function keys(value:unknown,allowed:string[]):value is Record<string,any>{return !!value&&typeof value==='object'&&!Array.isArray(value)&&Object.keys(value).every(k=>allowed.includes(k));}
-/** Only the observed family-confusion frame is decoded. Unknown fields,
- * commands, filters and invented calculator parameters remain invalid. */
+/** A source quote is non-executable evidence, not a new calculator field.
+ * Validate the entire canonical frame after removing only clear.quote. */
+function clearQuoteFrame(raw:unknown,question:string):unknown{
+ if(!keys(raw,['version','action','binding','parameters','presentation'])||!['read','calculate'].includes(raw.action))return raw;
+ const frame=structuredClone(raw),p=frame.parameters,list=frame.action==='read'?p?.conditions:p?.edits;
+ if(!Array.isArray(list)||list.length>32)return raw;
+ let changed=false;
+ for(const edit of list){
+  if(!edit||typeof edit!=='object'||Array.isArray(edit)||edit.op!=='clear'||!Object.hasOwn(edit,'quote'))continue;
+  if(typeof edit.quote!=='string'||!edit.quote||edit.quote.length>1000||!question.includes(edit.quote))return raw;
+  delete edit.quote;changed=true;
+ }
+ if(changed)try{return parseIntent(frame);}catch{/* Unknown fields remain invalid. */}
+ return raw;
+}
+/** Source-proven commands decode family confusion. Unknown fields and other
+ * calculator parameters remain invalid. */
 export function recoverLoanGraphFrame(raw:unknown,question:string,state:State):unknown{
+ const canonical=clearQuoteFrame(raw,question);if(canonical!==raw)return canonical;
  if(state.pending||state.running||state.failure||!chartTarget(question,state)||!keys(raw,['version','action','binding','parameters','presentation'])||raw.action!=='read')return raw;
  const p=raw.parameters;
  if(!keys(p,['metric','grouping','comparison','conditions','options'])||p.metric!=='loan_payments'||p.grouping!=='time'||p.comparison!=='none'||!Array.isArray(p.conditions)||p.conditions.length||!keys(p.options,['chart','format','detail']))return raw;

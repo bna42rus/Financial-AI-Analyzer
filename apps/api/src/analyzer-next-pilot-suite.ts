@@ -11,6 +11,7 @@ import type {GlobalSnapshot} from '../../../packages/analyzer/src/task-context.t
 import {parseIntent} from '../../../packages/analyzer/src/next/intent.ts';
 import {queryMetrics,queryGroupings} from '../../../packages/analyzer/src/registry.ts';
 import {analysisOptionsSchema} from '../../../packages/analyzer/src/analysis.ts';
+import {calculatorSchema} from '../../../packages/analyzer/src/calculators.ts';
 export type SuiteCase={id:string;chain:string;question:string;ui?:AdditionalCase['ui']};
 export function createPilotSuite(name:unknown,catalog:Catalog){
  if(name!==undefined&&name!=='basic'&&name!=='additional')throw Error('PILOT_SUITE_INVALID');
@@ -31,9 +32,11 @@ export function pilotIntentDiagnostic(raw:unknown):unknown{
  const finite=(value:unknown,allowed:readonly string[])=>typeof value==='string'&&allowed.includes(value)?value:'unsupported';
  const common=['version','action','binding','parameters','presentation'];
  const optionNames=Object.keys(analysisOptionsSchema.properties);
+ const calculatorKinds=calculatorSchema.anyOf.map(s=>(s.properties.kind as {enum:string[]}).enum[0]!),calculatorFields=[...new Set(calculatorSchema.anyOf.flatMap(s=>Object.keys(s.properties)))];
+ const edits=Array.isArray(p.edits)?p.edits.slice(0,32).map(value=>{const e=record(value);return {field:finite(e.field,calculatorFields),op:finite(e.op,['set','clear']),valueKind:e.value===null?'null':Array.isArray(e.value)?'array':typeof e.value,valueChoice:finite(e.value,['annuity','differentiated','both','reduce_term','reduce_payment']),hasQuote:Object.hasOwn(e,'quote'),extraFieldCount:Object.keys(e).filter(k=>!['field','op','value','quote'].includes(k)).length};}):null;
  return {invalid:true,action:finite(r.action,['read','calculate','compare','explain']),bindingMode:finite(b.mode,['new','continue','reference','answer']),
   missing:common.filter(k=>!Object.hasOwn(r,k)),unknownCommonCount:Object.keys(r).filter(k=>!common.includes(k)).length,
-  metric:finite(p.metric,[...queryMetrics,'loan_payments']),grouping:finite(p.grouping,[...queryGroupings,'time']),
+  metric:finite(p.metric,[...queryMetrics,'loan_payments']),grouping:finite(p.grouping,[...queryGroupings,'time']),calculator:finite(p.calculator,calculatorKinds),edits,
   presentationFormat:finite(presentation.format,['auto','number','table','chart','operations']),
   invalidPresentationOptionNames:['format','detail'].filter(k=>Object.hasOwn(options,k)),unknownOptionCount:Object.keys(options).filter(k=>!optionNames.includes(k)).length};
 }
