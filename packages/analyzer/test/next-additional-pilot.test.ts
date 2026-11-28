@@ -182,3 +182,23 @@ test('source date completion does not treat category or merchant month names as 
  assert.equal(sourcePeriodEdit('Новая задача: расходы за октябрь 2025','2026-11-25',base)?.op,'set');
  assert.throws(()=>sourcePeriodEdit('Расходы за сентябрь 2025 и за октябрь 2025','2026-11-25',base),/TASK_PERIOD_EVIDENCE_AMBIGUOUS/);
 });
+test('schedule vocabulary and complete keep clauses decode both saved loan methods without editing numerical inputs',async()=>{
+ const h=await run(),state=h.states.get('loan-both-charts')!,previous=state.history.find(t=>t.handle===state.active);if(previous?.kind!=='loan')throw Error('loan');
+ const raw=envelope('read',{metric:'loan_payments',grouping:'time',comparison:null,conditions:[],options:{chart:'line'}});
+ for(const [n,question] of [
+  'Выведи графики помесячных платежей для обоих способов. Сумму, ставку и срок не меняй.',
+  'Покажи графики ежемесячных платежей для обоих типов. Ставку и срок не изменяй.',
+  'Отобрази диаграммы помесячных платежей для обоих способов. Сумму не меняйте.',
+ ].entries()){
+  const env={scope,requestId:id(1990+n),question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+  const p=prepareTask(state,env,raw);if(p.status!=='ready'||p.task.kind!=='loan')throw Error('loan');
+  assert.equal(p.task.presentation.format,'chart');assert.deepEqual(p.task.inputs.map(i=>({...i,payment:undefined})),[0,1].map(()=>({...previous.results[0]!.input,payment:undefined})));assert.deepEqual(p.task.inputs.map(i=>i.payment),['annuity','differentiated']);
+ }
+ for(const question of [
+  'Выведи графики помесячных платежей для обоих способов по реальным операциям.',
+  'Выведи графики помесячных платежей для обоих способов. Сумму увеличь.',
+  'Выведи графики помесячных платежей для обоих способов под 15%.',
+  'Не выводи графики помесячных платежей для обоих способов.',
+  'Выведи графики помесячных платежей для обоих способов. Сумму не уменьшай.',
+ ])assert.equal(normalizeSourceIntent(parseIntent(raw),state,{scope,requestId:id(1998),question,date:'2026-11-25',global:{revision:0,filter:{},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog}).action,'read',question);
+});

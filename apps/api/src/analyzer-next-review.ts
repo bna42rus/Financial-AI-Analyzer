@@ -8,6 +8,7 @@ import type {ProviderInput,Understanding} from '../../../packages/analyzer/src/n
 import {workflowPrototypeVersion} from '../../../packages/analyzer/src/next/workflow.ts';
 import type {AssistantModel,AssistantJournal} from './assistant-workflow.ts';
 import {nextModelCall} from './analyzer-next-model-call.ts';
+import {normalizeSourceIntent} from '../../../packages/analyzer/src/next/source-intent.ts';
 import {foldSource,sourceOccurrences} from '../../../packages/analyzer/src/next/source-literals.ts';
 
 export const nextReviewVersion='cashneuro-next-review/1';
@@ -40,8 +41,9 @@ function effect(preparation:Preparation):unknown{
 export function nextReviewInput(input:ProviderInput,reply:Understanding,state:State,env:Environment){
  if(input.version!==workflowPrototypeVersion||input.question!==env.question||input.date!==env.date||!isDeepStrictEqual(input.context,taskProjection(state)))throw new TypeError('NEXT_REVIEW_CONTEXT_CHANGED');
  const financial=reply.relevance==='financial'||reply.relevance==='adjacent';
- const prepared=financial?effect(prepareTask(state,env,reply.intent)):{status:reply.relevance};
- return publicFields({version:nextReviewVersion,question:input.question,date:input.date,context:input.context,pendingInputs:state.pending?.draft??null,candidate:reply,effect:prepared});
+ const candidate=financial&&reply.intent?{...reply,intent:normalizeSourceIntent(reply.intent,state,env)}:reply;
+ const prepared=financial?effect(prepareTask(state,env,candidate.intent)):{status:reply.relevance};
+ return publicFields({version:nextReviewVersion,question:input.question,date:input.date,context:input.context,pendingInputs:state.pending?.draft??null,candidate,effect:prepared});
 }
 export async function reviewNextUnderstanding(input:ProviderInput,reply:Understanding,state:State,env:Environment,model:AssistantModel,journal:AssistantJournal,dispatch:'allow'|'replay_only'='allow'):Promise<boolean>{
  const checked=await nextModelCall(model,journal,{phase:'check_changes',protocol:nextReviewVersion,prompt:nextReviewPrompt,input:nextReviewInput(input,reply,state,env),schema:nextReviewSchema},1,dispatch);

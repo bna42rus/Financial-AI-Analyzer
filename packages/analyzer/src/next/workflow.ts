@@ -34,7 +34,7 @@ class WorkflowError extends TypeError {readonly code:string;constructor(code:str
 function fail(code:string):never{throw new WorkflowError(code);}
 const clone=<T>(value:T):T=>structuredClone(value);
 function sameScope(a:TaskScope,b:TaskScope){return ['ownerId','chatId','chatEpoch','generation'].every(k=>a[k as keyof TaskScope]===b[k as keyof TaskScope]);}
-function parseUnderstanding(raw:unknown,state:State,question:string):Understanding{
+export function parseUnderstanding(raw:unknown,state:State,question:string):Understanding{
  const r=object(raw,['relevance','intent']);
  if(Object.keys(r).length!==2||!Object.hasOwn(r,'intent'))fail('PROVIDER_REPLY_INVALID');
  const relevance=choice(r.relevance,['financial','adjacent','ambiguous','unrelated']);

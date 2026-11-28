@@ -25,10 +25,13 @@ function knownBinding(intent:Intent,state:State){
  return !!task&&(!m![2]||task.kind==='loan'&&!!task.results[Number(m![2])-1]);
 }
 function chartWords(question:string):string[]|false{
- const text=fold(question).replace(/(?:,?\s+не\s+(?:меняя|изменяя)\s+(?:условий|параметров))[.!?]*$/u,''),words=text.match(/\p{L}+/gu)??[];
+ let text=fold(question).replace(/(?:,?\s+не\s+(?:меняя|изменяя)\s+(?:условий|параметров))[.!?]*$/u,'');
+ const keep=/(?:[.;]\s*|,\s*)([\p{L}\s,]+?)\s+не (?:меняй|меняйте|изменяй|изменяйте)[.!?]*$/u.exec(text);
+ if(keep){const fields=keep[1]!.match(/\p{L}+/gu)??[];if(fields.filter(w=>w!=='и').length&&fields.filter(w=>w!=='и').every(w=>resolveLexeme('loan_keep_field',w).status==='known'))text=text.slice(0,keep.index);}
+ const words=text.match(/\p{L}+/gu)??[];
  if(!words.length||!/^[\p{L}\s.,?!;:—–-]+$/u.test(text))return false;
  const allowed=/^(?:вернись|вернитесь|верни|верните|возвратись|покажи|покажите|построй|постройте|к|и|по|для|того|этому|этого|сохраненному|сохраненного|прежнему|предыдущему|расчету|расчета|модели|модель|сценарию|сценария|кредита|кредиту|займа|займу|график|графики|графика|платежей|платежи|ежемесячных|ежемесячные|основного|основным|долга|долгом|процентов|процентами|оба|обоих|типов|типа|вместе|с)$/u;
- const normalized=words.map(w=>{const format=resolveLexeme('format',w,true);if(format.status==='known'&&format.key==='chart')return 'график';const action=resolveLexeme('action',w,true);return action.status==='known'&&action.key==='read'?'покажи':w;});
+ const normalized=words.map(w=>{const schedule=resolveLexeme('schedule_word',w,true);if(schedule.status==='known')return schedule.canonical;const format=resolveLexeme('format',w,true);if(format.status==='known'&&format.key==='chart')return 'график';const action=resolveLexeme('action',w,true);return action.status==='known'&&action.key==='read'?'покажи':w;});
  return normalized.every(w=>allowed.test(w))&&normalized.some(w=>/^график/u.test(w))&&(normalized.some(w=>/^(?:покажи|покажите|построй|постройте)$/u.test(w))||normalized[0]?.startsWith('график'))?normalized:false;
 }
 export function isLoanChartResume(question:string){

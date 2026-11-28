@@ -11,6 +11,7 @@ import type {AssistantAccounting} from './assistant-journal.ts';
 import type {RunReceipt,AssistantRequest} from './assistant-workflow.ts';
 import {createCloudAssistantModel} from './assistant-transport.ts';
 import {pilotModelCall} from './analyzer-next-pilot-call.ts';
+import {prepareReviewRefresh,reviewRefreshBudgetIds,seedRefreshedUnderstanding} from './analyzer-next-review-refresh.ts';
 import {firstReviewRetry} from './analyzer-next-review-retry.ts';
 import {runReviewPilotTurn,reviewPilotCandidate,reviewPilotDiagnostic} from './analyzer-next-review-pilot.ts';
 import type {AdditionalCase} from '../../../packages/analyzer/src/next/additional-pilot.ts';
@@ -52,6 +53,8 @@ async function main(){
    const request:AssistantRequest={requestId,scope,question:c.question,global,conversation:emptyConversation(scope),dataRevision:env.dataRevision,timezone:'Europe/Moscow',now:new Date('2026-11-25T12:00:00Z')};
    const retry=await firstReviewRetry(cfg.directory,manifest,request,env);budgetIds=retry.budgetIds;manifest={...manifest,ids:retry.ids};console.log('RETRY: previous rejected receipt retained; all previous spend remains within the same 5 RUB ceiling.');
   }else if(reviewPilot)try{await readAssistantPrivateFile(join(cfg.directory,'review-first-retry.json'));throw Error('PILOT_RETRY_FLAG_REQUIRED');}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
+  if(cfg.refreshRejectedReview&&!reviewPilot)throw Error('PILOT_REVIEW_REFRESH_DENIED');
+  if(reviewPilot)budgetIds.push(...await reviewRefreshBudgetIds(cfg.directory,manifest,!!cfg.refreshRejectedReview));
   const journalDirectory=join(cfg.directory,'journal');await mkdir(journalDirectory,{recursive:true,mode:0o700});
   const transaction=async<T>(action:(db:import('pg').PoolClient)=>Promise<T>)=>{const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[cfg.userId]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}};
   const runCost=async(db:import('pg').PoolClient)=>BigInt((await db.query(`SELECT COALESCE(sum(CASE WHEN state IN ('settled','released') THEN settled_atoms ELSE reserved_atoms END),0)::text AS n FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=ANY($2::uuid[])`,[cfg.userId,budgetIds])).rows[0].n);
@@ -80,7 +83,10 @@ async function main(){
     await db.query(`UPDATE commerce.analyzer_request SET state=$3,usage_state=$4,input_tokens=$5,output_tokens=$6,model_version=$7,updated_at=clock_timestamp() WHERE user_id=$1 AND request_id=$2 AND step='assistant_0'`,[cfg.userId,id,usage?'completed':'unknown',usage?'reported':'unknown',usage?.inputTokens??null,usage?.outputTokens??null,usage?.modelVersion??null]);return changed;
    });if(violation)throw Error('ASSISTANT_PROVIDER_CHANGED');}};
    let receipt:RunReceipt|undefined,replayed=false,semantic=false,reviewCode='',providerCode='',resolved='',reviewAccepted:boolean|undefined;const started=performance.now();
-   const result=await withAssistantJournal(journalDirectory,request,accounting,async journal=>{
+   const refresh=reviewPilot&&cfg.refreshRejectedReview?await prepareReviewRefresh(cfg.directory,manifest,request,session.snapshot(),environment):null;
+   if(refresh&&!budgetIds.includes(refresh.request.requestId))budgetIds.push(refresh.request.requestId);
+   const result=await withAssistantJournal(journalDirectory,refresh?.request??request,accounting,async journal=>{
+    if(refresh){await seedRefreshedUnderstanding(journal,refresh.seed);console.log('REVIEW_REFRESH: original rejection retained; understanding reused; only changed review may dispatch within the same run ceiling.');}
     receipt=journal.receipt;
     if(reviewPilot){
      const checked=await runReviewPilotTurn(c as AdditionalCase,session,environment,provider.forNextRequest(),journal,async()=>{if(!provider.allowed(cfg.email))throw Error('PILOT_ACCOUNT_DENIED');},replayOnly?'replay_only':'allow');

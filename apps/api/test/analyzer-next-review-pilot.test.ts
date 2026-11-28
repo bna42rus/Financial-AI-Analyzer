@@ -1,16 +1,16 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {reviewPilotCases,reviewPilotCandidate,runReviewPilotTurn,reviewPilotVersion,reviewPilotSignature,reviewPilotDiagnostic} from '../src/analyzer-next-review-pilot.ts';
+import {reviewPilotCases,reviewPilotCandidate,runReviewPilotTurn,reviewPilotPreparationMatches,reviewPilotVersion,reviewPilotSignature,reviewPilotDiagnostic} from '../src/analyzer-next-review-pilot.ts';
 import {createPilotSuite} from '../src/analyzer-next-pilot-suite.ts';
 import {nextReviewVersion} from '../src/analyzer-next-review.ts';
-import {PrototypeSession} from '../../../packages/analyzer/src/next/workflow.ts';
+import {PrototypeSession,parseUnderstanding} from '../../../packages/analyzer/src/next/workflow.ts';
 import {intentVersion} from '../../../packages/analyzer/src/next/intent.ts';
 import type {AssistantModel,AssistantJournal,RunReceipt,CompletionInput} from '../src/assistant-workflow.ts';
 import {scope,catalog,id} from '../../../packages/analyzer/test/fixtures/next-finances.ts';
 import {createCloudAssistantModel} from '../src/assistant-transport.ts';
 import {nextCallFingerprint} from '../src/analyzer-next-model-call.ts';
 import {workflowPrototypeVersion} from '../../../packages/analyzer/src/next/workflow.ts';
-import {taskProjection} from '../../../packages/analyzer/src/next/tasks.ts';
+import {taskProjection,prepareTask} from '../../../packages/analyzer/src/next/tasks.ts';
 import {understandingPrompt,understandingSchema} from '../../../packages/analyzer/src/next/understanding.ts';
 
 const binding={mode:'continue',conditions:'pin'};
@@ -45,7 +45,9 @@ test('oracle cannot authorize execution: a permissive reviewer executes the cont
 });
 test('a reviewer rejection cannot be bypassed by correct numerical expectations; correct totals cannot hide a missing chart',async()=>{
  const rejected=harness(undefined,'reject-all'),r=await rejected.run(0);assert.equal(r.matches,false);assert.equal(r.reads,0);assert.equal(r.result.status,'failed');
- const ignored=harness(undefined,'ignore-chart');assert.equal((await ignored.run(2)).matches,true);const chart=await ignored.run(3);assert.equal(chart.result.status,'completed');assert.equal(chart.matches,false);
+ const ignored=harness(undefined,'ignore-chart');assert.equal((await ignored.run(2)).matches,true);const c=reviewPilotCases[3]!,state=ignored.sessions.get(c.chain)!.snapshot(),env={scope,requestId:id(803),question:c.question,date:'2026-11-25',global:createPilotSuite('review',catalog).global(c),accessRevision:'synthetic/1',dataRevision:'synthetic/1',catalog};
+ const reply=parseUnderstanding(payload(3),state,c.question),prepared=prepareTask(state,env,reply.intent);if(prepared.status!=='ready')throw Error('ready');prepared.task.presentation.format='auto';assert.equal(reviewPilotPreparationMatches(c,prepared,reply,catalog),false);
+ const chart=await ignored.run(3);assert.equal(chart.result.status,'completed');assert.equal(chart.matches,true);
 });
 test('replay after fresh sessions uses all ten saved replies without reserve or model calls; a missing review stays free',async()=>{
  const first=harness();for(let i=0;i<5;i++)assert.equal((await first.run(i)).matches,true);
