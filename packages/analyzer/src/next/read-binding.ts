@@ -15,7 +15,8 @@ export function normalizeReadBinding(intent:Intent,previous:Query|null,question:
  const body=question.trim().replace(/[?!.]+$/u,'').trim().replace(/^(?:(?:а|и|теперь|тогда)\s+)+/iu,'');
  let expression=edit.expression;
  if(edit.field==='period'||edit.field==='postedPeriod'){
-  if(!isCompletePeriodLiteral(body,date))return intent;
+  const period=edit.field==='period'?{from:previous.filter.from,through:previous.filter.through}:{from:previous.filter.postedFrom,through:previous.filter.postedThrough};
+  if(!isCompletePeriodLiteral(body,date)&&!isCompletePeriodLiteral(body,date,period))return intent;
   periodExpression(expression,question,date,edit.field==='period'?{from:previous.filter.from,through:previous.filter.through}:{from:previous.filter.postedFrom,through:previous.filter.postedThrough});
   expression=body; // Explicit text is applied after the current UI-field merge.
  }else if(edit.field==='amount'){

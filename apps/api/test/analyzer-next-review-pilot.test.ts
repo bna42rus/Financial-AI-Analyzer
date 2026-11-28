@@ -32,7 +32,7 @@ function harness(receipts=new Map<number,RunReceipt>(),mode:'normal'|'accept-all
   }};
   return runReviewPilotTurn(c,session,{scope,requestId:id(800+index),question:c.question,date:'2026-11-25',global:suite.global(c),accessRevision:'synthetic/1',dataRevision:'synthetic/1',catalog},model,journal,async()=>{},dispatch);
  }
- return {run,inputs,receipts,get posts(){return posts;},get reserves(){return reserves;},get settlements(){return settlements;}};
+ return {run,inputs,receipts,sessions,get posts(){return posts;},get reserves(){return reserves;},get settlements(){return settlements;}};
 }
 test('five review cases use both real call slots; strict source scope and the negative control have independent acceptance',async()=>{
  const h=harness();for(let i=0;i<reviewPilotCases.length;i++){const r=await h.run(i);assert.equal(r.matches,true,reviewPilotCases[i]!.id+': '+JSON.stringify(r.result));if(i===4){assert.equal(r.result.status,'failed');assert.equal(r.reads,0);assert.equal(r.accepted,false);}}
@@ -77,4 +77,16 @@ test('the second observed reply reuses its received understanding and pays only 
  const model:AssistantModel={bound:{modelVersion:usage.modelVersion,inputTokens:10000,outputTokens:1000},async complete(input,before){assert.equal(input.phase,'check_changes');await before();posts++;return {value:{version:nextReviewVersion,decision:'accept',conditions:[{quote:c.question,covered:true}]},usage};}};
  const checked=await runReviewPilotTurn(c,session,env,model,journal,async()=>{});assert.equal(checked.matches,true);assert.equal(checked.replayed,true);assert.equal(posts,1);assert.equal(reserves,1);assert.equal(checked.reads,1);assert.deepEqual(receipt.calls[0],original);
  model.complete=async()=>{throw Error('No model call on replay');};const replay=await runReviewPilotTurn(c,new PrototypeSession(scope),env,model,journal,async()=>{},'replay_only');assert.equal(replay.matches,true);assert.equal(reserves,1);assert.equal(posts,1);
+});
+test('the observed month qualifier replays received understanding, preserves the strict scope and calls only its missing reviewer',async()=>{
+ const h=harness();assert.equal((await h.run(0)).matches,true);
+ const c=reviewPilotCases[1]!,session=h.sessions.get(c.chain)!;
+ const value=intent('read',{metric:null,grouping:null,comparison:null,conditions:[{field:'period',op:'set',expression:'сентябрь того же года'}],options:{}},{mode:'continue',conditions:'merge_ui'});
+ const call={phase:'understand' as const,prompt:understandingPrompt,input:{version:workflowPrototypeVersion,question:c.question,date:'2026-11-25',context:taskProjection(session.snapshot())},schema:understandingSchema};
+ const receipt:RunReceipt={fingerprint:'e'.repeat(64),calls:[{phase:'understand',state:'received',fingerprint:nextCallFingerprint(call),value,usage:{modelVersion:'synthetic-review-model',inputTokens:100,outputTokens:50}}]};
+ h.receipts.set(1,receipt);const saved=structuredClone(receipt.calls[0]),before=h.posts;
+ const result=await h.run(1);assert.equal(result.matches,true);assert.equal(result.replayed,true);assert.equal(result.accepted,true);assert.equal(result.reads,1);assert.equal(h.posts-before,1);assert.equal(h.reserves,3);assert.deepEqual(receipt.calls[0],saved);
+ const state=session.snapshot(),task=state.history.find(t=>t.handle===state.active);if(task?.kind!=='read')throw Error('read');
+ assert.equal(task.node.query.filter.from,'2025-09-01');assert.equal(task.node.query.filter.through,'2025-09-30');assert.equal(task.node.query.filter.amountFrom,'10001');assert.deepEqual(task.node.query.filter.accountIds,[catalog.accounts[0]!.id]);
+ const replay=harness(structuredClone(h.receipts));assert.equal((await replay.run(0,'replay_only')).matches,true);assert.equal((await replay.run(1,'replay_only')).matches,true);assert.equal(replay.posts,0);assert.equal(replay.reserves,0);
 });

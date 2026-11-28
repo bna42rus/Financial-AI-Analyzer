@@ -112,13 +112,13 @@ function readBase(state:State,env:Environment,previous:ReadTask|null,pin:boolean
  resolved.node.query=resolved.query;resolved.node.global=clone(env.global);
  return resolved.node;
 }
-function expressionEdit(field:Condition,expression:string,env:Environment,base:Query):ConditionEdit{
+function expressionEdit(field:Condition,expression:string,env:Environment,base:Query,reference:OperationsFilter={}):ConditionEdit{
  if(field==='amount'&&!env.question.includes(expression))fail('TASK_AMOUNT_LITERAL_REQUIRED');
  if(!['period','postedPeriod','accounts','categories','counterparties'].includes(field))questionQuote(expression,env.question);
  let value:OperationsFilter;
  if(field==='period'||field==='postedPeriod'){
   let period;
-  try{period=periodExpression(expression,env.question,env.date,{from:field==='period'?base.filter.from:base.filter.postedFrom,through:field==='period'?base.filter.through:base.filter.postedThrough});}
+  try{period=periodExpression(expression,env.question,env.date,{from:field==='period'?base.filter.from:base.filter.postedFrom,through:field==='period'?base.filter.through:base.filter.postedThrough},{from:field==='period'?reference.from:reference.postedFrom,through:field==='period'?reference.through:reference.postedThrough});}
   catch(error){if(error instanceof TypeError&&/^(?:TASK_|INVALID_)[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
   value=field==='period'?period:{postedFrom:period.from,postedThrough:period.through};
  }else if(field==='amount')value=assistantAmountLiteral(expression,'absolute_operation');
@@ -206,12 +206,12 @@ export function prepareTask(state:State,env:Environment,raw:unknown):Preparation
  const initial=pending?.kind==='read'?mergeDraft(pending.filter,pending.global,env.global):undefined;
  const grouping=p.grouping??(pending?.kind==='read'?pending.grouping:null),comparison=p.comparison??(pending?.kind==='read'?pending.comparison:null);
  let node=readBase(state,env,prior,pin,metric??'expenses',grouping,'none',[],initial);
- const conditions=[...p.conditions];
+ const conditions=[...p.conditions],yearReference=prior?.node.query.filter??(pending?.kind==='read'?pending.filter:{});
  if(!conditions.some(e=>e.field==='period'||e.field==='postedPeriod')&&(p.options.dateBasis??prior?.node.query.options?.dateBasis)!=='posted'){
-  try{const edit=sourcePeriodEdit(env.question,env.date,node.query);if(edit)conditions.push(edit);}catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
+  try{const edit=sourcePeriodEdit(env.question,env.date,node.query,yearReference);if(edit)conditions.push(edit);}catch(error){if(error instanceof TypeError&&/^TASK_[A-Z_]+$/.test(error.message))fail(error.message);throw error;}
  }
  const edits:ConditionEdit[]=conditions.map(edit=>{
-  if(edit.op==='set')return expressionEdit(edit.field,edit.expression,env,node.query);
+  if(edit.op==='set')return expressionEdit(edit.field,edit.expression,env,node.query,yearReference);
   if(edit.op==='clear')return {field:edit.field,op:'clear'};
   const value=pick(env.global.filter,edit.field);return Object.keys(value).length?{field:edit.field,op:'set',value}:{field:edit.field,op:'clear'};
  });

@@ -122,8 +122,8 @@ export function normalizeSourceIntent(intent:Intent,state:State,env:Environment)
 }
 /** A missing model edit does not erase a directly stated temporal condition.
  * Only an anchored temporal literal is supplied, never arbitrary named text. */
-export function sourcePeriodEdit(question:string,date:string,base:Query):ConditionEdit|null{
- const facts=periodFacts(question,date,base.filter).filter(f=>/^(?:за|в|с|последние|последних)\s|^(?:сегодня|вчера)$/iu.test(f.source)||isCompletePeriodLiteral(question,date));
+export function sourcePeriodEdit(question:string,date:string,base:Query,reference:Pick<Query['filter'],'from'|'through'>=base.filter):ConditionEdit|null{
+ const facts=periodFacts(question,date,base.filter,reference).filter(f=>/^(?:за|в|с|последние|последних)\s|^(?:сегодня|вчера)$/iu.test(f.source)||isCompletePeriodLiteral(question,date,reference)||/^(?:(?:а|теперь|тогда)\s+)*$/iu.test(question.slice(0,f.start))&&isCompletePeriodLiteral(f.source,date,reference));
  const unique=[...new Map(facts.map(f=>[stable(f.period),f])).values()];if(unique.length>1)fail('TASK_PERIOD_EVIDENCE_AMBIGUOUS');
  return unique.length?{field:'period',op:'set',expression:unique[0]!.source}:null;
 }

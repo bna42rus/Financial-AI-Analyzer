@@ -62,6 +62,15 @@ test('only the requested filter changes; current UI fields are merged before the
  const p=ready(prepareTask(h.state,h.env,intent()));if(p.task.kind!=='read')return;
  assert.equal(p.task.node.query.filter.from,'2024-09-01');assert.deepEqual(p.task.node.query.filter.categoryIds,[taxi]);assert.equal(p.task.node.query.grouping,'category');
 });
+test('an explicit same-year reference keeps the chosen task year even after the UI period changes',async()=>{
+ const h=await setup();h.env.question='Теперь сентябрь того же года.';
+ h.env.global={revision:1,filter:{from:'2024-10-01',through:'2024-10-31',accountIds:[account],categoryIds:[taxi]},touched:{period:1,categories:1}};
+ const raw=intent('period','сентябрь того же года');raw.binding={mode:'continue',conditions:'merge_ui'};raw.parameters.metric=null;raw.parameters.grouping=null;
+ const p=ready(prepareTask(h.state,h.env,raw));if(p.task.kind!=='read')throw Error('read');
+ assert.equal(p.task.node.query.filter.from,'2025-09-01');assert.equal(p.task.node.query.filter.through,'2025-09-30');assert.deepEqual(p.task.node.query.filter.categoryIds,[taxi]);assert.equal(p.task.node.query.grouping,'category');
+ const fresh={...raw,binding:{mode:'new'} as const};assert.throws(()=>prepareTask(emptyState(scope),h.env,fresh),/TASK_PERIOD_YEAR_CONTEXT_REQUIRED/);
+ const short=normalizeReadBinding(intent('period','сентябрь того же года'),query,'А сентябрь того же года?',date);assert.equal(short.binding.mode,'continue');
+});
 
 test('explicit strict wording preserves one-cent boundaries and never removes a negation',()=>{
  assert.equal(assistantAmountLiteral('строго больше 100 рублей','absolute_operation').amountFrom,'10001');

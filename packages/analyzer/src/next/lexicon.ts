@@ -32,6 +32,7 @@ export const analyzerLexicon:readonly Lexeme[]=Object.freeze((
  {"family":"time_relation","key":"previous","label":"Предыдущий","forms":["предыдущий","предыдущая","предыдущее","предыдущие","прошлый","прошлая","прошлое","прошлые","предыдущего","предыдущем","предыдущему","предыдущую","прошлого","прошлом","прошлому","прошлую"],"canonical":"предыдущий"},
  {"family":"time_relation","key":"current","label":"Текущий","forms":["текущий","текущая","текущее","текущие","этот","эта","это","эти","текущего","текущем","текущему","текущую","этом","этого","этому","эту"],"canonical":"текущий"},
  {"family":"time_relation","key":"next","label":"Следующий","forms":["следующий","следующая","следующее","следующие","будущий","будущая","будущее","следующего","следующем","следующему","следующую","будущего","будущем","будущему","будущую"],"canonical":"следующий"},
+ {"family":"year_reference","key":"same","label":"Год выбранного предыдущего периода","forms":["того же года","том же году","в том же году","тот же год","за тот же год"],"canonical":"того же года"},
  {"family":"metric","key":"expenses","label":"Расходы","forms":["расходы","расходов","расходам","расходами","траты","трат","потратил","потратила","потрачено","расход","расхода","расходу","расходе","тратам","тратами"],"canonical":"расходы"},
  {"family":"metric","key":"gross_expenses","label":"Расходы до возвратов","forms":["расходы без вычета возвратов","расходы до возвратов"],"canonical":"расходы без вычета возвратов"},
  {"family":"metric","key":"income","label":"Доходы","forms":["доход","доходы","доходов","доходам","доходами","заработал","заработала","дохода","доходу","доходе"],"canonical":"доход"},
@@ -150,7 +151,7 @@ export function resolveLexeme(family:string,value:string,allowTypos=false):Lexem
  const word=fold(value),index=indexes.get(family);if(!index)return {status:'unknown'};
  const found=(items:readonly Lexeme[],match:'exact'|'typo',edits=0):LexemeMatch=>items.length===1?{status:'known',key:items[0]!.key,canonical:items[0]!.canonical,label:items[0]!.label,match,distance:edits}:items.length?{status:'ambiguous',keys:items.map(e=>e.key).sort()}:{status:'unknown'};
  const exact=index.exact.get(word);if(exact)return found(exact,'exact');
- if(!allowTypos||reservedForms.has(word)||['operator','negation'].includes(family)||!/^[\p{L}]{5,32}$/u.test(word)||/^(?:не|без)/u.test(word))return {status:'unknown'};
+ if(!allowTypos||reservedForms.has(word)||['operator','negation','year_reference'].includes(family)||!/^[\p{L}]{5,32}$/u.test(word)||/^(?:не|без)/u.test(word))return {status:'unknown'};
  const maximum=family==='payment'&&word.length>=8?2:1;
  const matches=index.entries.map(({entry,words})=>({entry,distance:Math.min(...words.filter(f=>Math.abs(f.length-word.length)<=maximum).map(f=>distance(word,f)))})).filter(m=>m.distance<=maximum);
  // Every candidate inside the allowed distance matters. Do not pick an
