@@ -5,7 +5,7 @@ import type {Intent,ConditionEdit} from './intent.ts';
 import type {State,Environment,ReadTask} from './tasks.ts';
 import type {Query} from '../registry.ts';
 import {resolveLexeme} from './lexicon.ts';
-import {periodFacts,isCompletePeriodLiteral} from './period.ts';
+import {periodFacts,periodExpression,isCompletePeriodLiteral} from './period.ts';
 import {hasExplicitComparisonBase,comparisonPeriodOrder} from './comparison-periods.ts';
 const fold=(v:string)=>v.normalize('NFKC').toLocaleLowerCase('ru-RU').replaceAll('ё','е').trim();
 const same=(a:unknown,b:unknown)=>stable(a)===stable(b);
@@ -123,7 +123,7 @@ export function normalizeSourceIntent(intent:Intent,state:State,env:Environment)
  if(state.pending)return intent;
  const chart=chartTarget(env.question,state);
  if(chart&&(intent.action==='calculate'&&intent.parameters.calculator==='loan'||intent.action==='explain'||intent.action==='read'&&!intent.parameters.conditions.length))return {version:intent.version,action:'calculate',binding:{mode:'reference',handle:chart.loan.handle,conditions:'pin'},parameters:{calculator:'loan',edits:chart.both?[{field:'payment',op:'clear'}]:[]},presentation:{...intent.presentation,format:'chart'}};
- if(intent.action!=='read'||!hasExplicitComparisonBase(env.question)||intent.parameters.conditions.some(e=>e.field!=='period'||e.op!=='set')||Object.keys(intent.parameters.options).length)return intent;
+ if(intent.action!=='read'||!hasExplicitComparisonBase(env.question)||intent.parameters.conditions.some(e=>e.field!=='period'||e.op!=='set')||Object.keys(intent.parameters.options).some(k=>k!=='comparisonPeriod'))return intent;
  if(/(?:сильнее|больше|меньше|самый|самая|самое|максим|миним|средн|медиан|процент|дол[яюи])/iu.test(env.question))return intent;
  const active=[...state.history].reverse().find(t=>t.kind==='read'),facts=periodFacts(env.question,env.date,active?.kind==='read'?active.node.query.filter:{});
  const periods=[...new Map(facts.map(f=>[stable(f.period),f.period])).values()];if(periods.length!==2)return intent;
@@ -134,7 +134,15 @@ export function normalizeSourceIntent(intent:Intent,state:State,env:Environment)
   const key=signature(t),group=groups.get(key)??new Map<number,ReadTask>();group.set(index,t);groups.set(key,group);
  }
  const pairs=[...groups.values()].filter(g=>g.size===2);if(pairs.length!==1)fail('TASK_COMPARISON_CONTEXT_AMBIGUOUS');
- comparisonPeriodOrder([periods[0]!,periods[1]!],env.question,env.date); // Prove the baseline, including conflicts/negation.
+ const order=comparisonPeriodOrder([periods[0]!,periods[1]!],env.question,env.date); // Prove the baseline, including conflicts/negation.
+ const baseline=intent.parameters.options.comparisonPeriod;
+ if(baseline){
+  if(intent.parameters.comparison!=='custom'||!same(baseline,periods[order[0]]))fail('TASK_COMPARISON_PERIOD_MISMATCH');
+  const target=periods[order[1]]!,source=facts.find(f=>same(f.period,target))!.source;
+  // Resolve the model's target against the independently proven target phrase,
+  // with the source/context year. The model baseline cannot supply a year.
+  for(const edit of intent.parameters.conditions)if(edit.op==='set'&&!same(periodExpression(edit.expression,source,env.date,target),target))fail('TASK_PERIOD_EVIDENCE_MISMATCH');
+ }
  return {version:intent.version,action:'compare',binding:{mode:'new'},parameters:{scenarios:[pairs[0]!.get(0)!.handle,pairs[0]!.get(1)!.handle],criterion:'value',objective:'max'},presentation:intent.presentation};
 }
 /** A missing model edit does not erase a directly stated temporal condition.

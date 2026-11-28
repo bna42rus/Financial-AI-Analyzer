@@ -30,8 +30,9 @@ test('offline scripted 30-case harness traverses mandatory review and independen
  const suite=createPilotSuite('acceptance',catalog);assert.equal(suite.cases.length,30);assert.equal(suite.limitRub,'10');assert.equal(new Set(suite.cases.map(c=>c.id)).size,30);assert.notEqual(suite.caseSignature,createPilotSuite('additional',catalog).caseSignature);assert.notEqual(suite.caseSignature,createPilotSuite('review',catalog).caseSignature);
  const first=await run();assert.equal(first.calls,60);assert.equal(first.reserves,60);const replay=await run(structuredClone(first.saved),true);assert.equal(replay.calls,0);assert.equal(replay.reserves,0);
 });
-test('retained current-comparison selection and named report return cross all 30 cases and replay both calls for free',async()=>{
+test('retained custom baseline, current variants and named report return cross all 30 cases and replay both calls for free',async()=>{
  const overrides={
+  'months-explicit-base':{version:intentVersion,action:'read',binding:{mode:'new'},parameters:{metric:'expenses',grouping:'category',comparison:'custom',conditions:[{field:'period',op:'set',expression:'сентябрь'}],options:{comparisonPeriod:{from:'2025-10-01',through:'2025-10-31'}}},presentation:{format:'auto',detail:'normal'}},
   'loan-tied-comparison':{version:intentVersion,action:'compare',binding:{mode:'new'},parameters:{scenarios:['t1_v1','t1_v2','t2_v1','t2_v2','t3_v1','t3_v2'],criterion:'interest',objective:'min'},presentation:{format:'auto',detail:'normal'}},
   'mixed-back-to-read':{version:intentVersion,action:'read',binding:{mode:'continue',conditions:'merge_ui'},parameters:{metric:null,grouping:null,comparison:null,conditions:[{field:'period',op:'set',expression:'сентябрь'}],options:{}},presentation:{format:'auto',detail:'normal'}},
  };

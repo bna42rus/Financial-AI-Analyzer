@@ -153,6 +153,27 @@ test('comparison roles survive alternative date spelling and model defaults, whi
  }
  assert.throws(()=>prepareTask(ambiguous,{...environment,question:additionalCases.find(c=>c.id==='months-explicit-base')!.question},retained['months-explicit-base']),/TASK_COMPARISON_CONTEXT_AMBIGUOUS/);
 });
+test('retained custom baseline keeps the explicit comparison year for both months',async()=>{
+ const h=await run(),state=h.states.get('months-explicit-base')!,c=additionalCases.find(c=>c.id==='months-explicit-base')!;
+ const env={scope,requestId:id(2500),question:c.question,date:'2026-11-25',global:{revision:0,filter:{accountIds:[account]},touched:{}},dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+ const raw=envelope('read',{metric:'expenses',grouping:'category',comparison:'custom',conditions:[condition('period','сентябрь')],options:{comparisonPeriod:{from:'2025-10-01',through:'2025-10-31'}}});
+ const p=prepareTask(state,env,raw);if(p.status!=='ready'||p.task.kind!=='read')throw Error('read');
+ assert.deepEqual({from:p.task.node.query.filter.from,through:p.task.node.query.filter.through},{from:'2025-09-01',through:'2025-09-30'});
+ assert.deepEqual(p.task.node.query.options?.comparisonPeriod,{from:'2025-10-01',through:'2025-10-31'});
+ const replay=await run({'months-explicit-base':raw});assert.equal(replay.results.size,25);
+ for(const question of ['Сопоставь 2025-09 относительно 2025-10','Сравни сентябрь 2025 по сравнению с октябрём 2025']){
+  const same=prepareTask(state,{...env,question},raw);if(same.status!=='ready'||same.task.kind!=='read')throw Error('read');
+  assert.equal(same.task.node.query.filter.from,'2025-09-01');assert.equal(same.task.node.query.options?.comparisonPeriod?.from,'2025-10-01');
+ }
+ for(const period of [{from:'2026-10-01',through:'2026-10-31'},{from:'2025-09-01',through:'2025-09-30'},{from:'2025-10-01',through:'2025-10-01'}]){
+  const wrong=structuredClone(raw);wrong.parameters.options={comparisonPeriod:period};assert.throws(()=>prepareTask(state,env,wrong),/TASK_COMPARISON_PERIOD_MISMATCH/);
+ }
+ for(const expression of ['2026-09','2025-10','сентябрь 2024']){
+  const wrong=structuredClone(raw);wrong.parameters.conditions=[condition('period',expression)];assert.throws(()=>prepareTask(state,env,wrong),/TASK_PERIOD_EVIDENCE_MISMATCH/);
+ }
+ const statistics=structuredClone(raw);statistics.parameters.options={...statistics.parameters.options,statistic:'mean'};
+ assert.equal(normalizeSourceIntent(parseIntent(statistics),state,env).action,'read');
+});
 test('payment typo matching is bounded to a whole choice, not explanations, negations, arbitrary labels or numbers',()=>{
  for(const q of ['А дифиренцированный?','дифференцированный','тогда диференцированный'])assert.equal(paymentChoice(q)?.payment,'differentiated',q);
  for(const q of ['ануитентный','аннуитетный','Выбери ануитетный.'])assert.equal(paymentChoice(q)?.payment,'annuity',q);
