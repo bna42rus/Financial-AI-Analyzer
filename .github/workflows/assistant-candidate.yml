@@ -65,7 +65,7 @@ jobs:
       - name: Verify category continuity and review fields offline
         run: pnpm --filter @finance/api exec node --import tsx --test test/classification-plan.test.ts test/classification-pass.test.ts test/category-continuity.test.ts test/review-fields.test.ts test/review-remember.test.ts ../../packages/finance-core/test/merchant-followups.test.ts
       - name: Verify Analyzer arithmetic and workflow offline
-        run: pnpm --filter @finance/api exec node --import tsx --test ../../packages/analyzer/test/program.test.ts test/assistant-workflow.test.ts test/assistant-context-followups.test.ts test/assistant-durability.test.ts test/assistant-report.test.ts test/financial-sources.test.ts test/analyzer-next-foundation.test.ts test/analyzer-next-pilot.test.ts test/analyzer-next-review.test.ts test/analyzer-next-review-pilot.test.ts
+        run: pnpm --filter @finance/api exec node --import tsx --test ../../packages/analyzer/test/program.test.ts test/assistant-workflow.test.ts test/assistant-context-followups.test.ts test/assistant-durability.test.ts test/assistant-report.test.ts test/financial-sources.test.ts test/analyzer-next-foundation.test.ts test/analyzer-next-pilot.test.ts test/analyzer-next-review.test.ts test/analyzer-next-review-pilot.test.ts test/analyzer-next-review-retry.test.ts
       - name: Verify Analyzer HTTP changes and source scopes
         env:
           SECURITY_TEST_DATABASE_URL: postgresql://postgres@127.0.0.1:55432/postgres

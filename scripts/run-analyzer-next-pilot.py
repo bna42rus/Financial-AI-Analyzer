@@ -39,10 +39,13 @@ def main():
     parser.add_argument('--sha', required=True)
     parser.add_argument('--resume', help='Reuse an existing private run and its receipts by source SHA')
     parser.add_argument('--suite', choices=['basic', 'additional', 'review'], default='basic')
+    parser.add_argument('--retry-first-rejected', action='store_true', help='One explicit review retry; preserve prior receipt and cumulative cost')
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('--live', action='store_true')
     mode.add_argument('--replay-only', action='store_true', help='Never dispatch a model request; require all saved replies')
     args = parser.parse_args()
+    if args.retry_first_rejected and (args.suite != 'review' or not args.resume):
+        parser.error('--retry-first-rejected requires --suite review and --resume')
     if args.replay_only and not args.resume:
         parser.error('--replay-only requires --resume')
     if os.geteuid() != 0 or not re.fullmatch('[a-f0-9]{40}', args.sha):
@@ -93,12 +96,12 @@ def main():
         if json.loads(private(target / 'source-ready.json')) != {'sha': args.sha}:
             raise RuntimeError('PILOT_SOURCE_INCOMPLETE')
         print('PRECHECK: offline contracts, context, complete dialogs and comparison regressions.', flush=True)
-        checks = ['next-contract', 'next-period', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression', 'next-additional-pilot']
+        checks = ['next-contract', 'next-period', 'next-read-evidence', 'next-read-binding', 'next-tasks', 'next-workflow', 'next-regression', 'next-additional-pilot']
         checked = subprocess.run(['/usr/bin/node', '--test', *[str(source / 'packages/analyzer/test' / (name+'.test.ts')) for name in checks]], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
         if checked.returncode:
             raise RuntimeError('PILOT_OFFLINE_PRECHECK_FAILED')
         if args.suite == 'review':
-            checked = subprocess.run(['/usr/bin/node', '--import', 'tsx', '--test', 'test/analyzer-next-review.test.ts', 'test/analyzer-next-review-pilot.test.ts'], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
+            checked = subprocess.run(['/usr/bin/node', '--import', 'tsx', '--test', 'test/analyzer-next-review.test.ts', 'test/analyzer-next-review-pilot.test.ts', 'test/analyzer-next-review-retry.test.ts'], cwd=source / 'apps/api', env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'test'})
             if checked.returncode:
                 raise RuntimeError('PILOT_REVIEW_PRECHECK_FAILED')
         spec = importlib.util.spec_from_file_location('pilot_account', source / 'scripts/diagnose-analyzer-account-staging.py')
@@ -120,7 +123,7 @@ def main():
             directory(journal_target)
             private(journal_target / 'run.json')
             print('Reusing the existing pilot receipts; '+('model dispatch disabled.' if args.replay_only else 'only missing replies may dispatch.'), flush=True)
-        payload = {'activeApi': api, 'directory': str(journal_target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0], 'suite': args.suite}
+        payload = {'activeApi': api, 'directory': str(journal_target), 'databaseUrl': values['DATABASE_URL'], 'settings': settings, 'email': email, 'userId': owner[0], 'suite': args.suite, 'retryFirstRejected': args.retry_first_rejected}
         result = subprocess.run(['/usr/bin/node', '--import', 'tsx', 'src/analyzer-next-pilot-main.ts', '--replay-only' if args.replay_only else '--live'], cwd=source / 'apps/api', input=json.dumps(payload), text=True, env={'PATH': '/usr/local/bin:/usr/bin:/bin', 'NODE_ENV': 'production'})
         return result.returncode
 

@@ -112,7 +112,8 @@ function readBase(state:State,env:Environment,previous:ReadTask|null,pin:boolean
  return resolved.node;
 }
 function expressionEdit(field:Condition,expression:string,env:Environment,base:Query):ConditionEdit{
- if(field!=='period'&&field!=='postedPeriod')questionQuote(expression,env.question);
+ if(field==='amount'&&!env.question.includes(expression))fail('TASK_AMOUNT_LITERAL_REQUIRED');
+ if(!['period','postedPeriod','accounts','categories','counterparties'].includes(field))questionQuote(expression,env.question);
  let value:OperationsFilter;
  if(field==='period'||field==='postedPeriod'){
   let period;
@@ -121,10 +122,16 @@ function expressionEdit(field:Condition,expression:string,env:Environment,base:Q
   value=field==='period'?period:{postedFrom:period.from,postedThrough:period.through};
  }else if(field==='amount')value=assistantAmountLiteral(expression,'absolute_operation');
  else if(['accounts','categories','counterparties'].includes(field)){
-  const group=field as 'accounts'|'categories'|'counterparties',fold=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU').replaceAll('ё','е').trim();
+  const group=field as 'accounts'|'categories'|'counterparties',fold=(s:string)=>s.normalize('NFKC').toLocaleLowerCase('ru-RU').replaceAll('ё','е').replace(/\s+/gu,' ').trim();
   const candidates=env.catalog[group].filter(item=>fold(item.name)===fold(expression));
   if(candidates.length!==1)fail(candidates.length?'TASK_ENTITY_AMBIGUOUS':'TASK_ENTITY_MISSING');
   const item=candidates[0]!;
+  // Case/NFKC/ё equivalence supplies no authority: require the whole name in
+  // the question and reject a shorter name contained in a longer catalog name.
+  const source=fold(env.question),spans:{start:number;end:number;name:string}[]=[];
+  for(const candidate of env.catalog[group]){const name=fold(candidate.name);if(!name)continue;for(let at=source.indexOf(name);at>=0;at=source.indexOf(name,at+1))if(!/[\p{L}\p{N}_]/u.test(source[at-1]??'')&&!/[\p{L}\p{N}_]/u.test(source[at+name.length]??''))spans.push({start:at,end:at+name.length,name});}
+  const maximal=spans.filter(a=>!spans.some(b=>b.start<=a.start&&b.end>=a.end&&(b.start<a.start||b.end>a.end)));
+  if(!maximal.some(s=>s.name===fold(expression)))fail('TASK_EVIDENCE_MISSING');
   if(group==='categories'){
    const category=item as Catalog['categories'][number];
    value=category.parentId?{categoryIds:[category.parentId],subcategoryIds:[category.id]}:{categoryIds:[category.id]};

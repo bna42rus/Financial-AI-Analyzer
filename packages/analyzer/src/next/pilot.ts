@@ -1,7 +1,7 @@
 /** Small synthetic understanding pilot. Expected outcomes never enter model input. */
 import {calculatorRublesMinor} from '../calculators.ts';
 import type {Preparation,Outcome} from './tasks.ts';
-export {understandingSchema as pilotSchema,understandingPrompt as pilotPrompt} from './understanding.ts';
+export {understandingSchema as pilotSchema,legacyUnderstandingPrompt as pilotPrompt} from './understanding.ts';
 export const pilotCases=[
  {id:'loan-new',chain:'loan',question:'Посчитай кредит: беру 300 тысяч, ставка 19% в год, вернуть за три года.'},
  {id:'loan-concept',chain:'loan',question:'А что значит аннуитетный и дифференцированный, где это у себя посмотреть?'},

@@ -11,6 +11,7 @@ import type {AssistantAccounting} from './assistant-journal.ts';
 import type {RunReceipt,AssistantRequest} from './assistant-workflow.ts';
 import {createCloudAssistantModel} from './assistant-transport.ts';
 import {pilotModelCall} from './analyzer-next-pilot-call.ts';
+import {firstReviewRetry} from './analyzer-next-review-retry.ts';
 import {runReviewPilotTurn,reviewPilotCandidate,reviewPilotDiagnostic} from './analyzer-next-review-pilot.ts';
 import type {AdditionalCase} from '../../../packages/analyzer/src/next/additional-pilot.ts';
 import {reserveAssistantCall,settleAssistantCall} from './assistant-db-accounting.ts';
@@ -45,9 +46,15 @@ async function main(){
   try{manifest=await readAssistantPrivateFile(manifestPath);}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;
    const {writeFile}=await import('node:fs/promises');manifest={version:suite.version,accountBinding,ids:suite.cases.map(()=>randomUUID()),...(suite.caseSignature?{caseSignature:suite.caseSignature}:{})};await writeFile(manifestPath,JSON.stringify(manifest)+'\n',{flag:'wx',mode:0o600});}
   if(manifest.version!==suite.version||manifest.accountBinding!==accountBinding||manifest.caseSignature!==suite.caseSignature||!Array.isArray(manifest.ids)||manifest.ids.length!==suite.cases.length||new Set(manifest.ids).size!==suite.cases.length||manifest.ids.some((v:unknown)=>typeof v!=='string'||!/^[-a-f0-9]{36}$/.test(v)))throw Error('PILOT_MANIFEST_INVALID');
+  let budgetIds=[...manifest.ids];
+  if(cfg.retryFirstRejected){
+   if(!reviewPilot)throw Error('PILOT_RETRY_DENIED');const c=suite.cases[0]!,requestId=manifest.ids[0],global=suite.global(c),env={scope,requestId,question:c.question,date:'2026-11-25',global,dataRevision:'synthetic/1',accessRevision:'synthetic/1',catalog};
+   const request:AssistantRequest={requestId,scope,question:c.question,global,conversation:emptyConversation(scope),dataRevision:env.dataRevision,timezone:'Europe/Moscow',now:new Date('2026-11-25T12:00:00Z')};
+   const retry=await firstReviewRetry(cfg.directory,manifest,request,env);budgetIds=retry.budgetIds;manifest={...manifest,ids:retry.ids};console.log('RETRY: previous rejected receipt retained; all previous spend remains within the same 5 RUB ceiling.');
+  }else if(reviewPilot)try{await readAssistantPrivateFile(join(cfg.directory,'review-first-retry.json'));throw Error('PILOT_RETRY_FLAG_REQUIRED');}catch(e){if((e as NodeJS.ErrnoException).code!=='ENOENT')throw e;}
   const journalDirectory=join(cfg.directory,'journal');await mkdir(journalDirectory,{recursive:true,mode:0o700});
   const transaction=async<T>(action:(db:import('pg').PoolClient)=>Promise<T>)=>{const db=await pool.connect();try{await db.query('BEGIN');await db.query("SELECT set_config('app.user_id',$1,true)",[cfg.userId]);const result=await action(db);await db.query('COMMIT');return result;}catch(e){await db.query('ROLLBACK');throw e;}finally{db.release();}};
-  const runCost=async(db:import('pg').PoolClient)=>BigInt((await db.query(`SELECT COALESCE(sum(CASE WHEN state IN ('settled','released') THEN settled_atoms ELSE reserved_atoms END),0)::text AS n FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=ANY($2::uuid[])`,[cfg.userId,manifest.ids])).rows[0].n);
+  const runCost=async(db:import('pg').PoolClient)=>BigInt((await db.query(`SELECT COALESCE(sum(CASE WHEN state IN ('settled','released') THEN settled_atoms ELSE reserved_atoms END),0)::text AS n FROM commerce.ai_cost_reservation WHERE user_id=$1 AND request_id=ANY($2::uuid[])`,[cfg.userId,budgetIds])).rows[0].n);
   const budget=()=>transaction(async db=>({month:await provider.budgetState!(db),run:await runCost(db)}));
   const before=await budget();console.log(`PILOT ${suite.name}: ${suite.cases.length} synthetic turns; ${replayOnly?'replay only, dispatch disabled':'run ceiling '+suite.limitRub+' RUB'}; existing monthly cap preserved. MONTH_AVAILABLE ${rub(before.month!.remainingAtoms)} RUB`);
   const sessions=new Map(suite.cases.map(c=>[c.chain,new PrototypeSession(scope)])),failedChains=new Set<string>();let tested=0,passed=0,skipped=0,newReservations=0;
