@@ -25,13 +25,26 @@ export function sealNextSession(session:PrototypeSession,key:Uint8Array):NextChe
  if(Buffer.byteLength(payload)>limit)throw new TypeError('NEXT_CHECKPOINT_TOO_LARGE');
  return {version:nextCheckpointVersion,payload,mac:signature(payload,key).toString('hex')};
 }
-export function restoreNextSession(scope:TaskScope,raw:unknown,key:Uint8Array):PrototypeSession{
- try{
+function authenticatedState(raw:unknown,key:Uint8Array):State{
   const r=object(raw,['version','payload','mac']);
   if(r.version!==nextCheckpointVersion||typeof r.payload!=='string'||Buffer.byteLength(r.payload)>limit||typeof r.mac!=='string'||!/^[a-f0-9]{64}$/.test(r.mac))invalid();
   if(!timingSafeEqual(signature(r.payload,key),Buffer.from(r.mac,'hex')))invalid();
   const saved=object(JSON.parse(r.payload),['version','state']);
   if(saved.version!==nextCheckpointVersion)invalid();
-  return PrototypeSession.fromTrustedCheckpoint(scope,saved.state as State);
+  return saved.state as State;
+}
+export function restoreNextSession(scope:TaskScope,raw:unknown,key:Uint8Array):PrototypeSession{
+ try{return PrototypeSession.fromTrustedCheckpoint(scope,authenticatedState(raw,key));}catch{invalid();}
+}
+/** Only the DB adapter may rebind a surviving chat after its generation-reset
+ * trigger updates the row. Owner/chat lifetime stay fixed; full key reset deletes
+ * the chat via the existing cascade instead. Default restoration stays strict. */
+export function restoreNextSessionForStore(scope:TaskScope,raw:unknown,key:Uint8Array,storedGeneration:string):PrototypeSession{
+ try{
+  if(storedGeneration!==scope.generation)invalid();
+  const saved=authenticatedState(raw,key),state=PrototypeSession.fromTrustedCheckpoint(saved.scope,saved).snapshot();
+  if(['ownerId','chatId','chatEpoch'].some(k=>state.scope[k as keyof TaskScope]!==scope[k as keyof TaskScope]))invalid();
+  if(state.scope.generation!==scope.generation){state.scope.generation=scope.generation;state.book.scope.generation=scope.generation;state.revision++;}
+  return PrototypeSession.fromTrustedCheckpoint(scope,state);
  }catch{invalid();}
 }

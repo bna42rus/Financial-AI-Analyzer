@@ -5,6 +5,7 @@ import {PrototypeSession} from '../src/next/workflow.ts';
 import type {Provider,ProviderInput,Services,AccessContext} from '../src/next/workflow.ts';
 import type {Environment} from '../src/next/tasks.ts';
 import {intentVersion} from '../src/next/intent.ts';
+import {AssistantError} from '../src/assistant-error.ts';
 import {id,scope,account,food,catalog,rows} from './fixtures/next-finances.ts';
 const base=(action:string,parameters:unknown,binding:unknown={mode:'new'},format='auto')=>({version:intentVersion,action,parameters,binding,presentation:{format,detail:'normal'}});
 const keep={mode:'continue',conditions:'merge_ui'};
@@ -71,6 +72,13 @@ test('provider exceptions and malformed replies expose only fixed codes; neither
  for(const value of ['throw','malformed','conflict']){
   const h=harness();h.reply=async()=>{if(value==='throw')throw Error('private-provider-dump');if(value==='conflict')return {relevance:'unrelated',intent:read('октябрь 2025')};return {relevance:'financial',intent:{sql:'private-sql-dump'}};};
   const env=h.env('октябрь 2025'),r=await h.session.run(env,h.provider,h.services);assert.equal(r.status,'failed');assert.equal(h.reads,0);assert.ok(!JSON.stringify(r).includes('private-'));await h.session.run(env,h.provider,h.services);assert.equal(h.calls,1);assert.equal(h.session.snapshot().history.length,0);
+ }
+});
+test('recognized delivery and monetary holds retain actionable codes, while arbitrary error text stays private',async()=>{
+ for(const code of ['ASSISTANT_DELIVERY_UNKNOWN','AI_COST_RECONCILIATION_REQUIRED','AI_PROJECT_COST_EXHAUSTED','ASSISTANT_TARIFF_STALE','PRIVATE_PROVIDER_DUMP']){
+  const h=harness();h.reply=async()=>{throw new AssistantError(code);};const env=h.env('октябрь 2025');
+  const result=await h.session.run(env,h.provider,h.services);assert.equal(result.status,'failed');if(result.status==='failed')assert.equal(result.code,code.startsWith('PRIVATE_')?'PROVIDER_FAILED':code);
+  await h.session.run(env,h.provider,h.services);assert.equal(h.calls,1);assert.equal(h.reads,0);assert.equal(h.session.snapshot().history.length,0);
  }
 });
 test('semantic rejection blocks structurally valid intent before financial reads',async()=>{

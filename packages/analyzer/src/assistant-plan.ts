@@ -24,6 +24,8 @@ import { object, dateFact } from '../../finance-core/src/model.ts';
 import { parseOperationsFilter } from '../../finance-core/src/operations.ts';
 import type { OperationsFilter } from '../../finance-core/src/operations.ts';
 import { sanitizeText, safeText } from '../../privacy/src/text.ts';
+import { AssistantError } from './assistant-error.ts';
+export { AssistantError } from './assistant-error.ts';
 
 export const assistantVersion = 'cashneuro-assistant-plan/7';
 export const assistantGrouping:Record<typeof queryGroupings[number],string> = {none:'total',category:'category_totals',operation:'operation_list',time:'time',subcategory:'subcategory',account:'account',bank:'bank',counterparty:'counterparty',merchant:'merchant',kind:'kind',role:'role'};
@@ -65,10 +67,6 @@ export const assistantPlanSchema = closed({
 export const reportRequestSchema=buildReportSchema(assistantPlanSchema.properties);
 Object.assign(assistantPlanSchema.properties,{report:reportRequestSchema});
 
-export class AssistantError extends TypeError {
-  readonly code: string;
-  constructor(code: string) { super(code); this.code = code; }
-}
 export type Calendar = { timezone: string; currentDate: string };
 export function profileCalendar(now: Date, timezone: string): Calendar {
   try {

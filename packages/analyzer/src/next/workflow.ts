@@ -7,6 +7,7 @@ import {parseIntent} from './intent.ts';
 import {recoverLoanGraphFrame} from './source-intent.ts';
 import type {Intent} from './intent.ts';
 import {safeText} from '../../../privacy/src/text.ts';
+import {AssistantError} from '../assistant-error.ts';
 import {object,choice,uuid} from '../../../finance-core/src/model.ts';
 import {emptyTaskBook,globalSnapshot,parseTaskBook} from '../task-context.ts';
 import type {TaskScope} from '../task-context.ts';
@@ -44,6 +45,7 @@ function parseUnderstanding(raw:unknown,state:State,question:string):Understandi
 }
 function safeCode(error:unknown,fallback:string):string{
  if(error instanceof WorkflowError||error instanceof PreparationError)return /^[A-Z][A-Z_]{0,79}$/.test(error.code)?error.code:fallback;
+ if(error instanceof AssistantError&&['ASSISTANT_DELIVERY_UNKNOWN','ASSISTANT_PROVIDER_CHANGED','ASSISTANT_REQUEST_CHANGED','ASSISTANT_CALL_LIMIT','ASSISTANT_BUDGET_EXHAUSTED','ASSISTANT_RECONCILIATION_REQUIRED','ASSISTANT_TARIFF_STALE','ASSISTANT_MODEL_CHANGED','ASSISTANT_MONTHLY_PERIOD_CHANGED','AI_COST_RECONCILIATION_REQUIRED','AI_DELIVERY_UNKNOWN','AI_USER_COST_EXHAUSTED','AI_PROJECT_COST_EXHAUSTED','AI_PROVIDER_CONTRACT_CHANGED','AI_PROJECT_BUDGET_CHANGED','AI_REQUEST_CHANGED','AI_STATE_CHANGED','AI_CONTEXT_CHANGED','AI_REQUEST_CANCELLED','AI_QUOTA_PERIOD_CHANGED'].includes(error.code))return error.code;
  if(error instanceof TypeError&&['UNSANITIZED_TEXT','INTENT_PROTOTYPE_INVALID','TASK_EVIDENCE_MISSING'].includes(error.message))return error.message;
  return fallback; // Never return provider/DB exception text, prompts or identifiers.
 }

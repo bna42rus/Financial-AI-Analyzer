@@ -21,16 +21,12 @@ import { prepareFinance } from './finance.ts';
 import { analyzerCycle, analyzerQuota, calculateAnalyzerQuery } from './analyzer.ts';
 import { assertReferences,operationsDataset } from './operations.ts';
 import { yandexCatalog } from './yandex-runtime.ts';
-import { reserveCost, settleCost } from './analyzer-cost.ts';
+import {reserveAssistantCall,settleAssistantCall} from './assistant-db-accounting.ts';
 import { stableJSON } from './finance-history.ts';
 import { HttpError } from './types.ts';
 
 type Authorize = (db: PoolClient) => Promise<void>;
 type Claim = { input: AssistantRequest; expected: ExpectedAssistantState; state: 'pending' | 'completed' | 'cancelled'; reply: unknown; anchorExact: string; periodExact: string };
-const step = (i: number): 'assistant_0' | 'assistant_1' | 'assistant_2' => {
-  if (!Number.isInteger(i) || i < 0 || i > 2) throw new AssistantError('ASSISTANT_CALL_LIMIT');
-  return `assistant_${i}` as ReturnType<typeof step>;
-};
 const integer = (v: unknown) => { if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0) throw new TypeError('TASK_REVISION_INVALID'); return v; };
 
 export {financeProfile as assistantProfile} from './finance-profile.ts';
@@ -138,30 +134,13 @@ export async function executeAssistant(pool: Pool, userId: string, value: unknow
       async reserve(index, bound) {
         await within(async db => {
           await guard(db);
-          await db.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', ['cloud-task-dispatch:' + userId]);
-          if ((await db.query('SELECT 1 FROM commerce.analyzer_request WHERE user_id=$1 AND request_id=$2 AND step=$3', [userId, id, step(index)])).rowCount) throw new HttpError(409, 'AI_DELIVERY_UNKNOWN');
-          if ((await db.query("SELECT 1 FROM commerce.analyzer_request r WHERE r.user_id=$1 AND (r.state='sent' OR r.usage_state='unknown') AND NOT (r.state='failed' AND EXISTS (SELECT 1 FROM commerce.ai_cost_reservation c WHERE c.user_id=r.user_id AND c.request_id=r.request_id AND c.step=r.step AND c.state='released' AND c.settled_atoms=0 AND c.reported_input_tokens IS NULL AND c.reported_output_tokens IS NULL)) LIMIT 1", [userId])).rowCount) throw new HttpError(409, 'AI_COST_RECONCILIATION_REQUIRED');
-          await db.query(`INSERT INTO commerce.analyzer_request(user_id,request_id,step,fingerprint,state,provider,model,period_start,anchor_at,usage_state)
-            VALUES($1,$2,$3,$4,'sent','cashneuro-assistant/1',$5,$6,$7,'not_sent')`, [userId, id, step(index), fingerprint, bound.modelVersion, claim.periodExact, claim.anchorExact]);
-          const policy = provider.policy;
-          await provider.prepareDispatch?.(db, policy);
-          // The owner's monthly Staging money authorization is distinct from
-          // the customer's paid allowance. Keep request journal keys intact;
-          // only new monetary reservations use the authorized calendar month.
-          const costAnchor = provider.costPeriod === 'project' ? policy.projectPeriodStart : claim.anchorExact;
-          const costPeriod = provider.costPeriod === 'project' ? policy.projectPeriodStart : claim.periodExact;
-          await reserveCost(db, { userId, requestId: id, step: step(index), anchorAt: costAnchor, periodStart: costPeriod }, policy, bound);
-          await provider.authorizeDispatch(db, policy);
+          await reserveAssistantCall(db,userId,id,index,fingerprint,bound,claim,provider);
         });
       },
       async settle(index, usage) {
         // Actual cost is settled even after cancellation, deletion or expiry.
         const violation = await within(async db => {
-          const changed = await settleCost(db, userId, id, step(index), usage);
-          await db.query(`UPDATE commerce.analyzer_request SET state=CASE WHEN $4='received' AND NOT EXISTS(SELECT 1 FROM finance.analyzer_task_request WHERE user_id=$1 AND id=$2 AND state='pending') THEN 'completed' ELSE $4 END,usage_state=$5,input_tokens=$6,output_tokens=$7,model_version=$8,updated_at=clock_timestamp()
-            WHERE user_id=$1 AND request_id=$2 AND step=$3 AND state IN ('sent','received','unknown')`,
-          [userId, id, step(index), usage ? 'received' : 'unknown', usage ? 'reported' : 'unknown', usage?.inputTokens ?? null, usage?.outputTokens ?? null, usage?.modelVersion ?? null]);
-          return changed;
+          return settleAssistantCall(db,userId,id,index,usage);
         });
         if (violation) throw new AssistantError('ASSISTANT_PROVIDER_CHANGED');
       },
